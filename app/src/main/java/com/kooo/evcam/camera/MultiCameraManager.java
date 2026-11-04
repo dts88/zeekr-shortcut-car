@@ -163,6 +163,11 @@ public class MultiCameraManager {
      * 下一次开录计划和源尺寸都一样就沿用；它的录像输出离开了会话（被摘掉、随相机关了）才放。
      */
     private final Map<String, Slot> slots = new HashMap<>();
+    /**
+     * 熄屏后的帧率（fps；0 = 照视频流配置）：相机管家定的（{@link CameraKeeper}，规矩在 {@link ChannelRules#darkFps}），
+     * 这里只交给各路录制器（{@link #setDarkFps}）。新建的录制器建的时候套上（{@link #lanePrep} 上读）。
+     */
+    private volatile int darkFps;
     /** 在 {@link #lanePrep} 上建着录制器的那几路，带着这一次建的号（主线程）：停录时清掉，建好回来对不上就放掉。 */
     private final Map<String, Integer> building = new HashMap<>();
     private int buildSerial;
@@ -1095,6 +1100,8 @@ public class MultiCameraManager {
         Slot slot = new Slot(key, camera, recorder, tag, plan, source, texture, surface);
         slot.reuseNotedGen = recordGeneration;
         slots.put(key, slot);
+        // 建的这一阵相机管家换过熄屏后的帧率的话，这里补上：下一个编码器起照它
+        recorder.setDarkFps(darkFps, false);
         camera.declareRecord(texture, surface, why -> onRecordOutputDropped(slot, why));
         noteRecorderBuilt(laneName(key), source.getWidth(), source.getHeight(), ms, "");
         channel.wake();
@@ -1736,6 +1743,19 @@ public class MultiCameraManager {
             if (media.phase == MediaPhase.RUNNING) {
                 media.recorder.switchNow();
             }
+        }
+    }
+
+    /**
+     * 相机管家定的熄屏后的帧率（主线程，项目所有者 2026-11-04）：交给每一路录制器，从它的下一个编码器起按它录；
+     * {@code cutNow}：在录的那几路马上切一段换上（{@link CodecVideoRecorder#setDarkFps}）。什么时候换、换成多少都是管家定的，这里只照做。
+     * 还在建的那一路建的时候已经读过，建好挂上时再交一次（{@link #recorderBuilt}）。MediaRecorder 那条路不节流：选了熄屏后的帧率时
+     * 录制走 MediaCodec（{@code AppConfig.shouldUseCodecRecording}）。
+     */
+    public void setDarkFps(int fps, boolean cutNow) {
+        darkFps = fps;
+        for (Slot slot : slots.values()) {
+            slot.recorder.setDarkFps(fps, cutNow && slot.phase == SlotPhase.RUNNING);
         }
     }
 
@@ -4606,6 +4626,8 @@ public class MultiCameraManager {
         });
         codecRecorder.setSegmentDuration(segmentDurationMs);
         codecRecorder.setFrameRate(targetFrameRate, frameRateCap);
+        // 熄屏后的帧率（相机管家定的）：第一个编码器就照它
+        codecRecorder.setDarkFps(darkFps, false);
         // 跟随这一路配置里的码率等级。写死一档的话那个选项就是个摆设。
         // 码率本身由录制器按这一档和编码尺寸算（见 TargetBitrate）——
         // 这里不再算第二遍：以前算了，然后那个数在默认路径上被丢掉。

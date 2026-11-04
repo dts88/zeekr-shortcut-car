@@ -115,6 +115,17 @@ public final class SettingsRegistry {
                     R.string.set_footage_audio_source_call));
 
     /**
+     * 熄屏后的帧率（录制 →「熄屏持续录制」的下一层，项目所有者 2026-11-04）：熄屏后只录环视时按它录，亮屏或开车时恢复视频流配置的帧率
+     * （判断在相机管家，{@code camera.ChannelRules.darkFps}）。存的就是帧率（fps），{@code follow} = 跟随视频流配置（默认，和以前一样）。
+     * 只有 10、3 两档（项目所有者：不要 1 fps）。
+     */
+    public static final SettingSpec SCREEN_OFF_FPS = SettingSpec.of(
+            "screen_off_fps", "熄屏后的帧率", com.kooo.evcam.AppConfig.SCREEN_OFF_FPS_FOLLOW,
+            entry(com.kooo.evcam.AppConfig.SCREEN_OFF_FPS_FOLLOW, "跟随视频流配置", R.string.opt_screen_off_fps_follow),
+            entry("10", "10 fps"),
+            entry("3", "3 fps"));
+
+    /**
      * 模拟声浪自己的音量（设置 → 系统「模拟声浪」页，试验性；{@code sound.DriveSound}）：在车机媒体音量之上再乘这么多。
      * 存的就是 dB 数，界面上显示的也是它 —— 显示的就是实际用的增益。项目所有者 2026-10-21 实车：−12 dB 太小，平时用 0 dB，
      * 最低 −6 dB 就够；默认 0 dB（以前存的 −18、−12 不在单子里，读出来按默认）。
@@ -209,6 +220,7 @@ public final class SettingsRegistry {
             REARVIEW_VIEWS,
             SIDE_VIEW_TARGET,
             FOOTAGE_AUDIO_SOURCE,
+            SCREEN_OFF_FPS,
             DRIVE_SOUND_VOLUME,
             DRIVE_SOUND_RPM,
             DRIVE_SOUND_GEARBOX,

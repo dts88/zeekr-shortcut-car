@@ -66,10 +66,12 @@
                 android:title="@string/set_auto_record_title"
                 android:summary="@string/set_auto_record_summary" />
 
-            <!-- 熄屏后还录不录：2026-10-19 起从「系统」挪到这里，和「启动自动录制」一组（项目所有者定；规格 lifecycle-spec 开头） -->
-            <SwitchPreferenceCompat
+            <!--
+              熄屏后还录不录：2026-10-19 起从「系统」挪到这里，和「启动自动录制」一组（项目所有者定；规格 lifecycle-spec 开头）。
+              2026-11-04 起开关加下一层（项目所有者）：行尾写熄屏后的帧率、下面一行是哨兵模式此刻开没开，点这一行选帧率
+            -->
+            <com.kooo.evcam.settings.SwitchNavPreference
                 android:key="pref_screen_off_keep_recording"
-                android:defaultValue="true"
                 android:title="@string/set_screen_off_keep_title"
                 android:summary="@string/set_screen_off_keep_summary" />
         </PreferenceCategory>

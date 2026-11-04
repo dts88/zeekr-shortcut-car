@@ -201,6 +201,22 @@ public final class RecordSpecs {
         return explicit(fps, hardwareMaxFps);
     }
 
+    /**
+     * 套上熄屏后的帧率（相机管家定的，项目所有者 2026-11-04）之后的标称帧率：{@code darkFps} 大于 0 时取它和视频流配置里低的那个
+     * （配置本来更低的，熄屏后不会反而升高）；0 = 照配置。
+     */
+    public static int limitedFps(int nominal, int darkFps) {
+        return darkFps > 0 ? Math.min(nominal, darkFps) : nominal;
+    }
+
+    /** 同上，渲染节流的上限：配置不节流（{@link #FPS_UNLIMITED}）时就是熄屏后的帧率。 */
+    public static int limitedCap(int cap, int darkFps) {
+        if (darkFps <= 0) {
+            return cap;
+        }
+        return cap == FPS_UNLIMITED ? darkFps : Math.min(cap, darkFps);
+    }
+
     private static int explicit(String fps, int hardwareMaxFps) {
         try {
             return Math.max(5, Math.min(hardwareMaxFps, Integer.parseInt(fps)));

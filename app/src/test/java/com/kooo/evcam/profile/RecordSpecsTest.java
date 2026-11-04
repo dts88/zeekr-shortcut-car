@@ -115,4 +115,19 @@ public class RecordSpecsTest {
         assertEquals(new LinkedHashSet<>(Arrays.asList(CameraSlots.KEY_CABIN_FRONT, CameraSlots.KEY_CABIN_REAR)),
                 RecordSpecs.enabledCameraKeys(profile));
     }
+
+    /** 熄屏后的帧率只往下压：视频流配置本来更低的照低的，0 = 照配置；配置不节流时上限就是熄屏后的帧率。 */
+    @Test
+    public void darkFpsNeverRaisesTheProfileRate() {
+        assertEquals(25, RecordSpecs.limitedFps(25, 0));
+        assertEquals(10, RecordSpecs.limitedFps(25, 10));
+        assertEquals(3, RecordSpecs.limitedFps(20, 3));
+        assertEquals(5, RecordSpecs.limitedFps(5, 10));
+
+        assertEquals(RecordSpecs.FPS_UNLIMITED, RecordSpecs.limitedCap(RecordSpecs.FPS_UNLIMITED, 0));
+        assertEquals(20, RecordSpecs.limitedCap(20, 0));
+        assertEquals(3, RecordSpecs.limitedCap(RecordSpecs.FPS_UNLIMITED, 3));
+        assertEquals(10, RecordSpecs.limitedCap(20, 10));
+        assertEquals(5, RecordSpecs.limitedCap(5, 10));
+    }
 }

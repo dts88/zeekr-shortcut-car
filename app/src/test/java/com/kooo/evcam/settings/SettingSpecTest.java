@@ -217,4 +217,17 @@ public class SettingSpecTest {
                     asRead, spec.valueAt(index));
         }
     }
+
+    /** 熄屏后的帧率：默认跟随视频流配置，只有 10、3 两档（项目所有者 2026-11-04），别的值都是帧率数（AppConfig.getScreenOffFps 照它解）。 */
+    @Test
+    public void screenOffFpsIsFollowOrAFrameRate() {
+        SettingSpec spec = SettingsRegistry.SCREEN_OFF_FPS;
+        assertEquals(com.kooo.evcam.AppConfig.SCREEN_OFF_FPS_FOLLOW, spec.defaultValue);
+        assertArrayEquals(new String[]{com.kooo.evcam.AppConfig.SCREEN_OFF_FPS_FOLLOW, "10", "3"}, spec.values());
+        for (String value : spec.values()) {
+            if (!com.kooo.evcam.AppConfig.SCREEN_OFF_FPS_FOLLOW.equals(value)) {
+                assertTrue(value, Integer.parseInt(value) > 0);
+            }
+        }
+    }
 }

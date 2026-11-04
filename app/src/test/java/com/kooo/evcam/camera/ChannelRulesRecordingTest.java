@@ -171,4 +171,29 @@ public class ChannelRulesRecordingTest {
     public void aStartInTheDarkWaitsForTheScreen() {
         assertFalse(ChannelRules.autoStartMoment(false, true, true));
     }
+
+    // ------------------------------------------------------------------ 熄屏后的帧率（项目所有者 2026-11-04）
+
+    /** 只在环视留着只录像时（通道的熄屏决定是 KEPT）按选的帧率；亮着、在开车、放开了，一律照视频流配置。 */
+    @Test
+    public void darkFpsOnlyWhileTheSurroundIsKeptInTheDark() {
+        assertEquals(3, ChannelRules.darkFps(ChannelRules.SurroundInDark.KEPT, 3));
+        assertEquals(10, ChannelRules.darkFps(ChannelRules.SurroundInDark.KEPT, 10));
+        assertEquals("跟随视频流配置", 0, ChannelRules.darkFps(ChannelRules.SurroundInDark.KEPT, 0));
+        assertEquals("亮着、黑了不到 30 秒、在开车", 0, ChannelRules.darkFps(ChannelRules.SurroundInDark.LIT, 3));
+        assertEquals("放开了（录像也停）", 0, ChannelRules.darkFps(ChannelRules.SurroundInDark.RELEASED, 3));
+    }
+
+    /** 降下来从下一段起（换段本来就换编码器），升回去马上切一段（人回到车上了）；0 = 视频流配置，算最高。 */
+    @Test
+    public void darkFpsGoesDownAtTheNextSegmentAndBackUpAtOnce() {
+        assertEquals(ChannelRules.FpsChange.NONE, ChannelRules.darkFpsChange(0, 0));
+        assertEquals(ChannelRules.FpsChange.NONE, ChannelRules.darkFpsChange(3, 3));
+        assertEquals(ChannelRules.FpsChange.NEXT_SEGMENT, ChannelRules.darkFpsChange(0, 3));
+        assertEquals(ChannelRules.FpsChange.NEXT_SEGMENT, ChannelRules.darkFpsChange(0, 10));
+        assertEquals(ChannelRules.FpsChange.NEXT_SEGMENT, ChannelRules.darkFpsChange(10, 3));
+        assertEquals(ChannelRules.FpsChange.CUT_NOW, ChannelRules.darkFpsChange(3, 0));
+        assertEquals(ChannelRules.FpsChange.CUT_NOW, ChannelRules.darkFpsChange(10, 0));
+        assertEquals(ChannelRules.FpsChange.CUT_NOW, ChannelRules.darkFpsChange(3, 10));
+    }
 }

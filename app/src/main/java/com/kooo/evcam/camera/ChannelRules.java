@@ -1233,6 +1233,43 @@ public final class ChannelRules {
         return surroundKept(w) ? SurroundInDark.KEPT : SurroundInDark.RELEASED;
     }
 
+    // ================================================================= 熄屏后的帧率（项目所有者 2026-11-04）
+
+    /**
+     * 这一次录像此刻该按什么帧率录（「熄屏持续录制」的下一层「熄屏后的帧率」）：通道对环视的熄屏决定是留着
+     * （{@link SurroundInDark#KEPT}：熄屏满 30 秒、没在开车、哨兵模式开或布防、「熄屏持续录制」开着，环视只录像）时，
+     * 用设置里选的那一档；别的时候 0 —— 照视频流配置（项目所有者：正常录制时仍然跟随录制配置）。
+     * 视频流配置本来更低的，录制器建编码器时照低的（{@code RecordSpecs.limitedFps}）。
+     *
+     * @param chosen 设置里选的帧率（fps）；0 = 跟随视频流配置
+     */
+    static int darkFps(SurroundInDark verdict, int chosen) {
+        return verdict == SurroundInDark.KEPT && chosen > 0 ? chosen : 0;
+    }
+
+    /** 录像的帧率怎么换上（{@link #darkFpsChange}）。 */
+    enum FpsChange {
+        /** 没变。 */
+        NONE,
+        /** 从下一段起：换段本来就要换编码器，帧率、码率在那时一起换，不多切一段。 */
+        NEXT_SEGMENT,
+        /** 马上切一段换上（和分段计时到点切的是同一步）。 */
+        CUT_NOW
+    }
+
+    /**
+     * 录像的帧率从 {@code from} 换到 {@code to}（fps；0 = 照视频流配置，算最高）怎么换（项目所有者 2026-11-04，以系统稳定为主）：
+     * 降下来从下一段起（最多晚一段，这时车边一般没人，也不多换一次编码器）；升回去马上切一段 —— 亮屏、开车正是人回到车上的时候，
+     * 不能让这一段剩下的时间还是低帧率。
+     */
+    static FpsChange darkFpsChange(int from, int to) {
+        if (from == to) {
+            return FpsChange.NONE;
+        }
+        boolean lower = to > 0 && (from == 0 || to < from);
+        return lower ? FpsChange.NEXT_SEGMENT : FpsChange.CUT_NOW;
+    }
+
     // ================================================================= 录像（相机管家，项目所有者 2026-11-03：录像协调器抹掉，规矩和相机的放在一起）
 
     /**

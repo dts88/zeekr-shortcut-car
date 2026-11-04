@@ -13,7 +13,8 @@ import com.kooo.evcam.R;
 
 /**
  * 开关加下一层（ui-spec §三，项目所有者 2026-10-23）：一个功能既要开关、又要到下一层去填写或选择时，合成一行 ——
- * 车牌号水印（下一层是输入车牌号）、行驶信息条（下一层是「车辆信号」里选显示哪些信号）。
+ * 车牌号水印（下一层是输入车牌号）、行驶信息条（下一层是「车辆信号」里选显示哪些信号）、熄屏持续录制（下一层是熄屏后的帧率，
+ * 行尾的值下面另有一行哨兵模式此刻的状态，{@link #showSentryStatus}）。
  *
  * <p>行首的开关只管开关；点这一行其余的地方不切换开关，交给 {@code OnPreferenceClickListener} 进下一层；
  * 行尾写当前值（{@link #setValue}）再加 ›。和安卓系统设置里 Wi-Fi、蓝牙那一行是同一种，开关照车机放在行首。</p>
@@ -30,6 +31,14 @@ public class SwitchNavPreference extends SwitchPreferenceCompat implements Prefe
         super(context, attrs);
         setLayoutResource(R.layout.pref_row_switch_nav);
         setWidgetLayoutResource(R.layout.pref_widget_switch);
+    }
+
+    /**
+     * 行尾的当前值下面多一行哨兵模式此刻的状态（{@code pref_row_switch_nav_sentry}，{@code ui.SentryStatusView} 自己读、自己换字）：
+     * 开关的效果要看哨兵模式的那一行用（熄屏持续录制）。要在这一行交给列表之前叫（列表按布局分视图类型）。
+     */
+    public void showSentryStatus() {
+        setLayoutResource(R.layout.pref_row_switch_nav_sentry);
     }
 
     /** 行尾的当前值（车牌号、选了几项）；空就只有 ›。 */

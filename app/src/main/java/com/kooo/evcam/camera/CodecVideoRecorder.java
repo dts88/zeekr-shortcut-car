@@ -85,6 +85,13 @@ public class CodecVideoRecorder {
 
     /** 渲染节流上限；0 = 不限制。和 {@link #frameRate}（标称值）不是同一件事。 */
     private int frameRateCap;
+    /**
+     * 熄屏后的帧率（fps；0 = 照视频流配置）：相机管家定的、经相机层交过来（{@link #setDarkFps}），建编码器时套上（{@link #createEncoder}）。
+     * {@link #frameRate}、{@link #frameRateCap} 照旧是视频流配置里的。
+     */
+    private volatile int darkFps;
+    /** 这一代编码器建的时候套的熄屏后的帧率：渲染节流照它（{@link #applyEncoderFrameRate}），马上切一段时看换没换。 */
+    private volatile int encoderDarkFps;
     
     // 自适应 drain 间隔控制（优化版 - 减少CPU占用）
     private volatile long currentDrainIntervalMs = 20;  // 当前 drain 间隔（毫秒）- 提高到20ms减少CPU占用
@@ -174,8 +181,11 @@ public class CodecVideoRecorder {
     private String encoderSpecLine = "";
     private String specSizeText = "";
     private String specCodecText = "";
-    /** 设置里选的那个帧率。它是<b>上限</b>，不是结果。 */
-    private int nominalFrameRate;
+    /**
+     * 这一代编码器的标称帧率：视频流配置里选的那个，熄屏后的帧率更低时是它（{@link #createEncoder}）。它是<b>上限</b>，不是结果。
+     * 写入线程的时间戳兜底也读它（{@link #ptsStepUs}）。
+     */
+    private volatile int nominalFrameRate;
     /** 实测帧率：已写帧数 / 时间戳跨度。0 表示还没测出来。 */
     private int measuredFrameRate;
 
@@ -588,13 +598,33 @@ public class CodecVideoRecorder {
     }
 
     /**
-     * 标称帧率对应的时间戳步长（微秒）。
+     * 熄屏后的帧率（相机管家定的，项目所有者 2026-11-04）：大于 0 时，之后建的编码器按它和视频流配置里低的那个录 ——
+     * 标称帧率、码率、渲染节流三处照同一个数（{@link #createEncoder}）；0 = 照视频流配置。编码器每一段换一个，所以录着像时是下一段起换上。
+     * {@code cutNow}：在录、这一代编码器套的不是它，就马上切一段换上（编码线程上，和分段计时到点切的是同一个 {@link #switchToNextSegment}）。
+     * 只照做：什么时候换、换成多少都是管家定的。
+     */
+    public void setDarkFps(int fps, boolean cutNow) {
+        darkFps = Math.max(0, fps);
+        Handler encoderLooper = encoderHandler;
+        if (!cutNow || encoderLooper == null) {
+            return;
+        }
+        encoderLooper.post(() -> {
+            if (isRecording.get() && encoderDarkFps != darkFps) {
+                AppLog.d(TAG, "Camera " + cameraId + " frame rate changes now, switching to a new segment");
+                StallWatch.runTask(encoderBeat, cameraId, "frame-rate-switch", this::switchToNextSegment);
+            }
+        });
+    }
+
+    /**
+     * 这一代编码器的标称帧率对应的时间戳步长（微秒）。
      *
      * <p>只在 {@link #nextPtsUs(long, boolean)} 的兜底分支里用到 —— 正常情况下时间戳来自
      * 编码器，不需要这个值。</p>
      */
     private long ptsStepUs() {
-        int fps = frameRate;
+        int fps = nominalFrameRate > 0 ? nominalFrameRate : frameRate;
         if (fps <= 0) {
             fps = 25;  // 兜底，与历史行为一致
         }
@@ -659,8 +689,8 @@ public class CodecVideoRecorder {
         if (encoder == null) {
             return;  // 还没创建，创建时会再套用一次
         }
-        // 节流用上限（可以是 0 = 不限制），不是标称值
-        encoder.setFrameRate(frameRateCap);
+        // 节流用上限（可以是 0 = 不限制），不是标称值；熄屏后的帧率照这一代编码器套的那个（createEncoder）
+        encoder.setFrameRate(com.kooo.evcam.profile.RecordSpecs.limitedCap(frameRateCap, encoderDarkFps));
     }
 
     /**
@@ -1765,12 +1795,15 @@ public class CodecVideoRecorder {
         // 检测并选择最优编码格式（forceH264 开启时固定 H.264）
         mimeType = selectBestEncoder();
 
-        int effectiveFrameRate = frameRate;
+        // 熄屏后的帧率（相机管家定的，setDarkFps）在建编码器时套上：标称帧率、码率、渲染节流照同一个数。
+        // 建成了才记成这一代的（下面），中途出错的话节流还是上一代的那个
+        int dark = darkFps;
+        int effectiveFrameRate = com.kooo.evcam.profile.RecordSpecs.limitedFps(frameRate, dark);
 
         // 码率只有一条公式（TargetBitrate），两种编码都走它 —— 它自己知道 H.264
         // 要的比 HEVC 多。以前兼容模式走另一条公式，于是「强制 H.264」这个为了
         // 兼容而存在的开关，反而成了码率最高、画质最好的那条路。
-        int effectiveBitrate = calculateOptimalBitrate();
+        int effectiveBitrate = calculateOptimalBitrate(effectiveFrameRate);
         // 写入排队的字节上限跟着这个码率走（SampleRing.queueBytesFor）
         ring.setQueueCapBytes(SampleRing.queueBytesFor(effectiveBitrate));
 
@@ -1816,10 +1849,23 @@ public class CodecVideoRecorder {
         // 同一批数字也送给角标第二行
         specSizeText = width + "x" + height;
         specCodecText = mimeType.equals(MIME_TYPE_HEVC) ? "H.265" : "H.264";
-        nominalFrameRate = effectiveFrameRate;
-        // 实测值不清零：换分段会重建编码器，而相机的出帧率不会因此改变。
+        // 实测值平常不清零：换分段会重建编码器，而相机的出帧率不会因此改变。
         // 清零的话每段开头都要重新等一秒，角标先闪回「~标称值」再跳回来。
+        // 只有帧率换了（进出熄屏后的帧率）才清：旧的实测值对这一段不成立
+        if (effectiveFrameRate != nominalFrameRate) {
+            measuredFrameRate = 0;
+        }
+        nominalFrameRate = effectiveFrameRate;
         rebuildSpecLine();
+        int previousDark = encoderDarkFps;
+        encoderDarkFps = dark;
+        if (dark != previousDark) {
+            // 渲染节流跟着换（准备时 EGL 还没建，建好时它自己套一次）
+            applyEncoderFrameRate();
+            com.kooo.evcam.blackbox.BlackBox.note("录像（相机 " + cameraId + "）：这一段起"
+                    + (dark > 0 ? "按熄屏后的帧率录：" : "恢复视频流配置的帧率：")
+                    + effectiveFrameRate + " fps、" + TargetBitrate.format(effectiveBitrate));
+        }
     }
 
     /**
@@ -1946,9 +1992,12 @@ public class CodecVideoRecorder {
         return MediaCodec.createEncoderByType(mimeType);
     }
 
-    /** 公式在 {@link TargetBitrate} 里，设置界面显示的也是它算出来的同一个数。 */
-    private int calculateOptimalBitrate() {
-        return TargetBitrate.compute(qualityLevel, width, height, frameRate,
+    /**
+     * 公式在 {@link TargetBitrate} 里，设置界面显示的也是它算出来的同一个数（按视频流配置的帧率；
+     * 熄屏后的帧率按套上之后的帧率算，帧率低了码率跟着低）。
+     */
+    private int calculateOptimalBitrate(int fps) {
+        return TargetBitrate.compute(qualityLevel, width, height, fps,
                 mimeType.equals(MIME_TYPE_HEVC));
     }
 

@@ -56,6 +56,8 @@ import java.util.Set;
  *       停放的录制器留在会话里，接回时直接加入；接回被拒（等 U 盘）、不接了就放。</li>
  *   <li><b>熄屏</b>：停不停、黑着能不能开，照相机管家的规矩（{@link ChannelRules#recordInDark}、{@link ChannelRules#startsInDark}）：
  *       通道算黑时判了停就停（相机先封好文件再关）；熄屏中哨兵模式变成开、通道留下了环视，「这一趟要录」立着就接着录（只录环视）。</li>
+ *   <li><b>熄屏后的帧率</b>（项目所有者 2026-11-04）：环视留着只录像时按设置里选的帧率录，降下来从下一段起、亮屏或开车马上切一段恢复
+ *       （{@link ChannelRules#darkFps}、{@link ChannelRules#darkFpsChange}）。开录时、通道的熄屏决定变了时这里定，相机层、录制器照做。</li>
  *   <li><b>这一趟</b>（{@link Trip}）：车机真正开机、人点开主界面起，到退出。「这一趟要录」落盘，进程被车机结束后又起来，照它接着录。</li>
  *   <li>后台开录而现在用不了相机（安卓 12 的限制）、屏幕亮着：把主界面拉起来（{@link Recovery#bringUpMainForRecording}）。</li>
  * </ul>
@@ -191,6 +193,11 @@ public final class CameraKeeper {
     private boolean slowWriteNoticedThisRecording;
     /** 这一次因熄屏停的录像亮屏接不接：停的那一刻照规矩定（{@link #stopForScreenOff}），{@link #settleWanted} 照它留不留「这一趟要录」。 */
     private boolean screenOffResumes;
+    /**
+     * 熄屏后的帧率：最后定下的那一个（fps；0 = 照视频流配置）。开录时照此刻的定一次、交给相机层（{@link #startWith}），
+     * 通道对环视的熄屏决定变了时跟着换（{@link #followDarkFps}）。
+     */
+    private int darkFps;
 
     private CameraKeeper(Context context) {
         this.context = context.getApplicationContext();
@@ -930,7 +937,7 @@ public final class CameraKeeper {
      * 调度对熄屏录像的决定变了（调度在一轮当中叫，排到主线程上做；做的时候读此刻的决定，多做一次无害）—— 照
      * {@link ChannelRules#onRecordVerdict}：黑着、在录（含等开录、等自动接回）而判了停 → 熄屏停；黑着、没在录，熄屏中哨兵模式变成开
      * 让通道留下了环视 →「这一趟要录」立着就接着录，只录环视。现在用不了相机（前台服务是后台起的）就不开、写一行，亮屏再接。
-     * 屏幕不知道黑没黑时排到知道了再做。
+     * 之后熄屏后的帧率跟着换（{@link #followDarkFps}：停了的不切）。屏幕不知道黑没黑时排到知道了再做。
      */
     private void onChannelVerdict() {
         if (!ScreenState.known()) {
@@ -954,6 +961,34 @@ public final class CameraKeeper {
             default:
                 break;
         }
+        followDarkFps();
+    }
+
+    /** 熄屏后的帧率此刻该是多少（{@link ChannelRules#darkFps}：通道对环视的熄屏决定，加上设置里选的那一档）。 */
+    private int darkFpsNow() {
+        return ChannelRules.darkFps(ChannelScheduler.surroundVerdict(), appConfig.getScreenOffFps());
+    }
+
+    /**
+     * 通道对环视的熄屏决定变了（{@link #onChannelVerdict}，停录、开录那一步之后）：熄屏后的帧率要换，在录就交给相机层 ——
+     * 降下来从下一段起、升回去马上切一段（{@link ChannelRules#darkFpsChange}）。刚判了停的（哨兵模式关了、车机要睡）已经不在录，
+     * 不交、不切；没在录的开录时再定（{@link #startWith}）。
+     */
+    private void followDarkFps() {
+        int target = darkFpsNow();
+        ChannelRules.FpsChange change = ChannelRules.darkFpsChange(darkFps, target);
+        if (change == ChannelRules.FpsChange.NONE) {
+            return;
+        }
+        darkFps = target;
+        if (!isRecording() || attemptManager == null || attemptManager.isReleased()) {
+            return;
+        }
+        boolean cut = change == ChannelRules.FpsChange.CUT_NOW;
+        attemptManager.setDarkFps(target, cut);
+        BlackBox.noteImportant("录像：通道对环视的熄屏决定是 " + ChannelScheduler.surroundVerdict() + "，"
+                + (cut ? "马上切一段，按" : "从下一段起按")
+                + (target > 0 ? "「熄屏后的帧率」" + target + " fps（视频流配置更低的照低的）" : "视频流配置的帧率") + "录");
     }
 
     /**
@@ -1074,6 +1109,12 @@ public final class CameraKeeper {
         CameraNeeds.current().claim(CameraNeeds.Holder.RECORDING);
         // 在录就立着「这一趟要录」：录着的进程被结束了要接得回来
         noteWanted(true, why.name());
+        // 熄屏后的帧率照此刻定好交给相机层，各路第一段就按它录（熄屏中哨兵模式变成开、接着录环视的那一种是 fps 大于 0）
+        darkFps = darkFpsNow();
+        manager.setDarkFps(darkFps, false);
+        if (darkFps > 0) {
+            BlackBox.noteImportant("录像：环视留着只录像，按「熄屏后的帧率」" + darkFps + " fps 录（视频流配置更低的照低的）");
+        }
         if (!manager.startRecording(cameras, storage)) {
             BlackBox.noteImportant("开录失败：相机层没能开始（" + why + "）");
             end(RecordStop.START_FAILED);

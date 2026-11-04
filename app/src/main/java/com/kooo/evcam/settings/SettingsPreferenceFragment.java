@@ -1566,13 +1566,46 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                         com.kooo.evcam.KeepAliveManager.stopKeepAliveWork(requireContext());
                     }
                 });
-        // 熄屏持续录制录到什么时候看哨兵模式（熄屏 v3：开着一直录环视，没开录到车机要睡）：行尾写着哨兵模式此刻开没开（行样式在 apply 之前标上）
-        androidx.preference.Preference keepRecording = findPreference("pref_screen_off_keep_recording");
-        if (keepRecording != null) {
-            PreferenceRows.markSentryStatus(keepRecording);
+        bindScreenOffKeep();
+    }
+
+    /**
+     * 熄屏持续录制（开关加下一层，项目所有者 2026-11-04）：开关照旧；行尾写熄屏后的帧率，下面一行是哨兵模式此刻开没开
+     * （它录不录看哨兵模式；行样式在交给列表之前换上）；点这一行选熄屏后的帧率。什么时候按它录、按多少由相机管家定
+     * （{@code camera.ChannelRules.darkFps}），这里只存设置。
+     */
+    private void bindScreenOffKeep() {
+        SwitchNavPreference pref = findPreference("pref_screen_off_keep_recording");
+        if (pref == null) {
+            return;
         }
+        pref.showSentryStatus();
         bindSwitch("pref_screen_off_keep_recording", appConfig.isScreenOffKeepRecording(),
                 value -> appConfig.setScreenOffKeepRecording(value));
+        showScreenOffFps(pref);
+        pref.setOnPreferenceClickListener(preference -> {
+            SettingSpec spec = SettingsRegistry.SCREEN_OFF_FPS;
+            showChoice(getString(R.string.set_screen_off_fps_title), null, getString(R.string.set_screen_off_fps_note),
+                    localizedNames(spec), spec.values(), spec.sanitize(appConfig.getScreenOffFpsChoice()), value -> {
+                        appConfig.setScreenOffFpsChoice(value);
+                        showScreenOffFps(pref);
+                    });
+            return true;
+        });
+    }
+
+    /** 熄屏持续录制那一行的行尾：熄屏后的帧率（「跟随视频流配置」「10 fps」这样，和框里的选项同一个名字）。 */
+    private void showScreenOffFps(SwitchNavPreference pref) {
+        SettingSpec spec = SettingsRegistry.SCREEN_OFF_FPS;
+        String current = spec.sanitize(appConfig.getScreenOffFpsChoice());
+        String[] values = spec.values();
+        String[] names = localizedNames(spec);
+        for (int i = 0; i < values.length; i++) {
+            if (values[i].equals(current)) {
+                pref.setValue(names[i]);
+                return;
+            }
+        }
     }
 
     // ------------------------------------------------------------------ 原「高级」，现在在开发者选项里
