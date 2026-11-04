@@ -69,7 +69,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                     this::onMicPermission);
     /** 「悬浮键与灵动贴」页上的灵动贴那一组；别的页是 null。 */
     private SmartButtonRows smartButtonRows;
-    /** 灵动贴：搜索前要「附近的设备」权限（扫描、连接），结果交给那一组（{@link SmartButtonRows}）。登记规矩同上。 */
+    /** 灵动贴：绑定前要「附近的设备」权限（扫描、连接），结果交给那一组（{@link SmartButtonRows}）。登记规矩同上。 */
     private final androidx.activity.result.ActivityResultLauncher<String[]> bluetoothPermissions =
             registerForActivityResult(
                     new androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions(),
@@ -1292,12 +1292,22 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         bindSmartButtons();
     }
 
-    /** 灵动贴（试验性）那一组：搜索一行，连接过的每一台一行（{@link SmartButtonRows}）。重绑时先把上一份收掉。 */
+    /**
+     * 灵动贴（试验性）那一组：总开关一行（关着时不扫描蓝牙，车主 2026-11-04），绑定一行，绑定的每一台一行（{@link SmartButtonRows}）。
+     * 重绑时先把上一份收掉。
+     */
     private void bindSmartButtons() {
         if (smartButtonRows != null) {
             smartButtonRows.detach();
             smartButtonRows = null;
         }
+        bindSwitch(SmartButtonRows.SWITCH_KEY, appConfig.isSmartButtonsEnabled(), on -> {
+            appConfig.setSmartButtonsEnabled(on);
+            com.kooo.evcam.button.SmartButtons buttons = com.kooo.evcam.button.SmartButtons.get();
+            if (buttons != null) {
+                buttons.setEnabled(on);
+            }
+        });
         androidx.preference.PreferenceCategory category = findPreference("cat_smart_buttons");
         if (category != null) {
             smartButtonRows = new SmartButtonRows(this, category, bluetoothPermissions);

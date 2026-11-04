@@ -458,7 +458,7 @@ public final class CameraKeeper {
      *       {@link #EXIT_DEADLINE_MS}，到点照样结束。以前是主线程自己关相机、关完再结束 —— 相机服务一卡，进程就退不掉；</li>
      *   <li>告诉调度「退出」：从此只关，不开、不改输出、不救；登记表从此作废，直到退出的记号清掉（人又点开主界面、真正开机）；</li>
      *   <li>这一趟到头、在录的停掉、在等开录的不等（{@link #endTripForExit}）；前台服务停；超级镜子、盲区画面停（它们的画布死了，
-     *       留着只是让系统以 START_STICKY 的名义再去重启它们）；唤醒锁放；</li>
+     *       留着只是让系统以 START_STICKY 的名义再去重启它们）；灵动贴的扫描停（交给系统的，进程没了也不停）；唤醒锁放；</li>
      *   <li>放管线：停录收尾、这一份换下去，调度按次序关完相机、丢掉输出，再放录制器；停录收尾排在管线的收拾线程上，看门的线程等到它。</li>
      * </ol>
      *
@@ -482,6 +482,11 @@ public final class CameraKeeper {
         CameraForegroundService.stop(context);
         com.kooo.evcam.zeekr.RearViewMirrorService.stop(context);
         com.kooo.evcam.zeekr.SideViewService.stop(context);
+        // 灵动贴的扫描是交给系统的（PendingIntent）：不当场停，进程没了系统还接着扫，又把应用叫起来
+        com.kooo.evcam.button.SmartButtons buttons = com.kooo.evcam.button.SmartButtons.get();
+        if (buttons != null) {
+            buttons.userExits();
+        }
         com.kooo.evcam.WakeUpHelper.releasePersistentWakeLock();
         holder.release();
         if (pipeline != null) {

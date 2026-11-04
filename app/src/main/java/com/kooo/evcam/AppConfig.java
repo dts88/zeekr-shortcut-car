@@ -2364,12 +2364,23 @@ public class AppConfig {
 
     // ==================== 灵动贴 ====================
 
-    /** 连接过的灵动贴（蓝牙地址，逗号隔开，按连接先后）。是设置：导出、导入跟着走；按键计数、电量这些运行状态不在这里（{@code button.SmartButtons}）。 */
+    /** 绑定的灵动贴（蓝牙地址，逗号隔开，按绑定先后）。是设置：导出、导入跟着走；计数、电量、版本、序列号这些运行状态不在这里（{@code button.SmartButtons}）。 */
     private static final String KEY_SMART_BUTTONS = "smart_buttons";
+    /** 灵动贴开着没有（2026-11-04 车主：没开启时不扫描蓝牙，Lab 同时开着时好用蓝牙做测试）。 */
+    private static final String KEY_SMART_BUTTONS_ENABLED = "smart_buttons_enabled";
     /** 每一台单击 / 双击做什么：{@code smart_button_action.<地址>.<1 或 2>}，值是 {@code button.SmartButtonAction} 的 key。 */
     private static final String KEY_SMART_BUTTON_ACTION_PREFIX = "smart_button_action.";
 
-    /** 连接过的灵动贴，按连接先后。 */
+    /** 灵动贴开着没有；默认开：一台都没绑的本来就不扫。 */
+    public boolean isSmartButtonsEnabled() {
+        return prefs.getBoolean(KEY_SMART_BUTTONS_ENABLED, true);
+    }
+
+    public void setSmartButtonsEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_SMART_BUTTONS_ENABLED, enabled).apply();
+    }
+
+    /** 绑定的灵动贴，按绑定先后。 */
     public java.util.List<String> getSmartButtons() {
         String joined = prefs.getString(KEY_SMART_BUTTONS, "");
         java.util.List<String> out = new java.util.ArrayList<>();
