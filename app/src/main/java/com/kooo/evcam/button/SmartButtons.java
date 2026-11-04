@@ -71,7 +71,8 @@ import java.util.Set;
  * <ul>
  *   <li>广播里的计数变了就是按了一下（{@link SmartButtonAd}）。计数存着，进程重启后照样接得上。</li>
  *   <li>单击、双击查这一台选的动作（{@link SmartButtonAction}），在主线程上做：悬浮按钮那几项走 {@link QuickActions}（同一份），
- *       驾驶模式走 {@link Telemetry#setDriveMode}，升挡、降挡交给模拟声浪（{@link DriveSound#shift}）。没开启灵动贴、用户退出以后什么都不做。</li>
+ *       写车的（驾驶模式和其他车控动作）交给 {@link CarMoves}，媒体、语音走 {@link MediaMove}，升挡、降挡交给模拟声浪
+ *       （{@link DriveSound#shift}）。写车的没做成提示一句（{@link #carResult}）。没开启灵动贴、用户退出以后什么都不做。</li>
  *   <li>长按（约 3 秒、背光闪）只用来连接，不绑动作（车主 2026-11-04）。</li>
  *   <li>同一下从广播、通知各来一遍只算一次（{@link SmartButtonAd#samePress}）。</li>
  *   <li>正在绑定时绑过的按了不做；拿绑过的来长按，告诉一声，这次绑定结束。</li>
@@ -123,7 +124,7 @@ public final class SmartButtons {
     private static final int SCAN_REQUEST = 1;
 
     /** 运行状态（计数、电量、版本、序列号）：不是设置，不导出（{@code settings.SettingsBackup} 只带设置和视频流配置）。 */
-    private static final String STATE = "smart_button_state";
+    static final String STATE = "smart_button_state";
     /** 以前「按完顺手读电量」记的上次试的时刻：那件事去掉了（2026-11-04），起来时把留下的删掉。 */
     private static final String RETIRED_BATTERY_TRY = "batteryTry.";
 
@@ -1107,7 +1108,38 @@ public final class SmartButtons {
             stepDriveMode(action.driveModeStep);
         } else if (action.gearStep != 0) {
             DriveSound.shift(action.gearStep);
+        } else if (action.car != null) {
+            String label = action.label(app);
+            CarMoves.run(app, action.key, action.car, result -> carResult(label, result));
+        } else if (action.media != null && !action.media.perform(app)) {
+            Toast.makeText(app, app.getString(R.string.msg_car_action_unavailable, action.label(app)), Toast.LENGTH_SHORT).show();
         }
+    }
+
+    /** 写车的没做成（主线程）：提示一句为什么。做成了不提示：车上看得到。 */
+    private void carResult(String label, CarMoves.Result result) {
+        String text;
+        switch (result) {
+            case DONE:
+                return;
+            case NO_CHANGE:
+                text = app.getString(R.string.msg_car_action_no_change, label);
+                break;
+            case POWER_SAVING:
+                text = app.getString(R.string.msg_car_action_power_saving);
+                break;
+            case MOVING:
+                text = app.getString(R.string.msg_car_action_standstill);
+                break;
+            case NOT_FITTED:
+                text = app.getString(R.string.msg_car_action_no_fragrance);
+                break;
+            case UNAVAILABLE:
+            default:
+                text = app.getString(R.string.msg_car_action_unavailable, label);
+                break;
+        }
+        Toast.makeText(app, text, Toast.LENGTH_SHORT).show();
     }
 
     /**
@@ -1125,11 +1157,12 @@ public final class SmartButtons {
         }
     }
 
+    /** 切驾驶模式（{@link CarMoves#driveMode}）：没切成提示「驾驶模式没有切换」，连按的目标作废。 */
     private void writeDriveMode(int mode) {
         driveTarget = mode;
         driveTargetAt = SystemClock.elapsedRealtime();
-        Telemetry.get().setDriveMode(mode, ok -> {
-            if (!ok) {
+        CarMoves.run(app, "drive_mode", CarMoves.driveMode(mode), result -> {
+            if (result != CarMoves.Result.DONE) {
                 driveTarget = 0;
                 Toast.makeText(app, R.string.msg_drive_mode_failed, Toast.LENGTH_SHORT).show();
             }
