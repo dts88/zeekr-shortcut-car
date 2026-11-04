@@ -187,6 +187,11 @@
                 android:resource="@xml/accessibility_service_config" />
         </service>
 
+        <!-- 灵动贴扫描的结果（button.ScanReceiver，2026-11-04）：PendingIntent 扫描由系统用我们自己的身份送来，不导出 -->
+        <receiver
+            android:name=".button.ScanReceiver"
+            android:exported="false" />
+
         <!-- 开机自启动广播接收器 -->
         <receiver
             android:name=".BootReceiver"
