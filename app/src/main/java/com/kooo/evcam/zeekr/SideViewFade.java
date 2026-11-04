@@ -1,50 +1,59 @@
 package com.kooo.evcam.zeekr;
 
-import android.view.View;
+import android.animation.ValueAnimator;
 import android.view.animation.LinearInterpolator;
 
 /**
  * 盲区画面收起前的淡出（项目所有者 2026-11-04）：画面在给定的时间里从正常匀速淡到看不见。
  *
- * <p>动的是画面这一层的透明度（窗口里的整个视图），窗口那一层的不动 —— 备着时的 0、HUD 的透明度和夜间亮度
- * （{@link HudPicture#opacity}）照旧，两层相乘。什么时候淡、淡多久是判定定的（{@link SideViewTrigger#FADE_MS}），
- * 这里只管画；中控屏、HUD 两个窗口各用一份。主线程。</p>
+ * <p>淡到哪了交给 {@link Target} 画：中控屏的窗口一个窗口一个画面，淡整个视图（{@code View#setAlpha}）；
+ * HUD 的窗口一个窗口里左右两个画面，各淡各的（画的时候乘上去）。窗口那一层的透明度不动 —— 备着时的 0、
+ * HUD 的透明度和夜间亮度（{@link HudPicture#opacity}）照旧，两层相乘。什么时候淡、淡多久是判定定的
+ * （{@link SideViewTrigger#FADE_MS}），这里只管画。主线程。</p>
  */
 final class SideViewFade {
 
-    private final View view;
-    private boolean fading;
+    /** 淡到哪了：1 是正常，0 是看不见。 */
+    interface Target {
+        void setFade(float alpha);
+    }
 
-    SideViewFade(View view) {
-        this.view = view;
+    private final Target target;
+    private ValueAnimator animator;
+
+    SideViewFade(Target target) {
+        this.target = target;
     }
 
     /** 开始淡出，{@code durationMs} 后淡完；已经在淡就不重来。 */
     void start(long durationMs) {
-        if (fading) {
+        if (animator != null) {
             return;
         }
-        fading = true;
-        view.animate().cancel();
-        view.animate().alpha(0f).setDuration(Math.max(0L, durationMs))
-                .setInterpolator(new LinearInterpolator()).start();
+        ValueAnimator a = ValueAnimator.ofFloat(1f, 0f);
+        a.setDuration(Math.max(0L, durationMs));
+        a.setInterpolator(new LinearInterpolator());
+        a.addUpdateListener(v -> target.setFade((Float) v.getAnimatedValue()));
+        animator = a;
+        a.start();
     }
 
     /** 又显示了（淡出中又亮、换一侧、新的一次显示）：停下，回到正常。 */
     void restore() {
         stop();
-        view.setAlpha(1f);
+        target.setFade(1f);
     }
 
-    /** 收起、移走：停下。淡到哪留在哪（这时窗口已经看不见），下一次显示时回到正常（{@link #restore}）。 */
+    /** 收起、移走：停下。淡到哪留在哪（这时已经看不见），下一次显示时回到正常（{@link #restore}）。 */
     void stop() {
-        if (fading) {
-            view.animate().cancel();
-            fading = false;
+        ValueAnimator a = animator;
+        animator = null;
+        if (a != null) {
+            a.cancel();
         }
     }
 
     boolean isFading() {
-        return fading;
+        return animator != null;
     }
 }

@@ -2216,20 +2216,15 @@ public class MultiCameraManager {
     }
 
     /**
-     * 盲区画面的窗口移走了（onSurfaceTextureDestroyed，主线程）：撤回盲区画面输出，画布由管线留着、由调度放 ——
-     * 和超级镜子同一个办法（{@link #keepMirrorCanvas}），会话里的画布不自己放。只声明在环视那一路上。
+     * 盲区画面的一个窗口移走了（onSurfaceTextureDestroyed，主线程）：撤回那一块输出（中控屏两块、HUD，{@code kind}），
+     * 画布由管线留着、由调度放 —— 和超级镜子同一个办法（{@link #keepMirrorCanvas}），会话里的画布不自己放。只声明在环视那一路上。
      *
      * @return true：画布留下了，调用方返回 false（TextureView 不放）；false：照常让它放
      */
-    public static boolean keepSideCanvas(MultiCameraManager current, android.graphics.SurfaceTexture texture) {
-        MultiCameraManager owner = ownerOf(current, ChannelRules.Kind.SIDE, CameraSlots.KEY_SURROUND, texture);
-        return owner != null && owner.keepCanvas(ChannelRules.Kind.SIDE, CameraSlots.KEY_SURROUND, texture);
-    }
-
-    /** HUD 上的盲区画面窗口移走了：同 {@link #keepSideCanvas}，是另一样输出（{@link ChannelRules.Kind#HUD}）。 */
-    public static boolean keepHudCanvas(MultiCameraManager current, android.graphics.SurfaceTexture texture) {
-        MultiCameraManager owner = ownerOf(current, ChannelRules.Kind.HUD, CameraSlots.KEY_SURROUND, texture);
-        return owner != null && owner.keepCanvas(ChannelRules.Kind.HUD, CameraSlots.KEY_SURROUND, texture);
+    public static boolean keepSideCanvas(MultiCameraManager current, ChannelRules.Kind kind,
+                                         android.graphics.SurfaceTexture texture) {
+        MultiCameraManager owner = ownerOf(current, kind, CameraSlots.KEY_SURROUND, texture);
+        return owner != null && owner.keepCanvas(kind, CameraSlots.KEY_SURROUND, texture);
     }
 
     /**
@@ -2291,9 +2286,9 @@ public class MultiCameraManager {
             case MIRROR:
                 return camera.withdrawMirror(texture);
             case SIDE:
-                return camera.withdrawSide(texture);
+            case SIDE_SECOND:
             case HUD:
-                return camera.withdrawHud(texture);
+                return camera.withdrawSide(kind, texture);
             default:
                 return camera.withdrawPreview(texture);
         }
@@ -2321,14 +2316,12 @@ public class MultiCameraManager {
         return takeKeptCanvas(ChannelRules.Kind.MIRROR, cameraKey);
     }
 
-    /** 新开的盲区画面窗口接回上一个窗口留下的画布（同 {@link #takeKeptMirror}）；拿回来之后接着重新声明（{@link SingleCamera#declareSide}）。 */
-    public android.graphics.SurfaceTexture takeKeptSide() {
-        return takeKeptCanvas(ChannelRules.Kind.SIDE, CameraSlots.KEY_SURROUND);
-    }
-
-    /** 新开的 HUD 窗口接回上一个留下的画布（同 {@link #takeKeptSide}）；拿回来之后接着重新声明（{@link SingleCamera#declareHud}）。 */
-    public android.graphics.SurfaceTexture takeKeptHud() {
-        return takeKeptCanvas(ChannelRules.Kind.HUD, CameraSlots.KEY_SURROUND);
+    /**
+     * 新开的盲区画面窗口接回上一个窗口在同一块（{@code kind}：中控屏两块、HUD）留下的画布（同 {@link #takeKeptMirror}）；
+     * 拿回来之后接着重新声明（{@link SingleCamera#declareSide}）。
+     */
+    public android.graphics.SurfaceTexture takeKeptSide(ChannelRules.Kind kind) {
+        return takeKeptCanvas(kind, CameraSlots.KEY_SURROUND);
     }
 
     private android.graphics.SurfaceTexture takeKeptCanvas(ChannelRules.Kind kind, String cameraKey) {
@@ -2361,8 +2354,9 @@ public class MultiCameraManager {
         if (kind == ChannelRules.Kind.MIRROR) {
             com.kooo.evcam.blackbox.BlackBox.note("后视镜留下的画布没人接回：" + roleName(cameraKey)
                     + "的会话里已经没有它，放掉" + com.kooo.evcam.blackbox.BlackBox.afterScreenOff());
-        } else if (kind == ChannelRules.Kind.SIDE || kind == ChannelRules.Kind.HUD) {
-            com.kooo.evcam.blackbox.BlackBox.note("盲区画面" + (kind == ChannelRules.Kind.HUD ? "（HUD）" : "")
+        } else if (ChannelRules.sideView(kind)) {
+            com.kooo.evcam.blackbox.BlackBox.note("盲区画面" + (kind == ChannelRules.Kind.HUD ? "（HUD）"
+                    : kind == ChannelRules.Kind.SIDE_SECOND ? "（中控屏第二块）" : "")
                     + "留下的画布没人接回：环视的会话里已经没有它，放掉" + com.kooo.evcam.blackbox.BlackBox.afterScreenOff());
         } else {
             com.kooo.evcam.blackbox.BlackBox.note("主界面留下的预览画布没人接回：" + roleName(cameraKey)
@@ -4307,6 +4301,9 @@ public class MultiCameraManager {
                     case HUD:
                         names.add("HUD 盲区画面");
                         break;
+                    case SIDE_SECOND:
+                        names.add("中控屏第二块盲区画面");
+                        break;
                     case RECORD:
                         names.add("录像");
                         break;
@@ -4324,7 +4321,8 @@ public class MultiCameraManager {
          */
         private String deadText(Set<ChannelRules.Kind> removed) {
             boolean canvas = removed.contains(ChannelRules.Kind.PREVIEW) || removed.contains(ChannelRules.Kind.MIRROR)
-                    || removed.contains(ChannelRules.Kind.SIDE) || removed.contains(ChannelRules.Kind.HUD);
+                    || removed.contains(ChannelRules.Kind.SIDE) || removed.contains(ChannelRules.Kind.HUD)
+                    || removed.contains(ChannelRules.Kind.SIDE_SECOND);
             boolean record = !useCodecRecording && removed.contains(ChannelRules.Kind.RECORD);
             if (record && !canvas) {
                 return "MediaRecorder 停了";

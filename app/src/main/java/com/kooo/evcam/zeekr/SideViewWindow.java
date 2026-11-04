@@ -33,6 +33,9 @@ import com.kooo.evcam.R;
  * <p>子视图是普通 TextureView，本容器在 {@code dispatchDraw} 里分格反投影，画面本身和「不显示过时的画面」那条规矩在
  * {@link SideViewPicture}（HUD 的窗口共用）。不新建 GL 管线，不动相机会话（为什么见 {@link RearViewMirrorView}）。</p>
  *
+ * <p>一个窗口一个画面。中控屏上有两块画布时左右各一个窗口（项目所有者 2026-11-04：后视镜上的灯左右可能同时亮），
+ * 只有一块时这一个窗口显示优先的那一侧、换侧就挪过去（{@link SideViewTrigger.Result#lane}）。</p>
+ *
  * <h3>三种状态</h3>
  *
  * <ul>
@@ -64,7 +67,7 @@ public class SideViewWindow extends ViewGroup implements SideViewOutputWindow {
     private final FisheyeMesh.Painter paintTexture = this::drawTextureOnce;
     private final Handler handler = new Handler(Looper.getMainLooper());
     /** 收起前的淡出（{@link #fadeOut}）。 */
-    private final SideViewFade fadeAway = new SideViewFade(this);
+    private final SideViewFade fadeAway = new SideViewFade(this::setAlpha);
 
     private WindowManager.LayoutParams params;
     private boolean attached;
@@ -87,7 +90,12 @@ public class SideViewWindow extends ViewGroup implements SideViewOutputWindow {
         }
     };
 
-    public SideViewWindow(Context context, AppConfig appConfig, Runnable onClose) {
+    /** 点了关闭按钮：关掉的是这个窗口此刻显示的那一侧。 */
+    interface CloseListener {
+        void onClose(int lane);
+    }
+
+    public SideViewWindow(Context context, AppConfig appConfig, CloseListener onClose) {
         super(context);
         this.picture = new SideViewPicture(appConfig);
         this.appConfig = appConfig;
@@ -98,7 +106,7 @@ public class SideViewWindow extends ViewGroup implements SideViewOutputWindow {
         closeButton = new CloseButton(context);
         closeButton.setOnClickListener(v -> {
             if (shown && onClose != null) {
-                onClose.run();
+                onClose.onClose(lane);
             }
         });
         addView(closeButton);
@@ -132,8 +140,8 @@ public class SideViewWindow extends ViewGroup implements SideViewOutputWindow {
     }
 
     @Override
-    public int lane() {
-        return lane;
+    public boolean isShowing(int side) {
+        return attached && shown && lane == side;
     }
 
     /**
@@ -159,8 +167,12 @@ public class SideViewWindow extends ViewGroup implements SideViewOutputWindow {
         attachAt(side, true);
     }
 
+    /** 一个窗口一个画面：显示着 {@code side} 才收。 */
     @Override
-    public void conceal() {
+    public void conceal(int side) {
+        if (lane != side) {
+            return;
+        }
         fadeAway.stop();
         if (!attached || !shown) {
             return;
@@ -172,15 +184,15 @@ public class SideViewWindow extends ViewGroup implements SideViewOutputWindow {
     }
 
     @Override
-    public void fadeOut(long durationMs) {
-        if (attached && shown) {
+    public void fadeOut(int side, long durationMs) {
+        if (isShowing(side)) {
             fadeAway.start(durationMs);
         }
     }
 
     @Override
-    public boolean isFading() {
-        return fadeAway.isFading();
+    public boolean isFading(int side) {
+        return lane == side && fadeAway.isFading();
     }
 
     /**

@@ -3036,8 +3036,8 @@ public final class ChannelScheduler {
         void onOutputDropped(String cameraId, ChannelRules.Out out, SingleCamera.Drop why) {
             CameraPort port = portById(cameraId);
             if (port != null && out != null
-                    && (out.kind == ChannelRules.Kind.RECORD || out.kind == ChannelRules.Kind.SIDE
-                    || out.kind == ChannelRules.Kind.HUD || out.kind == ChannelRules.Kind.MIRROR)) {
+                    && (out.kind == ChannelRules.Kind.RECORD || ChannelRules.sideView(out.kind)
+                    || out.kind == ChannelRules.Kind.MIRROR)) {
                 port.dropped(out, why);
             }
             wake();

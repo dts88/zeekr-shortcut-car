@@ -35,13 +35,18 @@ import com.kooo.evcam.telemetry.VehicleState;
  * 盲区画面：打转向灯时在中控屏、HUD 上显示该侧摄像头的画面（issue #6、#24）；设置里开着的话，后视镜上的盲区指示灯、
  * 停车后的开门预警亮了也显示那一侧（项目所有者 2026-11-03）。窗口、相机登记、车辆信号都在这里。
  *
- * <h3>两个出口，一套判定</h3>
+ * <h3>三个出口，两份判定</h3>
  *
- * <p>中控屏上的窗口（{@link SideViewWindow}）和 HUD 上的窗口（{@link SideViewHudWindow}，2026-10-21）各是一个出口
+ * <p>中控屏上的窗口（{@link SideViewWindow}）和 HUD 上的窗口（{@link SideViewHudWindow}，2026-10-21）各是出口
  * （{@link Output}）：各自的窗口、各自在环视上声明的画布、各自「这一段带不带它」。显示在哪由设置定
  * （{@link AppConfig#getSideViewTarget}，默认两处）：选 HUD 而找不到 HUD、或者这一段 HUD 用不了时，退回中控屏。
- * 判定规则同一套（{@link SideViewTrigger}），只差一条：HUD 不看最低车速（FerixzTanz 的规则，项目所有者 2026-10-16 定照用）。
- * 中控屏窗口的关闭按钮关掉的是这一次打灯，两处一起收。</p>
+ * 判定（{@link SideViewTrigger}）中控屏、HUD 各一份，规则同一套，只差一条：HUD 不看最低车速（FerixzTanz 的规则，
+ * 项目所有者 2026-10-16 定照用）。</p>
+ *
+ * <p><b>左右两侧同时显示</b>（项目所有者 2026-11-04：后视镜上的灯左右可能同时亮）：中控屏两块画布、两个窗口，
+ * 第一块管左侧、第二块（{@link ChannelRules.Kind#SIDE_SECOND}）管右侧；第二块这一段让出来了（共享预览流挂不下时它最先让），
+ * 第一块显示优先的那一侧（{@link SideViewTrigger.Result#lane}）。HUD 一块画布、一个窗口同时画两侧。
+ * 中控屏窗口的关闭按钮关掉的是那一侧这一次，中控屏、HUD 两处一起收。</p>
  *
  * <h3>只声明、只登记（同超级镜子，{@link RearViewMirrorService}）</h3>
  *
@@ -85,8 +90,13 @@ public class SideViewService extends Service {
     private static volatile SideViewService instance;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
-    private final Output center = new Output(false);
-    private final Output hud = new Output(true);
+    /** 判定：中控屏一份（两块画布共用）、HUD 一份（不看最低车速）。 */
+    private final SideViewTrigger centerTrigger = new SideViewTrigger();
+    private final SideViewTrigger hudTrigger = new SideViewTrigger();
+    /** 中控屏第一块（左侧，只剩它时显示优先的那一侧）、第二块（右侧）、HUD。 */
+    private final Output center = new Output(ChannelRules.Kind.SIDE);
+    private final Output centerSecond = new Output(ChannelRules.Kind.SIDE_SECOND);
+    private final Output hud = new Output(ChannelRules.Kind.HUD);
     private AppConfig appConfig;
     private boolean listening;
     private boolean destroyed;
@@ -131,6 +141,7 @@ public class SideViewService extends Service {
         SideViewService svc = instance;
         if (svc != null) {
             svc.center.applyAim();
+            svc.centerSecond.applyAim();
             svc.hud.applyAim();
         }
     }
@@ -154,8 +165,10 @@ public class SideViewService extends Service {
         SideViewService svc = instance;
         if (svc != null) {
             svc.handler.post(() -> {
-                if (svc.center.window instanceof SideViewWindow) {
-                    ((SideViewWindow) svc.center.window).applyPlacement();
+                for (Output output : new Output[]{svc.center, svc.centerSecond}) {
+                    if (output.window instanceof SideViewWindow) {
+                        ((SideViewWindow) output.window).applyPlacement();
+                    }
                 }
             });
         }
@@ -170,7 +183,8 @@ public class SideViewService extends Service {
         return "side view: listening=" + svc.listening
                 + " lamps=" + (svc.lampsHeld ? Telemetry.get().lamps() : "off")
                 + " claimed=" + CameraKeeper.get(svc).needs(CameraKeeper.Use.SIDE_VIEW)
-                + " center{" + svc.center.describe() + "} hud{" + svc.hud.describe() + "}";
+                + " center{" + svc.center.describe() + "} second{" + svc.centerSecond.describe()
+                + "} hud{" + svc.hud.describe() + "}";
     }
 
     /** 诊断报告里的一行：HUD 窗口此刻的样子；服务没在跑是 null。 */
@@ -204,6 +218,7 @@ public class SideViewService extends Service {
     private void rebindIfAttached() {
         if (!destroyed) {
             center.rebindIfAttached();
+            centerSecond.rebindIfAttached();
             hud.rebindIfAttached();
         }
     }
@@ -255,7 +270,10 @@ public class SideViewService extends Service {
         Telemetry.get().removeListener(readingsListener);
         Telemetry.get().release(TELEMETRY_USER);
         syncLamps();
+        centerTrigger.reset();
+        hudTrigger.reset();
         center.stop();
+        centerSecond.stop();
         hud.stop();
         refusalShown = false;
         AppLog.i(TAG, "盲区画面：停止监听");
@@ -303,10 +321,14 @@ public class SideViewService extends Service {
         SideViewDecision.Input in = input(s, r, lamps, appConfig.getSideViewMinSpeed());
         // HUD 不看最低车速：低速也显示（FerixzTanz 的规则）
         SideViewDecision.Input hudIn = input(s, r, lamps, 0);
-        SideViewTrigger.Result centerResult = center.trigger.update(now, in, dark);
-        SideViewTrigger.Result hudResult = hud.trigger.update(now, hudIn, dark);
-        center.evaluate(useCenter ? centerResult : null, in);
-        hud.evaluate(useHud ? hudResult : null, hudIn);
+        SideViewTrigger.Result centerResult = centerTrigger.update(now, in, dark);
+        SideViewTrigger.Result hudResult = hudTrigger.update(now, hudIn, dark);
+        // 中控屏：两块画布左右各管一侧；第二块这一段让出来了，第一块显示优先的那一侧
+        boolean pair = !centerSecond.refused;
+        center.evaluate(useCenter ? centerResult : null, in,
+                pair ? new int[]{LaneCycle.LEFT} : new int[]{centerResult.lane});
+        centerSecond.evaluate(useCenter ? centerResult : null, in, new int[]{LaneCycle.RIGHT});
+        hud.evaluate(useHud ? hudResult : null, hudIn, new int[]{LaneCycle.LEFT, LaneCycle.RIGHT});
         if (hud.window instanceof SideViewHudWindow) {
             ((SideViewHudWindow) hud.window).setNight(night);
         }
@@ -353,7 +375,7 @@ public class SideViewService extends Service {
             return;
         }
         boolean refusedWanted = (centerWants && center.refused) || (hudWants && hud.refused);
-        if (refusedWanted && !center.showing() && !hud.showing() && !refusalShown) {
+        if (refusedWanted && !center.showing() && !centerSecond.showing() && !hud.showing() && !refusalShown) {
             refusalShown = true;
             showRefusal();
         }
@@ -373,13 +395,14 @@ public class SideViewService extends Service {
         return hudDisplay;
     }
 
-    /** 点了中控屏窗口的关闭按钮：关掉这一次（打灯的、后视镜上的灯亮的），中控屏、HUD 两处一起收。 */
-    private void onCloseTapped() {
-        BlackBox.note("盲区画面：点了关闭，这一次不再显示");
+    /** 点了中控屏一个窗口的关闭按钮：关掉那一侧这一次（打灯的、后视镜上的灯亮的），中控屏、HUD 两处一起收；另一侧不动。 */
+    private void onCloseTapped(int lane) {
+        BlackBox.note("盲区画面：点了「" + LaneCycle.labelOf(lane) + "」的关闭，这一次不再显示");
         center.noteIfNoFrame();
+        centerSecond.noteIfNoFrame();
         hud.noteIfNoFrame();
-        center.trigger.dismiss();
-        hud.trigger.dismiss();
+        centerTrigger.dismiss(lane);
+        hudTrigger.dismiss(lane);
         evaluate();
     }
 
@@ -392,9 +415,9 @@ public class SideViewService extends Service {
         }
     }
 
-    /** 两个出口都声明了画布、登记了才算用着：都放开了才放开登记。登记表一变，监听就叫醒调度。 */
+    /** 三个出口都放开了才放开登记（都声明了画布、登记了才算用着）。登记表一变，监听就叫醒调度。 */
     private void releaseClaimIfUnused() {
-        if (!center.claimed && !hud.claimed) {
+        if (!center.claimed && !centerSecond.claimed && !hud.claimed) {
             CameraKeeper.get(this).release(CameraKeeper.Use.SIDE_VIEW);
         }
     }
@@ -416,7 +439,7 @@ public class SideViewService extends Service {
 
     /** 两个出口都没有窗口了：看门狗停下。 */
     private void stopWatchdogIfIdle() {
-        if (watchdog != null && center.window == null && hud.window == null) {
+        if (watchdog != null && center.window == null && centerSecond.window == null && hud.window == null) {
             handler.removeCallbacks(watchdog);
             watchdog = null;
         }
@@ -431,6 +454,7 @@ public class SideViewService extends Service {
         CameraManagerHolder.getInstance().removeReplacedListener(pipelineReplaced);
         stopListening();
         center.detach();
+        centerSecond.detach();
         hud.detach();
         handler.removeCallbacksAndMessages(null);
         super.onDestroy();
@@ -444,13 +468,15 @@ public class SideViewService extends Service {
     // ================================================================= 一个出口
 
     /**
-     * 盲区画面的一个出口：中控屏、或者 HUD。窗口、画布在环视上的声明、这一段带不带它各管各的；
-     * 判定（{@link #trigger}）各一份，规则同一套（HUD 那份不看最低车速）。登记表、看门狗、提示是服务一份。
+     * 盲区画面的一个出口：中控屏第一块、中控屏第二块、或者 HUD（{@link #kind}）。窗口、画布在环视上的声明、这一段带不带它
+     * 各管各的；判定是服务的（中控屏两块共用一份，{@link #centerTrigger}），这里照它显示自己管的那几侧。
+     * 登记表、看门狗、提示是服务一份。
      */
     private final class Output {
 
+        /** 在环视上声明成哪一样输出：{@link ChannelRules.Kind#SIDE}、{@link ChannelRules.Kind#SIDE_SECOND}、{@link ChannelRules.Kind#HUD}。 */
+        final ChannelRules.Kind kind;
         final boolean isHud;
-        final SideViewTrigger trigger = new SideViewTrigger();
         SideViewOutputWindow window;
         /** 输出声明在哪一路相机上（环视）、属于哪一份管线、声明出去的那块画布。 */
         SingleCamera boundCamera;
@@ -472,13 +498,14 @@ public class SideViewService extends Service {
         long shownAtMs;
         boolean firstFrameSeen;
 
-        Output(boolean isHud) {
-            this.isHud = isHud;
+        Output(ChannelRules.Kind kind) {
+            this.kind = kind;
+            this.isHud = kind == ChannelRules.Kind.HUD;
         }
 
-        /** 黑匣子里跟在「盲区画面」后面的标记：中控屏不加，HUD 加「（HUD）」。 */
+        /** 黑匣子里跟在「盲区画面」后面的标记：中控屏第一块不加，别的加种类名（「（HUD）」「（SIDE_SECOND）」）。 */
         String label() {
-            return isHud ? "（HUD）" : "";
+            return kind == ChannelRules.Kind.SIDE ? "" : "（" + kind + "）";
         }
 
         boolean showing() {
@@ -502,9 +529,8 @@ public class SideViewService extends Service {
             }
         }
 
-        /** 熄屏、服务退出：判定从头来，这一段结束，窗口移走。 */
+        /** 熄屏、服务退出：这一段结束，窗口移走（判定由服务从头来）。 */
         void stop() {
-            trigger.reset();
             if (refused) {
                 // 熄屏也是这一段的结束（同离开 D 挡 30 秒、原厂画面）：亮屏后再挂窗口时重试。服务退出也走这里，那就只是结束
                 refused = false;
@@ -518,8 +544,9 @@ public class SideViewService extends Service {
          * 照这一刻的判定做事。
          *
          * @param result 这个出口的判定；null 是这一刻不用这个出口（显示位置不含它、找不到 HUD、只选 HUD 而 HUD 用得上）
+         * @param lanes  这个出口这一刻管哪几侧：中控屏两块各一侧（只剩第一块时是优先的那一侧），HUD 两侧
          */
-        void evaluate(SideViewTrigger.Result result, SideViewDecision.Input in) {
+        void evaluate(SideViewTrigger.Result result, SideViewDecision.Input in, int[] lanes) {
             if (result == null) {
                 if (window != null) {
                     BlackBox.note("盲区画面" + label() + "：这一刻不用这一处，移走窗口");
@@ -534,11 +561,11 @@ public class SideViewService extends Service {
                 BlackBox.note("盲区画面" + label() + "：不带它的这一段结束，下一次挂窗口时重试");
             }
             if (!refused) {
-                apply(result, in);
+                apply(result, in, lanes);
             }
         }
 
-        private void apply(SideViewTrigger.Result result, SideViewDecision.Input in) {
+        private void apply(SideViewTrigger.Result result, SideViewDecision.Input in, int[] lanes) {
             SideViewOutputWindow w = window;
             if (w != null && !w.isAttached()) {
                 // 窗口不是我们收的（HUD 那块屏没了，系统收掉了 Presentation）：这一段不再挂
@@ -558,36 +585,66 @@ public class SideViewService extends Service {
                 }
                 return;
             }
+            int first = SideViewDecision.NONE;
+            for (int lane : lanes) {
+                if (result.side(lane).shown) {
+                    first = lane;
+                    break;
+                }
+            }
             if (w == null) {
-                BlackBox.note(result.shown
-                        ? "盲区画面" + label() + "：显示「" + LaneCycle.labelOf(result.lane) + "」"
-                        + (result.cause == SideViewTrigger.Cause.BLIND_SPOT ? "（盲区指示灯亮）"
-                        : result.cause == SideViewTrigger.Cause.DOOR_WARNING ? "（开门预警亮）" : "")
+                SideViewTrigger.Cause firstCause = first != SideViewDecision.NONE ? result.side(first).cause : null;
+                BlackBox.note(first != SideViewDecision.NONE
+                        ? "盲区画面" + label() + "：显示「" + LaneCycle.labelOf(first) + "」"
+                        + (firstCause == SideViewTrigger.Cause.BLIND_SPOT ? "（盲区指示灯亮）"
+                        : firstCause == SideViewTrigger.Cause.DOOR_WARNING ? "（开门预警亮）" : "")
                         + "（窗口没备着，现在挂）"
                         : "盲区画面" + label() + "：D 挡，窗口备着");
-                open(result.lane, result.shown);
-                return;
+                open(first != SideViewDecision.NONE ? first : lanes.length > 0 ? lanes[0] : result.lane,
+                        first != SideViewDecision.NONE);
+                w = window;
+                if (w == null) {
+                    return;
+                }
             }
-            if (result.shown) {
-                if (!w.isShowing() || w.lane() != result.lane) {
-                    BlackBox.note("盲区画面" + label() + "：显示「" + LaneCycle.labelOf(result.lane) + "」"
-                            + (result.cause == SideViewTrigger.Cause.BLIND_SPOT ? "（盲区指示灯亮）"
-                            : result.cause == SideViewTrigger.Cause.DOOR_WARNING ? "（开门预警亮）" : ""));
+            for (int lane : lanes) {
+                SideViewTrigger.Side side = result.side(lane);
+                if (!side.shown) {
+                    continue;
+                }
+                if (!w.isShowing(lane)) {
+                    BlackBox.note("盲区画面" + label() + "：显示「" + LaneCycle.labelOf(lane) + "」"
+                            + (side.cause == SideViewTrigger.Cause.BLIND_SPOT ? "（盲区指示灯亮）"
+                            : side.cause == SideViewTrigger.Cause.DOOR_WARNING ? "（开门预警亮）" : ""));
                     noteShown();
-                    w.show(result.lane);
-                } else if (result.fadeMs == 0 && w.isFading()) {
-                    // 淡出中同一侧又亮了：回到正常，接着显示
-                    BlackBox.note("盲区画面" + label() + "：淡出中又显示「" + LaneCycle.labelOf(result.lane) + "」");
-                    w.show(result.lane);
+                    w.show(lane);
+                } else if (side.fadeMs == 0 && w.isFading(lane)) {
+                    // 淡出中那一侧又亮了：回到正常，接着显示
+                    BlackBox.note("盲区画面" + label() + "：淡出中又显示「" + LaneCycle.labelOf(lane) + "」");
+                    w.show(lane);
                 }
-                if (result.fadeMs > 0) {
-                    w.fadeOut(result.fadeMs);
+                if (side.fadeMs > 0) {
+                    w.fadeOut(lane, side.fadeMs);
                 }
-            } else if (w.isShowing()) {
-                noteIfNoFrame();
-                BlackBox.note("盲区画面" + label() + "：收起，窗口备着");
-                w.conceal();
             }
+            // 不归它管了的、不再显示的那几侧收起（只剩第一块时它换到另一侧，show 已经挪过去了）
+            for (int lane : new int[]{LaneCycle.LEFT, LaneCycle.RIGHT}) {
+                if (w.isShowing(lane) && !(manages(lanes, lane) && result.side(lane).shown)) {
+                    noteIfNoFrame();
+                    w.conceal(lane);
+                    BlackBox.note("盲区画面" + label() + "：收起「" + LaneCycle.labelOf(lane) + "」"
+                            + (w.isShowing() ? "" : "，窗口备着"));
+                }
+            }
+        }
+
+        private boolean manages(int[] lanes, int lane) {
+            for (int one : lanes) {
+                if (one == lane) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         // ------------------------------------------------------------- 窗口
@@ -682,7 +739,7 @@ public class SideViewService extends Service {
             if (pipeline == null || pipeline.isReleased()) {
                 return;
             }
-            SurfaceTexture kept = isHud ? pipeline.takeKeptHud() : pipeline.takeKeptSide();
+            SurfaceTexture kept = pipeline.takeKeptSide(kind);
             if (kept == null) {
                 return;
             }
@@ -701,9 +758,9 @@ public class SideViewService extends Service {
             w.syncCanvas();
         }
 
-        /** 这块画布交给管线留着（{@link MultiCameraManager#keepSideCanvas} / {@link MultiCameraManager#keepHudCanvas}）。 */
+        /** 这块画布交给管线留着（{@link MultiCameraManager#keepSideCanvas}，照这一块的种类）。 */
         private boolean keepCanvas(MultiCameraManager pipeline, SurfaceTexture st) {
-            return isHud ? MultiCameraManager.keepHudCanvas(pipeline, st) : MultiCameraManager.keepSideCanvas(pipeline, st);
+            return MultiCameraManager.keepSideCanvas(pipeline, kind, st);
         }
 
         /**
@@ -834,8 +891,7 @@ public class SideViewService extends Service {
             }
             final SingleCamera declaredOn = camera;
             SingleCamera.RecordDropped dropped = why -> onDropped(declaredOn, surfaceTexture, why);
-            boolean declared = isHud ? camera.declareHud(surfaceTexture, dropped)
-                    : camera.declareSide(surfaceTexture, dropped);
+            boolean declared = camera.declareSide(kind, surfaceTexture, dropped);
             CameraKeeper keeper = CameraKeeper.get(SideViewService.this);
             boolean newlyClaimed = !keeper.needs(CameraKeeper.Use.SIDE_VIEW);
             claimed = true;
@@ -895,7 +951,7 @@ public class SideViewService extends Service {
             SingleCamera camera = boundCamera;
             SurfaceTexture texture = boundTexture;
             return camera != null && texture != null && camera.sessionOutputs().carries(
-                    new ChannelRules.Out(isHud ? ChannelRules.Kind.HUD : ChannelRules.Kind.SIDE, texture));
+                    new ChannelRules.Out(kind, texture));
         }
 
         private void scheduleRetry(SurfaceTexture surfaceTexture) {
@@ -935,7 +991,7 @@ public class SideViewService extends Service {
             boundManager = null;
             boundTexture = null;
             if (camera != null && texture != null
-                    && (isHud ? camera.withdrawHud(texture) : camera.withdrawSide(texture))) {
+                    && camera.withdrawSide(kind, texture)) {
                 AppLog.i(TAG, "盲区画面" + label() + "撤回了输出（相机 " + camera.getCameraId() + "）：还在会话里的由通道调度摘");
                 if (manager != null) {
                     manager.channelScheduler().wake();

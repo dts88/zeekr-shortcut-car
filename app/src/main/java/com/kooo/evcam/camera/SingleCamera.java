@@ -385,11 +385,12 @@ public class SingleCamera {
 
     /** 声明、我们建的 Surface、上一份会话带着的输出，这几样的锁。拿着它时不进相机服务、不回调。 */
     private final Object outputLock = new Object();
-    /** 声明着的预览、后视镜、盲区画面（中控屏、HUD）、录像，每样最多一个（{@link #outputLock}）。 */
+    /** 声明着的预览、后视镜、盲区画面（中控屏两块、HUD）、录像，每样最多一个（{@link #outputLock}）。 */
     private Declared declaredPreview;
     private Declared declaredMirror;
     private Declared declaredSide;
     private Declared declaredHud;
+    private Declared declaredSideSecond;
     private Declared declaredRecord;
     /**
      * 我们自己建的 Surface（预览、后视镜、盲区画面的 {@code new Surface(SurfaceTexture)}，或者鱼眼校正管线的入口），按输出记。
@@ -423,10 +424,13 @@ public class SingleCamera {
      */
     private volatile int[] latestAdjust;
 
-    /** 会话里几样输出的次序：预览、后视镜、盲区画面（中控屏、HUD）共用一条流（预览打头），出帧口、录像各一条，JPEG 最后。 */
+    /**
+     * 会话里几样输出的次序：预览、后视镜、盲区画面（中控屏、HUD、中控屏第二块）共用一条流（预览打头），出帧口、录像各一条，
+     * JPEG 最后。共享预览流挂不下时排在后面的先让：中控屏第二块，再是 HUD（项目所有者 2026-11-04 定的次序）。
+     */
     private static final ChannelRules.Kind[] SESSION_ORDER = {
             ChannelRules.Kind.PREVIEW, ChannelRules.Kind.MIRROR, ChannelRules.Kind.SIDE, ChannelRules.Kind.HUD,
-            ChannelRules.Kind.SINK, ChannelRules.Kind.RECORD};
+            ChannelRules.Kind.SIDE_SECOND, ChannelRules.Kind.SINK, ChannelRules.Kind.RECORD};
     /** 共享预览流最多能挂几块画布（框架给的上限，AOSP 是 4；车机上记一行看实际是几），变了才记；0 = 还没记过。 */
     private static volatile int sharedSurfaceLimitNoted;
 
@@ -1271,6 +1275,8 @@ public class SingleCamera {
                             return "mirror";
                         case SIDE:
                             return "side";
+                        case SIDE_SECOND:
+                            return "side-second";
                         case HUD:
                             return "hud";
                         case RECORD:
@@ -1635,84 +1641,82 @@ public class SingleCamera {
     }
 
     /**
-     * 声明盲区画面的画布：以 SurfaceTexture 作身份，同 {@link #declareMirror}。窗口藏起来、再显示都不算变化 ——
-     * 画面只要活着就留在会话里。
+     * 声明盲区画面的一块画布：中控屏（{@link ChannelRules.Kind#SIDE}）、中控屏第二块（{@link ChannelRules.Kind#SIDE_SECOND}，
+     * 2026-11-04）、HUD（{@link ChannelRules.Kind#HUD}，2026-10-21）三块可以同时在会话里。以 SurfaceTexture 作身份，
+     * 同 {@link #declareMirror}。窗口藏起来、再显示都不算变化 —— 画面只要活着就留在会话里。
      *
+     * @param kind      哪一块；别的种类什么都不做
      * @param onDropped 相机层丢了它（共享预览流挂不下、会话配不上）时告诉谁（调度在主线程上派发）
      */
-    public boolean declareSide(SurfaceTexture texture, RecordDropped onDropped) {
-        if (texture == null) {
+    public boolean declareSide(ChannelRules.Kind kind, SurfaceTexture texture, RecordDropped onDropped) {
+        if (texture == null || !ChannelRules.sideView(kind)) {
             return false;
         }
-        ChannelRules.Out out = new ChannelRules.Out(ChannelRules.Kind.SIDE, texture);
+        ChannelRules.Out out = new ChannelRules.Out(kind, texture);
         boolean changed;
         synchronized (outputLock) {
-            changed = declaredSide == null || !declaredSide.out.equals(out);
+            Declared current = sideSlot(kind);
+            changed = current == null || !current.out.equals(out);
             if (changed) {
-                declaredSide = new Declared(out, null, null, onDropped);
+                setSideSlot(kind, new Declared(out, null, null, onDropped));
             }
         }
         if (changed) {
-            AppLog.d(TAG, "Camera " + cameraId + " side view declared: " + texture);
+            AppLog.d(TAG, "Camera " + cameraId + " side view " + kind + " declared: " + texture);
             tidyLater();
         }
         return changed;
     }
 
-    /** 撤回盲区画面：只撤回 {@code texture} 这一块。 */
-    public boolean withdrawSide(SurfaceTexture texture) {
-        boolean changed;
-        synchronized (outputLock) {
-            changed = texture != null && declaredSide != null && declaredSide.out.consumer == texture;
-            if (changed) {
-                declaredSide = null;
-            }
-        }
-        if (changed) {
-            AppLog.d(TAG, "Camera " + cameraId + " side view withdrawn: " + texture);
-            tidyLater();
-        }
-        return changed;
-    }
-
-    /**
-     * 声明盲区画面在 HUD 上的画布（2026-10-21）：同 {@link #declareSide}，是另一样输出 —— 中控屏、HUD 两块可以同时在会话里。
-     *
-     * @param onDropped 相机层丢了它（共享预览流挂不下、会话配不上）时告诉谁（调度在主线程上派发）
-     */
-    public boolean declareHud(SurfaceTexture texture, RecordDropped onDropped) {
-        if (texture == null) {
+    /** 撤回盲区画面的一块画布：只撤回 {@code kind} 那一块、而且是 {@code texture} 才撤回。 */
+    public boolean withdrawSide(ChannelRules.Kind kind, SurfaceTexture texture) {
+        if (!ChannelRules.sideView(kind)) {
             return false;
         }
-        ChannelRules.Out out = new ChannelRules.Out(ChannelRules.Kind.HUD, texture);
         boolean changed;
         synchronized (outputLock) {
-            changed = declaredHud == null || !declaredHud.out.equals(out);
+            Declared current = sideSlot(kind);
+            changed = texture != null && current != null && current.out.consumer == texture;
             if (changed) {
-                declaredHud = new Declared(out, null, null, onDropped);
+                setSideSlot(kind, null);
             }
         }
         if (changed) {
-            AppLog.d(TAG, "Camera " + cameraId + " HUD side view declared: " + texture);
+            AppLog.d(TAG, "Camera " + cameraId + " side view " + kind + " withdrawn: " + texture);
             tidyLater();
         }
         return changed;
     }
 
-    /** 撤回 HUD 上的盲区画面：只撤回 {@code texture} 这一块。 */
-    public boolean withdrawHud(SurfaceTexture texture) {
-        boolean changed;
-        synchronized (outputLock) {
-            changed = texture != null && declaredHud != null && declaredHud.out.consumer == texture;
-            if (changed) {
-                declaredHud = null;
-            }
+    /** 盲区画面那一块的声明（{@link #outputLock}）；不是盲区画面的种类是 null。 */
+    private Declared sideSlot(ChannelRules.Kind kind) {
+        switch (kind) {
+            case SIDE:
+                return declaredSide;
+            case SIDE_SECOND:
+                return declaredSideSecond;
+            case HUD:
+                return declaredHud;
+            default:
+                return null;
         }
-        if (changed) {
-            AppLog.d(TAG, "Camera " + cameraId + " HUD side view withdrawn: " + texture);
-            tidyLater();
+    }
+
+    /** 换掉盲区画面那一块的声明（{@link #outputLock}）。 */
+    private void setSideSlot(ChannelRules.Kind kind, Declared declared) {
+        switch (kind) {
+            case SIDE:
+                declaredSide = declared;
+                break;
+            case SIDE_SECOND:
+                declaredSideSecond = declared;
+                break;
+            case HUD:
+                declaredHud = declared;
+                break;
+            default:
+                break;
         }
-        return changed;
     }
 
     /**
@@ -1755,10 +1759,11 @@ public class SingleCamera {
         return changed;
     }
 
-    /** 声明着的录像、盲区画面（中控屏、HUD）、超级镜子输出 {@code out} 离开会话时该告诉谁；不是它、或者已经撤回了返回 null。 */
+    /** 声明着的录像、盲区画面（中控屏两块、HUD）、超级镜子输出 {@code out} 离开会话时该告诉谁；不是它、或者已经撤回了返回 null。 */
     public RecordDropped dropListener(ChannelRules.Out out) {
         synchronized (outputLock) {
-            for (Declared current : new Declared[]{declaredRecord, declaredSide, declaredHud, declaredMirror}) {
+            for (Declared current : new Declared[]{declaredRecord, declaredSide, declaredHud, declaredSideSecond,
+                    declaredMirror}) {
                 if (current != null && current.out.equals(out)) {
                     return current.onDropped;
                 }
@@ -1779,7 +1784,7 @@ public class SingleCamera {
         Set<ChannelRules.Out> result = new LinkedHashSet<>();
         synchronized (outputLock) {
             for (Declared declared : new Declared[]{declaredPreview, declaredMirror, declaredSide, declaredHud,
-                    declaredRecord}) {
+                    declaredSideSecond, declaredRecord}) {
                 if (declared != null && alive(declared.out.consumer)
                         && (declared.surface == null || declared.surface.isValid())) {
                     result.add(declared.out);
@@ -1983,7 +1988,7 @@ public class SingleCamera {
     /** 和这一样输出相同的声明；没有返回 null（{@link #outputLock}）。 */
     private Declared declaredFor(ChannelRules.Out out) {
         for (Declared declared : new Declared[]{declaredPreview, declaredMirror, declaredSide, declaredHud,
-                declaredRecord}) {
+                declaredSideSecond, declaredRecord}) {
             if (declared != null && declared.out.equals(out)) {
                 return declared;
             }
@@ -2679,14 +2684,14 @@ public class SingleCamera {
         List<OutputConfiguration> outputConfigs = new ArrayList<>();
 
         // 正常模式：使用 OutputConfiguration 实现 Surface Sharing (API 28+)
-        // 将所有预览性质的 Surface（主预览、后视镜、盲区画面的中控屏和 HUD 两块）组合成一个硬件流；
+        // 将所有预览性质的 Surface（主预览、后视镜、盲区画面的中控屏两块和 HUD）组合成一个硬件流；
         // 几块的缓冲区尺寸在这之前都拨成了相机的输出尺寸，OutputConfiguration 才对得上
         OutputConfiguration previewSharedConfig = null;
         int sharedCount = 0;
         final Map<ChannelRules.Out, Surface> built = new LinkedHashMap<>();
         for (Target target : targets) {
             ChannelRules.Kind kind = target.out.kind;
-            boolean sideView = kind == ChannelRules.Kind.SIDE || kind == ChannelRules.Kind.HUD;
+            boolean sideView = ChannelRules.sideView(kind);
             if (kind == ChannelRules.Kind.PREVIEW || kind == ChannelRules.Kind.MIRROR || sideView) {
                 if (previewSharedConfig == null) {
                     previewSharedConfig = new OutputConfiguration(target.surface);
@@ -2694,11 +2699,12 @@ public class SingleCamera {
                     outputConfigs.add(previewSharedConfig);
                     noteSharedSurfaceLimit(previewSharedConfig.getMaxSharedSurfaceCount());
                 } else if (sideView && sharedCount >= previewSharedConfig.getMaxSharedSurfaceCount()) {
-                    // 共享预览流挂满了（框架给的上限）：盲区画面最可有可无，这一份会话不带它（HUD 那块排在最后，先轮到它），
-                    // 告诉盲区画面那一侧（它撤回声明，不然调度会一直想把它加回来）
+                    // 共享预览流挂满了（框架给的上限）：盲区画面最可有可无，这一份会话不带它（排在最后的先轮到：
+                    // 中控屏第二块，再是 HUD），告诉盲区画面那一侧（它撤回声明，不然调度会一直想把它加回来）
                     com.kooo.evcam.blackbox.BlackBox.noteImportant("相机 " + cameraId + " 共享预览流已挂 " + sharedCount
                             + " 块画布（上限 " + previewSharedConfig.getMaxSharedSurfaceCount() + "）：这一份会话不带盲区画面"
-                            + (kind == ChannelRules.Kind.HUD ? "（HUD）" : "（中控屏）"));
+                            + (kind == ChannelRules.Kind.HUD ? "（HUD）"
+                            : kind == ChannelRules.Kind.SIDE_SECOND ? "（中控屏第二块）" : "（中控屏）"));
                     dropOutput(target.out, Drop.CONFIG_FAILED);
                     continue;
                 } else {
@@ -2746,6 +2752,7 @@ public class SingleCamera {
         // 配不上时按这份会话里有什么来丢
         final ChannelRules.Out sideOut = firstOfKind(built.keySet(), ChannelRules.Kind.SIDE);
         final ChannelRules.Out hudOut = firstOfKind(built.keySet(), ChannelRules.Kind.HUD);
+        final ChannelRules.Out secondOut = firstOfKind(built.keySet(), ChannelRules.Kind.SIDE_SECOND);
         final ChannelRules.Out mirrorOut = firstOfKind(targets, ChannelRules.Kind.MIRROR);
         final ChannelRules.Out recordOut = firstOfKind(targets, ChannelRules.Kind.RECORD);
 
@@ -2847,14 +2854,18 @@ public class SingleCamera {
                     return;
                 }
 
-                // 再丢盲区画面：录不录像都先丢它（预览、超级镜子、录像都比它要紧），中控屏、HUD 两块一起丢，
+                // 再丢盲区画面：录不录像都先丢它（预览、超级镜子、录像都比它要紧），中控屏两块、HUD 一起丢，
                 // 告诉盲区画面那一侧撤回
-                if (sideOut != null || hudOut != null) {
+                if (sideOut != null || hudOut != null || secondOut != null) {
                     com.kooo.evcam.blackbox.BlackBox.noteImportant("相机 " + cameraId
-                            + " 会话配置失败：先丢掉盲区画面再试"
-                            + (sideOut != null && hudOut != null ? "（中控屏和 HUD）" : hudOut != null ? "（HUD）" : ""));
+                            + " 会话配置失败：先丢掉盲区画面再试（"
+                            + (sideOut != null ? "中控屏" : "") + (secondOut != null ? "、中控屏第二块" : "")
+                            + (hudOut != null ? "、HUD" : "") + "）");
                     if (sideOut != null) {
                         dropOutput(sideOut, Drop.CONFIG_FAILED);
+                    }
+                    if (secondOut != null) {
+                        dropOutput(secondOut, Drop.CONFIG_FAILED);
                     }
                     if (hudOut != null) {
                         dropOutput(hudOut, Drop.CONFIG_FAILED);

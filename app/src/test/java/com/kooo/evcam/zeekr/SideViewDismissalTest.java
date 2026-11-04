@@ -55,4 +55,16 @@ public class SideViewDismissalTest {
         assertFalse("灭了清掉", dismissal.suppressLight(LaneCycle.LEFT, false));
         assertFalse("再亮是新的一次", dismissal.suppressLight(LaneCycle.LEFT, true));
     }
+
+    /** 两侧都关掉了：各自压着、各自灭了才清（2026-11-04 起两侧可以同时显示）。 */
+    @Test
+    public void bothSidesCanBeDismissedOnTheirOwn() {
+        SideViewDismissal dismissal = new SideViewDismissal();
+        dismissal.dismissLight(LaneCycle.LEFT);
+        dismissal.dismissLight(LaneCycle.RIGHT);
+        assertTrue(dismissal.suppressLight(LaneCycle.LEFT, true));
+        assertTrue("关右边不会让左边又弹出来", dismissal.suppressLight(LaneCycle.RIGHT, true));
+        assertFalse(dismissal.suppressLight(LaneCycle.LEFT, false));
+        assertTrue("左边灭了，右边照旧压着", dismissal.suppressLight(LaneCycle.RIGHT, true));
+    }
 }

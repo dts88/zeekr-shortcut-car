@@ -6,7 +6,10 @@ import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
-/** {@link SideViewTrigger}：D 挡备着、打灯显示、灯灭后留 1 秒（再淡 1 秒）、离开 D 挡 30 秒后摘掉、原厂画面和熄屏立刻全收。 */
+/**
+ * {@link SideViewTrigger}：D 挡备着、打灯显示、灯灭后留 1 秒（再淡 1 秒）、离开 D 挡 30 秒后摘掉、原厂画面和熄屏立刻全收；
+ * 左右各管各的（2026-11-04），只能显示一侧时的先后。
+ */
 public class SideViewTriggerTest {
 
     private static SideViewDecision.Input in(String gear, Integer turn) {
@@ -134,7 +137,7 @@ public class SideViewTriggerTest {
     public void closeButtonDismissesThisSignalOnly() {
         SideViewTrigger t = new SideViewTrigger();
         t.update(0, in("D", 1), false);
-        t.dismiss();
+        t.dismiss(LaneCycle.LEFT);
         SideViewTrigger.Result r = t.update(100, in("D", 1), false);
         assertFalse(r.shown);
         assertTrue("D 挡：回到备着", r.attached);
@@ -176,7 +179,7 @@ public class SideViewTriggerTest {
     public void resetForgetsTheDismissal() {
         SideViewTrigger t = new SideViewTrigger();
         t.update(0, in("D", 1), false);
-        t.dismiss();
+        t.dismiss(LaneCycle.LEFT);
         t.reset();
         SideViewTrigger.Result r = t.update(100, in("D", 1), false);
         assertTrue(r.shown);
@@ -227,7 +230,7 @@ public class SideViewTriggerTest {
         lit.useBlindSpot = true;
         lit.blindSpotRight = true;
         assertTrue(t.update(0, lit, false).shown);
-        t.dismiss();
+        t.dismiss(LaneCycle.RIGHT);
         SideViewTrigger.Result r = t.update(100, lit, false);
         assertFalse("还亮着：这一次关掉了", r.shown);
         assertTrue("D 挡：回到备着", r.attached);
@@ -246,7 +249,7 @@ public class SideViewTriggerTest {
         lit.useBlindSpot = true;
         lit.blindSpotLeft = true;
         assertEquals(LaneCycle.LEFT, t.update(0, lit, false).lane);
-        t.dismiss();
+        t.dismiss(LaneCycle.LEFT);
         lit.blindSpotRight = true;
         SideViewTrigger.Result r = t.update(100, lit, false);
         assertTrue("右边亮了照样显示", r.shown);
@@ -345,7 +348,7 @@ public class SideViewTriggerTest {
         closed.update(0, fading("D", 2), false);
         closed.update(1_000, fading("D", 0), false);
         closed.update(held, fading("D", 0), false);
-        closed.dismiss();
+        closed.dismiss(LaneCycle.RIGHT);
         r = closed.update(held + 100, fading("D", 0), false);
         assertFalse("点了关闭：当场收", r.shown);
         assertEquals(0, r.fadeMs);
@@ -357,5 +360,101 @@ public class SideViewTriggerTest {
         r = reverse.update(held + 100, fading("R", 0), false);
         assertFalse("倒挡：当场全收", r.attached);
         assertEquals(0, r.fadeMs);
+    }
+
+    // ------------------------------------------------------------------ 左右两侧（项目所有者 2026-11-04）
+
+    private static SideViewDecision.Input lights(String gear, Integer turn, boolean left, boolean right) {
+        SideViewDecision.Input in = in(gear, turn);
+        in.useBlindSpot = true;
+        in.blindSpotLeft = left;
+        in.blindSpotRight = right;
+        return in;
+    }
+
+    /** 后视镜上的灯左右都亮：两侧都显示；只能显示一侧时先亮起来的那一侧。 */
+    @Test
+    public void bothLightsShowBothSides() {
+        SideViewTrigger t = new SideViewTrigger();
+        t.update(0, lights("D", 0, false, true), false);
+        SideViewTrigger.Result r = t.update(500, lights("D", 0, true, true), false);
+        assertTrue(r.left.shown);
+        assertTrue(r.right.shown);
+        assertEquals(SideViewTrigger.Cause.BLIND_SPOT, r.left.cause);
+        assertEquals("只能显示一侧时：先亮的右边", LaneCycle.RIGHT, r.lane);
+    }
+
+    /** 同时亮起来的：只能显示一侧时先左边。 */
+    @Test
+    public void lightsComingOnTogetherPutTheLeftFirst() {
+        SideViewTrigger.Result r = new SideViewTrigger().update(0, lights("D", 0, true, true), false);
+        assertTrue(r.left.shown);
+        assertTrue(r.right.shown);
+        assertEquals(LaneCycle.LEFT, r.lane);
+    }
+
+    /** 打着转向灯、另一侧的灯也亮：两侧都显示，只能显示一侧时转向灯那一侧优先（项目所有者 2026-11-04）。 */
+    @Test
+    public void aTurnSignalWithTheOtherSideLitShowsBothAndComesFirst() {
+        SideViewTrigger t = new SideViewTrigger();
+        t.update(0, lights("D", 0, true, false), false);
+        SideViewTrigger.Result r = t.update(300, lights("D", 2, true, false), false);
+        assertTrue("左边的灯照样显示", r.left.shown);
+        assertTrue(r.right.shown);
+        assertEquals(SideViewTrigger.Cause.TURN, r.right.cause);
+        assertEquals("转向灯那一侧优先，虽然左边先亮", LaneCycle.RIGHT, r.lane);
+        assertEquals(SideViewTrigger.Cause.TURN, r.cause);
+    }
+
+    /** 一侧灭了只收那一侧（留 1 秒、淡 1 秒），另一侧照旧；只能显示一侧时换到还亮着的那一侧。 */
+    @Test
+    public void eachSideHoldsAndFadesOnItsOwn() {
+        SideViewTrigger t = new SideViewTrigger();
+        SideViewDecision.Input both = lights("D", 0, true, true);
+        both.fade = true;
+        t.update(0, both, false);
+        SideViewDecision.Input rightOnly = lights("D", 0, false, true);
+        rightOnly.fade = true;
+        SideViewTrigger.Result r = t.update(1_000, rightOnly, false);
+        assertTrue("左边灭了先留着", r.left.shown);
+        assertEquals(null, r.left.cause);
+        assertTrue(r.right.shown);
+        assertEquals("只能显示一侧时换到还亮着的右边", LaneCycle.RIGHT, r.lane);
+        assertEquals(1_000 + SideViewTrigger.HOLD_AFTER_SIGNAL_MS, r.wakeAt);
+
+        long held = 1_000 + SideViewTrigger.HOLD_AFTER_SIGNAL_MS;
+        r = t.update(held, rightOnly, false);
+        assertEquals("左边在淡", SideViewTrigger.FADE_MS, r.left.fadeMs);
+        assertEquals("右边不淡", 0, r.right.fadeMs);
+        r = t.update(held + SideViewTrigger.FADE_MS, rightOnly, false);
+        assertFalse(r.left.shown);
+        assertTrue(r.right.shown);
+    }
+
+    /** 关掉一侧：只关那一侧，另一侧照旧显示；两侧都能各自关掉。 */
+    @Test
+    public void closingOneSideLeavesTheOther() {
+        SideViewTrigger t = new SideViewTrigger();
+        SideViewDecision.Input both = lights("D", 0, true, true);
+        t.update(0, both, false);
+        t.dismiss(LaneCycle.LEFT);
+        SideViewTrigger.Result r = t.update(100, both, false);
+        assertFalse("左边这一次关掉了", r.left.shown);
+        assertTrue(r.right.shown);
+        t.dismiss(LaneCycle.RIGHT);
+        r = t.update(200, both, false);
+        assertFalse(r.left.shown);
+        assertFalse("右边也关掉了", r.right.shown);
+        assertTrue("D 挡：回到备着", r.attached);
+    }
+
+    /** 一侧亮着、另一侧没有：D 挡照样备着，两侧各报各的（中控屏两块各管一侧时照它）。 */
+    @Test
+    public void eachSideReportsOnItsOwn() {
+        SideViewTrigger.Result r = new SideViewTrigger().update(0, lights("D", 0, false, true), false);
+        assertTrue("D 挡：备着", r.attached);
+        assertFalse(r.side(LaneCycle.LEFT).shown);
+        assertTrue(r.side(LaneCycle.RIGHT).shown);
+        assertEquals(SideViewTrigger.Cause.BLIND_SPOT, r.side(LaneCycle.RIGHT).cause);
     }
 }

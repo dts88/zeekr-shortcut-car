@@ -14,10 +14,8 @@ import android.graphics.drawable.ColorDrawable;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
-import android.util.DisplayMetrics;
 import android.util.Size;
 import android.view.Display;
-import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
@@ -37,6 +35,12 @@ import com.kooo.evcam.AutoFitTextureView;
  * 左灯靠左、右灯靠右）。不接点击、没有关闭按钮：HUD 不是触摸屏。系统在那块屏没了时会自己收掉 Presentation，
  * 所以 {@link #isAttached()} 每次都问它一句，服务发现不挂着了就当这一段 HUD 用不了。</p>
  *
+ * <h3>左右两个画面（项目所有者 2026-11-04）</h3>
+ *
+ * <p>后视镜上的灯左右可能同时亮：这个窗口铺满那块屏、本身透明，左右两个画面各画在自己的位置上，一块画布同时画两个
+ * （不多占一块环视的输出）。两个画面各管各的：显示、收起、淡出（{@link SideViewFade}，画的时候乘上去）、
+ * 「先盖黑、等新帧」（{@link SideViewPicture} 一侧一份）。画面外面不画东西，原厂在 HUD 上显示的照样看得见。</p>
+ *
  * <h3>HUD 是投影</h3>
  *
  * <p>黑色是不亮：黑底、盖黑在 HUD 上都是「什么也没有」。画面过一条对比度曲线（白天、夜间各一档），四边渐隐到黑，
@@ -53,21 +57,38 @@ public class SideViewHudWindow extends ViewGroup implements SideViewOutputWindow
 
     private static final long TICK_MS = 250L;
 
+    /** 一侧的画面：显示着没有、画面本身（盖黑、等新帧）、淡到哪了。 */
+    private final class Picture {
+        final int lane;
+        final SideViewPicture picture;
+        final SideViewFade fade;
+        boolean shown;
+        /** 收起前的淡出淡到哪了：1 正常，0 看不见。 */
+        float alpha = 1f;
+
+        Picture(int lane) {
+            this.lane = lane;
+            this.picture = new SideViewPicture(appConfig);
+            this.fade = new SideViewFade(a -> {
+                alpha = a;
+                invalidate();
+            });
+        }
+    }
+
     private final AppConfig appConfig;
     private final Display display;
     private final AutoFitTextureView textureView;
-    private final SideViewPicture picture;
+    private final Picture left;
+    private final Picture right;
     private final FisheyeMesh.Painter paintTexture = this::drawTextureOnce;
     private final Handler handler = new Handler(Looper.getMainLooper());
+    /** 四边渐隐用的（和收起前的淡出不是一回事）。 */
     private final Paint fadePaint = new Paint();
-    /** 收起前的淡出（{@link #fadeOut}；和四边渐隐的 {@link #fadePaint} 不是一回事）。 */
-    private final SideViewFade fadeAway = new SideViewFade(this);
 
     private Presentation presentation;
     private FrameLayout root;
     private boolean attached;
-    private boolean shown;
-    private int lane = LaneCycle.LEFT;
     private boolean night;
     /** 画面过的对比度曲线；对比度 100 时是 null（原样）。 */
     private Paint tonePaint;
@@ -82,14 +103,18 @@ public class SideViewHudWindow extends ViewGroup implements SideViewOutputWindow
     private final Runnable tick = new Runnable() {
         @Override
         public void run() {
-            if (!isAttached() || !shown) {
+            if (!isShowing()) {
                 return;
             }
-            if (picture.checkStale(SystemClock.uptimeMillis())) {
-                if (picture.isStale()) {
-                    AppLog.i(TAG, "HUD 盲区画面 " + SideViewPicture.STALE_MS + " ms 没有新帧：盖上");
+            long now = SystemClock.uptimeMillis();
+            for (Picture p : new Picture[]{left, right}) {
+                if (p.shown && p.picture.checkStale(now)) {
+                    if (p.picture.isStale()) {
+                        AppLog.i(TAG, "HUD 盲区画面「" + LaneCycle.labelOf(p.lane) + "」" + SideViewPicture.STALE_MS
+                                + " ms 没有新帧：盖上");
+                    }
+                    invalidate();
                 }
-                invalidate();
             }
             handler.postDelayed(this, TICK_MS);
         }
@@ -99,8 +124,11 @@ public class SideViewHudWindow extends ViewGroup implements SideViewOutputWindow
         super(context);
         this.appConfig = appConfig;
         this.display = display;
-        this.picture = new SideViewPicture(appConfig);
-        setBackgroundColor(0xFF000000);
+        this.left = new Picture(LaneCycle.LEFT);
+        this.right = new Picture(LaneCycle.RIGHT);
+        // 铺满那块屏、本身透明：只在两个画面的位置上画（原厂在 HUD 上显示的不挡）
+        setBackgroundColor(0);
+        setWillNotDraw(false);
         textureView = new AutoFitTextureView(context);
         addView(textureView);
         fadePaint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.DST_OUT));
@@ -119,14 +147,16 @@ public class SideViewHudWindow extends ViewGroup implements SideViewOutputWindow
 
     @Override
     public void setSourceSize(Size size) {
-        if (picture.setSourceSize(size)) {
+        boolean changed = left.picture.setSourceSize(size);
+        changed |= right.picture.setSourceSize(size);
+        if (changed) {
             invalidate();
         }
     }
 
     @Override
     public boolean hasGeometry() {
-        return picture.hasGeometry();
+        return left.picture.hasGeometry();
     }
 
     /** 挂着：系统在那块屏没了时会自己收掉 Presentation，所以每次问它一句。 */
@@ -137,12 +167,12 @@ public class SideViewHudWindow extends ViewGroup implements SideViewOutputWindow
 
     @Override
     public boolean isShowing() {
-        return isAttached() && shown;
+        return isAttached() && (left.shown || right.shown);
     }
 
     @Override
-    public int lane() {
-        return lane;
+    public boolean isShowing(int side) {
+        return isAttached() && picture(side).shown;
     }
 
     @Override
@@ -164,7 +194,7 @@ public class SideViewHudWindow extends ViewGroup implements SideViewOutputWindow
     public void applyConfig() {
         readLook();
         if (isAttached()) {
-            place();
+            requestLayout();
             applyWindowAlpha();
         }
         invalidate();
@@ -184,53 +214,76 @@ public class SideViewHudWindow extends ViewGroup implements SideViewOutputWindow
         fadeShaders = null;
     }
 
+    private Picture picture(int side) {
+        return side == LaneCycle.RIGHT ? right : left;
+    }
+
     // ------------------------------------------------------------------ 窗口
 
+    /** 挂上，两侧都不显示（备着）；已经挂着就只是把两侧都收起。 */
     @Override
     public void attachHidden(int side) {
-        attachAt(side, false);
+        for (Picture p : new Picture[]{left, right}) {
+            p.fade.stop();
+            p.shown = false;
+        }
+        attach();
     }
 
+    /** 显示这一侧，另一侧照旧（两侧可以同时显示）。 */
     @Override
     public void show(int side) {
-        attachAt(side, true);
+        Picture p = picture(side);
+        // 淡出中又显示，或者上一次淡完收起的：回到正常
+        p.fade.restore();
+        if (!(isAttached() && p.shown)) {
+            p.picture.beginShowing(SystemClock.uptimeMillis());
+        }
+        p.shown = true;
+        attach();
     }
 
     @Override
-    public void conceal() {
-        fadeAway.stop();
-        if (!isAttached() || !shown) {
+    public void conceal(int side) {
+        Picture p = picture(side);
+        p.fade.stop();
+        if (!isAttached() || !p.shown) {
             return;
         }
-        shown = false;
-        handler.removeCallbacks(tick);
+        p.shown = false;
+        if (!isShowing()) {
+            handler.removeCallbacks(tick);
+        }
         applyWindowAlpha();
         syncCanvas();
+        invalidate();
     }
 
     @Override
-    public void fadeOut(long durationMs) {
-        if (isAttached() && shown) {
-            fadeAway.start(durationMs);
+    public void fadeOut(int side, long durationMs) {
+        if (isShowing(side)) {
+            picture(side).fade.start(durationMs);
         }
     }
 
     @Override
-    public boolean isFading() {
-        return fadeAway.isFading();
+    public boolean isFading(int side) {
+        return picture(side).fade.isFading();
     }
 
-    /** 当场移走：Presentation 收掉，画布在这一下被收走，服务把它交给管线留着（{@link MultiCameraManager#keepHudCanvas}）。 */
+    /** 当场移走：Presentation 收掉，画布在这一下被收走，服务把它交给管线留着（{@link MultiCameraManager#keepSideCanvas}）。 */
     @Override
     public void detach() {
         handler.removeCallbacks(tick);
-        fadeAway.stop();
+        for (Picture p : new Picture[]{left, right}) {
+            p.fade.stop();
+            p.shown = false;
+        }
         Presentation p = presentation;
         FrameLayout frame = root;
         presentation = null;
         root = null;
         attached = false;
-        shown = false;
         if (frame != null) {
             try {
                 frame.removeView(this);
@@ -247,18 +300,8 @@ public class SideViewHudWindow extends ViewGroup implements SideViewOutputWindow
         }
     }
 
-    private void attachAt(int side, boolean show) {
-        boolean wasShown = isAttached() && shown;
-        boolean sideChanged = side != lane;
-        lane = side;
-        if (show) {
-            // 淡出中又显示、换一侧，或者上一次淡完收起的：回到正常
-            fadeAway.restore();
-        }
-        if (show && !wasShown) {
-            picture.beginShowing(SystemClock.uptimeMillis());
-        }
-        shown = show;
+    /** 没挂就挂上（铺满那块屏的透明 Presentation），挂着就照两侧此刻显示没有换窗口的透明度、画布可见不可见。 */
+    private void attach() {
         if (!isAttached()) {
             if (attached) {
                 // 系统收掉了（那块屏没了）：先收干净，服务据此当这一段 HUD 用不了
@@ -269,7 +312,8 @@ public class SideViewHudWindow extends ViewGroup implements SideViewOutputWindow
                 Presentation p = new Presentation(getContext(), display);
                 FrameLayout frame = new FrameLayout(p.getContext());
                 frame.setBackgroundColor(0);
-                frame.addView(this, placement());
+                frame.addView(this, new FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
                 p.setContentView(frame);
                 Window window = p.getWindow();
                 if (window != null) {
@@ -291,39 +335,24 @@ public class SideViewHudWindow extends ViewGroup implements SideViewOutputWindow
                 return;
             }
         } else {
-            if (sideChanged) {
-                place();
-            }
             applyWindowAlpha();
             syncCanvas();
         }
-        if (shown) {
+        if (left.shown || right.shown) {
             handler.removeCallbacks(tick);
             handler.postDelayed(tick, TICK_MS);
         }
         invalidate();
     }
 
-    /** 画面在 HUD 里的位置和大小，照 HUD 的真实尺寸和设置算（{@link HudPicture#place}）。 */
-    private FrameLayout.LayoutParams placement() {
-        DisplayMetrics metrics = new DisplayMetrics();
-        display.getRealMetrics(metrics);
-        HudPicture.Rect rect = HudPicture.place(metrics.widthPixels, metrics.heightPixels,
+    /** 画面在 HUD 里的位置和大小，照这块窗口（铺满那块屏）的尺寸和设置算（{@link HudPicture#place}）。 */
+    private HudPicture.Rect placement(int side) {
+        return HudPicture.place(getWidth(), getHeight(),
                 appConfig.getHudHeight(), appConfig.getHudShape(), appConfig.getHudEdge(), appConfig.getHudVertical(),
-                lane == LaneCycle.RIGHT);
-        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(rect.width, rect.height, Gravity.TOP | Gravity.START);
-        lp.leftMargin = rect.left;
-        lp.topMargin = rect.top;
-        return lp;
+                side == LaneCycle.RIGHT);
     }
 
-    private void place() {
-        if (root != null && getParent() == root) {
-            setLayoutParams(placement());
-        }
-    }
-
-    /** 显示时按设置的透明度（夜间再乘夜间亮度），备着时全透明。 */
+    /** 有一侧显示着时按设置的透明度（夜间再乘夜间亮度），两侧都不显示（备着）时全透明。 */
     private void applyWindowAlpha() {
         Presentation p = presentation;
         Window window = p != null ? p.getWindow() : null;
@@ -331,13 +360,14 @@ public class SideViewHudWindow extends ViewGroup implements SideViewOutputWindow
             return;
         }
         WindowManager.LayoutParams attrs = window.getAttributes();
-        attrs.alpha = shown ? HudPicture.opacity(appConfig.getHudOpacity(), appConfig.getHudNight(), night) : 0f;
+        attrs.alpha = left.shown || right.shown
+                ? HudPicture.opacity(appConfig.getHudOpacity(), appConfig.getHudNight(), night) : 0f;
         window.setAttributes(attrs);
     }
 
     @Override
     public void syncCanvas() {
-        int visibility = shown || !textureView.isAvailable() ? View.VISIBLE : View.INVISIBLE;
+        int visibility = left.shown || right.shown || !textureView.isAvailable() ? View.VISIBLE : View.INVISIBLE;
         if (textureView.getVisibility() != visibility) {
             textureView.setVisibility(visibility);
         }
@@ -345,7 +375,10 @@ public class SideViewHudWindow extends ViewGroup implements SideViewOutputWindow
 
     @Override
     public void noteFrame() {
-        if (picture.noteFrame(SystemClock.uptimeMillis(), shown)) {
+        long now = SystemClock.uptimeMillis();
+        boolean redraw = left.picture.noteFrame(now, left.shown);
+        redraw |= right.picture.noteFrame(now, right.shown);
+        if (redraw) {
             invalidate();
         }
     }
@@ -354,10 +387,13 @@ public class SideViewHudWindow extends ViewGroup implements SideViewOutputWindow
     public String describe() {
         return "display=" + display.getDisplayId() + " attached=" + attached
                 + " presentation=" + (presentation == null ? "none" : presentation.isShowing() ? "showing" : "gone")
-                + " shown=" + shown + " lane=" + LaneCycle.labelOf(lane)
+                + " left=" + describe(left) + " right=" + describe(right)
                 + " canvas=" + (textureView.isAvailable() ? "ready" : "none")
-                + " geometry=" + (hasGeometry() ? "known" : "unknown")
-                + " covered=" + (shown && picture.covered()) + " night=" + night;
+                + " geometry=" + (hasGeometry() ? "known" : "unknown") + " night=" + night;
+    }
+
+    private static String describe(Picture p) {
+        return !p.shown ? "hidden" : (p.picture.covered() ? "covered" : "live") + (p.fade.isFading() ? "+fading" : "");
     }
 
     // ------------------------------------------------------------------ 布局与绘制
@@ -365,33 +401,57 @@ public class SideViewHudWindow extends ViewGroup implements SideViewOutputWindow
     @Override
     protected void onMeasure(int widthSpec, int heightSpec) {
         super.onMeasure(widthSpec, heightSpec);
-        textureView.measure(MeasureSpec.makeMeasureSpec(getMeasuredWidth(), MeasureSpec.EXACTLY),
-                MeasureSpec.makeMeasureSpec(getMeasuredHeight(), MeasureSpec.EXACTLY));
+        // 画布照一个画面的大小（左右两个一样大，互为镜像），实际取景由 dispatchDraw 的网格决定
+        HudPicture.Rect rect = HudPicture.place(getMeasuredWidth(), getMeasuredHeight(),
+                appConfig.getHudHeight(), appConfig.getHudShape(), appConfig.getHudEdge(), appConfig.getHudVertical(),
+                false);
+        textureView.measure(MeasureSpec.makeMeasureSpec(Math.max(1, rect.width), MeasureSpec.EXACTLY),
+                MeasureSpec.makeMeasureSpec(Math.max(1, rect.height), MeasureSpec.EXACTLY));
     }
 
     @Override
     protected void onLayout(boolean changed, int l, int t, int r, int b) {
-        // 子视图铺满，实际取景由 dispatchDraw 的网格决定
-        textureView.layout(0, 0, getWidth(), getHeight());
+        textureView.layout(0, 0, textureView.getMeasuredWidth(), textureView.getMeasuredHeight());
     }
 
     @Override
     protected void dispatchDraw(Canvas canvas) {
-        int width = getWidth();
-        int height = getHeight();
-        if (width <= 0 || height <= 0) {
+        if (getWidth() <= 0 || getHeight() <= 0) {
             return;
         }
-        if (!shown) {
+        if (!left.shown && !right.shown) {
             // 备着：窗口是透明的。画布还没建好时照画一次，它才建得出来
             if (!textureView.isAvailable()) {
                 drawTextureOnce(canvas);
             }
             return;
         }
-        if (!picture.live()) {
+        for (Picture p : new Picture[]{left, right}) {
+            if (p.shown) {
+                drawPicture(canvas, p);
+            }
+        }
+    }
+
+    /** 一侧的画面画在它自己的位置上：底下铺黑（HUD 上不亮），淡出时整个乘上淡到哪了。 */
+    private void drawPicture(Canvas canvas, Picture p) {
+        HudPicture.Rect rect = placement(p.lane);
+        int width = rect.width;
+        int height = rect.height;
+        if (width <= 0 || height <= 0) {
+            return;
+        }
+        int outer = canvas.save();
+        canvas.translate(rect.left, rect.top);
+        canvas.clipRect(0, 0, width, height);
+        if (p.alpha < 1f) {
+            canvas.saveLayerAlpha(0f, 0f, width, height, Math.round(255 * Math.max(0f, p.alpha)));
+        }
+        canvas.drawColor(0xFF000000);
+        if (!p.picture.live()) {
             // 盖着：画一次子视图（不画就不取帧），再盖黑 —— HUD 上什么也没有
-            picture.draw(canvas, width, height, lane, paintTexture);
+            p.picture.draw(canvas, width, height, p.lane, paintTexture);
+            canvas.restoreToCount(outer);
             return;
         }
         float fade = HudPicture.fadePx(fadePercent, width, height);
@@ -400,7 +460,7 @@ public class SideViewHudWindow extends ViewGroup implements SideViewOutputWindow
         if (mirrored) {
             canvas.scale(-1f, 1f, width / 2f, height / 2f);
         }
-        picture.draw(canvas, width, height, lane, paintTexture);
+        p.picture.draw(canvas, width, height, p.lane, paintTexture);
         if (fade > 0f) {
             if (mirrored) {
                 canvas.scale(-1f, 1f, width / 2f, height / 2f);
@@ -408,6 +468,7 @@ public class SideViewHudWindow extends ViewGroup implements SideViewOutputWindow
             eraseEdges(canvas, width, height, fade);
         }
         canvas.restoreToCount(save);
+        canvas.restoreToCount(outer);
     }
 
     /** 四条渐变带，把画面从边上往里擦成透明（底下是黑的：HUD 上不亮）：最外沿擦净，到带的内沿不擦。 */
