@@ -1,15 +1,15 @@
 package com.kooo.evcam.zeekr;
 
 /**
- * 盲区画面：此刻该不该显示、显示哪一侧。
+ * 盲区画面：此刻哪一侧该不该显示（左右各判各的，项目所有者 2026-11-04；先后、保留、淡出在 {@link SideViewTrigger}）。
  *
  * <h3>规则</h3>
  *
  * <ul>
  *   <li>左灯只显示左侧那一路，右灯只显示右侧那一路；双闪、不打灯、读不到都不显示（{@link #turnLane}）。</li>
  *   <li><b>后视镜上的灯</b>（项目所有者 2026-11-03，设置里各自开关，默认关）：盲区指示灯、停车后的开门预警，哪一侧亮了就显示哪一侧，
- *       不用打转向灯（{@link #lightLane}）。不看车速（开门预警是停着车亮的，盲区灯低速也会亮）；双闪不拦。
- *       打着转向灯时以转向灯为准；显示着的那一侧灯还亮着就一直显示它，不在两侧之间来回跳。</li>
+ *       不用打转向灯（{@link #lit}）。不看车速（开门预警是停着车亮的，盲区灯低速也会亮）；双闪不拦。
+ *       两侧都亮就两侧都显示，打着转向灯时另一侧亮着也显示（项目所有者 2026-11-04）。</li>
  *   <li><b>原厂画面优先</b>：挂 R 挡、原厂 360 在显示、原厂画面弹着（360 或侧方小窗）、
  *       泊车辅助开着，任何一样成立都不显示；已经显示着的立刻收。</li>
  *   <li>打灯时车速低于设定值不显示（默认 30 km/h：再慢原厂自己会弹侧方小窗）；车速读不到不拦。
@@ -41,7 +41,10 @@ public final class SideViewDecision {
         public Float speedKmh;
         /** 设置里的门槛，km/h；0 表示不看车速。 */
         public int minSpeedKmh;
-        /** 此刻已经显示着的是哪一路（{@link LaneCycle#LEFT} / {@link LaneCycle#RIGHT}），没显示是 {@link #NONE}。 */
+        /**
+         * 转向灯打的那一侧此刻已经显示着就是那一侧（{@link LaneCycle#LEFT} / {@link LaneCycle#RIGHT}，{@link SideViewTrigger} 填），
+         * 不然是 {@link #NONE}：显示着的不再看车速（{@link #turnLane}）。
+         */
         public int showing = NONE;
         /** 后视镜上的盲区指示灯：左、右亮着没有；null 读不到。 */
         public Boolean blindSpotLeft;
@@ -58,20 +61,6 @@ public final class SideViewDecision {
          * 「录制时减少动效」开着而在录、系统关了动画时不放）。不放就和以前一样，留够就收。
          */
         public boolean fade;
-    }
-
-    /**
-     * @return 该显示的那一路：{@link LaneCycle#LEFT} / {@link LaneCycle#RIGHT}，或 {@link #NONE}
-     */
-    public static int decide(Input in) {
-        if (factoryViewActive(in)) {
-            return NONE;
-        }
-        int turn = turnLane(in);
-        if (turn != NONE) {
-            return turn;
-        }
-        return lightLane(in.showing, lit(in, LaneCycle.LEFT), lit(in, LaneCycle.RIGHT));
     }
 
     /** 转向灯要显示哪一侧（双闪、不打灯、读不到、原厂画面在都不显示；还没显示时看车速）。 */
@@ -111,27 +100,6 @@ public final class SideViewDecision {
     static boolean blindSpotLit(Input in, int lane) {
         return in.useBlindSpot
                 && Boolean.TRUE.equals(lane == LaneCycle.LEFT ? in.blindSpotLeft : in.blindSpotRight);
-    }
-
-    /**
-     * 后视镜上的灯要显示哪一侧：显示着的那一侧还亮着就接着显示它；不然左边亮着先左边，再右边。不看车速。
-     *
-     * @param showing 此刻显示着的那一侧（{@link #NONE} 是没显示）
-     */
-    static int lightLane(int showing, boolean leftLit, boolean rightLit) {
-        if (showing == LaneCycle.LEFT && leftLit) {
-            return LaneCycle.LEFT;
-        }
-        if (showing == LaneCycle.RIGHT && rightLit) {
-            return LaneCycle.RIGHT;
-        }
-        if (leftLit) {
-            return LaneCycle.LEFT;
-        }
-        if (rightLit) {
-            return LaneCycle.RIGHT;
-        }
-        return NONE;
     }
 
     /**

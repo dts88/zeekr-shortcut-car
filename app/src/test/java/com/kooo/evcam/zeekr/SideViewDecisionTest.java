@@ -7,7 +7,8 @@ import static org.junit.Assert.assertTrue;
 import org.junit.Test;
 
 /**
- * {@link SideViewDecision}：左灯只显示左、右灯只显示右、灯灭就不要、原厂画面优先。
+ * {@link SideViewDecision}：左灯只显示左、右灯只显示右、灯灭就不要、原厂画面优先；后视镜上的灯哪一侧亮算哪一侧
+ * （两侧怎么一起显示、先后在 {@code SideViewTriggerTest}）。
  *
  * <p>来源：FerixzTanz 的 PR #4、wysie 的 PR #19（GPL-3.0）。</p>
  */
@@ -28,12 +29,12 @@ public class SideViewDecisionTest {
 
     @Test
     public void leftSignalShowsLeftOnly() {
-        assertEquals(LaneCycle.LEFT, SideViewDecision.decide(driving(1)));
+        assertEquals(LaneCycle.LEFT, SideViewDecision.turnLane(driving(1)));
     }
 
     @Test
     public void rightSignalShowsRightOnly() {
-        assertEquals(LaneCycle.RIGHT, SideViewDecision.decide(driving(2)));
+        assertEquals(LaneCycle.RIGHT, SideViewDecision.turnLane(driving(2)));
     }
 
     @Test
@@ -53,33 +54,33 @@ public class SideViewDecisionTest {
     public void signalOffCloses() {
         SideViewDecision.Input in = driving(0);
         in.showing = LaneCycle.LEFT;
-        assertEquals(SideViewDecision.NONE, SideViewDecision.decide(in));
+        assertEquals(SideViewDecision.NONE, SideViewDecision.turnLane(in));
     }
 
     @Test
     public void unreadableSignalShowsNothing() {
-        assertEquals(SideViewDecision.NONE, SideViewDecision.decide(driving(null)));
+        assertEquals(SideViewDecision.NONE, SideViewDecision.turnLane(driving(null)));
     }
 
     @Test
     public void hazardsShowNothing() {
         SideViewDecision.Input in = driving(0);
         in.hazard = true;
-        assertEquals(SideViewDecision.NONE, SideViewDecision.decide(in));
+        assertEquals(SideViewDecision.NONE, SideViewDecision.turnLane(in));
     }
 
     @Test
     public void switchingSidesFollowsTheSignal() {
         SideViewDecision.Input in = driving(2);
         in.showing = LaneCycle.LEFT;
-        assertEquals(LaneCycle.RIGHT, SideViewDecision.decide(in));
+        assertEquals(LaneCycle.RIGHT, SideViewDecision.turnLane(in));
     }
 
     @Test
     public void reverseGearWins() {
         SideViewDecision.Input in = driving(1);
         in.gear = "R";
-        assertEquals(SideViewDecision.NONE, SideViewDecision.decide(in));
+        assertEquals(SideViewDecision.NONE, SideViewDecision.turnLane(in));
     }
 
     @Test
@@ -87,24 +88,24 @@ public class SideViewDecisionTest {
         SideViewDecision.Input in = driving(1);
         in.showing = LaneCycle.LEFT;
         in.stockPopupShown = true;
-        assertEquals(SideViewDecision.NONE, SideViewDecision.decide(in));
+        assertEquals(SideViewDecision.NONE, SideViewDecision.turnLane(in));
     }
 
     @Test
     public void stock360AndParkAssistWin() {
         SideViewDecision.Input a = driving(2);
         a.stock360Shown = true;
-        assertEquals(SideViewDecision.NONE, SideViewDecision.decide(a));
+        assertEquals(SideViewDecision.NONE, SideViewDecision.turnLane(a));
         SideViewDecision.Input b = driving(2);
         b.parkAssistOn = true;
-        assertEquals(SideViewDecision.NONE, SideViewDecision.decide(b));
+        assertEquals(SideViewDecision.NONE, SideViewDecision.turnLane(b));
     }
 
     @Test
     public void belowSpeedThresholdDoesNotOpen() {
         SideViewDecision.Input in = driving(1);
         in.speedKmh = 20f;
-        assertEquals(SideViewDecision.NONE, SideViewDecision.decide(in));
+        assertEquals(SideViewDecision.NONE, SideViewDecision.turnLane(in));
     }
 
     @Test
@@ -112,7 +113,7 @@ public class SideViewDecisionTest {
         SideViewDecision.Input in = driving(1);
         in.speedKmh = 20f;
         in.showing = LaneCycle.LEFT;
-        assertEquals(LaneCycle.LEFT, SideViewDecision.decide(in));
+        assertEquals(LaneCycle.LEFT, SideViewDecision.turnLane(in));
     }
 
     @Test
@@ -130,10 +131,10 @@ public class SideViewDecisionTest {
         SideViewDecision.Input a = driving(1);
         a.speedKmh = 5f;
         a.minSpeedKmh = 0;
-        assertEquals(LaneCycle.LEFT, SideViewDecision.decide(a));
+        assertEquals(LaneCycle.LEFT, SideViewDecision.turnLane(a));
         SideViewDecision.Input b = driving(1);
         b.speedKmh = null;
-        assertEquals(LaneCycle.LEFT, SideViewDecision.decide(b));
+        assertEquals(LaneCycle.LEFT, SideViewDecision.turnLane(b));
     }
 
     // ------------------------------------------------------------------ 后视镜上的灯（2026-11-03）
@@ -143,7 +144,8 @@ public class SideViewDecisionTest {
         SideViewDecision.Input in = driving(0);
         in.useBlindSpot = true;
         in.blindSpotRight = true;
-        assertEquals(LaneCycle.RIGHT, SideViewDecision.decide(in));
+        assertTrue(SideViewDecision.lit(in, LaneCycle.RIGHT));
+        assertFalse(SideViewDecision.lit(in, LaneCycle.LEFT));
     }
 
     @Test
@@ -154,15 +156,17 @@ public class SideViewDecisionTest {
         in.hazard = true;
         in.useDoorWarning = true;
         in.doorWarningLeft = true;
-        assertEquals(LaneCycle.LEFT, SideViewDecision.decide(in));
+        assertTrue(SideViewDecision.lit(in, LaneCycle.LEFT));
     }
 
+    /** 转向灯和另一侧的灯各算各的：左灯打着，右边亮着照样算亮（项目所有者 2026-11-04：两侧都显示）。 */
     @Test
-    public void aTurnSignalWinsOverALight() {
+    public void aTurnSignalAndTheOtherSidesLightAreIndependent() {
         SideViewDecision.Input in = driving(1);
         in.useBlindSpot = true;
         in.blindSpotRight = true;
-        assertEquals(LaneCycle.LEFT, SideViewDecision.decide(in));
+        assertEquals(LaneCycle.LEFT, SideViewDecision.turnLane(in));
+        assertTrue(SideViewDecision.lit(in, LaneCycle.RIGHT));
     }
 
     @Test
@@ -170,20 +174,11 @@ public class SideViewDecisionTest {
         SideViewDecision.Input in = driving(0);
         in.blindSpotLeft = true;
         in.doorWarningRight = true;
-        assertEquals(SideViewDecision.NONE, SideViewDecision.decide(in));
+        assertFalse(SideViewDecision.lit(in, LaneCycle.LEFT));
+        assertFalse(SideViewDecision.lit(in, LaneCycle.RIGHT));
         in.useBlindSpot = true;
-        assertEquals("只开了盲区指示灯", LaneCycle.LEFT, SideViewDecision.decide(in));
-    }
-
-    @Test
-    public void theShowingSideStaysWhileItIsLit() {
-        SideViewDecision.Input in = driving(0);
-        in.useBlindSpot = true;
-        in.blindSpotLeft = true;
-        in.blindSpotRight = true;
-        assertEquals("都亮着：先左边", LaneCycle.LEFT, SideViewDecision.decide(in));
-        in.showing = LaneCycle.RIGHT;
-        assertEquals("显示着的那一侧还亮着就不跳", LaneCycle.RIGHT, SideViewDecision.decide(in));
+        assertTrue("只开了盲区指示灯", SideViewDecision.lit(in, LaneCycle.LEFT));
+        assertFalse(SideViewDecision.lit(in, LaneCycle.RIGHT));
     }
 
     @Test
@@ -192,7 +187,7 @@ public class SideViewDecisionTest {
         in.gear = "R";
         in.useDoorWarning = true;
         in.doorWarningLeft = true;
-        assertEquals(SideViewDecision.NONE, SideViewDecision.decide(in));
+        assertTrue("倒挡：原厂画面优先（判定当场全收，SideViewTrigger）", SideViewDecision.factoryViewActive(in));
     }
 
     @Test
@@ -200,6 +195,7 @@ public class SideViewDecisionTest {
         SideViewDecision.Input in = driving(0);
         in.useBlindSpot = true;
         in.useDoorWarning = true;
-        assertEquals(SideViewDecision.NONE, SideViewDecision.decide(in));
+        assertFalse(SideViewDecision.lit(in, LaneCycle.LEFT));
+        assertFalse(SideViewDecision.lit(in, LaneCycle.RIGHT));
     }
 }
