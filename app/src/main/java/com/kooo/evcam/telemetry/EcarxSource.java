@@ -26,7 +26,8 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * 车辆信号这一路：车机系统自带的 ECARX 车辆接口（{@code com.ecarx.xui.adaptapi}），全反射，只读。
+ * 车辆信号这一路：车机系统自带的 ECARX 车辆接口（{@code com.ecarx.xui.adaptapi}），全反射。读数只读；写只给灵动贴的动作，
+ * 走 {@link #access}（{@link CarAccess}，项目所有者 2026-10-30 驾驶模式、2026-11-04「极+」那一套）。
  *
  * <h3>为什么是它、怎么读（zeekr-shortcut-lab 在 7X 上、在 App Lab 容器里实测）</h3>
  *
@@ -142,8 +143,11 @@ final class EcarxSource {
     private Object sensor;
     private Method getFunctionValue;
     private Method getFunctionValueZoned;
-    /** 唯一的写（{@link #write}）：灵动贴切驾驶模式。 */
+    /** 写只走 {@link #access}：灵动贴的动作。 */
     private Method setFunctionValue;
+    private Method setFunctionValueZoned;
+    /** 连着时给灵动贴读写用的那一份（{@link #access}）；没连上、断了、停了是 null。 */
+    private volatile CarAccess access;
     private Method getSensorEvent;
     private Method getSensorLatestValue;
     private Object functionWatcher;
@@ -236,6 +240,7 @@ final class EcarxSource {
 
     void stop() {
         stopped = true;
+        access = null;
         if (active == this) {
             active = null;
         }
@@ -462,6 +467,7 @@ final class EcarxSource {
                 getFunctionValue = findMethod(function, "getFunctionValue", int.class);
                 getFunctionValueZoned = findMethod(function, "getFunctionValue", int.class, int.class);
                 setFunctionValue = findMethod(function, "setFunctionValue", int.class, int.class);
+                setFunctionValueZoned = findMethod(function, "setFunctionValue", int.class, int.class, int.class);
             }
             if (sensor != null) {
                 getSensorEvent = findMethod(sensor, "getSensorEvent", int.class);
@@ -492,6 +498,8 @@ final class EcarxSource {
                 return;
             }
             sleptAtLastPass = sleptMs();
+            access = new Access(function, getFunctionValue, getFunctionValueZoned, setFunctionValue, setFunctionValueZoned,
+                    sensor, getSensorLatestValue);
             status = String.format(Locale.US,
                     "connected in %d ms; function=%s zoned=%s sensorEvent=%s sensorValue=%s; driver %s; %s",
                     SystemClock.elapsedRealtime() - start, getFunctionValue != null, getFunctionValueZoned != null,
@@ -1167,6 +1175,7 @@ final class EcarxSource {
      */
     private void lose() {
         connected = false;
+        access = null;
         Handler h = handler;
         if (h != null) {
             h.removeCallbacks(reconcile);
@@ -1400,50 +1409,101 @@ final class EcarxSource {
         }
     }
 
-    /** 写过之后隔多久读回来对（Lab 写入测试用的 0.15 秒，这里放宽一点）。 */
-    static final long WRITE_CHECK_MS = 300;
-
-    /**
-     * 写一个功能号（只有 {@link Telemetry#setDriveMode} 叫）：在自己的线程上写，隔 {@link #WRITE_CHECK_MS} 读回来，
-     * 读回等于写的值才算写进去了 —— 车机说「受理」不等于做到了（Lab findings §2.48、§2.50）。结果在本线程上交给 {@code done}。
-     */
-    void write(int id, int value, java.util.function.Consumer<Boolean> done) {
-        Handler h = handler;
-        if (h == null || stopped) {
-            done.accept(false);
-            return;
-        }
-        h.post(() -> {
-            if (stopped || !connected || setFunctionValue == null) {
-                AppLog.w(TAG, "write refused: connected=" + connected + " setter=" + (setFunctionValue != null));
-                done.accept(false);
-                return;
-            }
-            Object accepted;
-            try {
-                accepted = setFunctionValue.invoke(function, id, value);
-            } catch (Throwable t) {
-                AppLog.w(TAG, "write failed: " + describe(t));
-                done.accept(false);
-                return;
-            }
-            h.postDelayed(() -> {
-                Object back = readFunction(id);
-                boolean ok = back instanceof Number && ((Number) back).intValue() == value;
-                BlackBox.note("车辆接口写入：" + Integer.toHexString(id) + " = " + Integer.toHexString(value)
-                        + "，受理 " + accepted + "，读回 " + (back instanceof Number
-                        ? Integer.toHexString(((Number) back).intValue()) : String.valueOf(back)) + (ok ? "（写进去了）" : "（没变）"));
-                done.accept(ok);
-            }, WRITE_CHECK_MS);
-        });
+    /** 连着时给灵动贴读写用的那一份；没连上、断了、停了是 null（{@link Telemetry#carAccess}）。 */
+    CarAccess access() {
+        return stopped || !connected ? null : access;
     }
 
-    /** 不在信号表里的功能号直接读一次；读不到返回 null。 */
+    /** 不在信号表里的功能号直接读一次（找黑屏信号那几项）；读不到返回 null。 */
     private Object readFunction(int id) {
         try {
             return getFunctionValue == null ? null : getFunctionValue.invoke(function, id);
         } catch (Throwable t) {
             return null;
+        }
+    }
+
+    /**
+     * 车辆接口的读写，连上那一刻的那几个对象（{@link CarAccess}）：同步的 binder 调用，在叫的那个线程上做，不占这个来源的线程
+     * （写车的读回要等一阵，不能让信号的读数跟着等）。出了错读是 null、写是 false，只写日志。
+     */
+    private static final class Access implements CarAccess {
+        private final Object function;
+        private final Method get;
+        private final Method getZoned;
+        private final Method set;
+        private final Method setZoned;
+        private final Object sensor;
+        private final Method sensorValue;
+
+        Access(Object function, Method get, Method getZoned, Method set, Method setZoned, Object sensor, Method sensorValue) {
+            this.function = function;
+            this.get = get;
+            this.getZoned = getZoned;
+            this.set = set;
+            this.setZoned = setZoned;
+            this.sensor = sensor;
+            this.sensorValue = sensorValue;
+        }
+
+        @Override
+        public Integer read(int id) {
+            return number(get, function, id);
+        }
+
+        @Override
+        public Integer read(int id, int zone) {
+            return number(getZoned, function, id, zone);
+        }
+
+        @Override
+        public boolean write(int id, int value) {
+            return accepted(set, id, value);
+        }
+
+        @Override
+        public boolean write(int id, int zone, int value) {
+            return accepted(setZoned, id, zone, value);
+        }
+
+        @Override
+        public Float sensor(int type) {
+            if (sensorValue == null || sensor == null) {
+                return null;
+            }
+            try {
+                Object v = sensorValue.invoke(sensor, type);
+                // 占位值（255、-65535、极小的非零数）算读不到，同信号表
+                return v instanceof Number ? Signal.floatOrNull(((Number) v).floatValue()) : null;
+            } catch (Throwable t) {
+                return null;
+            }
+        }
+
+        private static Integer number(Method m, Object target, Object... args) {
+            if (m == null || target == null) {
+                return null;
+            }
+            try {
+                Object v = m.invoke(target, args);
+                return v instanceof Number ? ((Number) v).intValue() : null;
+            } catch (Throwable t) {
+                return null;
+            }
+        }
+
+        /** 写；回 boolean 的照它，回别的（有的版本回 void）当受理，抛了是没写成。 */
+        private boolean accepted(Method m, Object... args) {
+            if (m == null || function == null) {
+                return false;
+            }
+            try {
+                Object r = m.invoke(function, args);
+                return !(r instanceof Boolean) || (Boolean) r;
+            } catch (Throwable t) {
+                AppLog.w(TAG, "write failed: " + describe(t));
+                return false;
+            }
         }
     }
 
