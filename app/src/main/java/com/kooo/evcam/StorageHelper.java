@@ -375,48 +375,6 @@ public class StorageHelper {
     }
     
     /**
-     * 获取录制时实际写入的目录
-     * 如果启用了中转写入，返回临时目录；否则返回最终存储目录
-     *
-     * <p>中转写入的临时目录在内置存储上，和 {@link #footageRoot} 是同一道门：中转写入归开发者选项管，
-     * 开发者选项关着时按关算（{@code AppConfig.DEVELOPER_KEYS}），走不到这条分支。</p>
-     * @param context 上下文
-     * @return 录制写入目录；没有地方可存（没有 U 盘、开发者选项没开）时为 null
-     */
-    public static File getRecordingDir(Context context) {
-        AppConfig config = new AppConfig(context);
-
-        // 检查是否应该使用中转写入
-        if (config.shouldUseRelayWrite()) {
-            // 使用临时目录（内置存储的缓存目录）
-            File tempDir = new File(context.getCacheDir(), FileTransferManager.TEMP_VIDEO_DIR);
-            if (!tempDir.exists()) {
-                if (tempDir.mkdirs()) {
-                    AppLog.d(TAG, "创建临时视频目录: " + tempDir.getAbsolutePath());
-                } else {
-                    AppLog.e(TAG, "创建临时视频目录失败，回退到普通目录");
-                    return getVideoDir(context);
-                }
-            }
-            return tempDir;
-        }
-        
-        // 不使用中转写入，直接返回最终存储目录
-        return getVideoDir(context);
-    }
-    
-    /**
-     * 获取视频的最终存储目录
-     * 即使启用了中转写入，这个方法也返回最终的目标目录
-     * @param context 上下文
-     * @return 最终存储目录；没有地方可存时为 null
-     */
-    public static File getFinalVideoDir(Context context) {
-        AppConfig config = new AppConfig(context);
-        return getVideoDir(context, config.isUsingExternalSdCard());
-    }
-    
-    /**
      * 根据 AppConfig 配置获取图片存储目录
      * @param context 上下文
      * @return 图片存储目录；没有地方可存（没有 U 盘、开发者选项没开）时为 null
@@ -764,8 +722,7 @@ public class StorageHelper {
      * 设置里选存储位置的框里「录像保存在 …」那句写的目录。
      *
      * <ul>
-     *   <li>正在录：录制器实际写的那个（盘写不进、换过盘就是新盘）。中转写入时录像先在内部缓存里，
-     *       写完才转存过去 —— 那句写转存到的目录，不写缓存；</li>
+     *   <li>正在录：录制器实际写的那个（盘写不进、换过盘就是新盘）；</li>
      *   <li>没在录：按设置下一次开录会写的那个；</li>
      *   <li>此刻录不了（没有 U 盘、开发者选项没开）：null —— 那句写「未检测到 U 盘」，
      *       不写一个永远不会写进去的内置存储路径。</li>
@@ -775,9 +732,7 @@ public class StorageHelper {
      */
     public static File savedVideoDir(Context context, boolean recording) {
         File actual = lastRecordingDir;
-        File relayCache = new File(context.getCacheDir(), FileTransferManager.TEMP_VIDEO_DIR);
-        if (recording && actual != null
-                && !actual.getAbsoluteFile().equals(relayCache.getAbsoluteFile())) {
+        if (recording && actual != null) {
             return actual;
         }
         if (!isRecordingStorageAvailable(context)) {

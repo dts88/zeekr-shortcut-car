@@ -9,7 +9,6 @@ import android.widget.Toast;
 
 import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.AppLog;
-import com.kooo.evcam.FileTransferManager;
 import com.kooo.evcam.R;
 import com.kooo.evcam.StorageHelper;
 import com.kooo.evcam.blackbox.BlackBox;
@@ -61,10 +60,7 @@ import java.util.TreeSet;
  *   <li><b>双闪</b>用的是同一个 {@link #pass}：亮起那一刻锁 [亮起 − 1 分钟, 亮起]（前一分钟和正在录的那一段），
  *       亮着时每 {@link #HAZARD_TICK_MS} 锁一遍新录的，关闭时照闪远光锁两遍 [亮起 − 1 分钟, 关闭]
  *       （关闭那一刻、再过 {@link LockWindow#SECOND_PASS_DELAY_MS}）。亮着时录像停了、开关关了，都当在那一刻关闭。</li>
- *   <li><b>录像在哪</b>（{@link #scan}）：U 盘录像目录；录制器换过盘就还有新盘上那个；中转写入时先写在内部缓存里，
- *       写完才搬到开录时定下的目标目录 —— 缓存里的按文件名锁进<b>那个</b>目录的清单（搬过去时名字不变），
- *       不是此刻的录像目录（U 盘掉线时它会落到内置存储上，锁进去等于没锁）。目标目录此刻不在（盘掉了），
- *       缓存里的先不锁，每 {@link #RELAY_RETRY_MS} 再试一次，等盘回来。</li>
+ *   <li><b>录像在哪</b>（{@link #scan}）：U 盘录像目录；录制器换过盘就还有新盘上那个。</li>
  * </ul>
  *
  * <p>鸣笛自动锁定规则一样，但车上还读不到喇叭信号（Lab 还在找）：设置里那一项一直置灰、打不开，这里没有它的代码。
@@ -75,10 +71,6 @@ public final class AutoLock implements Telemetry.Listener {
     private static final String TAG = "AutoLock";
     /** 在 {@link Telemetry} 登记用的名字。 */
     private static final String USER = "auto-lock";
-    /** 中转写入的目标目录不在（盘掉了）时，隔多久再试一遍。 */
-    static final long RELAY_RETRY_MS = 30_000L;
-    /** 最多再试几遍：一小时。中转缓存里的文件放一小时就过期删掉（{@code FileTransferManager}），再等也没用。 */
-    static final int RELAY_RETRY_LIMIT = 120;
     /** 离上一次弹不到这么久，提示不再弹（连着锁上几次时不一个接一个地弹）。 */
     private static final long TOAST_GAP_MS = 4_000L;
     /** 双闪亮着时隔多久把新录的锁上一遍：最短的分段是 1 分钟，半分钟一遍，正在录的那一段一开始就锁上。 */
@@ -119,8 +111,6 @@ public final class AutoLock implements Telemetry.Listener {
 
     // ---- 下面这几个只在主线程上动
     private Context app;
-    /** 这次录像中转写入时，缓存里的文件写完搬去哪（开录时定下的）；不是中转写入为 null。 */
-    private File relayTarget;
     private boolean watching;
     private Boolean lastFlash;
     private Boolean lastHazard;
@@ -156,16 +146,13 @@ public final class AutoLock implements Telemetry.Listener {
 
     /**
      * 开录了（相机管家开录那一下叫；在不在录只问它，{@link CameraKeeper#isRecording}）。哪个线程调都行。
-     *
-     * @param relayTarget 中转写入时，缓存里的文件写完搬去的目录（开录时定下的）；不是中转写入传 null
      */
-    public void recordingStarted(Context context, File relayTarget) {
+    public void recordingStarted(Context context) {
         final Context appContext = context.getApplicationContext();
         // 排在之后所有的锁定前面：同一个线程，先来先做
         worker.post(() -> segmentMs = segmentLengths(appContext));
         main.post(() -> {
             app = appContext;
-            this.relayTarget = relayTarget;
             update();
         });
     }
@@ -287,12 +274,10 @@ public final class AutoLock implements Telemetry.Listener {
      * @param toast 第一遍锁上了新的弹哪一句；0 不弹（手动锁定另有 {@link Reply}）
      */
     private void lockWindow(Context context, LockWindow window, long nowMs, Source source, int toast) {
-        // 这次录像的中转目标跟着这一下走：第二遍时可能已经停了录、又开了一次
-        final File target = relayTarget;
         // 手动按的每按一次回一句：两遍共用一个，先碰到录像的那一遍回
         final Reply reply = source == Source.BUTTON ? new Reply(context) : null;
-        worker.post(() -> pass(context, window, target, 0, source, reply, toast));
-        worker.postDelayed(() -> pass(context, window, target, 1, source, reply, 0),
+        worker.post(() -> pass(context, window, 0, source, reply, toast));
+        worker.postDelayed(() -> pass(context, window, 1, source, reply, 0),
                 Math.max(0L, window.endMs - nowMs) + LockWindow.SECOND_PASS_DELAY_MS);
     }
 
@@ -304,8 +289,7 @@ public final class AutoLock implements Telemetry.Listener {
         hazardSinceMs = nowMs;
         final Context context = app;
         final LockWindow window = LockWindow.hazard(nowMs, nowMs);
-        final File target = relayTarget;
-        worker.post(() -> pass(context, window, target, ROUND_HAZARD_ON, Source.HAZARD, null, R.string.msg_hazard_locked));
+        worker.post(() -> pass(context, window, ROUND_HAZARD_ON, Source.HAZARD, null, R.string.msg_hazard_locked));
         main.removeCallbacks(hazardTick);
         main.postDelayed(hazardTick, HAZARD_TICK_MS);
     }
@@ -317,8 +301,7 @@ public final class AutoLock implements Telemetry.Listener {
         }
         final Context context = app;
         final LockWindow window = LockWindow.hazard(hazardSinceMs, System.currentTimeMillis());
-        final File target = relayTarget;
-        worker.post(() -> pass(context, window, target, ROUND_HAZARD_ONGOING, Source.HAZARD, null, 0));
+        worker.post(() -> pass(context, window, ROUND_HAZARD_ONGOING, Source.HAZARD, null, 0));
         main.postDelayed(hazardTick, HAZARD_TICK_MS);
     }
 
@@ -335,37 +318,31 @@ public final class AutoLock implements Telemetry.Listener {
     /**
      * 一遍：列目录、算重叠、锁上还没锁的。{@link #worker} 上。
      *
-     * @param relayTarget 中转写入的目标目录（见 {@link #scan}）；不是中转写入为 null
-     * @param round       0 = 当时（双闪是关闭那一刻），1 = 补锁（窗口结束后），2 起 = 等中转目标目录回来再试；
-     *                    双闪另有 {@link #ROUND_HAZARD_ON}（亮起那一刻）、{@link #ROUND_HAZARD_ONGOING}（亮着时）
-     * @param reply       手动锁定时回的那一句；自动的为 null
-     * @param toast       这一遍锁上了新的弹哪一句；0 不弹
+     * @param round 0 = 当时（双闪是关闭那一刻），1 = 补锁（窗口结束后）；
+     *              双闪另有 {@link #ROUND_HAZARD_ON}（亮起那一刻）、{@link #ROUND_HAZARD_ONGOING}（亮着时）
+     * @param reply 手动锁定时回的那一句；自动的为 null
+     * @param toast 这一遍锁上了新的弹哪一句；0 不弹
      */
-    private void pass(Context context, LockWindow window, File relayTarget, int round, Source source, Reply reply,
-                      int toast) {
+    private void pass(Context context, LockWindow window, int round, Source source, Reply reply, int toast) {
         if (!source.enabled(context)) {
             BlackBox.noteImportant((source == Source.FLASH ? "闪远光自动锁定" : source == Source.HAZARD ? "双闪自动锁定" : "悬浮按钮锁定")
                     + (round == ROUND_HAZARD_ON ? "（双闪亮起）" : round == ROUND_HAZARD_ONGOING ? "（双闪中）"
-                            : round == 0 ? (source == Source.HAZARD ? "（双闪关闭）" : "（当时）")
-                            : round == 1 ? "（补锁）" : "（等盘回来）")
+                            : round == 0 ? (source == Source.HAZARD ? "（双闪关闭）" : "（当时）") : "（补锁）")
                     + " " + describe(window) + "：开关已关，不锁");
             return;
         }
-        Scan scan = scan(context, relayTarget);
-        Set<String> all = new HashSet<>(scan.waiting);
-        for (Set<String> names : scan.byListDir.values()) {
+        Map<File, Set<String>> byListDir = scan(context);
+        Set<String> all = new HashSet<>();
+        for (Set<String> names : byListDir.values()) {
             all.addAll(names);
         }
         Set<String> hit = window.overlapping(all, segmentMs, longest(segmentMs));
-        // 碰到窗口、却因为中转目标目录不在而这一遍锁不了的
-        Set<String> waiting = new TreeSet<>(scan.waiting);
-        waiting.retainAll(hit);
         List<String> locking = new ArrayList<>();
         int alreadyLocked = 0;
         // 碰到了能锁的录像（已经锁着的也算）；每份清单这一遍要新锁上的
         boolean found = false;
         Map<File, Set<String>> toLock = new LinkedHashMap<>();
-        for (Map.Entry<File, Set<String>> entry : scan.byListDir.entrySet()) {
+        for (Map.Entry<File, Set<String>> entry : byListDir.entrySet()) {
             Set<String> names = new TreeSet<>(entry.getValue());
             names.retainAll(hit);
             if (names.isEmpty()) {
@@ -383,31 +360,21 @@ public final class AutoLock implements Telemetry.Listener {
                 toLock.put(entry.getKey(), names);
             }
         }
-        FootageLocks.Result result = reply != null ? reply.after(round, found, !waiting.isEmpty(), toLock.size())
+        FootageLocks.Result result = reply != null ? reply.after(round, found, toLock.size())
                 : toast != 0 ? toastWhenLocked(toast) : null;
         for (Map.Entry<File, Set<String>> entry : toLock.entrySet()) {
             FootageLocks.set(entry.getKey(), entry.getValue(), true, result);
         }
-        // 第二遍起还有锁不了的：隔一阵再试，等盘回来（第一遍不用，第二遍本来就排着；双闪亮着时那几遍后面还有）
-        boolean retry = !waiting.isEmpty() && round >= 1 && round < RELAY_RETRY_LIMIT;
-        if (retry) {
-            worker.postDelayed(() -> pass(context, window, relayTarget, round + 1, source, reply, 0), RELAY_RETRY_MS);
-        }
-        // 等盘回来的那几遍、双闪亮着时那几遍只在锁上了（或者不再等）时记一行，不然一小时能记一百多行
-        boolean log = round == ROUND_HAZARD_ONGOING ? !locking.isEmpty() : round <= 1 || !locking.isEmpty() || !retry;
+        // 双闪亮着时那几遍只在锁上了时记一行，不然一小时能记一百多行
+        boolean log = round != ROUND_HAZARD_ONGOING || !locking.isEmpty();
         if (log) {
             BlackBox.noteImportant((source == Source.FLASH ? "闪远光自动锁定" : source == Source.HAZARD ? "双闪自动锁定" : "悬浮按钮锁定")
                     + (round == ROUND_HAZARD_ON ? "（双闪亮起）" : round == ROUND_HAZARD_ONGOING ? "（双闪中）"
-                            : round == 0 ? (source == Source.HAZARD ? "（双闪关闭）" : "（当时）")
-                            : round == 1 ? "（补锁）" : "（等盘回来）")
+                            : round == 0 ? (source == Source.HAZARD ? "（双闪关闭）" : "（当时）") : "（补锁）")
                     + " " + describe(window)
                     + "：" + (locking.isEmpty() ? "没有新的要锁" : "锁上 " + locking.size() + " 个 " + locking)
                     + (alreadyLocked > 0 ? "，已经锁着 " + alreadyLocked + " 个" : "")
-                    + (hit.isEmpty() ? "（盘上没有这段时间的录像）" : "")
-                    + (waiting.isEmpty() ? "" : "；中转缓存里 " + waiting.size() + " 个 " + waiting + " 要搬去的 "
-                            + relayTarget + " 此刻不在（盘掉了？），这一遍没锁"
-                            + (retry ? "，" + (RELAY_RETRY_MS / 1000) + " 秒后再试"
-                                    : round == 0 ? "，补锁时再试" : round < 0 ? "，下一遍再试" : "，不再等")));
+                    + (hit.isEmpty() ? "（盘上没有这段时间的录像）" : ""));
         }
     }
 
@@ -437,8 +404,7 @@ public final class AutoLock implements Telemetry.Listener {
     /**
      * 手动锁定（悬浮按钮）回的那一句：一次按下只回一句，由两遍里先碰到录像的那一遍回 ——
      * 碰到的都锁上了（新锁的、本来就锁着的都算）说「已锁定」，有一份清单没写成说「无法保存锁定状态」；
-     * 两遍都没碰到说「当前时刻无可锁定的录像」。中转写入、目标盘不在、要等盘回来才能锁的不算碰到，
-     * 也不说没有（开发者选项里才有中转写入）。
+     * 两遍都没碰到说「当前时刻无可锁定的录像」。
      */
     private final class Reply {
         private final Context context;
@@ -452,17 +418,16 @@ public final class AutoLock implements Telemetry.Listener {
         /**
          * 这一遍之后回不回、怎么回。{@link #worker} 上。
          *
-         * @param found   这一遍碰到了能锁的录像（已经锁着的也算）
-         * @param waiting 这一遍碰到了要等盘回来才能锁的
-         * @param lists   这一遍要写几份清单（0 = 碰到的都已经锁着）
+         * @param found 这一遍碰到了能锁的录像（已经锁着的也算）
+         * @param lists 这一遍要写几份清单（0 = 碰到的都已经锁着）
          * @return 每份清单写完时的回调；不用回调时为 null
          */
-        FootageLocks.Result after(int round, boolean found, boolean waiting, int lists) {
-            if (claimed || round > 1) {
+        FootageLocks.Result after(int round, boolean found, int lists) {
+            if (claimed) {
                 return null;
             }
             if (!found) {
-                if (round == 1 && !waiting) {
+                if (round == 1) {
                     claimed = true;
                     main.post(() -> toast(context, R.string.msg_footage_nothing_here));
                 }
@@ -493,36 +458,19 @@ public final class AutoLock implements Telemetry.Listener {
 
     // ================================================================= 盘上有什么
 
-    /** 一遍列出来的：按锁定清单所在目录分好的文件名；中转目标目录不在、这一遍锁不了的缓存文件名。 */
-    private static final class Scan {
-        final Map<File, Set<String>> byListDir = new LinkedHashMap<>();
-        final Set<String> waiting = new TreeSet<>();
-    }
-
     /**
-     * 录像可能在哪，按「锁定清单在哪个目录」分好：此刻的录像目录；录制器换过盘时新盘上那个。
-     * 中转写入（{@code relayTarget} 不为 null）时还有：已经搬到目标目录的；内部缓存里还没搬的 ——
-     * 锁进目标目录的清单（搬过去名字不变）。目标目录此刻不在（盘掉了），缓存里的不往别处写，放进 waiting。
+     * 录像可能在哪，按「锁定清单在哪个目录」分好的文件名：此刻的录像目录；录制器换过盘时新盘上那个。
      * 只认本应用的录像文件名。
      */
-    private static Scan scan(Context context, File relayTarget) {
-        Scan scan = new Scan();
+    private static Map<File, Set<String>> scan(Context context) {
+        Map<File, Set<String>> byListDir = new LinkedHashMap<>();
         File video = StorageHelper.getVideoDir(context);
-        File temp = new File(context.getCacheDir(), FileTransferManager.TEMP_VIDEO_DIR);
         File actual = StorageHelper.lastRecordingDir();
-        collect(scan.byListDir, video, video);
-        if (actual != null && !actual.getAbsoluteFile().equals(temp.getAbsoluteFile())) {
-            collect(scan.byListDir, actual, actual);
+        collect(byListDir, video, video);
+        if (actual != null) {
+            collect(byListDir, actual, actual);
         }
-        if (relayTarget != null) {
-            if (relayTarget.isDirectory()) {
-                collect(scan.byListDir, relayTarget, relayTarget);
-                collect(scan.byListDir, temp, relayTarget);
-            } else {
-                scan.waiting.addAll(ownClips(temp));
-            }
-        }
-        return scan;
+        return byListDir;
     }
 
     private static void collect(Map<File, Set<String>> out, File dir, File listDir) {

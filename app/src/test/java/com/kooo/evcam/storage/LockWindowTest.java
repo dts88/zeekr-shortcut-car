@@ -312,7 +312,7 @@ public class LockWindowTest {
     @Test
     public void onlyTheAppsOwnRecordingsCountAndDuplicatesAreHarmless() {
         List<String> names = new ArrayList<>(clips(SURROUND, MIN, 2));
-        names.add(clip(0, SURROUND));  // 中转写入：内部缓存和 U 盘上各一份
+        names.add(clip(0, SURROUND));  // 同一个文件列了两遍：录像目录和录制器实际写的目录是同一个
         names.add("holiday.mp4");
         names.add("locked.txt");
         names.add(clip(0, SURROUND).replace(".mp4", ".jpg"));

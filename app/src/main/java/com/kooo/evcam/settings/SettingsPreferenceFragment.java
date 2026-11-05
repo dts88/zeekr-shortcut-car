@@ -180,7 +180,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             return;
         }
         // 开发者选项在「关于与致谢」（另一个 Activity）里开关：回来时变了就按新的状态整页重绑 ——
-        // 中转写入能不能开、内置存储那一项怎么写、开发者分区接不接线都跟着它
+        // 内置存储那一项怎么写、开发者分区接不接线都跟着它
         if (appConfig != null && boundUnlocked != DeveloperMode.isUnlocked()) {
             onCreatePreferences(null, null);
             return;
@@ -216,7 +216,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 value -> appConfig.setAutoStartRecording(value));
 
         // 拍照使用 JPEG 输出：锁成开，只有开发者选项开着时能改（关着时主界面在后台拍不到画面，见 AppConfig）。
-        // 没开时开着、灰着、点不动，下面写「需开启开发者选项」（同「中转写入」）—— 读到的值本来就按开算（DEVELOPER_KEYS）
+        // 没开时开着、灰着、点不动，下面写「需开启开发者选项」—— 读到的值本来就按开算（DEVELOPER_KEYS）
         bindSwitch("pref_photo_via_jpeg", appConfig.isPhotoViaJpegEnabled(),
                 enabled -> {
                     appConfig.setPhotoViaJpegEnabled(enabled);
@@ -288,24 +288,6 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
 
     private void bindStorage() {
         bindStorageLocation();
-
-        // 中转写入 2026-11-02 停用（项目所有者：普通用户、开发者都不再用，界面上拿掉；AppConfig.shouldUseRelayWrite 固定为关）。
-        // 原来的绑定注释在这里，要恢复时连同 preferences.xml 里那一行一起放回：
-        // // 中转写入是「先写内置再搬走」，本质上就是往内置存储规律性地写，
-        // // 所以和内置存储同一个门槛：开发者选项关着时置灰，值也按关算（AppConfig 那道门），写着关就是关
-        // SwitchPreferenceCompat relay = findPreference("pref_relay_write");
-        // if (relay != null) {
-        //     relay.setPersistent(false);
-        //     relay.setChecked(appConfig.isRelayWriteEnabled());
-        //     if (!StorageHelper.isInternalStorageAllowed()) {
-        //         relay.setEnabled(false);
-        //         relay.setSummary(getString(R.string.msg_relay_dev_only));
-        //     }
-        //     relay.setOnPreferenceChangeListener((preference, newValue) -> {
-        //         appConfig.setRelayWriteEnabled(Boolean.TRUE.equals(newValue));
-        //         return true;
-        //     });
-        // }
 
         bindStorageLimits();
         bindFootageLock();
