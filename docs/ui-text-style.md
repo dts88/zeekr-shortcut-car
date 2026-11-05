@@ -428,7 +428,7 @@
   Drive mode didn't change / Mod pemanduan tidak bertukar。
   2026-11-04 搜索改成绑定（项目所有者定的做法）：set_smart_button_search_title、set_smart_button_search_summary、
   dlg_smart_button_search_note、msg_smart_button_connected 删掉，由下面绑定的几条代替；dlg_smart_button_delete_msg、
-  msg_smart_button_no_permission 里的「搜索」「连接」改成「绑定」（见「待项目所有者确认」）。
+  msg_smart_button_no_permission 里的「搜索」「连接」改成「绑定」（2026-11-05 批准，见下面「灵动贴绑定那一批」）。
 - 2026-11-04 批准（灵动贴绑定，项目所有者看过设计里的文字：「文字描述没问题」）：set_smart_button_bind_title「绑定灵动贴」；
   绑定框里的 dlg_smart_button_bind_note「长按灵动贴约 3 秒，直到背光闪烁」。
 - 2026-10-30（项目所有者同意更新首启说明框）：guide_3 去掉「操作按钮可在「设置 → 界面 → 操作按钮位置」中放到驾驶座一侧。」（三种语言）：前一个框已经问过驾驶座在哪一侧，提示里也写了这条路径。没有新句子。
@@ -494,18 +494,10 @@
   「Keeps recording the surround view after you leave the car. Requires Sentry Mode to keep the head unit awake.」/
   「Terus merakam paparan sekeliling selepas anda keluar dari kereta. Memerlukan Mod Sentry supaya unit kepala kekal berjaga.」
   （不再写后座舱亮屏后恢复录制、没开哨兵模式时亮屏后恢复：行为不变，只是不写）。
-- vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
-- 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
-
-### 待项目所有者确认
-
-下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
-可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
-
-- 关于页致谢加 LEO（2026-11-05 项目所有者要求，中文照项目所有者的原话；关于页没有马来文）：about_thanks_body 在
+- 2026-11-05 批准（关于页致谢加 LEO，项目所有者当天要求，中文照项目所有者的原话；关于页没有马来文）：about_thanks_body 在
   「Bilibili 极氪7X 车友圈微信群的各位成员」那一条前面加「• LEO（Bilibili 极氪7X 车友圈）—— 提供了国内车机所使用的一些重要代码数据。」/
   「• LEO (Bilibili Zeekr 7X owners' circle) — provided important code data used by Chinese-market head units.」
-- 灵动贴动作扩到「极+」那一套（2026-11-05，草稿；项目所有者 2026-11-04 定了做什么，名字还没看）：组名 smart_button_group_*
+- 2026-11-05 批准（灵动贴动作扩到「极+」那一套，项目所有者 2026-11-04 定了做什么）：组名 smart_button_group_*
   「应用功能」「驾驶」「语音与媒体」「座椅与方向盘」「空调」「车身」「灯光与香氛」「场景」/ App、Driving、Voice and media、
   Seats and steering wheel、Climate、Body、Lights and fragrance、Scenes / Apl、Pemanduan、Suara dan media、
   Tempat duduk dan stereng、Penyaman udara、Badan kereta、Lampu dan wangian、Senario；动作名 smart_button_action_*：
@@ -519,23 +511,23 @@
   Tidak tersedia dalam mod Penjimatan Kuasa Super；msg_car_action_standstill「车辆停稳后才能使用」/ Available only when the car
   is stationary / Hanya tersedia apabila kereta tidak bergerak；msg_car_action_no_fragrance「香氛未安装」/ Fragrance isn't installed /
   Wangian tidak dipasang。
-- 车辆信号页后视镜上那四行，名字下面那行小字里的读法（2026-11-03，草稿；照「功能」「功能·区域 0x1」那几个的写法）：
+- 2026-11-05 批准（车辆信号页后视镜上那四行，名字下面那行小字里的读法，2026-11-03 加；照「功能」「功能·区域 0x1」那几个的写法）：
   vi_kind_setting「设置服务」/ settings service / perkhidmatan tetapan；vi_kind_setting_zone「设置服务·区域 %1$s」/
   settings service·zone %1$s / perkhidmatan tetapan·zon %1$s。前面是管理器上的常量名（不写号码：号码车上按名字取）。
-- 盲区画面的说明（2026-11-04，项目所有者加了淡出，照着改；2026-10-16 起的那一句是批过的）：set_side_view_summary
+- 2026-11-05 批准（盲区画面的说明，2026-11-04 项目所有者加了淡出，照着改；取代 2026-10-17 批的那一句）：set_side_view_summary
   「打转向灯时在屏幕该侧显示侧方摄像头画面，转向灯关闭 1 秒后开始淡出，再过 1 秒完全消失；倒挡或原厂画面显示时不显示。挂 D 挡时环视保持开启。」/
   「Shows the side camera on the signalling side when the turn signal is on; 1 second after the signal turns off it starts to fade out
   and is gone 1 second later; not shown in reverse or while a factory view is on screen. Surround view stays on in D.」/
   「Memaparkan kamera sisi di sebelah isyarat apabila lampu isyarat dihidupkan; 1 saat selepas lampu isyarat dimatikan ia mula pudar
   dan hilang sepenuhnya 1 saat kemudian; tidak dipaparkan dalam gear undur atau semasa paparan kilang dipaparkan. Paparan sekeliling
   kekal hidup dalam gear D.」（只改了「1 秒后消失」那半句）。
-- 盲区画面那一行的两个附加项（2026-11-04，草稿）：英文、马来文名字 set_side_view_blind_spot_chip Blind spot alert /
+- 2026-11-05 批准（盲区画面那一行的两个附加项，2026-11-04 加）：英文、马来文名字 set_side_view_blind_spot_chip Blind spot alert /
   Amaran titik buta、set_side_view_door_warning_chip Door open warning / Amaran buka pintu（「开门预警」照术语表）；
   按钮下面的一行小字 set_side_view_lamps_note「后视镜上的盲区提醒、开门预警亮起时也显示该侧画面，不必打转向灯，不受最低车速限制」/
   「Also shows that side when the blind spot alert or door open warning on the side mirror comes on, without the turn signal;
   Minimum speed doesn't apply」/「Turut memaparkan sebelah itu apabila amaran titik buta atau amaran buka pintu pada cermin sisi
   menyala, tanpa lampu isyarat; Kelajuan minimum tidak terpakai」（意思照 2026-11-03 批的两句说明合成一句）。
-- 熄屏持续录制的下一层「熄屏后的帧率」（2026-11-04，草稿；项目所有者看过中文示意）：框的标题 set_screen_off_fps_title
+- 2026-11-05 批准（熄屏持续录制的下一层「熄屏后的帧率」，2026-11-04 加；项目所有者看过中文示意）：框的标题 set_screen_off_fps_title
   「熄屏后的帧率」/ Screen-off frame rate / Kadar bingkai skrin padam；选项下面的说明 set_screen_off_fps_note
   「熄屏后只录制环视时按所选帧率录制，录像占用的空间更小；亮屏或开车时恢复视频流配置的帧率。」/「When only the surround view
   is recorded after the screen goes off, it uses the selected frame rate to take up less space. The stream profile frame rate is
@@ -543,7 +535,7 @@
   bingkai yang dipilih digunakan supaya rakaman mengambil lebih sedikit ruang. Kadar bingkai profil strim digunakan semula apabila
   skrin hidup atau anda mula memandu.」；选项 opt_screen_off_fps_follow「跟随视频流配置」/ Follow stream profile /
   Ikut profil strim（另两项「10 fps」「3 fps」三种语言一样，行尾写的也是选项的名字）。
-- 灵动贴绑定那一批（2026-11-04，草稿；中文只有上面批过的两条是项目所有者看过的原话）：
+- 2026-11-05 批准（灵动贴绑定那一批，2026-11-04 加；绑定框标题和说明的中文 2026-11-04 已批，见上面）：
   - 总开关 set_smart_buttons_title「灵动贴」/ Smart buttons / Butang pintar；说明 set_smart_buttons_summary
     「按下已绑定的灵动贴时执行所选动作；关闭后，不扫描蓝牙」/「Runs the chosen action when a paired smart button is pressed;
     when off, doesn't scan for Bluetooth devices」/「Menjalankan tindakan yang dipilih apabila butang pintar yang dipasangkan ditekan;
@@ -566,6 +558,15 @@
     msg_smart_button_no_permission「没有「附近的设备」权限，无法绑定灵动贴」/ Without the Nearby devices permission, smart buttons
     can't be paired / Tanpa kebenaran Peranti berdekatan, butang pintar tidak dapat dipasangkan。
   - 术语表加「绑定」：英文 pair、马来文 pasangkan。
+- vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
+- 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
+
+### 待项目所有者确认
+
+下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
+可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
+
+- （现在没有。）
 
 ---
 
@@ -627,4 +628,4 @@
 | 画面调节 | 画面调节；画面调节窗口 | Image adjustment | Pelarasan imej | 不用「亮度 / 降噪调节」 |
 | 设置分区与页面 | 录制、存储、超级镜子、悬浮键与灵动贴、界面、系统、开发者选项、检查更新、关于与致谢 | Recording、Storage、Super mirror、Floating button and smart buttons、Interface、System、Developer options、Check for updates、About & credits | Rakaman、Storan、Cermin super、Butang terapung dan butang pintar、Antara muka、Sistem、Pilihan pembangun、Semak kemas kini、Perihal & penghargaan | 关于页没有马来文，见 §5 |
 | 灵动贴 | 灵动贴（只有页名里和「悬浮键」连着写，别处的悬浮按钮照旧） | smart button | butang pintar | — |
-| 绑定（灵动贴） | 绑定：绑定灵动贴、已绑定 | pair：Pair smart button、paired | pasangkan：Pasangkan butang pintar、dipasangkan | 「连接」只指连上蓝牙的那一下（长按时）；不用「搜索」「登记」「配对」（2026-11-04，待项目所有者确认） |
+| 绑定（灵动贴） | 绑定：绑定灵动贴、已绑定 | pair：Pair smart button、paired | pasangkan：Pasangkan butang pintar、dipasangkan | 「连接」只指连上蓝牙的那一下（长按时）；不用「搜索」「登记」「配对」（2026-11-04 加，2026-11-05 项目所有者批准） |
