@@ -92,7 +92,7 @@ This page does not cover that.
 
 - **Recommended — the newest `-beta` on the [Releases](../../releases) page.** Once it is installed,
   the app can fetch later betas itself under Settings → Check for updates.
-- The [latest stable release](../../releases/latest) is older and lacks some of the features on
+- The [latest stable release](../../releases/tag/v2.0.0) is older and lacks some of the features on
   this page.
 
 Download the `ZeekrShortcut-*.apk` asset from the release page and sideload it through App Lab.
