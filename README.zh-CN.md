@@ -141,6 +141,8 @@ cd zeekr-shortcut-car && ./gradlew assembleRelease
 
 把 App Lab 的合成流拆成四宫格并渲染出来，是本项目独立实现的。
 
+模拟声浪的合成方法、各款声音和调校，都是 dts88 的原创；CarPiano 和 EngineV1 只提供了事实（见 [NOTICE.md](NOTICE.md)）。
+
 ### 贡献者
 
 - **[wysie](https://github.com/wysie)**：大量设计以及代码。
@@ -149,3 +151,13 @@ cd zeekr-shortcut-car && ./gradlew assembleRelease
 - **SW**：积极测试和反馈，非常感谢。
 
 来源、第三方组件许可与边界说明见 [NOTICE.md](NOTICE.md)，完整条款见 [LICENSE](LICENSE)。
+
+### 用到本项目的代码或信息时
+
+如果你的项目用到了极氪即刻的代码，或者用到了这里最先公开的事实（平台笔记、信号编号、摄像头排布等），
+请在显眼的位置注明：README 靠前的位置，以及应用的「关于」或致谢页。例如：
+
+> 使用了 [极氪即刻（Zeekr Shortcut）](https://github.com/dts88/zeekr-shortcut-car)（dts88，GPL-3.0）的代码 / 信息。
+
+代码是 GPL-3.0，保留版权和许可声明本来就是必须的。其中含 EVCam 或贡献者的部分，也请一并保留他们的署名（见 [NOTICE.md](NOTICE.md)）。
+事实不受许可证约束，所以这一点是请求：本项目对 CarPiano 和 EngineV1 也是这样做的。
