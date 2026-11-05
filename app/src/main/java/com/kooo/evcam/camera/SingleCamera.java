@@ -505,12 +505,12 @@ public class SingleCamera {
     }
 
 
-    public SingleCamera(Context context, String cameraId, TextureView textureView) {
+    /** 画布在这里没有：主界面声明了才接上（{@link #declarePreview}）。 */
+    public SingleCamera(Context context, String cameraId) {
         this.context = context;
         this.cameraId = cameraId;
         this.captureBeat = StallWatch.capture(cameraId);
         StallWatch.registerCamera(this);
-        this.textureView = textureView;
         this.cameraManager = (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
     }
 
@@ -520,14 +520,6 @@ public class SingleCamera {
 
     public void setCameraPosition(String position) {
         this.cameraPosition = position;
-
-        // 如果是后摄像头，应用左右镜像变换
-        if (autoMirrorBack() && textureView != null) {
-            applyMirrorTransform();
-        }
-        if (textureView != null) {
-            applyLaneTransform();
-        }
     }
 
     /**
