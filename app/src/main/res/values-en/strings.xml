@@ -187,6 +187,7 @@
     <string name="smart_button_action_welcome_light">Welcome light show</string>
     <string name="smart_button_action_charging_light">Charging light show</string>
     <string name="smart_button_action_driving_light">Driving light show</string>
+    <string name="smart_button_action_rear_fog_flash">Rear fog lamp flash (red button)</string>
     <string name="smart_button_action_fragrance">Fragrance</string>
     <string name="smart_button_action_theater_driver">Theater mode (driver)</string>
     <string name="smart_button_action_theater_passenger">Theater mode (passenger)</string>

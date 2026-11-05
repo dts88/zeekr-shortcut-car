@@ -387,6 +387,36 @@ public class CarMovesTest {
         assertEquals(Signal.DRIVE_MODE.id + "=" + Signal.DRIVE_MODE_SPORT, car.writes.get(0));
     }
 
+    // ---- 红掣（后雾灯闪烁，7X=U 搬来）
+
+    /** 闪三下：亮灭各 350ms，三次「亮=1、灭=0」，完结回 0；有一下读到 1 算成了。 */
+    @Test
+    public void rearFogFlashesThreeTimes() {
+        FakeCar car = new FakeCar();
+        car.set(Signal.REAR_FOG.id, ALL, 0);
+        assertEquals(CarMoves.Result.DONE, run(car, CarMoves.rearFogFlash()));
+        assertEquals(6, car.writes.size());                       // 每吓一开一关，三吓六笔
+        assertEquals(Signal.REAR_FOG.id + "=1", car.writes.get(0));            // 亮
+        assertEquals(Signal.REAR_FOG.id + "=0", car.writes.get(1));            // 灭
+        assertEquals(Signal.REAR_FOG.id + "=0", car.writes.get(5));            // 完结回 0
+    }
+
+    /** 车机不受理（车机没这个号、写不进）：做不了，不数成。 */
+    @Test
+    public void rearFogRefusedIsUnavailable() {
+        FakeCar car = new FakeCar();
+        car.acceptPlain = false;
+        assertEquals(CarMoves.Result.UNAVAILABLE, run(car, CarMoves.rearFogFlash()));
+    }
+
+    /** 受理了但车上一直没亮：没生效（这台车多半没这功能，照实报）。 */
+    @Test
+    public void rearFogNeverLitIsNoChange() {
+        FakeCar car = new FakeCar();
+        car.applies = false;                                      // 写了也不变，读到的一直是 null
+        assertEquals(CarMoves.Result.NO_CHANGE, run(car, CarMoves.rearFogFlash()));
+    }
+
     // ---- 执行前的检查
 
     /** 超级省电时不执行（「极+」）；读不到超级省电当没开。 */

@@ -34,7 +34,7 @@ public class SmartButtonActionTest {
             assertSame(floating, action.floating);
             assertEquals(0, action.driveMode);
         }
-        assertEquals(1 + FloatingAction.values().length + 3 + 4 + 35, all.size());
+        assertEquals(1 + FloatingAction.values().length + 3 + 4 + 36, all.size());
     }
 
     /** 「不使用」不在哪一组；别的都在一组里，按组的先后列出，每一组都有东西。 */
