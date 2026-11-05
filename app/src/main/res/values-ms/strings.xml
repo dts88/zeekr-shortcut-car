@@ -187,6 +187,7 @@
     <string name="smart_button_action_welcome_light">Pertunjukan lampu sambutan</string>
     <string name="smart_button_action_charging_light">Pertunjukan lampu pengecasan</string>
     <string name="smart_button_action_driving_light">Pertunjukan lampu pemanduan</string>
+    <string name="smart_button_action_rear_fog_flash">Kelip lampu kabus belakang (butang merah)</string>
     <string name="smart_button_action_fragrance">Wangian</string>
     <string name="smart_button_action_theater_driver">Mod teater (pemandu)</string>
     <string name="smart_button_action_theater_passenger">Mod teater (penumpang)</string>
