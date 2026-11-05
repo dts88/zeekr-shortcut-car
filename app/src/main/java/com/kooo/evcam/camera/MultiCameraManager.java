@@ -5,7 +5,6 @@ import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.AppLog;
 import com.kooo.evcam.profile.RecordSpecs;
 import com.kooo.evcam.profile.StreamSpec;
-import com.kooo.evcam.FileTransferManager;
 import com.kooo.evcam.StorageHelper;
 import android.content.Context;
 import android.os.Environment;
@@ -50,8 +49,6 @@ public class MultiCameraManager {
     private boolean isRecording = false;
     /** 用软编码录制（编码录制器）；false = MediaRecorder（开发者选项里的非默认模式）。建管线时定一次。 */
     private boolean useCodecRecording = false;
-    private boolean useRelayWrite = false;      // 是否使用中转写入（录制到内部存储，异步传输到U盘）
-    private File finalSaveDir = null;           // 最终存储目录（用于中转写入模式）
 
     /**
      * 几路分段时共用的名字：出了一个名字之后这么久之内来切段的几路都拿它（数在 {@link SharedSegmentName#SHARE_MS}）。
@@ -199,11 +196,6 @@ public class MultiCameraManager {
     /** 这个录像意图已经报过「录起来了」（第一路加入时报一次）。 */
     private boolean startReported;
     private LaneListener laneListener;
-    /**
-     * 被放弃的写入线程手上还开着的文件（这个进程里所有录制器的）：中转写入整次停时扫缓存目录要跳过它们 ——
-     * 半个文件转过去就坏了。写入线程回过神来收好的，留在缓存里，下一个进程停录时一起转存。
-     */
-    private static final Set<String> HELD_BY_STUCK_WRITERS = java.util.concurrent.ConcurrentHashMap.newKeySet();
     /**
      * 建录制器、重新备好、停放用的那一条线程：一次只做一个，按排进来的先后（建的时候环视先）。都是等录制器的编码线程做完一步
      * （正常几十到几百毫秒，最多 5 秒）。停放不放在收拾线程上：收拾线程只收文件、放录制器 —— 一次停放卡住，
@@ -376,11 +368,6 @@ public class MultiCameraManager {
         boolean nextPending;
         /** 这一趟不用了（停录、管线放了）：手上那一步（在备、在开录）做完就停。 */
         boolean retired;
-        /**
-         * 中转写入时，这一趟作废时还在备、在开录（叫停时不在录）：它做完那一步自己停的时候把文件转存到这里；null = 不转存。
-         * 整次停扫缓存时跳过它的文件 —— 它那时可能还开着。
-         */
-        File relayOnStop;
 
         MediaSlot(String key, SingleCamera camera, VideoRecorder recorder) {
             this.key = key;
@@ -1202,7 +1189,7 @@ public class MultiCameraManager {
             return;
         }
         if (!current) {
-            stopAndPark(slot, null, null);
+            stopAndPark(slot, null);
             return;
         }
         startSlot(slot, token, frameAt, ms);
@@ -1307,16 +1294,12 @@ public class MultiCameraManager {
         LaneTrip trip = trip(key);
         trip.leaves++;
         trip.leftAt = now;
-        File relayTarget = useRelayWrite ? finalSaveDir : null;
         if (!useCodecRecording) {
             MediaSlot media = mediaSlots.get(key);
             if (media != null && media.phase == MediaPhase.RUNNING) {
-                stopMedia(media, change, relayTarget);
+                stopMedia(media, change);
             } else {
-                // 还在开录：开起来回来时看到这一次加入作废了，当场停掉、收文件、转存（mediaStarted）
-                if (media != null) {
-                    media.relayOnStop = relayTarget;
-                }
+                // 还在开录：开起来回来时看到这一次加入作废了，当场停掉、收文件（mediaStarted）
                 noteLeftUnstarted(key, why, "MediaRecorder 还在开录，开起来就停掉、收文件");
             }
             publishLanes();
@@ -1324,7 +1307,7 @@ public class MultiCameraManager {
         }
         Slot slot = slots.get(key);
         if (slot != null && slot.phase == SlotPhase.RUNNING) {
-            stopAndPark(slot, change, relayTarget);
+            stopAndPark(slot, change);
         } else {
             // 还在重新备好（没开过录、没有文件）：备好回来时看到这一次加入作废了，照「停 → 停放」放掉编码器（rearmed）
             noteLeftUnstarted(key, why, "还没开录（录制器在重新备好），没有文件");
@@ -1335,12 +1318,10 @@ public class MultiCameraManager {
     /**
      * 叫停这个录制器（不等），在收拾线程上收好文件（期限 {@link CodecVideoRecorder#STOP_BUDGET_MS}），再在 {@link #lanePrep}
      * 上停放（编码器放掉；EGL 和输入 SurfaceTexture 留着照常取帧 —— 录像输出还是同一个、还在会话里），回主线程（{@link #slotParked}）。
-     * 中转写入只转存这一个录制器收掉的那几个文件：缓存目录里别的路还在写。
      *
-     * @param change      一路退出的这一段（黑匣子那一行要）；作废的加入是 null
-     * @param relayTarget 中转写入的目标目录；null = 不转存
+     * @param change 一路退出的这一段（黑匣子那一行要）；作废的加入是 null
      */
-    private void stopAndPark(Slot slot, LaneChange change, File relayTarget) {
+    private void stopAndPark(Slot slot, LaneChange change) {
         slot.phase = SlotPhase.STOPPING;
         final CodecVideoRecorder recorder = slot.recorder;
         try {
@@ -1354,7 +1335,7 @@ public class MultiCameraManager {
             try {
                 recorder.awaitDrain(deadline);
                 recorder.finishStop(deadline);
-                result = handOverStopped(recorder, relayTarget);
+                result = handOverStopped(recorder);
             } catch (Exception e) {
                 AppLog.e(TAG, "Error stopping the codec recorder of " + slot.key, e);
                 result = "收拾它的录制器出错：" + e;
@@ -1634,28 +1615,16 @@ public class MultiCameraManager {
         return media == null ? null : media.out;
     }
 
-    /**
-     * 退出录像的那个录制器收掉了哪些文件（收拾线程上）：黑匣子一句；中转写入时把它们转存到这一次录像的目标目录
-     * （写入线程还攥着的那个除外，半个文件转过去就坏了 —— 记进 {@link #HELD_BY_STUCK_WRITERS}，整次停扫缓存时也跳过它）。
-     */
-    private String handOverStopped(CodecVideoRecorder recorder, File relayTarget) {
+    /** 退出录像的那个录制器收掉了哪些文件（收拾线程上）：黑匣子一句；写入线程还攥着的那个另说一句。 */
+    private String handOverStopped(CodecVideoRecorder recorder) {
         String held = recorder.heldFile();
-        if (held != null) {
-            HELD_BY_STUCK_WRITERS.add(held);
-        }
-        List<File> files = new ArrayList<>();
         StringBuilder names = new StringBuilder();
         for (String path : recorder.stoppedFiles()) {
             File file = new File(path);
             if (path.equals(held) || !file.exists()) {
                 continue;
             }
-            files.add(file);
             names.append(names.length() > 0 ? "、" : "").append(file.getName());
-        }
-        if (relayTarget != null && !files.isEmpty()) {
-            final File[] transfer = files.toArray(new File[0]);
-            laneHandler.postDelayed(() -> transferSpecificTempFiles(relayTarget, transfer), 500);
         }
         String result = (names.length() == 0 ? "没有留下文件" : "文件 " + names + " 收好了")
                 + (recorder.drainLate() ? "（编码线程到期限还没排空，最后几帧没要）" : "");
@@ -1806,14 +1775,10 @@ public class MultiCameraManager {
             public void onSegmentSwitch(String cameraId, int newSegmentIndex, String completedFilePath) {
                 AppLog.d(TAG, "Segment switch for camera " + cameraId + " to segment " + newSegmentIndex);
                 if (staleCallback(tag.gen, "segment switch", cameraId)) {
-                    // 停过录（又开过）：中转目标、空间检查都是这一次的了。上一次的文件由那次停录转存
+                    // 停过录（又开过）：空间检查是这一次的了
                     return;
                 }
-                // 中转写入：把收好的上一段转存到最终目录（由回调给出确切路径，不会转到正在录的新文件）。
                 // 界面上的段号不在这里报：出一个新的共用名字才加 1（segmentTimestampProvider）
-                if (useRelayWrite && finalSaveDir != null && newSegmentIndex > 0 && completedFilePath != null) {
-                    scheduleRelayTransfer(completedFilePath);
-                }
                 checkStorage("分段切换");
             }
 
@@ -1882,10 +1847,10 @@ public class MultiCameraManager {
         };
     }
 
-    /** 存储检查看哪个目录：录像实际写进的那个（换过盘就是新盘）；中转写入时看最终目录。 */
+    /** 存储检查看哪个目录：录像实际写进的那个（换过盘就是新盘）。 */
     private File guardedVideoDir() {
         File actual = StorageHelper.lastRecordingDir();
-        if (!isRecording || useRelayWrite || actual == null) {
+        if (!isRecording || actual == null) {
             return StorageHelper.getVideoDir(context);
         }
         return actual;
@@ -1895,15 +1860,11 @@ public class MultiCameraManager {
      * 录像盘写不进时还能写到哪，给录制器换盘用。
      *
      * <p>别的挂着的 U 盘，设定的那个优先、其余按剩余空间；开发者选项打开着时最后是内置存储（降级，项目所有者 2026-10-24：
-     * 只在开发者选项打开时，要说清楚 —— {@link StorageHelper#recordingFallback}）。
-     * 中转写入时录制器写的是内置缓存，U 盘掉不掉线它感觉不到，不换。</p>
+     * 只在开发者选项打开时，要说清楚 —— {@link StorageHelper#recordingFallback}）。</p>
      */
     private List<File> fallbackDirsFor(Set<String> deadVolumes) {
         List<File> dirs = new ArrayList<>();
         AppConfig config = new AppConfig(context);
-        if (config.shouldUseRelayWrite()) {
-            return dirs;
-        }
         StorageHelper.clearCache();
         File internal = StorageHelper.isInternalStorageAllowed()
                 ? Environment.getExternalStorageDirectory() : null;
@@ -1916,11 +1877,11 @@ public class MultiCameraManager {
 
     /**
      * 存储位置选的那个 U 盘上的录像目录，此刻挂着（看传进来的挂载表，不碰盘）才给：录制器写在别处时，每开一个新文件先问它，
-     * 挂回来就写回去。选的是内置存储、中转写入（录制器写的是内置缓存）、选的盘没挂着：null。
+     * 挂回来就写回去。选的是内置存储、选的盘没挂着：null。
      */
     private File homeDirFor(List<File> mounted) {
         AppConfig config = new AppConfig(context);
-        if (!config.isUsingExternalSdCard() || config.shouldUseRelayWrite()) {
+        if (!config.isUsingExternalSdCard()) {
             return null;
         }
         File root = FallbackVolumes.home(mounted, config.getCustomSdCardPath(), config.getLastDetectedSdPath());
@@ -4452,7 +4413,7 @@ public class MultiCameraManager {
     /**
      * 软编码录制器的回调是不是上一次录像的（之后停过录、又开过）。录制器收尾要几秒，新旧两次可能交叠：
      * 写不进、写盘跟不上、分段、换盘、第一笔数据这些只对这一次算数 —— 上一次的混进来，会把这一次打断、
-     * 把分段计数和中转目标弄乱。上一次停录时的文件报告（删掉了哪些坏文件）不在这里拦，那本来就是停录之后才来的。
+     * 把分段计数弄乱。上一次停录时的文件报告（删掉了哪些坏文件）不在这里拦，那本来就是停录之后才来的。
      */
     private boolean staleCallback(int gen, String what, String cameraId) {
         if (gen == recordGeneration) {
@@ -4506,11 +4467,6 @@ public class MultiCameraManager {
             // 信息条那份在开录时就登记了（还没真正录上），开录失败也要撤；没登记过时无害
             com.kooo.evcam.telemetry.InfoBar.recordingStopped();
         }
-    }
-
-    /** 这一次录像中转写入时，缓存里的文件写完搬去哪（开录时定下的）；不是中转写入、没在录是 null。闪远光自动锁定要它。 */
-    public File relayTargetDir() {
-        return isRecording && useRelayWrite ? finalSaveDir : null;
     }
 
     /**
@@ -4682,7 +4638,7 @@ public class MultiCameraManager {
      * 照样在计划里，它回来了自己加入。以前要等环视正常、各路按次序开完，再一起重建会话、等 3 秒会话计数，被拿着的那一路
      * 这一次不录（MediaRecorder 模式还要等画面稳定、再等 300 ms）。</p>
      *
-     * <p>写到哪照开录前查盘的那一份快照（{@code storage.recordDir}、中转写入的目标 {@code storage.videoDir}）：
+     * <p>写到哪照开录前查盘的那一份快照（{@code storage.videoDir}）：
      * 目录在存储线程上找好、建好，主线程不碰盘 —— 以前这里在主线程上再找一遍、exists / mkdirs，盘掉线时会卡住主线程
      * （审查 2026-10-11）。</p>
      *
@@ -4695,10 +4651,9 @@ public class MultiCameraManager {
         firstDataWrittenAtMs = 0;
 
         AppConfig appConfig = new AppConfig(context);
-        // 录制目录（中转写入时是内置存储上的临时目录，否则是最终目录）：查盘时在存储线程上找好、建好的
-        File saveDir = storage == null ? null : storage.recordDir;
-        boolean relay = appConfig.shouldUseRelayWrite();
-        if (saveDir == null || (relay && storage.videoDir == null)) {
+        // 录制目录：查盘时在存储线程上找好、建好的
+        File saveDir = storage == null ? null : storage.videoDir;
+        if (saveDir == null) {
             // 没有地方可存（没有 U 盘、开发者选项没开）：CameraKeeper 开录前已经拦过，走到这里是查盘时就没找到目录
             AppLog.e(TAG, "没有地方存录像（没有 U 盘），不开录");
             return false;
@@ -4718,15 +4673,6 @@ public class MultiCameraManager {
             return false;
         }
 
-        // 如果使用中转写入，记录最终目录
-        useRelayWrite = relay;
-        if (useRelayWrite) {
-            finalSaveDir = storage.videoDir;
-            AppLog.d(TAG, "Relay write mode: recording to " + saveDir.getAbsolutePath()
-                    + ", will transfer to " + finalSaveDir.getAbsolutePath());
-        } else {
-            finalSaveDir = null;
-        }
         // 行驶信息条开着：录像期间登记要用车辆信号（勾了后视镜上的灯也读灯，InfoBar 定），停录时注销（setRecording(false)；
         // 没别人在用就全停）。MediaRecorder 直接吃相机输出，画不了信息条（开着信息条的话建管线时就改用编码录制，
         // 见 AppConfig.shouldUseCodecRecording）
@@ -4814,7 +4760,6 @@ public class MultiCameraManager {
         noneLiveSince = 0;
         publishLanes();
 
-        final File relayTarget = useRelayWrite ? finalSaveDir : null;
         // 编码录制第一步就在这里：在录的、备好了还没开过录的，每一路都叫停（不等）。从这一刻起都不再录、不再分段、不再恢复，
         // 各自排空编码器、把收文件排在最后。以前在后台一路一路停，后面几路在等前面的时候还在录，可能跨过分段又开出新文件；
         // 三路各等十几秒，加起来超过相机管家的收拾期限，相机管家不等了、又开下一次，旧的还在写同一个盘。
@@ -4842,8 +4787,6 @@ public class MultiCameraManager {
         // 就是死输出，调度马上摘。在备的、在开录的回来看到这一趟作废了，自己停（mediaPrepared、mediaStarted）
         final List<MediaSlot> mediaStopping = new ArrayList<>();
         final List<VideoRecorder.Stopping> mediaTickets = new ArrayList<>();
-        // 在备、在开录的那几趟：做完那一步自己停、自己转存（relayOnStop）；它们的文件那时可能还开着，扫缓存时按名字跳过
-        final Set<String> stillOpen = new HashSet<>();
         for (String key : CameraSlots.openOrder(new ArrayList<>(mediaSlots.keySet()))) {
             MediaSlot media = mediaSlots.get(key);
             if (media == null) {
@@ -4856,11 +4799,6 @@ public class MultiCameraManager {
                 withdrawMedia(media);
                 mediaTickets.add(media.recorder.stop());
                 mediaStopping.add(media);
-            } else if (media.phase == MediaPhase.PREPARING || media.phase == MediaPhase.STARTING) {
-                media.relayOnStop = relayTarget;
-                if (media.file != null) {
-                    stillOpen.add(new File(media.file).getName());
-                }
             }
         }
         if (!mediaStopping.isEmpty()) {
@@ -4882,8 +4820,6 @@ public class MultiCameraManager {
         // 第二步（下面的收拾线程上）一起等它们排空、收好文件，共用这一个期限。按开机时长（不含深睡）算：
         // 等待用的计时、相机管家的收拾期限都不算深睡
         final long codecStopDeadline = android.os.SystemClock.uptimeMillis() + CodecVideoRecorder.STOP_BUDGET_MS;
-        useRelayWrite = false;
-        finalSaveDir = null;
         final boolean codec = useCodecRecording;
 
         // 在收拾线程上停，不卡主线程。一次只收拾一份（teardown 是单线程的）：退出时「人停的」那一次和释放那一次、
@@ -4906,8 +4842,7 @@ public class MultiCameraManager {
                     Slot slot = stopping.get(i);
                     try {
                         slot.recorder.finishStop(codecStopDeadline);
-                        // 整次停的文件由下面扫缓存一并转存，这里不单独转
-                        results[i] = handOverStopped(slot.recorder, null);
+                        results[i] = handOverStopped(slot.recorder);
                     } catch (Exception e) {
                         AppLog.e(TAG, "Error stopping the codec recorder of " + slot.key, e);
                         results[i] = "收拾它的录制器出错：" + e;
@@ -4918,28 +4853,10 @@ public class MultiCameraManager {
                 for (int i = 0; i < mediaStopping.size(); i++) {
                     VideoRecorder.Stopped outcome = mediaTickets.get(i).await(codecStopDeadline);
                     mediaOutcomes.add(outcome);
-                    // 整次停的文件由下面扫缓存一并转存，这里不单独转
-                    mediaResults[i] = mediaHandOver(outcome, null);
+                    mediaResults[i] = mediaHandOver(outcome);
                 }
                 for (VideoRecorder idle : mediaIdle) {
                     idle.release();
-                }
-
-                // 中转写入：把缓存目录里的录像都转存到最终目录 —— 这个进程里被放弃的写入线程手上还开着的那几个除外
-                // （半个文件转过去就坏了；它们要是回过神来收好了，留在缓存里，下一次中转写入停录时一起转存），
-                // 还在开录的那几趟 MediaRecorder 的也除外（它们停的时候自己转存）
-                if (relayTarget != null) {
-                    AppLog.d(TAG, "Scheduling relay transfer for remaining files...");
-                    File tempDir = new File(context.getCacheDir(), FileTransferManager.TEMP_VIDEO_DIR);
-                    final File[] filesToTransfer = tempDir.exists()
-                            ? tempDir.listFiles((dir, name) -> name.endsWith(".mp4")
-                                    && !HELD_BY_STUCK_WRITERS.contains(new File(dir, name).getAbsolutePath())
-                                    && !stillOpen.contains(name))
-                            : null;
-                    if (!HELD_BY_STUCK_WRITERS.isEmpty()) {
-                        AppLog.w(TAG, "Relay transfer skips files still held by stuck writers: " + HELD_BY_STUCK_WRITERS);
-                    }
-                    laneHandler.postDelayed(() -> transferSpecificTempFiles(relayTarget, filesToTransfer), 500);
                 }
             } catch (Exception e) {
                 AppLog.e(TAG, "Error in stopRecording", e);
@@ -5179,7 +5096,7 @@ public class MultiCameraManager {
         if (!current || !RecordingLanes.keepsNamedRecorder(channel.condition(key), channel.cannotOpen(key),
                 channel.releasedByDark(key))) {
             media.retired = true;
-            stopMedia(media, null, media.relayOnStop);
+            stopMedia(media, null);
             return;
         }
         media.phase = MediaPhase.READY;
@@ -5245,13 +5162,13 @@ public class MultiCameraManager {
                 checkAllUnrecordable();
             }
             media.retired = true;
-            stopMedia(media, null, media.relayOnStop);
+            stopMedia(media, null);
             publishLanes();
             return;
         }
         if (!current) {
             media.retired = true;
-            stopMedia(media, null, media.relayOnStop);
+            stopMedia(media, null);
             return;
         }
         media.phase = MediaPhase.RUNNING;
@@ -5297,7 +5214,7 @@ public class MultiCameraManager {
                     + (cannotOpen ? " (cannot open now)" : "") + (dark ? " (released by the dark screen)" : "")
                     + ": released, a new one is prepared when it comes back");
             media.retired = true;
-            stopMedia(media, null, null);
+            stopMedia(media, null);
         }
     }
 
@@ -5341,7 +5258,7 @@ public class MultiCameraManager {
             leaveLane(key, "它的录像输出" + text);
         } else if (media.phase == MediaPhase.READY && (configFailed || why == SingleCamera.Drop.RELEASED)) {
             media.retired = true;
-            stopMedia(media, null, null);
+            stopMedia(media, null);
         }
         channel.wake();
         publishLanes();
@@ -5358,12 +5275,11 @@ public class MultiCameraManager {
      * MediaRecorder 这一路的这一趟停掉（主线程叫，不等）：撤回它的录像输出；录制器当场放掉它交出去的 Surface，会话里还带着它的话
      * 就是死输出，调度马上摘（停下的 MediaRecorder 不再取帧，留在会话里那一路整条重复请求会停下）；录制器线程上停下、收好文件、
      * 放掉（{@link VideoRecorder#stop}）。收拾线程上等结果（期限 {@link CodecVideoRecorder#STOP_BUDGET_MS}），回主线程
-     * （{@link #mediaStopped}）。中转写入只转存这一趟收掉的那几个文件：缓存目录里别的路还在写。
+     * （{@link #mediaStopped}）。
      *
-     * @param change      一路退出的这一段（黑匣子那一行要）；作废的、放掉的那几趟是 null
-     * @param relayTarget 中转写入的目标目录；null = 不转存
+     * @param change 一路退出的这一段（黑匣子那一行要）；作废的、放掉的那几趟是 null
      */
-    private void stopMedia(MediaSlot media, LaneChange change, File relayTarget) {
+    private void stopMedia(MediaSlot media, LaneChange change) {
         media.phase = MediaPhase.STOPPING;
         media.nextPending = false;
         withdrawMedia(media);
@@ -5374,7 +5290,7 @@ public class MultiCameraManager {
             VideoRecorder.Stopped outcome = ticket.await(deadline);
             String text;
             try {
-                text = mediaHandOver(outcome, relayTarget);
+                text = mediaHandOver(outcome);
             } catch (Exception e) {
                 AppLog.e(TAG, "Error handing over the files of the MediaRecorder of " + media.key, e);
                 text = "收拾它的文件出错：" + e;
@@ -5385,26 +5301,17 @@ public class MultiCameraManager {
     }
 
     /**
-     * 一趟 MediaRecorder 收掉了哪些文件（收拾线程上）：黑匣子一句；中转写入时把它们转存到这一次录像的目标目录。
-     * 到点没停下的（录制器线程卡住了，多半是盘），那个还开着的文件记进 {@link #HELD_BY_STUCK_WRITERS}，整次停扫缓存时跳过它。
+     * 一趟 MediaRecorder 收掉了哪些文件（收拾线程上）：黑匣子一句。到点没停下的（录制器线程卡住了，多半是盘），
+     * 另说那个还开着、没收好的文件。
      */
-    private String mediaHandOver(VideoRecorder.Stopped outcome, File relayTarget) {
-        if (outcome.held != null) {
-            HELD_BY_STUCK_WRITERS.add(outcome.held);
-        }
-        List<File> files = new ArrayList<>();
+    private String mediaHandOver(VideoRecorder.Stopped outcome) {
         StringBuilder names = new StringBuilder();
         for (String path : outcome.files) {
             File file = new File(path);
             if (!file.exists()) {
                 continue;
             }
-            files.add(file);
             names.append(names.length() > 0 ? "、" : "").append(file.getName());
-        }
-        if (relayTarget != null && !files.isEmpty()) {
-            final File[] transfer = files.toArray(new File[0]);
-            laneHandler.postDelayed(() -> transferSpecificTempFiles(relayTarget, transfer), 500);
         }
         if (!outcome.finished) {
             return "MediaRecorder " + (CodecVideoRecorder.STOP_BUDGET_MS / 1000) + " 秒还没停下"
@@ -5474,101 +5381,6 @@ public class MultiCameraManager {
     /** 黑匣子里一趟 MediaRecorder 那一路的叫法（管线放了以后 cameras 清空了也叫得出）。 */
     private static String mediaName(MediaSlot media) {
         return media.camera.getCameraId() + "（" + roleName(media.key) + "）";
-    }
-
-    /**
-     * 调度将指定的已完成文件传输到最终目录
-     * @param completedFilePath 已完成录制的文件完整路径
-     */
-    private void scheduleRelayTransfer(String completedFilePath) {
-        if (finalSaveDir == null || completedFilePath == null) {
-            return;
-        }
-        
-        File tempFile = new File(completedFilePath);
-        if (!tempFile.exists()) {
-            AppLog.w(TAG, "Completed file does not exist: " + completedFilePath);
-            return;
-        }
-        
-        // 检查文件大小，避免传输空文件或损坏文件
-        if (tempFile.length() < 1024) {
-            AppLog.w(TAG, "Completed file too small, skipping transfer: " + completedFilePath + " (" + tempFile.length() + " bytes)");
-            return;
-        }
-        
-        File targetFile = new File(finalSaveDir, tempFile.getName());
-        
-        AppLog.d(TAG, "Scheduling relay transfer: " + tempFile.getName() + 
-                " -> " + targetFile.getAbsolutePath());
-        
-        FileTransferManager transferManager = FileTransferManager.getInstance(context);
-        transferManager.addTransferTask(tempFile, targetFile, 
-                new FileTransferManager.TransferCallback() {
-            @Override
-            public void onTransferComplete(File sourceFile, File targetFile) {
-                AppLog.d(TAG, "Relay transfer complete: " + targetFile.getName());
-            }
-            
-            @Override
-            public void onTransferFailed(File sourceFile, File targetFile, String error) {
-                AppLog.e(TAG, "Relay transfer failed: " + sourceFile.getName() + " - " + error);
-            }
-        });
-    }
-    
-    /**
-     * 将指定的临时视频文件传输到最终目录
-     * 【重要】此方法只传输预先指定的文件列表，避免传输在调用后新创建的文件
-     * @param targetDir 目标目录
-     * @param files 要传输的文件列表（在调用前收集）
-     */
-    private void transferSpecificTempFiles(File targetDir, File[] files) {
-        if (targetDir == null) {
-            AppLog.w(TAG, "Target directory is null, skipping transfer");
-            return;
-        }
-        
-        if (files == null || files.length == 0) {
-            AppLog.d(TAG, "No temp files to transfer");
-            return;
-        }
-        
-        AppLog.d(TAG, "Transferring " + files.length + " temp file(s) to " + targetDir.getAbsolutePath());
-        
-        FileTransferManager transferManager = FileTransferManager.getInstance(context);
-        
-        // 确保 FileTransferManager 已启动（如果从后台服务录制，可能未启动）
-        transferManager.start();
-        
-        for (File tempFile : files) {
-            // 检查文件是否仍然存在（可能已经被删除或移动）
-            if (!tempFile.exists()) {
-                AppLog.d(TAG, "Skipping non-existent file: " + tempFile.getName());
-                continue;
-            }
-            
-            // 跳过空文件（可能是正在被其他录制使用的新文件）
-            if (tempFile.length() == 0) {
-                AppLog.d(TAG, "Skipping empty file (may be in use): " + tempFile.getName());
-                continue;
-            }
-            
-            File targetFile = new File(targetDir, tempFile.getName());
-            
-            transferManager.addTransferTask(tempFile, targetFile, 
-                    new FileTransferManager.TransferCallback() {
-                @Override
-                public void onTransferComplete(File sourceFile, File targetFile) {
-                    AppLog.d(TAG, "Transfer complete: " + targetFile.getName());
-                }
-                
-                @Override
-                public void onTransferFailed(File sourceFile, File targetFile, String error) {
-                    AppLog.e(TAG, "Transfer failed: " + sourceFile.getName() + " - " + error);
-                }
-            });
-        }
     }
 
     /**

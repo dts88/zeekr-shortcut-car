@@ -1125,7 +1125,7 @@ public final class CameraKeeper {
             end(RecordStop.START_FAILED);
             return;
         }
-        AutoLock.get().recordingStarted(context, manager.relayTargetDir());
+        AutoLock.get().recordingStarted(context);
         AppLog.d(TAG, "开始录制 " + cameras.size() + " 路: " + cameras);
         for (Listener listener : new ArrayList<>(listeners)) {
             listener.onRecordingStarted();

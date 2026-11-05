@@ -38,7 +38,6 @@ import com.kooo.evcam.settings.SettingSpec;
 import com.kooo.evcam.settings.SettingsRegistry;
 import com.kooo.evcam.ui.NavDrawer;
 import com.kooo.evcam.camera.SingleCamera;
-import com.kooo.evcam.FileTransferManager;
 import com.kooo.evcam.StorageHelper;
 
 import java.util.ArrayList;
@@ -328,9 +327,6 @@ public class MainActivity extends AppCompatActivity {
         // 启动存储清理任务（如果用户设置了限制）
         storageCleanupManager = new StorageCleanupManager(this);
         storageCleanupManager.start();
-        
-        // 启动文件传输服务（用于U盘中转写入模式）
-        FileTransferManager.getInstance(this).start();
 
         // 检查是否是开机自启动
         boolean autoStartFromBoot = getIntent().getBooleanExtra("auto_start_from_boot", false);
@@ -2681,16 +2677,8 @@ public class MainActivity extends AppCompatActivity {
             // 退出那条路已经放了管线（exitApp），那时不写
             com.kooo.evcam.blackbox.BlackBox.note("主界面销毁：预览画布交给管线，管线留给应用");
         }
-        // 中转写入留不留（条件照旧）：还在录、在等开录、上一次停录还在收拾（needsPipeline），只是重建（夜间模式、语言切换），
-        // 或者还有别人在用相机（超级镜子、盲区画面、拍照）—— 留着。前台服务留不留由相机管家判（mainScreenGone）
-        final boolean keepServices = cameraManager != null && !cameraManager.isReleased()
-                && (keeper.needsPipeline() || isChangingConfigurations()
-                || keeper.needs(CameraKeeper.Use.MIRROR) || keeper.needs(CameraKeeper.Use.SIDE_VIEW));
-        AppLog.i(TAG, "onDestroy 中转写入" + (keepServices ? "保留" : "照没人要收") + " "
-                + instanceTag() + " recording=" + keeper.isRecording()
+        AppLog.i(TAG, "onDestroy " + instanceTag() + " recording=" + keeper.isRecording()
                 + " changingConfigurations=" + isChangingConfigurations() + " needs=" + keeper.describeNeeds());
-
-        // 关闭预览矫正悬浮窗
 
         // 停止调试信息更新
         stopDebugUpdates();
@@ -2730,11 +2718,6 @@ public class MainActivity extends AppCompatActivity {
         // 停止存储清理任务
         if (storageCleanupManager != null) {
             storageCleanupManager.stop();
-        }
-
-        // 文件传输（U 盘中转写入）：录制还在继续，分段还要往 U 盘搬，不能停
-        if (!keepServices) {
-            FileTransferManager.getInstance(this).stop();
         }
 
         // 这个界面设在管线上的回调一律摘掉：管线比界面活得久，不摘的话销毁了的界面被它留住、还被回调

@@ -302,16 +302,12 @@ public final class Mp4RepairFlow {
 
     // ================================================================= 零碎
 
-    /** 录制目录和最终目录可能不是一个（开了中转写入时），两个都看。 */
+    /** 要看的录像目录（此刻没有就是空的）。 */
     private static Set<File> dirs(Activity activity) {
         Set<File> dirs = new LinkedHashSet<>();
         File video = StorageHelper.getVideoDir(activity);
         if (video != null && video.isDirectory()) {
             dirs.add(video);
-        }
-        File recording = StorageHelper.getRecordingDir(activity);
-        if (recording != null && recording.isDirectory()) {
-            dirs.add(recording);
         }
         return dirs;
     }
