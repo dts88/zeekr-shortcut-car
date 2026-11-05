@@ -51,7 +51,10 @@ public final class CameraSlots {
     public static final String KEY_CABIN_FRONT = "back";
     /** 后座舱的内部 key。<b>不是「左侧」。</b> */
     public static final String KEY_CABIN_REAR = "left";
-    /** 第四路。极氪 7X 上不存在，自定义车型那种四面各一个相机的接法才用得到。 */
+    /**
+     * 第四路（EVCam 四面各一个相机的接法）。极氪 7X 上没有，管线不建它（2026-11-06 起相机这一侧不再列它）；
+     * 只剩回放认得这种后缀的旧文件。
+     */
     public static final String KEY_FOURTH = "right";
 
     private CameraSlots() {

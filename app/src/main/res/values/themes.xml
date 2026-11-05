@@ -103,18 +103,6 @@
         <item name="fontFamily">sans-serif-medium</item>
     </style>
 
-    <!-- 导航视图样式 -->
-    <style name="NavigationViewStyle">
-        <item name="itemBackground">@drawable/nav_item_background</item>
-        <item name="itemIconTint">@color/nav_icon_tint</item>
-        <item name="itemTextColor">@color/nav_text_primary</item>
-        <item name="itemShapeFillColor">@android:color/transparent</item>
-        <item name="itemIconPadding">16dp</item>
-        <item name="itemHorizontalPadding">20dp</item>
-        <item name="android:paddingStart">8dp</item>
-        <item name="android:paddingEnd">8dp</item>
-    </style>
-
     <!--
       开关：滑块永远是白的，开着时轨道是能量橙 —— 车机系统就是这个规则，
       没有「浅橙轨道」那一档。Material 自带的开关正好相反（滑块跟着变橙、

@@ -237,13 +237,6 @@ public class EglSurfaceEncoder {
     private long lastWatermarkUpdateMs = 0;
     private static final long WATERMARK_UPDATE_INTERVAL_MS = 1000; // 每秒更新一次水印
     
-    // 性能优化：跳帧控制（仅用于录制编码，不影响预览质量）
-    private int frameSkipCounter = 0;
-    private static final int FRAME_SKIP_THRESHOLD = 2; // 每3帧渲染1次（当CPU高负载时）
-    private boolean enableFrameSkip = false; // 默认不跳帧
-    
-    // 性能优化：异步渲染支持
-    private volatile boolean hasPendingFrame = false; // 是否有待处理的帧
     private final Object frameLock = new Object(); // 帧处理锁
     private volatile long lastFrameTimeNs = 0; // 上一帧时间戳
     /** 默认上限约 30fps，防止过度渲染；由 {@link #setFrameRate(int)} 按用户选择收紧。 */
@@ -330,7 +323,6 @@ public class EglSurfaceEncoder {
     
     // 性能优化：复用缓冲区，减少GC
     private final float[] tempMatrix = new float[16];
-    private long frameCount = 0;
 
     // 优化：控制何时需要清除缓冲（避免闪屏）
     private boolean needsClear = true;  // 初始需要清除
@@ -430,30 +422,6 @@ public class EglSurfaceEncoder {
     }
 
     /**
-     * 检查是否启用了时间水印
-     */
-    public boolean isWatermarkEnabled() {
-        return watermarkEnabled;
-    }
-
-    /**
-     * 设置是否启用跳帧（用于降低CPU占用）
-     * @param enabled true 表示启用跳帧
-     */
-    public void setFrameSkipEnabled(boolean enabled) {
-        this.enableFrameSkip = enabled;
-        this.frameSkipCounter = 0;
-        AppLog.d(TAG, "Camera " + cameraId + " Frame skip " + (enabled ? "enabled" : "disabled"));
-    }
-
-    /**
-     * 检查是否启用了跳帧
-     */
-    public boolean isFrameSkipEnabled() {
-        return enableFrameSkip;
-    }
-
-    /**
      * 渲染一帧到输出 Surface
      * 应该在 SurfaceTexture.onFrameAvailable 回调中调用
      * @param presentationTimeNs 帧的呈现时间（纳秒）
@@ -510,22 +478,6 @@ public class EglSurfaceEncoder {
                 // 忽略
             }
             return;
-        }
-
-        // 性能优化：跳帧控制（当启用时，每3帧渲染1次）
-        if (enableFrameSkip) {
-            frameSkipCounter++;
-            if (frameSkipCounter < FRAME_SKIP_THRESHOLD) {
-                // 跳过渲染，但更新时间戳
-                try {
-                    makeCurrent();
-                    inputSurfaceTexture.updateTexImage();
-                } catch (Exception e) {
-                    // 忽略
-                }
-                return;
-            }
-            frameSkipCounter = 0;
         }
 
         try {
@@ -1017,13 +969,6 @@ public class EglSurfaceEncoder {
         inputSurfaceTexture = null;
 
         AppLog.d(TAG, "Camera " + cameraId + " EglSurfaceEncoder released");
-    }
-
-    /**
-     * 获取纹理 ID
-     */
-    public int getTextureId() {
-        return textureId;
     }
 
     /**

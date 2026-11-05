@@ -53,7 +53,6 @@ public class ExpandablePhotoGroupAdapter extends RecyclerView.Adapter<RecyclerVi
 
     private OnItemClickListener itemClickListener;
     private OnItemSelectedListener itemSelectedListener;
-    private OnDateHeaderClickListener dateHeaderClickListener;
     private OnItemLongClickListener itemLongClickListener;
 
     public interface OnItemClickListener {
@@ -62,10 +61,6 @@ public class ExpandablePhotoGroupAdapter extends RecyclerView.Adapter<RecyclerVi
 
     public interface OnItemSelectedListener {
         void onItemSelected(PhotoGroup group);
-    }
-
-    public interface OnDateHeaderClickListener {
-        void onDateHeaderClick(DateSection<PhotoGroup> section, int position);
     }
 
     public interface OnItemLongClickListener {
@@ -100,10 +95,6 @@ public class ExpandablePhotoGroupAdapter extends RecyclerView.Adapter<RecyclerVi
         this.itemSelectedListener = listener;
     }
 
-    public void setOnDateHeaderClickListener(OnDateHeaderClickListener listener) {
-        this.dateHeaderClickListener = listener;
-    }
-
     public void setOnItemLongClickListener(OnItemLongClickListener listener) {
         this.itemLongClickListener = listener;
     }
@@ -121,10 +112,6 @@ public class ExpandablePhotoGroupAdapter extends RecyclerView.Adapter<RecyclerVi
 
     public Set<PhotoGroup> getSelectedGroups() {
         return selectedGroups;
-    }
-
-    public void setSelectedGroups(Set<PhotoGroup> groups) {
-        this.selectedGroups = groups;
     }
 
     public int getSelectedCount() {
@@ -156,17 +143,6 @@ public class ExpandablePhotoGroupAdapter extends RecyclerView.Adapter<RecyclerVi
         for (DateSection<PhotoGroup> section : dateSections) {
             selectedGroups.addAll(section.getItems());
         }
-    }
-
-    /**
-     * 获取所有 PhotoGroup 的总数
-     */
-    public int getTotalGroupCount() {
-        int count = 0;
-        for (DateSection<PhotoGroup> section : dateSections) {
-            count += section.getItemCount();
-        }
-        return count;
     }
 
     @Override
@@ -223,10 +199,6 @@ public class ExpandablePhotoGroupAdapter extends RecyclerView.Adapter<RecyclerVi
             section.toggleExpanded();
             buildFlattenedList();
             notifyDataSetChanged();
-            
-            if (dateHeaderClickListener != null) {
-                dateHeaderClickListener.onDateHeaderClick(section, position);
-            }
         });
     }
 

@@ -12,7 +12,6 @@ import android.hardware.camera2.CameraCaptureSession;
 import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraDevice;
 import android.hardware.camera2.CameraManager;
-import android.hardware.camera2.CameraMetadata;
 import android.hardware.camera2.CaptureRequest;
 import android.hardware.camera2.TotalCaptureResult;
 import android.hardware.camera2.params.StreamConfigurationMap;
@@ -184,15 +183,6 @@ public class SingleCamera {
     /** 系统有没有把这台相机给 SurfaceTexture 的画面左右翻过；null 表示还没查到。 */
     private Boolean sourceMirrored;
     private boolean imageAdjustEnabled = false;  // 是否启用亮度/降噪调节
-    
-    // 当前相机实际使用的参数（从 CaptureResult 读取）
-    private int actualExposureCompensation = 0;
-    private int actualAwbMode = CameraMetadata.CONTROL_AWB_MODE_AUTO;
-    private int actualEdgeMode = CameraMetadata.EDGE_MODE_OFF;
-    private int actualNoiseReductionMode = CameraMetadata.NOISE_REDUCTION_MODE_OFF;
-    private int actualEffectMode = CameraMetadata.CONTROL_EFFECT_MODE_OFF;
-    private int actualTonemapMode = CameraMetadata.TONEMAP_MODE_FAST;
-    private boolean hasReadActualParams = false;  // 是否已读取过实际参数
 
     // 调试：帧捕获监控
     private long frameCount = 0;  // 总帧数
@@ -515,12 +505,12 @@ public class SingleCamera {
     }
 
 
-    public SingleCamera(Context context, String cameraId, TextureView textureView) {
+    /** 画布在这里没有：主界面声明了才接上（{@link #declarePreview}）。 */
+    public SingleCamera(Context context, String cameraId) {
         this.context = context;
         this.cameraId = cameraId;
         this.captureBeat = StallWatch.capture(cameraId);
         StallWatch.registerCamera(this);
-        this.textureView = textureView;
         this.cameraManager = (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
     }
 
@@ -530,14 +520,6 @@ public class SingleCamera {
 
     public void setCameraPosition(String position) {
         this.cameraPosition = position;
-
-        // 如果是后摄像头，应用左右镜像变换
-        if (autoMirrorBack() && textureView != null) {
-            applyMirrorTransform();
-        }
-        if (textureView != null) {
-            applyLaneTransform();
-        }
     }
 
     /**
@@ -3222,10 +3204,6 @@ public class SingleCamera {
             frameCount++;
             long now = System.currentTimeMillis();
             lastFrameTimestampMs = now;
-            if (!hasReadActualParams || frameCount == 1) {
-                readActualParamsFromResult(result);
-                hasReadActualParams = true;
-            }
             fpsWindowFrameCount++;
             if (fpsWindowStartTime == 0) fpsWindowStartTime = now;
             long fpsElapsed = now - fpsWindowStartTime;
@@ -4034,13 +4012,6 @@ public class SingleCamera {
 
 
     /**
-     * 检查摄像头是否已连接
-     */
-    public boolean isConnected() {
-        return cameraDevice != null;
-    }
-
-    /**
      * 开（含救援重开的开那一半）没进 {@code openCamera} 就没成（不在列表里、查参数抛了、没有输出尺寸，这一轮的相机线程）：这一次开就此作罢，
      * 这一轮多半就此结束（结束的那一声先到主线程）。这一轮还是当前的（没被关）才收标记、报开不起来 —— 判断和改标记在同一把锁里；
      * 被关了的什么都不报：那是关，不是开不起来，标记归关它的那一下（审查 2026-10-11：以前照报，调度把一路已经在关、或者已经又开了的
@@ -4167,13 +4138,6 @@ public class SingleCamera {
     }
     
     /**
-     * 获取是否启用亮度/降噪调节
-     */
-    public boolean isImageAdjustEnabled() {
-        return imageAdjustEnabled;
-    }
-    
-    /**
      * 获取曝光补偿范围
      * @return 曝光补偿范围 [min, max]，如果不支持返回 null
      */
@@ -4185,22 +4149,6 @@ public class SingleCamera {
             }
         } catch (Exception e) {
             AppLog.e(TAG, "Camera " + cameraId + " failed to get exposure compensation range", e);
-        }
-        return null;
-    }
-    
-    /**
-     * 获取曝光补偿步长
-     * @return 曝光补偿步长（EV 单位），如果不支持返回 null
-     */
-    public android.util.Rational getExposureCompensationStep() {
-        try {
-            CameraCharacteristics chars = getCameraCharacteristics();
-            if (chars != null) {
-                return chars.get(CameraCharacteristics.CONTROL_AE_COMPENSATION_STEP);
-            }
-        } catch (Exception e) {
-            AppLog.e(TAG, "Camera " + cameraId + " failed to get exposure compensation step", e);
         }
         return null;
     }
@@ -4522,106 +4470,5 @@ public class SingleCamera {
             }
         }
         return false;
-    }
-
-    /**
-     * 从 CaptureResult 读取相机实际使用的参数
-     */
-    private void readActualParamsFromResult(TotalCaptureResult result) {
-        try {
-            // 曝光补偿
-            Integer exposure = result.get(TotalCaptureResult.CONTROL_AE_EXPOSURE_COMPENSATION);
-            if (exposure != null) {
-                actualExposureCompensation = exposure;
-            }
-            
-            // 白平衡模式
-            Integer awb = result.get(TotalCaptureResult.CONTROL_AWB_MODE);
-            if (awb != null) {
-                actualAwbMode = awb;
-            }
-            
-            // 边缘增强模式
-            Integer edge = result.get(TotalCaptureResult.EDGE_MODE);
-            if (edge != null) {
-                actualEdgeMode = edge;
-            }
-            
-            // 降噪模式
-            Integer noise = result.get(TotalCaptureResult.NOISE_REDUCTION_MODE);
-            if (noise != null) {
-                actualNoiseReductionMode = noise;
-            }
-            
-            // 特效模式
-            Integer effect = result.get(TotalCaptureResult.CONTROL_EFFECT_MODE);
-            if (effect != null) {
-                actualEffectMode = effect;
-            }
-            
-            // 色调映射模式
-            Integer tonemap = result.get(TotalCaptureResult.TONEMAP_MODE);
-            if (tonemap != null) {
-                actualTonemapMode = tonemap;
-            }
-            
-            AppLog.d(TAG, "Camera " + cameraId + " actual params: exposure=" + actualExposureCompensation +
-                    ", awb=" + actualAwbMode + ", edge=" + actualEdgeMode + 
-                    ", noise=" + actualNoiseReductionMode + ", effect=" + actualEffectMode +
-                    ", tonemap=" + actualTonemapMode);
-        } catch (Exception e) {
-            AppLog.e(TAG, "Camera " + cameraId + " failed to read actual params", e);
-        }
-    }
-    
-    // ==================== 获取实际参数的方法 ====================
-    
-    /**
-     * 获取相机实际使用的曝光补偿值
-     */
-    public int getActualExposureCompensation() {
-        return actualExposureCompensation;
-    }
-    
-    /**
-     * 获取相机实际使用的白平衡模式
-     */
-    public int getActualAwbMode() {
-        return actualAwbMode;
-    }
-    
-    /**
-     * 获取相机实际使用的边缘增强模式
-     */
-    public int getActualEdgeMode() {
-        return actualEdgeMode;
-    }
-    
-    /**
-     * 获取相机实际使用的降噪模式
-     */
-    public int getActualNoiseReductionMode() {
-        return actualNoiseReductionMode;
-    }
-    
-    /**
-     * 获取相机实际使用的特效模式
-     */
-    public int getActualEffectMode() {
-        return actualEffectMode;
-    }
-    
-    /**
-     * 获取相机实际使用的色调映射模式
-     */
-    public int getActualTonemapMode() {
-        return actualTonemapMode;
-    }
-    
-    /**
-     * 是否已读取过实际参数
-     */
-    public boolean hasActualParams() {
-        return hasReadActualParams;
     }
 }

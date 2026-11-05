@@ -82,7 +82,7 @@ public class RecordingFloatingService extends Service {
     /** 按住多久算长按。比系统默认的 500ms 略长一点：这个按钮是在车上按的。 */
     private static final long LONG_PRESS_MS = 600;
 
-    private final IBinder binder = new LocalBinder();
+    private final IBinder binder = new Binder();
     private Handler mainHandler;
     private AppConfig appConfig;
     private WindowManager windowManager;
@@ -126,12 +126,6 @@ public class RecordingFloatingService extends Service {
     // 广播接收器
     private BroadcastReceiver sizeUpdateReceiver;
     private BroadcastReceiver recordingStateReceiver;
-
-    public class LocalBinder extends Binder {
-        public RecordingFloatingService getService() {
-            return RecordingFloatingService.this;
-        }
-    }
 
     private final ServiceConnection serviceConnection = new ServiceConnection() {
         @Override

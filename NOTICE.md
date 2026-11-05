@@ -87,6 +87,8 @@ GPL-3.0 是传染性（copyleft）许可证。因此**本项目整体以 GPL-3.0
 `docs/evcam-upstream-douyin.jpg`、`docs/evcam-upstream-douyin2.png` 来自 EVCam，
 是其补盲功能作者（抖音 @星星舰见）的反馈群二维码，随上游一同保留以维持署名。
 应用里没有用到它们，2.0 之后从 `assets/` 挪到 `docs/`，不再打进 APK。
+同一位作者的补盲免责声明 `docs/upstream-EVCam-补盲免责声明.md`（原 `res/raw/blind_spot_disclaimer.md`）也来自 EVCam，
+应用里同样没有用到，2026-11-06 挪到 `docs/`。
 
 ---
 

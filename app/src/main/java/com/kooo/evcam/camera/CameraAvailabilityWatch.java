@@ -104,7 +104,7 @@ public final class CameraAvailabilityWatch {
 
     /** 主界面、录像、拍照、后视镜用到的几路的 key：我们管着的相机都在这几路里。 */
     private static final String[] KEYS = {CameraSlots.KEY_SURROUND, CameraSlots.KEY_CABIN_FRONT,
-            CameraSlots.KEY_CABIN_REAR, CameraSlots.KEY_FOURTH};
+            CameraSlots.KEY_CABIN_REAR};
 
     private CameraAvailabilityWatch() {
     }
