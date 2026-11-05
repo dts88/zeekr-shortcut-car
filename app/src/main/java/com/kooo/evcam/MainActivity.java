@@ -2848,35 +2848,6 @@ public class MainActivity extends AppCompatActivity {
         AppLog.d(TAG, "Registered cameras to ImageAdjustManager, adjust enabled: " + enabled);
     }
     
-    // ==================== 心跳推图相关方法 ====================
-
-
-    /**
-     * 获取已连接的摄像头数量
-     */
-    public int getConnectedCameraCount() {
-        if (cameraManager != null) {
-            return cameraManager.getConnectedCameraCount();
-        }
-        return 0;
-    }
-    
-
-
-    /**
-     * 转义 JSON 字符串
-     */
-    private String escapeJsonString(String str) {
-        if (str == null) {
-            return "";
-        }
-        return str.replace("\\", "\\\\")
-                  .replace("\"", "\\\"")
-                  .replace("\n", "\\n")
-                  .replace("\r", "\\r")
-                  .replace("\t", "\\t");
-    }
-    
     /**
      * 设置亮度/降噪调节启用状态
      * @param enabled true 表示启用

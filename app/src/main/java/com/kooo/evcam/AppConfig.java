@@ -194,8 +194,6 @@ public class AppConfig {
         return Math.round(DEFAULT_FLOATING_TOP_MARGIN_DP * density);
     }
     
-    // 录制模式常量
-    public static final String RECORDING_MODE_AUTO = "auto";  // 自动（一律 MediaCodec，见 shouldUseCodecRecording）
     public static final String RECORDING_MODE_MEDIA_RECORDER = "media_recorder";  // MediaRecorder（硬件编码）
     public static final String RECORDING_MODE_CODEC = "codec";  // MediaCodec（软编码）
     

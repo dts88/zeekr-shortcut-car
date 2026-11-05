@@ -256,53 +256,6 @@ public class StorageCleanupManager {
     }
     
     /**
-     * 手动触发清理（用于测试或用户手动清理）
-     */
-    public void manualCleanup() {
-        new Thread(this::performCleanup).start();
-    }
-    
-    /**
-     * 获取当前视频占用大小
-     * @return 占用大小（字节）
-     */
-    public long getVideoUsedSize() {
-        return getDirectorySize(StorageHelper.getVideoDir(context));
-    }
-    
-    /**
-     * 获取当前图片占用大小
-     * @return 占用大小（字节）
-     */
-    public long getPhotoUsedSize() {
-        return getDirectorySize(StorageHelper.getPhotoDir(context));
-    }
-    
-    /**
-     * 获取目录中所有文件的总大小
-     */
-    private long getDirectorySize(File directory) {
-        if (directory == null || !directory.exists() || !directory.isDirectory()) {
-            return 0;
-        }
-        
-        // 只认本应用写出来的文件：U 盘上可能有用户自己的东西，以前这里有什么删什么
-        File[] files = directory.listFiles(file -> file.isFile()
-                && (com.kooo.evcam.camera.StoragePlan.isOwnClip(file.getName())
-                || com.kooo.evcam.camera.StoragePlan.isOwnPhoto(file.getName())));
-        
-        if (files == null) {
-            return 0;
-        }
-        
-        long totalSize = 0;
-        for (File file : files) {
-            totalSize += file.length();
-        }
-        return totalSize;
-    }
-    
-    /**
      * 清理结果
      */
     private static class CleanupResult {

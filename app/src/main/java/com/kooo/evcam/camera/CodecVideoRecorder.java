@@ -576,14 +576,6 @@ public class CodecVideoRecorder {
     }
 
     /**
-     * 设置录制帧率
-     * @param fps 帧率（fps）
-     */
-    public void setFrameRate(int fps) {
-        setFrameRate(fps, fps);
-    }
-
-    /**
      * @param nominalFps 标称帧率，<b>必须是正数</b>。用于 {@code KEY_FRAME_RATE}
      *                   与码率估算 —— 这两处拿到 0 会配置失败或算出 0 码率。
      * @param capFps     渲染节流上限；0 表示不限制，视频流给多少录多少。
@@ -1663,13 +1655,6 @@ public class CodecVideoRecorder {
      */
     public Surface getRecordSurface() {
         return recordSurface;
-    }
-
-    /**
-     * 检查是否正在录制
-     */
-    public boolean isRecording() {
-        return isRecording.get();
     }
 
     /**

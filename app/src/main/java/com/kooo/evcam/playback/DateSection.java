@@ -53,20 +53,6 @@ public class DateSection<T> {
     }
     
     /**
-     * 获取日期字符串
-     */
-    public String getDateString() {
-        return dateString;
-    }
-    
-    /**
-     * 获取日期对象
-     */
-    public Date getDate() {
-        return date;
-    }
-    
-    /**
      * 获取该日期下的所有组
      */
     public List<T> getItems() {
@@ -85,13 +71,6 @@ public class DateSection<T> {
      */
     public boolean isExpanded() {
         return expanded;
-    }
-    
-    /**
-     * 设置展开状态
-     */
-    public void setExpanded(boolean expanded) {
-        this.expanded = expanded;
     }
     
     /**
