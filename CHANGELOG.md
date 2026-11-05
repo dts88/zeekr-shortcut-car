@@ -11,6 +11,41 @@ commit message, not here.
 
 Nothing yet.
 
+## [3.5.1-beta] - 2026-11-05
+
+**New since 2.93.3-beta**
+
+- **Camera handling optimized** for better stability and less impact on App Lab.
+- **Smart buttons reworked.** A new way to pair a button, and many more actions to choose from (manual shifting and the other existing actions stay). Extra functions for the X knob will be built on this later.
+- **New: Screen-off frame rate**, greatly reducing recording size in Sentry Mode.
+- **Blind spot view: two more triggers**, the Blind spot alert and Door open warning options (off by default). The Driving info bar shows them too.
+- **Blind spot view: improved position adjustment.** Thanks again to FerixzTanz and wysie, the authors of the blind spot view code.
+
+**Also new since 2.0.0**
+
+- **Recording stability further improved: recording and camera control completely reworked.**
+  - Fixed occasional short skips at high bitrates and full frame rate.
+  - When one camera has a problem, the others keep recording.
+  - All cameras stop together, and the end of a recording is no longer cut off.
+- **Camera settings no longer need an app restart.**
+- **New: Lock footage.** Videos and photos can be locked. Locked files are not removed by loop recording or a normal delete. If locked files fill the space, recording stops and says so.
+  - Recordings can be locked automatically on flash to pass or hazard lights. The car turns the hazard lights on by itself under emergency braking, so that locks too. Lock on horn is not available yet.
+  - The floating button can lock the current recording.
+- **New: Record sound (on by default).** Surround view recordings include the sound inside and outside the car, heard in playback.
+- **Super mirror**
+  - New Blind spot view: with the turn signal on, the side camera is shown on that side, on the center screen or the HUD. It is an aid only; please drive safely.
+    - Based on code and on-car research by FerixzTanz and wysie. FerixzTanz tuned the default angles and window on the car, and the HUD display comes from his CAMCORDER. Thanks to both for their contributions.
+  - New: switch between the rear view and the rear cabin.
+  - Direction labels (front, rear, left, right) on the window.
+- **Driving info bar (experimental) redesigned.** New items such as Sentry Mode, front and rear lamps and drive mode. You can choose which items it shows, and it is added to the surround view recording only. There's an easter egg in it.
+- **New: Simulated drive sound (experimental).** Simulated engine sound in Sport mode that follows throttle and speed. Two sounds, American V8 and Supersonic jet (old version); it can also play in Standard mode.
+- **New: Smart button support (experimental).** Smart buttons can be connected, and single and double press each run an action: anything the floating button can do, or switch the drive mode (Comfort, Standard or Sport). Settings show each button's battery level.
+- **Interface and features refined.** Settings reorganized and text sizes unified. New settings backup (export and import). Downloaded updates are verified before installing (thanks to wysie).
+
+**Known issues**
+- App Lab lost after a restart: some users report that App Lab disappears after the head unit restarts and must be reinstalled. This is likely related to this app; the cause is under investigation. Meanwhile the front cabin camera does not stay on: it turns off when you leave the car.
+- Simulated drive sound is sometimes silent; so far it seems to play only while the radio or CarPlay is playing. Under investigation.
+
 ## [3.5.0-alpha] - 2026-11-05
 
 - Smart buttons: new actions from the Chinese-market smart button set: one-touch Sport; voice assistant, media keys, mute and volume; seat and steering wheel heating, ventilation and massage, seat restore; climate, circulation and defrost; central locking, side mirrors, charging port cover and the factory 360 view; light shows and fragrance; theater, camping and Sentry modes.
