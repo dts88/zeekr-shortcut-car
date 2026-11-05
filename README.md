@@ -166,6 +166,9 @@ every change since then is visible as a diff.
 
 Splitting App Lab's composite stream into a grid and rendering it is implemented here from scratch.
 
+The simulated engine sound (its synthesis model, the voices and their tuning) is dts88's original work. CarPiano and
+EngineV1 only supplied facts (see [NOTICE.md](NOTICE.md)).
+
 ### Contributors
 
 - **[wysie](https://github.com/wysie)** — a great deal of design and code.
@@ -175,3 +178,15 @@ Splitting App Lab's composite stream into a grid and rendering it is implemented
 - **SW** — active testing and feedback. Many thanks.
 
 Origins, third-party licences and boundaries: [NOTICE.md](NOTICE.md).
+
+### Using this project's code or findings
+
+If your project uses code from Zeekr Shortcut, or relies on facts first published here (the platform notes, signal
+IDs, camera layouts and so on), please credit it in a prominent place: near the top of your README, and in your app's
+About or credits page. For example:
+
+> Uses code / findings from [Zeekr Shortcut](https://github.com/dts88/zeekr-shortcut-car) by dts88 (GPL-3.0).
+
+The code is GPL-3.0, so keeping its copyright and licence notices is required anyway. Where it includes EVCam's or a
+contributor's work, keep their credits too (see [NOTICE.md](NOTICE.md)). Facts can't be licensed, so for them this is
+a request: the same courtesy this project extends to CarPiano and EngineV1.
