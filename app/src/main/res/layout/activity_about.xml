@@ -5,7 +5,8 @@
   顺序是有意的：先谢人，再说这软件是什么、跟谁借的、怎么对待你的数据、
   出了事算谁的。致谢排在最前面，因为这个项目是别人给的信息攒起来的。
 
-  一处不能删：GPL-3.0 的继承关系是许可证要求，必须留在用户看得见的地方。
+  两处不能删：GPL-3.0 的继承关系，和「开源与来源」第一行的版权行。它们是 GPL-3.0 说的版权与许可声明，
+  NOTICE.md 第 8 节的附加条款还要求改过的版本保留署名，必须留在用户看得见的地方（docs/ui-spec.md 第十二节）。
 
   「安全须知」那行标题是开发者选项的入口（点一下弹密码框），换 id 会把它弄丢。
 
@@ -105,6 +106,14 @@
                 android:textColor="@color/text_primary"
                 android:textAppearance="@style/TextAppearance.Cam.Row"
                 android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="@string/about_credits_copyright"
+                android:textColor="@color/text_secondary"
+                android:textAppearance="@style/TextAppearance.Cam.Body" />
 
             <TextView
                 android:layout_width="match_parent"

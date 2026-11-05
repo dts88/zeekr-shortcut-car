@@ -159,5 +159,6 @@ cd zeekr-shortcut-car && ./gradlew assembleRelease
 
 > 使用了 [极氪即刻（Zeekr Shortcut）](https://github.com/dts88/zeekr-shortcut-car)（dts88，GPL-3.0）的代码 / 信息。
 
-代码是 GPL-3.0，保留版权和许可声明本来就是必须的。其中含 EVCam 或贡献者的部分，也请一并保留他们的署名（见 [NOTICE.md](NOTICE.md)）。
+代码是 GPL-3.0，保留版权和许可声明本来就是必须的。dts88 写的代码另有两条 GPL-3.0 第 7 条的附加条款：
+在应用的「关于」或致谢页里保留署名，改过的版本要标明不是原版（见 [NOTICE.md](NOTICE.md) 第 8 节）。其中含 EVCam 或贡献者的部分，也请一并保留他们的署名（见 [NOTICE.md](NOTICE.md)）。
 事实不受许可证约束，所以这一点是请求：本项目对 CarPiano 和 EngineV1 也是这样做的。
