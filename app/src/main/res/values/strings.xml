@@ -55,9 +55,6 @@
     <string name="set_info_bar_value">已选 %1$d 项</string>
     <string name="set_storage_location_title">存储位置</string>
     <string name="set_storage_port_note">推荐选择 USB-A 口的 U 盘。经实测，下车后 Type-C 口会断电，之后如仍在录制，将录制到 USB-A 口的 U 盘。</string>
-    <!-- 中转写入 2026-11-02 停用，界面上拿掉了；要恢复时放回下面几条 -->
-    <!-- <string name="set_relay_title">中转写入</string> -->
-    <!-- <string name="set_relay_summary">先写入内置存储，每个片段完成后再转存至 U 盘，可减少 U 盘写入不稳导致的丢帧。开启后，U 盘断开时不会自动改为录制到其他 U 盘。</string> -->
     <string name="set_storage_usage_no_drive">未检测到 U 盘</string>
     <string name="set_rearview_summary">悬浮显示环视中的任一路画面或后座舱画面；后视和后座舱画面左右镜像，与车内后视镜一致</string>
     <string name="set_rearview_switch_mode_title">切换方式</string>
@@ -446,7 +443,6 @@
 
     <!-- 设置界面里的提示与对话框 -->
     <string name="msg_stream_changed">视频流配置已改为「%1$s」</string>
-    <!-- <string name="msg_relay_dev_only">需开启开发者选项（会先写入内置存储）</string> -->
     <string name="msg_dev_only">需开启开发者选项</string>
     <string name="dlg_internal_title">使用内置存储？</string>
     <string name="dlg_internal_msg">录制时会持续写入数据。内置存储的写入寿命有限，且通常无法更换。\n\n建议使用 U 盘：损坏后可随时更换，也便于取下拷贝文件。</string>

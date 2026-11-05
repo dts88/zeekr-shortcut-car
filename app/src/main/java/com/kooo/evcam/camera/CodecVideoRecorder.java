@@ -576,14 +576,6 @@ public class CodecVideoRecorder {
     }
 
     /**
-     * 设置录制帧率
-     * @param fps 帧率（fps）
-     */
-    public void setFrameRate(int fps) {
-        setFrameRate(fps, fps);
-    }
-
-    /**
      * @param nominalFps 标称帧率，<b>必须是正数</b>。用于 {@code KEY_FRAME_RATE}
      *                   与码率估算 —— 这两处拿到 0 会配置失败或算出 0 码率。
      * @param capFps     渲染节流上限；0 表示不限制，视频流给多少录多少。
@@ -1204,10 +1196,8 @@ public class CodecVideoRecorder {
     /**
      * 这一次停录收掉的文件：{@link #finishStop} 结束时还在这个录制器手里的那几个 —— 最后一个文件、重建 / 恢复时收掉的、
      * 抢救出来的；太小删掉了的也在单子上（用的时候看在不在）。分段切换收好的那几个当时就报出去了
-     * （{@link RecordCallback#onSegmentSwitch}，中转写入那时就转存），不在里面。没开过录的那一次是空的；
+     * （{@link RecordCallback#onSegmentSwitch}），不在里面。没开过录的那一次是空的；
      * 下一次开录（重新备好）时清空。
-     *
-     * <p>一路单独离开录像时，中转写入只转存这几个（{@code MultiCameraManager}）：缓存目录里别的路还在写。</p>
      */
     public List<String> stoppedFiles() {
         return stoppedFiles;
@@ -1223,7 +1213,7 @@ public class CodecVideoRecorder {
 
     /**
      * 停录放弃等写入线程时它手里还开着的那个文件（还没写完、没收好）；没放弃过是 null。
-     * 中转写入停录时转存缓存里的文件要跳过它，半个文件转过去就坏了。
+     * 宿主写停录那一行黑匣子时单独说它。
      */
     public String heldFile() {
         return writerAbandoned ? heldFilePath : null;
@@ -1663,13 +1653,6 @@ public class CodecVideoRecorder {
      */
     public Surface getRecordSurface() {
         return recordSurface;
-    }
-
-    /**
-     * 检查是否正在录制
-     */
-    public boolean isRecording() {
-        return isRecording.get();
     }
 
     /**
@@ -2268,7 +2251,7 @@ public class CodecVideoRecorder {
         
         try {
             // 1. 收这一段、换编码器：排空编码器，把「收文件」排在这一段最后一个样本后面。
-            //    写入线程写完、收好之后才验证这个文件、报「这一段完成」（中转写入靠它转存，收好之前转存会拿到半个文件）
+            //    写入线程写完、收好之后才验证这个文件、报「这一段完成」
             stopRecordingForSegmentSwitch();
 
             // 不重置 firstFrameTimestampNs，保持 EGL 时间戳单调递增；每个文件的 PTS 基准写入线程开文件时清
@@ -2808,8 +2791,8 @@ public class CodecVideoRecorder {
         if (backpressure.dropped(now, queuedMs, queuedBytes)) {
             AppLog.w(TAG, "Camera " + cameraId + " write queue full (" + queuedMs + "ms, "
                     + megabytes(queuedBytes) + "MB): dropping camera frames until the writer catches up");
-            // 提示用户「U 盘写入跟不上」：只在写的是 U 盘、又不是换盘补写占着排队的时候（中转写入的内部缓存、
-            // 内置存储、换盘补写都不是 U 盘慢）。多久提示一次由相机管家定
+            // 提示用户「U 盘写入跟不上」：只在写的是 U 盘、又不是换盘补写占着排队的时候（内置存储、
+            // 换盘补写都不是 U 盘慢）。多久提示一次由相机管家定
             boolean slowDrive = isOnUsbDrive(saveDirectory) && !writerRelocating;
             RecordCallback cb = callback;
             Handler segment = segmentHandler;
@@ -2822,7 +2805,7 @@ public class CodecVideoRecorder {
 
     /**
      * 这个目录在不在 U 盘上：/storage/卷名/…，卷名不是内置存储（emulated、self）。
-     * 中转写入写的是内部缓存，开发者选项下可以写内置存储 —— 那时说「U 盘写入跟不上」是错的。
+     * 开发者选项下可以写内置存储 —— 那时说「U 盘写入跟不上」是错的。
      */
     private static boolean isOnUsbDrive(String dir) {
         if (dir == null || !dir.startsWith("/storage/")) {
@@ -2876,7 +2859,7 @@ public class CodecVideoRecorder {
      *
      * <p>内存里还没确认落盘的 —— 写过多留的那段和排着的 —— 交给一个抢救线程，尽力写到别的盘上（卡住的这个盘不试）；
      * 然后从内存里拿掉，内存不跟着一个卡死的线程一直占着（{@link SampleRing#abandon}）。命令留在队里：
-     * 写入线程回过神来照样收文件、退出。它手里开着的那个文件不验证、中转写入不转存（{@link #heldFile}），
+     * 写入线程回过神来照样收文件、退出。它手里开着的那个文件不验证（{@link #heldFile}），
      * 它自己收好时再验证（{@link #closeFile}）。</p>
      */
     private void abandonWriter(String stage) {
@@ -3368,7 +3351,7 @@ public class CodecVideoRecorder {
     /**
      * 收文件（写入线程上），这个文件前面排着的都写完了才轮到这一步：写文件尾、fsync、关掉；
      * 没确认落盘（或者这个文件中途写不下去了），写过多留的那段抢救成单独的文件。
-     * 分段切换的，收好了才验证这个文件、报「这一段完成」—— 中转写入在那时把它转存走，早了会拿到半个文件。
+     * 分段切换的，收好了才验证这个文件、报「这一段完成」。
      * 没开成的文件没什么可报；开了、一直没开轨的是空文件，删掉、不报。
      */
     private void closeFile(CloseFile close) {
@@ -3412,7 +3395,7 @@ public class CodecVideoRecorder {
             Handler segment = segmentHandler;
             if (close.nextSegmentIndex >= 0 && segment != null) {
                 final int nextIndex = close.nextSegmentIndex;
-                // 这一段交出去了（中转写入这就转存）：不再算这个录制器手里的，停录收掉的单子里没有它（stoppedFiles）
+                // 这一段交出去了：不再算这个录制器手里的，停录收掉的单子里没有它（stoppedFiles）
                 recordedFilePaths.remove(completed);
                 segment.post(() -> validateAndCleanupFile(completed));
                 RecordCallback cb = callback;

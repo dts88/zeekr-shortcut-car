@@ -136,13 +136,6 @@
             android:dialogMessage="@string/set_storage_port_note"
             android:summary="%s" />
 
-        <!-- 中转写入 2026-11-02 停用（项目所有者：普通用户、开发者都不再用），这一行从界面上拿掉；要恢复时放回：
-        <SwitchPreferenceCompat
-            android:key="pref_relay_write"
-            android:title="@string/set_relay_title"
-            android:summary="@string/set_relay_summary" />
-        -->
-
         <!-- 存储上限（2026-10-23 合成一行）：行尾写录像、照片两个上限，点开一个框里填两项，清理的规则写在框里 -->
         <Preference
             android:key="pref_storage_limits"

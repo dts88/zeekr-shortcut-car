@@ -108,11 +108,6 @@ public class AppConfig {
     private static final String KEY_HUD_FADE = "side_view_hud_fade";              // 边缘渐隐，短边的百分比
     private static final String KEY_REARVIEW_Y = "rearview_y";
 
-
-    // 中转写入配置
-    private static final String KEY_RELAY_WRITE_ENABLED = "relay_write_enabled";  // 中转写入开关（U盘存储时）
-
-
     // 时间角标配置
     private static final String KEY_TIMESTAMP_WATERMARK_ENABLED = "timestamp_watermark_enabled";  // 时间角标开关
     private static final String KEY_PHOTO_VIA_JPEG = "photo_via_jpeg";
@@ -194,8 +189,6 @@ public class AppConfig {
         return Math.round(DEFAULT_FLOATING_TOP_MARGIN_DP * density);
     }
     
-    // 录制模式常量
-    public static final String RECORDING_MODE_AUTO = "auto";  // 自动（一律 MediaCodec，见 shouldUseCodecRecording）
     public static final String RECORDING_MODE_MEDIA_RECORDER = "media_recorder";  // MediaRecorder（硬件编码）
     public static final String RECORDING_MODE_CODEC = "codec";  // MediaCodec（软编码）
     
@@ -682,13 +675,13 @@ public class AppConfig {
      * 判断只在 {@link #readsAsUnset} 这一处，读取走 {@link #readBoolean} 这几个；
      * 用的地方照旧调原来的 getter，不用各自再问开发者模式。</p>
      *
-     * <p>什么时候按新的算，和改这一项本身一样，看它在哪一刻被读：开录时读的（存储位置、中转写入、
+     * <p>什么时候按新的算，和改这一项本身一样，看它在哪一刻被读：开录时读的（存储位置、
      * 强制 H.264）从下一次开录起；建相机时读的（录制模式、相机映射、画面调节、预览走 GPU）
      * 从下一次启动应用起；熄屏录制从下一次熄屏起；拍照另存整帧从下一张起；视频回看走 GPU 从下一次打开回看起；
      * 记录可能占用摄像头的应用从下一次别的程序占用或放开相机起；盲区画面的三个标定角度从窗口下一次重画起，最晚下一次显示（在设置里改时，拖动条松手那一下当场）。</p>
      *
      * <p>收进来的有两种：开发者选项分区里的设置（{@code preferences.xml} 的 {@code screen_developer}）；
-     * 别的分区里只有开发者才选得了的值 —— 存储位置选内置存储、中转写入（先写内置存储）。
+     * 别的分区里只有开发者才选得了的值 —— 存储位置选内置存储。
      * 枚举型设置里只有几个选项只给开发者的（声音风格），不收整个键，标在那几个选项上
      * （{@code SettingSpec.Entry#developerOnly}），读的时候一样按没存过算（{@link #readEnum}）。
      * 分区里只是动作的几行（恢复画面调节默认值、权限、修复录像、归档）不存设置，不在这里。
@@ -713,7 +706,6 @@ public class AppConfig {
                 KEY_CAMERA_HOLDER_SUSPECTS,           // 记录可能占用摄像头的应用 → 关
                 KEY_PHOTO_VIA_JPEG,                   // 拍照使用 JPEG 输出 → 开（关着时主界面在后台拍不到画面）
                 KEY_STORAGE_LOCATION,                 // 存储位置 → U 盘（内置存储只有开发者选得了）
-                KEY_RELAY_WRITE_ENABLED,              // 中转写入 → 关
                 KEY_SIDE_VIEW_BACK,                   // 盲区画面的三个标定角度 → 默认
                 KEY_SIDE_VIEW_UP,
                 KEY_SIDE_VIEW_FOV,
@@ -761,9 +753,12 @@ public class AppConfig {
      *   <li>{@code cabins_one_shot_revert_pending}：2.17.0–2.19.0 前后座舱只用一次时，「视频流配置待改回『极氪7X（环视）』」的记号。
      *       2.20.0 起只有前座舱只用一次、不再改选择（项目所有者 2026-10-23）。</li>
      *   <li>{@code watermark_spec_enabled}：「水印显示录制规格」。2026-10-23 起录制规格跟着「时间水印」同开同关（项目所有者）。</li>
+     *   <li>{@code relay_write_enabled}：EVCam 的「中转写入」（先写内置存储、每段写完再搬到 U 盘）。2026-11-02 停用，
+     *       2026-11-06 删掉（项目所有者：完全没用到的 EVCam 代码全部删除）。</li>
      * </ul>
      */
-    private static final String[] RETIRED_KEYS = {"cabins_one_shot_revert_pending", "watermark_spec_enabled"};
+    private static final String[] RETIRED_KEYS = {"cabins_one_shot_revert_pending", "watermark_spec_enabled",
+            "relay_write_enabled"};
 
     /** 进程起来时调一次：去掉的功能留下的键（{@link #RETIRED_KEYS}）有就删。 */
     public void forgetRetiredKeys() {
@@ -1837,42 +1832,6 @@ public class AppConfig {
      */
     public String getLastDetectedSdPath() {
         return prefs.getString(KEY_LAST_DETECTED_SD_PATH, null);
-    }
-    
-    /**
-     * 要不要走中转写入（先写内置存储，每个片段写完再搬到 U 盘）。
-     *
-     * <p>2026-11-02 项目所有者定：停用，普通用户、开发者都不再用，设置里那一行也拿掉了。这里固定为关，
-     * 录制那边带中转的几条路都走不到。原来的判断注释在下面，要恢复时放回来，
-     * 再把 preferences.xml、SettingsPreferenceFragment.bindStorage 里注释掉的那一行放回。</p>
-     */
-    public boolean shouldUseRelayWrite() {
-        // // 只有使用U盘存储时才考虑中转写入
-        // if (!isUsingExternalSdCard()) {
-        //     return false;
-        // }
-        // return isRelayWriteEnabled();
-        return false;
-    }
-    
-    /**
-     * 设置中转写入开关
-     * @param enabled true 表示启用中转写入
-     */
-    public void setRelayWriteEnabled(boolean enabled) {
-        prefs.edit().putBoolean(KEY_RELAY_WRITE_ENABLED, enabled).apply();
-        AppLog.d(TAG, "中转写入设置: " + (enabled ? "启用" : "禁用"));
-    }
-    
-    /**
-     * 中转写入开没开。
-     *
-     * <p>默认关闭：中转写入会先写内部存储再搬到 U 盘，闪存写入量翻倍。
-     * 只有在 U 盘写入速度确实跟不上、录制出现卡顿时才值得开。
-     * 它是规律性地写内置存储，和内置存储同一个门槛：归开发者选项管，关着时按关算（{@link #DEVELOPER_KEYS}）。</p>
-     */
-    public boolean isRelayWriteEnabled() {
-        return readBoolean(KEY_RELAY_WRITE_ENABLED, false);
     }
     
     // ==================== 悬浮按钮透明度 ====================

@@ -166,7 +166,7 @@ public final class CameraContention {
             StringBuilder open = new StringBuilder();
             if (manager != null) {
                 for (String key : new String[]{CameraSlots.KEY_SURROUND, CameraSlots.KEY_CABIN_FRONT,
-                        CameraSlots.KEY_CABIN_REAR, CameraSlots.KEY_FOURTH}) {
+                        CameraSlots.KEY_CABIN_REAR}) {
                     SingleCamera camera = manager.getCamera(key);
                     if (camera != null && camera.holdsOrIsOpening()) {
                         open.append(open.length() > 0 ? "," : "").append(camera.getCameraId());

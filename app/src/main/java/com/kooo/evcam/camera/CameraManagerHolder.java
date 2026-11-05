@@ -637,13 +637,12 @@ public class CameraManagerHolder {
             }
             ZeekrMultiPlan plan = result.plan;
             if (plan == null) {
-                manager.initCameras(null, null, null, null, null, null, null, null);
+                manager.initCameras(null, null, null);
             } else {
                 manager.setEnabledLanes(shape.enabled);
-                manager.initCameras(plan.compositeId, null,
-                        shape.cabinFront ? plan.cabin1Id : null, null,
-                        shape.cabinRear ? plan.cabin2Id : null, null,
-                        null, null);
+                manager.initCameras(plan.compositeId,
+                        shape.cabinFront ? plan.cabin1Id : null,
+                        shape.cabinRear ? plan.cabin2Id : null);
                 pin(manager, CameraSlots.KEY_SURROUND, result.compositeUse);
                 pin(manager, CameraSlots.KEY_CABIN_FRONT, cabinFrontUse);
                 pin(manager, CameraSlots.KEY_CABIN_REAR, cabinRearUse);

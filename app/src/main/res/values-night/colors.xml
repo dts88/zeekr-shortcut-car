@@ -51,7 +51,6 @@
     <color name="dialog_guide_button_text">@color/on_energy</color>
 
     <!-- 常量 -->
-    <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
 
     <!--

@@ -2,7 +2,6 @@ package com.kooo.evcam;
 
 import android.content.Context;
 import android.content.Intent;
-import android.net.Uri;
 import android.os.Build;
 import android.os.PowerManager;
 import android.provider.Settings;
@@ -111,60 +110,4 @@ public class WakeUpHelper {
     public static boolean isPersistentWakeLockHeld() {
         return persistentWakeLock != null && persistentWakeLock.isHeld();
     }
-    
-    /**
-     * 检查应用是否在电池优化白名单中
-     * Android 6.0+ 的 Doze 模式会忽略 WakeLock，只有加入白名单才能真正阻止休眠
-     * 
-     * @return true 表示已在白名单中（不受 Doze 限制）
-     */
-    public static boolean isIgnoringBatteryOptimizations(Context context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            PowerManager pm = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
-            if (pm != null) {
-                return pm.isIgnoringBatteryOptimizations(context.getPackageName());
-            }
-        }
-        return true; // Android 6.0 以下不需要
-    }
-    
-    /**
-     * 请求加入电池优化白名单
-     * 这是阻止休眠的关键！Doze 模式下只有白名单应用的 WakeLock 才有效
-     * 
-     * 注意：会弹出系统对话框，需要用户确认
-     */
-    public static void requestIgnoreBatteryOptimizations(Context context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            if (!isIgnoringBatteryOptimizations(context)) {
-                try {
-                    Intent intent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
-                    intent.setData(Uri.parse("package:" + context.getPackageName()));
-                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                    context.startActivity(intent);
-                    AppLog.d(TAG, "Requesting battery optimization whitelist");
-                } catch (Exception e) {
-                    AppLog.e(TAG, "Failed to request battery optimization whitelist", e);
-                    // 某些设备可能不支持，尝试打开电池优化设置页面
-                    openBatteryOptimizationSettings(context);
-                }
-            } else {
-                AppLog.d(TAG, "Already in battery optimization whitelist");
-            }
-        }
-    }
-    
-    /**
-     * 打开电池优化设置页面（备用方案）
-     */
-    public static void openBatteryOptimizationSettings(Context context) {
-        try {
-            Intent intent = new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            context.startActivity(intent);
-        } catch (Exception e) {
-            AppLog.e(TAG, "Failed to open battery optimization settings", e);
-        }
-    }
-
 }

@@ -218,7 +218,7 @@ public final class VideoRecorder {
         public final boolean finished;
         /** 收好的文件（有画面的；空壳已经删了，报过 {@link RecordCallback#onCorruptedFilesDeleted}）。 */
         public final List<String> files;
-        /** 没停完时还开着的那个文件（中转写入扫缓存时跳过它）；停完是 null。 */
+        /** 没停完时还开着的那个文件；停完是 null。 */
         public final String held;
 
         Stopped(boolean finished, List<String> files, String held) {
