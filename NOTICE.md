@@ -29,7 +29,8 @@
 大的方向：
 
 - **新增，本项目独立实现**：极氪合成流的识别、拆分与四宫格渲染（`app/src/main/java/com/kooo/evcam/zeekr/`），
-  视频流配置与配置编辑器（`app/src/main/java/com/kooo/evcam/profile/`），电子后视镜，发送到手机。
+  视频流配置与配置编辑器（`app/src/main/java/com/kooo/evcam/profile/`），电子后视镜，发送到手机，
+  模拟声浪（`app/src/main/java/com/kooo/evcam/sound/`，见第 5 节）。
 - **删除**：钉钉 / 飞书 / Telegram 远程查看、心跳推图、MJPEG / RTP 推流，连同对应的 SDK 依赖。
 - **重做**：录制参数的来源（改由视频流配置按路决定）、设置界面、主界面与悬浮按钮、视频回看。
 - **包名与构建**：applicationId 改为 `io.github.dts88.zeekrshortcut`，签名可由环境变量覆盖，
@@ -106,9 +107,24 @@ GPL-3.0 是传染性（copyleft）许可证。因此**本项目整体以 GPL-3.0
   点火阶次和 1、2 阶的比例、固定共振峰的位置、带负荷时七八成是随机成分、高频怎么滚降 —— 用来校准逐缸合成器（`sound.PulseVoice`）；
   也看了它网页上的做法（真车录音按转速、负荷分段循环、交叉淡化，再加随油门开合的低通）。录音和代码都没有用。
 
+模拟声浪的合成方法、各款声音和调校，都是 dts88 的原创；上面两个项目只提供了这些事实。
+
 ---
 
 ## 6. 不是代码的内容
 
 - `app/src/main/res/raw/outside_voice_go_first.wav`（「You're welcome to go first. Be careful.」）：项目所有者用手机录下车外喇叭放出来的这句语音，
   再去噪、去混响、校正音色（2026-11-01）。
+
+---
+
+## 7. 用到本项目的代码或信息时
+
+如果你的项目用到了本项目的代码，或者用到了这里最先公开的事实（平台笔记、信号编号、摄像头排布等），
+请在显眼的位置注明：README 靠前的位置，以及应用的「关于」或致谢页。例如：
+
+> Uses code / findings from [Zeekr Shortcut](https://github.com/dts88/zeekr-shortcut-car) by dts88 (GPL-3.0).
+
+- **代码**：GPL-3.0，保留版权和许可声明本来就是必须的。其中含 EVCam（第 1 节）或贡献者（第 2 节）的部分，
+  也请一并保留他们的署名。
+- **事实**：事实不受许可证约束，所以这一点是请求，不是许可条款。本项目对 CarPiano 和 EngineV1（第 5 节）也是这样做的。
