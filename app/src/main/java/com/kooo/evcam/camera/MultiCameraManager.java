@@ -5901,23 +5901,6 @@ public class MultiCameraManager {
     }
 
     /**
-     * 获取已连接的相机数量
-     */
-    public int getConnectedCameraCount() {
-        int count = 0;
-        for (SingleCamera camera : cameras.values()) {
-            if (camera.isConnected()) {
-                count++;
-            }
-        }
-        return count;
-    }
-
-    /**
-     * 获取所有摄像头当前使用的分辨率信息
-     * @return 格式化的分辨率信息字符串
-     */
-    /**
      * 获取所有摄像头的实时调试信息（FPS + 分辨率）
      */
     public String getDebugStats() {
@@ -5936,28 +5919,6 @@ public class MultiCameraManager {
                     .append("(").append(camera.getCameraId()).append(") ");
             sb.append(String.format(java.util.Locale.US, "%.1f fps  ", fps));
             sb.append(res);
-        }
-        return sb.toString();
-    }
-
-    public String getCameraResolutionsInfo() {
-        StringBuilder sb = new StringBuilder();
-        for (Map.Entry<String, SingleCamera> entry : cameras.entrySet()) {
-            String key = entry.getKey();
-            SingleCamera camera = entry.getValue();
-            String cameraId = camera.getCameraId();
-            Size previewSize = camera.getPreviewSize();
-            
-            if (sb.length() > 0) {
-                sb.append("\n");
-            }
-            
-            sb.append(key).append(" (摄像头").append(cameraId).append("): ");
-            if (previewSize != null) {
-                sb.append(previewSize.getWidth()).append("×").append(previewSize.getHeight());
-            } else {
-                sb.append("未初始化");
-            }
         }
         return sb.toString();
     }

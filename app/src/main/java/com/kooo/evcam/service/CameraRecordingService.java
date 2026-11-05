@@ -3,9 +3,7 @@ package com.kooo.evcam.service;
 import android.app.Service;
 import android.content.Intent;
 import android.os.Binder;
-import android.os.Handler;
 import android.os.IBinder;
-import android.os.Looper;
 
 import com.kooo.evcam.AppLog;
 
@@ -20,22 +18,12 @@ import com.kooo.evcam.AppLog;
 public class CameraRecordingService extends Service {
     private static final String TAG = "CameraRecordingService";
 
-    private final IBinder binder = new LocalBinder();
-    private Handler mainHandler;
-    private boolean isServiceRunning = false;
-
-    public class LocalBinder extends Binder {
-        public CameraRecordingService getService() {
-            return CameraRecordingService.this;
-        }
-    }
+    private final IBinder binder = new Binder();
 
     @Override
     public void onCreate() {
         super.onCreate();
         AppLog.d(TAG, "录制服务创建");
-        mainHandler = new Handler(Looper.getMainLooper());
-        isServiceRunning = true;
     }
 
     @Override
@@ -58,10 +46,5 @@ public class CameraRecordingService extends Service {
         super.onDestroy();
         AppLog.d(TAG, "录制服务销毁");
         // 录像不属于这个服务：它被系统收走时录像照常，由相机管家管
-        isServiceRunning = false;
-    }
-
-    public boolean isServiceRunning() {
-        return isServiceRunning;
     }
 }

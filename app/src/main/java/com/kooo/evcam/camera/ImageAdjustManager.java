@@ -36,26 +36,12 @@ public class ImageAdjustManager {
     private int[] supportedNoiseReductionModes = null;
     private int[] supportedEffectModes = null;
     
-    // 回调接口
-    public interface OnParamsChangedListener {
-        void onParamsChanged();
-    }
-    
-    private OnParamsChangedListener listener;
-    
     public ImageAdjustManager(Context context) {
         this.context = context;
         this.appConfig = new AppConfig(context);
         
         // 从配置中加载保存的参数
         loadParamsFromConfig();
-    }
-    
-    /**
-     * 设置参数变化监听器
-     */
-    public void setOnParamsChangedListener(OnParamsChangedListener listener) {
-        this.listener = listener;
     }
     
     /**
@@ -106,17 +92,6 @@ public class ImageAdjustManager {
             }
             
             AppLog.d(TAG, "Registered camera: " + camera.getCameraId() + ", total: " + cameras.size());
-        }
-    }
-    
-    /**
-     * 注销摄像头
-     * @param camera 要注销的摄像头
-     */
-    public void unregisterCamera(SingleCamera camera) {
-        if (camera != null) {
-            cameras.remove(camera);
-            AppLog.d(TAG, "Unregistered camera: " + camera.getCameraId() + ", remaining: " + cameras.size());
         }
     }
     
@@ -174,11 +149,6 @@ public class ImageAdjustManager {
         }
         
         AppLog.d(TAG, "Updated " + successCount + "/" + cameras.size() + " cameras");
-        
-        // 通知监听器
-        if (listener != null) {
-            listener.onParamsChanged();
-        }
         
         return successCount;
     }
@@ -324,77 +294,5 @@ public class ImageAdjustManager {
      */
     public boolean isEffectModeSupported() {
         return supportedEffectModes != null && supportedEffectModes.length > 1;
-    }
-    
-    // ==================== 获取相机实际使用的参数 ====================
-    
-    /**
-     * 获取相机实际使用的曝光补偿值（从第一个已注册的相机获取）
-     */
-    public int getActualExposureCompensation() {
-        if (!cameras.isEmpty()) {
-            return cameras.get(0).getActualExposureCompensation();
-        }
-        return 0;
-    }
-    
-    /**
-     * 获取相机实际使用的白平衡模式
-     */
-    public int getActualAwbMode() {
-        if (!cameras.isEmpty()) {
-            return cameras.get(0).getActualAwbMode();
-        }
-        return 1; // AUTO
-    }
-    
-    /**
-     * 获取相机实际使用的色调映射模式
-     */
-    public int getActualTonemapMode() {
-        if (!cameras.isEmpty()) {
-            return cameras.get(0).getActualTonemapMode();
-        }
-        return 1; // FAST
-    }
-    
-    /**
-     * 获取相机实际使用的边缘增强模式
-     */
-    public int getActualEdgeMode() {
-        if (!cameras.isEmpty()) {
-            return cameras.get(0).getActualEdgeMode();
-        }
-        return 0; // OFF
-    }
-    
-    /**
-     * 获取相机实际使用的降噪模式
-     */
-    public int getActualNoiseReductionMode() {
-        if (!cameras.isEmpty()) {
-            return cameras.get(0).getActualNoiseReductionMode();
-        }
-        return 0; // OFF
-    }
-    
-    /**
-     * 获取相机实际使用的特效模式
-     */
-    public int getActualEffectMode() {
-        if (!cameras.isEmpty()) {
-            return cameras.get(0).getActualEffectMode();
-        }
-        return 0; // OFF
-    }
-    
-    /**
-     * 是否已获取到相机实际参数
-     */
-    public boolean hasActualParams() {
-        if (!cameras.isEmpty()) {
-            return cameras.get(0).hasActualParams();
-        }
-        return false;
     }
 }

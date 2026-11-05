@@ -203,16 +203,8 @@ public final class AppLog {
         logInternal(Log.DEBUG, tag, message, null);
     }
 
-    public static void d(String tag, String message, Throwable tr) {
-        logInternal(Log.DEBUG, tag, message, tr);
-    }
-
     public static void i(String tag, String message) {
         logInternal(Log.INFO, tag, message, null);
-    }
-
-    public static void i(String tag, String message, Throwable tr) {
-        logInternal(Log.INFO, tag, message, tr);
     }
 
     public static void w(String tag, String message) {

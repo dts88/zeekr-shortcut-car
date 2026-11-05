@@ -124,11 +124,6 @@ public class PhotoGroup {
         return sdf.format(captureTime);
     }
 
-    public String getFormattedDate() {
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
-        return sdf.format(captureTime);
-    }
-
     public String getFormattedTime() {
         SimpleDateFormat sdf = new SimpleDateFormat("HH:mm", Locale.getDefault());
         return sdf.format(captureTime);
@@ -154,29 +149,8 @@ public class PhotoGroup {
         return photoFiles.get(POSITION_RIGHT);
     }
 
-    public Map<String, File> getAllPhotoFiles() {
-        return new HashMap<>(photoFiles);
-    }
-
-    public File getThumbnailFile() {
-        if (photoFiles.containsKey(POSITION_FRONT)) {
-            return photoFiles.get(POSITION_FRONT);
-        } else if (photoFiles.containsKey(POSITION_BACK)) {
-            return photoFiles.get(POSITION_BACK);
-        } else if (photoFiles.containsKey(POSITION_LEFT)) {
-            return photoFiles.get(POSITION_LEFT);
-        } else if (photoFiles.containsKey(POSITION_RIGHT)) {
-            return photoFiles.get(POSITION_RIGHT);
-        }
-        return null;
-    }
-
     public int getPhotoCount() {
         return photoFiles.size();
-    }
-
-    public long getTotalSize() {
-        return totalSize;
     }
 
     public String getFormattedSize() {
