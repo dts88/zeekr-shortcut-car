@@ -175,3 +175,9 @@ Splitting App Lab's composite stream into a grid and rendering it is implemented
 - **SW** — active testing and feedback. Many thanks.
 
 Origins, third-party licences and boundaries: [NOTICE.md](NOTICE.md).
+
+### Capture session progress
+
+Only results from the current capture session update its frame/progress and FPS
+counters. Late results from a replaced session cannot postpone stall detection.
+This does not change camera ownership, retry budgets or recording defaults.
