@@ -442,7 +442,7 @@
     <string name="info_read_failed">Tidak dapat dibaca</string>
     <string name="msg_rearview_on">Cermin super dihidupkan. Seret tepi untuk mengalihkannya; leret bahagian tengah ke atas atau bawah untuk mengubah bingkai.</string>
     <string name="msg_side_view_unavailable">Tidak dapat memaparkan Paparan titik buta</string>
-    <string name="msg_side_view_camera_in_use">Tidak dapat memaparkan Paparan titik buta: kamera sedang digunakan oleh kereta</string>
+    <string name="msg_side_view_camera_in_use">Tidak dapat memaparkan Paparan titik buta: kamera sedang digunakan oleh kereta. Untuk melihat kabin belakang juga, tetapkan Tetapan → Cermin super → Paparan kepada Belakang + kabin belakang.</string>
     <string name="msg_rearview_reset">Tetingkap dan paparan Cermin super ditetapkan semula</string>
     <string name="msg_floating_reset">Butang terapung ditetapkan semula</string>
     <string name="msg_adjust_opened">Tetingkap pelarasan imej dibuka. Kembali ke skrin utama untuk melihat kesannya.</string>
