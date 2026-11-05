@@ -169,7 +169,7 @@
     <string name="smart_button_action_drive_down">驾驶模式向下</string>
     <string name="smart_button_action_gear_up">升挡（模拟声浪）</string>
     <string name="smart_button_action_gear_down">降挡（模拟声浪）</string>
-    <!-- 灵动贴的动作分组和 2026-11-05 加的动作（草稿，待项目所有者确认） -->
+    <!-- 灵动贴的动作分组和 2026-11-05 加的动作（项目所有者当天批准） -->
     <string name="smart_button_group_app">应用功能</string>
     <string name="smart_button_group_drive">驾驶</string>
     <string name="smart_button_group_media">语音与媒体</string>
