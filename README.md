@@ -187,6 +187,8 @@ About or credits page. For example:
 
 > Uses code / findings from [Zeekr Shortcut](https://github.com/dts88/zeekr-shortcut-car) by dts88 (GPL-3.0).
 
-The code is GPL-3.0, so keeping its copyright and licence notices is required anyway. Where it includes EVCam's or a
+The code is GPL-3.0, so keeping its copyright and licence notices is required anyway. dts88's code also carries two
+additional terms under GPL-3.0 section 7: keep the attribution in your app's About or credits screen, and mark a
+modified version as not the original (see [NOTICE.md](NOTICE.md), section 8). Where it includes EVCam's or a
 contributor's work, keep their credits too (see [NOTICE.md](NOTICE.md)). Facts can't be licensed, so for them this is
 a request: the same courtesy this project extends to CarPiano and EngineV1.
