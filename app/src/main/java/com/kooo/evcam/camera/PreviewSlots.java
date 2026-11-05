@@ -17,7 +17,7 @@ import java.util.Set;
 public final class PreviewSlots {
 
     /** 主界面上的几格画布，按布局里的顺序（不是开的次序）。 */
-    public static final String[] KEYS = {"front", "back", "left", "right"};
+    public static final String[] KEYS = {CameraSlots.KEY_SURROUND, CameraSlots.KEY_CABIN_FRONT, CameraSlots.KEY_CABIN_REAR};
 
     private PreviewSlots() {
     }

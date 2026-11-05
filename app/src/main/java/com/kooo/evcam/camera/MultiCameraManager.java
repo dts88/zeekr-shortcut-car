@@ -2343,13 +2343,14 @@ public class MultiCameraManager {
 
     /**
      * 按分好的槽位建各路相机、交给调度（主线程）。只有 {@link CameraManagerHolder} 调（大纲 §2 阶段 6：管线只在那里建，
-     * 槽位照存下的映射或相机列表分，相机列表、合成流探测都在相机线程上做完了才到这里）。画布一律是 null：主界面只声明自己的画布
+     * 槽位照存下的映射或相机列表分，相机列表、合成流探测都在相机线程上做完了才到这里）。画布不在这里给：主界面只声明自己的画布
      * （{@link #declarePreviews}）。某一路的 id 传 null 就不建那一路。做完算建好了（{@link #isBuilt}）。
+     *
+     * @param frontId 环视（{@link CameraSlots#KEY_SURROUND}）
+     * @param backId  前座舱（{@link CameraSlots#KEY_CABIN_FRONT}）
+     * @param leftId  后座舱（{@link CameraSlots#KEY_CABIN_REAR}）
      */
-    public void initCameras(String frontId, TextureView frontView,
-                           String backId, TextureView backView,
-                           String leftId, TextureView leftView,
-                           String rightId, TextureView rightView) {
+    public void initCameras(String frontId, String backId, String leftId) {
 
         // 清空之前的摄像头实例
         cameras.clear();
@@ -2357,35 +2358,27 @@ public class MultiCameraManager {
         // 同一路相机只建一份：两个槽位指到同一个 id（手动映射填错）时，后面的槽位空着。
         // 以前是两份都建、标成主 / 从实例，从实例什么都不做 —— 十处守卫只为这一种配置错误
         Set<String> used = new HashSet<>();
-        // 根据参数创建摄像头实例（支持 null TextureView 用于后台初始化）
         if (frontId != null && used.add(frontId)) {
-            SingleCamera frontCamera = new SingleCamera(context, frontId, frontView);
+            SingleCamera frontCamera = new SingleCamera(context, frontId);
             frontCamera.setCameraPosition("front");
             cameras.put("front", frontCamera);
             AppLog.d(TAG, "初始化前摄像头: ID=" + frontId);
         }
 
         if (backId != null && used.add(backId)) {
-            SingleCamera backCamera= new SingleCamera(context, backId, backView);
+            SingleCamera backCamera = new SingleCamera(context, backId);
             backCamera.setCameraPosition("back");
             cameras.put("back", backCamera);
             AppLog.d(TAG, "初始化后摄像头: ID=" + backId);
         }
 
         if (leftId != null && used.add(leftId)) {
-            SingleCamera leftCamera= new SingleCamera(context, leftId, leftView);
+            SingleCamera leftCamera = new SingleCamera(context, leftId);
             leftCamera.setCameraPosition("left");
             cameras.put("left", leftCamera);
             AppLog.d(TAG, "初始化左摄像头: ID=" + leftId);
         }
 
-        if (rightId != null && used.add(rightId)) {
-            SingleCamera rightCamera= new SingleCamera(context, rightId, rightView);
-            rightCamera.setCameraPosition("right");
-            cameras.put("right", rightCamera);
-            AppLog.d(TAG, "初始化右摄像头: ID=" + rightId);
-        }
-        
         AppLog.d(TAG, "共初始化 " + cameras.size() + " 个摄像头");
 
         // 为每个摄像头设置回调：报给这一份管线在调度里的把手，带着是哪一份管线（Reports 不拿着这一份管线 —— 卡住的孤儿晚到的报告

@@ -2814,7 +2814,7 @@ public class MainActivity extends AppCompatActivity {
         imageAdjustManager.clearCameras();
         
         // 注册各位置的摄像头
-        String[] positions = {"front", "back", "left", "right"};
+        String[] positions = PreviewSlots.KEYS;
         for (String position : positions) {
             SingleCamera camera = cameraManager.getCamera(position);
             if (camera != null) {
@@ -2841,7 +2841,7 @@ public class MainActivity extends AppCompatActivity {
         }
         
         // 设置各摄像头的启用状态
-        String[] positions = {"front", "back", "left", "right"};
+        String[] positions = PreviewSlots.KEYS;
         for (String position : positions) {
             SingleCamera camera = cameraManager.getCamera(position);
             if (camera != null) {
