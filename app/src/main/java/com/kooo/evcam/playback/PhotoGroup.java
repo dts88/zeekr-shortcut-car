@@ -196,26 +196,22 @@ public class PhotoGroup {
         return false;
     }
 
-    /**
-     * 删掉这一组里不在 {@code keep} 里的文件（锁定的留下）。删掉的从组里拿掉，留下的还在。
-     *
-     * @return 删掉了几个
-     */
-    public int deleteAllExcept(Set<String> keep) {
-        int deleted = 0;
+    /** 这一组的文件（拷一份：回放里删在后台线程上，见 PhotoPlaybackActivity#deleteSelected）。 */
+    public List<File> files() {
+        return new ArrayList<>(photoFiles.values());
+    }
+
+    /** 删掉了的从组里拿掉（删在后台线程上，组在主线程上改）。留下的（锁定的、没删掉的）还在。 */
+    public void dropDeleted(Set<String> deletedNames) {
         Iterator<Map.Entry<String, File>> it = photoFiles.entrySet().iterator();
         while (it.hasNext()) {
-            File file = it.next().getValue();
-            if (keep.contains(file.getName())) {
-                continue;
-            }
-            long size = file.length();
-            if (file.delete()) {
-                deleted++;
-                totalSize -= size;
+            if (deletedNames.contains(it.next().getValue().getName())) {
                 it.remove();
             }
         }
-        return deleted;
+        totalSize = 0;
+        for (File file : photoFiles.values()) {
+            totalSize += file.length();
+        }
     }
 }
