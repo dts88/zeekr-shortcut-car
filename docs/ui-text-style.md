@@ -558,6 +558,9 @@
     msg_smart_button_no_permission「没有「附近的设备」权限，无法绑定灵动贴」/ Without the Nearby devices permission, smart buttons
     can't be paired / Tanpa kebenaran Peranti berdekatan, butang pintar tidak dapat dipasangkan。
   - 术语表加「绑定」：英文 pair、马来文 pasangkan。
+- 2026-11-06 批准（关于页「开源与来源」第一行的版权行，项目所有者当天定、当天批；NOTICE.md 第 8 节的附加条款要求改版保留署名，
+  这一行不能删，见 ui-spec 第十二节；关于页只有中英两份）：about_credits_copyright「极氪即刻 © 2026 dts88。本应用不提供任何担保。」；
+  English「Zeekr Shortcut © 2026 dts88. Provided without any warranty.」
 - vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
 - 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
 
@@ -566,9 +569,7 @@
 下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
 可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
 
-- 2026-11-06 加（关于页「开源与来源」第一行的版权行，附加条款要求改版保留署名；关于页只有中英两份）：
-  about_credits_copyright「极氪即刻 © 2026 dts88。本应用不提供任何担保。」；
-  English「Zeekr Shortcut © 2026 dts88. Provided without any warranty.」
+- （现在没有。）
 
 ---
 
