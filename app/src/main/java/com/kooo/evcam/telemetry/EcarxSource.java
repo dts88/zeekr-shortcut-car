@@ -34,7 +34,7 @@ import java.util.Set;
 
 /**
  * 车辆信号这一路：车机系统自带的 ECARX 车辆接口（{@code com.ecarx.xui.adaptapi}），全反射。读数只读；写只给灵动贴的动作，
- * 走 {@link #access}（{@link CarAccess}，项目所有者 2026-10-30 驾驶模式、2026-11-04「极+」那一套）。
+ * 走 {@link #access}（{@link CarAccess}，项目所有者 2026-10-30 驾驶模式、2026-11-04 中国版那一套）。
  *
  * <h3>为什么是它、怎么读（zeekr-shortcut-lab 在 7X 上、在 App Lab 容器里实测）</h3>
  *

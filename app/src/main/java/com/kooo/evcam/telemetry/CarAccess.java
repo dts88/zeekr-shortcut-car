@@ -8,7 +8,7 @@
 package com.kooo.evcam.telemetry;
 
 /**
- * 车辆接口的读写（{@link Telemetry#carAccess}）：只有灵动贴的动作用（驾驶模式和「极+」那一套，项目所有者 2026-10-30、11-04）。
+ * 车辆接口的读写（{@link Telemetry#carAccess}）：只有灵动贴的动作用（驾驶模式和中国版那一套，项目所有者 2026-10-30、11-04）。
  *
  * <p>都是同步的 binder 调用，可以在任何线程上叫，但会等车机回话：别在主线程上叫。读不到、写不进返回 null / false，不抛。
  * 车机说「受理」不等于做到了（Lab findings §2.48、§2.50）：要读回来看。</p>

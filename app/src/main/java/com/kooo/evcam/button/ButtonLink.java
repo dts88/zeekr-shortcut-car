@@ -26,11 +26,11 @@ import java.util.Locale;
 import java.util.UUID;
 
 /**
- * 跟一台灵动贴的一次连接：只在长按（约 3 秒、背光闪）时连（车主 2026-11-04，同「极+」）。连上以后订按键通知、查版本、读电量、查序列号，
+ * 跟一台灵动贴的一次连接：只在长按（约 3 秒、背光闪）时连（车主 2026-11-04，同中国版）。连上以后订按键通知、查版本、读电量、查序列号，
  * 之后一直连着：灵动贴最后一下按完 15 秒自己断开（Lab findings §2.61、§2.93 车上又看到一次）。我们不主动断开，
  * 除了出错、蓝牙关了、车机要睡、退出、关了灵动贴、删了它、要连另一台。
  *
- * <p>顺序照「极+」（Lab findings §2.93）：连上 → 找服务 → 隔 {@link #SUBSCRIBE_DELAY_MS} 订 0x2A60 的通知（订上算连好，绑定在这一刻算成）
+ * <p>顺序照中国版（Lab findings §2.93）：连上 → 找服务 → 隔 {@link #SUBSCRIBE_DELAY_MS} 订 0x2A60 的通知（订上算连好，绑定在这一刻算成）
  * → 查版本 → 订电量通知、读一次电量 → 查序列号；两条查询之前各隔 {@link #QUERY_GAP_MS}。只写查询和蓝牙标准的订阅，不写别的。</p>
  *
  * <p>安卓的 GATT 同时只做一件事：一件做完（它的回调来了）再做下一件，回调要对得上是哪一种、而且这件真的开始了才算；
@@ -52,9 +52,9 @@ final class ButtonLink {
     static final long OP_TIMEOUT_MS = 3_000L;
     static final long BUSY_RETRY_MS = 200L;
     static final int BUSY_TRIES = 3;
-    /** 连上、找到服务以后隔这么久再订按键通知（「极+」）。 */
+    /** 连上、找到服务以后隔这么久再订按键通知（中国版）。 */
     static final long SUBSCRIBE_DELAY_MS = 100L;
-    /** 每条查询之前隔这么久（「极+」的写队列也是一条一条来）。 */
+    /** 每条查询之前隔这么久（中国版的写队列也是一条一条来）。 */
     static final long QUERY_GAP_MS = 150L;
 
     static final UUID NOTIFY = uuid16(0x2a60);
@@ -409,7 +409,7 @@ final class ButtonLink {
         enqueue(new Op(LABEL_SUBSCRIBE, Op.DESCRIPTOR, SUBSCRIBE_DELAY_MS, () -> subscribe(ch)));
     }
 
-    /** 按键通知订上了：算连好了，接着查版本、读电量、查序列号（「极+」灵动贴的顺序）。 */
+    /** 按键通知订上了：算连好了，接着查版本、读电量、查序列号（中国版灵动贴的顺序）。 */
     private void onReady() {
         ready = true;
         listener.ready(this);

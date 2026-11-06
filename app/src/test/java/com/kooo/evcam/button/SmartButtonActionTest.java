@@ -23,7 +23,7 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * 灵动贴能选的动作（{@link SmartButtonAction}）：不使用 + 悬浮按钮的全部 + 驾驶模式三项 + 手排模式四项 +「极+」那一套（2026-11-05），
+ * 灵动贴能选的动作（{@link SmartButtonAction}）：不使用 + 悬浮按钮的全部 + 驾驶模式三项 + 手排模式四项 + 中国版那一套（2026-11-05），
  * 按组列出，认不出的当不使用。
  */
 public class SmartButtonActionTest {
@@ -63,7 +63,7 @@ public class SmartButtonActionTest {
         }
     }
 
-    /** 「极+」那一套：写车的有要做的事，媒体、语音的有不碰车的那一样；车门、尾门不在里面。 */
+    /** 中国版那一套：写车的有要做的事，媒体、语音的有不碰车的那一样；车门、尾门不在里面。 */
     @Test
     public void theJiPlusActionsKnowWhatToDo() {
         String[] car = {"sport_one_touch", "volume_up", "volume_down", "steering_wheel_heat", "seat_vent_driver",

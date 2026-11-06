@@ -497,7 +497,7 @@
 - 2026-11-05 批准（关于页致谢加 LEO，项目所有者当天要求，中文照项目所有者的原话；关于页没有马来文）：about_thanks_body 在
   「Bilibili 极氪7X 车友圈微信群的各位成员」那一条前面加「• LEO（Bilibili 极氪7X 车友圈）—— 提供了国内车机所使用的一些重要代码数据。」/
   「• LEO (Bilibili Zeekr 7X owners' circle) — provided important code data used by Chinese-market head units.」
-- 2026-11-05 批准（灵动贴动作扩到「极+」那一套，项目所有者 2026-11-04 定了做什么）：组名 smart_button_group_*
+- 2026-11-05 批准（灵动贴动作扩到中国版那一套，项目所有者 2026-11-04 定了做什么）：组名 smart_button_group_*
   「应用功能」「驾驶」「语音与媒体」「座椅与方向盘」「空调」「车身」「灯光与香氛」「场景」/ App、Driving、Voice and media、
   Seats and steering wheel、Climate、Body、Lights and fragrance、Scenes / Apl、Pemanduan、Suara dan media、
   Tempat duduk dan stereng、Penyaman udara、Badan kereta、Lampu dan wangian、Senario；动作名 smart_button_action_*：
@@ -507,7 +507,7 @@
   观影模式（主驾）/（副驾）、露营模式、哨兵模式（同术语表）；英文、马来文见 strings.xml。提示：msg_car_action_unavailable
   「无法执行「%1$s」」/ Can't run %1$s / Tidak dapat menjalankan %1$s；msg_car_action_no_change「「%1$s」未生效，此车可能没有该功能」/
   %1$s didn't take effect; this car may not have it / %1$s tidak berkesan; kereta ini mungkin tiada ciri ini；
-  msg_car_action_power_saving「超级省电模式下不可用」（「极+」的说法）/ Not available in Super Power Saving mode /
+  msg_car_action_power_saving「超级省电模式下不可用」（中国版的说法）/ Not available in Super Power Saving mode /
   Tidak tersedia dalam mod Penjimatan Kuasa Super；msg_car_action_standstill「车辆停稳后才能使用」/ Available only when the car
   is stationary / Hanya tersedia apabila kereta tidak bergerak；msg_car_action_no_fragrance「香氛未安装」/ Fragrance isn't installed /
   Wangian tidak dipasang。

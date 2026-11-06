@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 灵动贴写车的那些动作（{@link CarMoves}）：换法照「极+」，执行前的两样检查，读回怎么算。车辆接口、常量名都是假的
+ * 灵动贴写车的那些动作（{@link CarMoves}）：换法照中国版，执行前的两样检查，读回怎么算。车辆接口、常量名都是假的
  * （号码随便编的，只看规则）。
  */
 public class CarMovesTest {
@@ -201,7 +201,7 @@ public class CarMovesTest {
         assertTrue(car.writes.isEmpty());
     }
 
-    /** 后视镜（「极+」）：读到几写几；读到的变了算成了，没变是没生效。 */
+    /** 后视镜（中国版）：读到几写几；读到的变了算成了，没变是没生效。 */
     @Test
     public void mirrorsWriteWhatTheyReadAndCountAChange() {
         FakeCar car = new FakeCar();
@@ -276,7 +276,7 @@ public class CarMovesTest {
         assertEquals(VIEW_360 + "=1", car.writes.get(1));
     }
 
-    /** 360、充电灯语（「极+」）：是 1 写 0，别的都写 1。 */
+    /** 360、充电灯语（中国版）：是 1 写 0，别的都写 1。 */
     @Test
     public void onUnlessOnTurnsOffOnlyWhenOn() {
         FakeCar car = new FakeCar();
@@ -427,7 +427,7 @@ public class CarMovesTest {
 
     // ---- 执行前的检查
 
-    /** 超级省电时不执行（「极+」）；读不到超级省电当没开。 */
+    /** 超级省电时不执行（中国版）；读不到超级省电当没开。 */
     @Test
     public void powerSavingBlocks() {
         FakeCar car = new FakeCar();

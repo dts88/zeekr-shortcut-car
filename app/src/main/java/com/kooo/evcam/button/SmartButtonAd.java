@@ -11,15 +11,15 @@ import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 
 /**
- * 灵动贴（广播名 ZEEKR_button）的广播、通知和查询怎么读、怎么写。格式是 zeekr-shortcut-lab 在车上实测、又对过中国版「极+」的
+ * 灵动贴（广播名 ZEEKR_button）的广播、通知和查询怎么读、怎么写。格式是 zeekr-shortcut-lab 在车上实测、又对过中国版的
  * （Lab findings §2.61、§2.65、§2.92、§2.93，2026-11-04 车上又对了一遍），这里只照着读。
  *
  * <h3>广播</h3>
- * <p>下标是 {@code ScanRecord.getBytes()} 的绝对位置，跟「极+」一样不拆段。车上的灵动贴是
+ * <p>下标是 {@code ScanRecord.getBytes()} 的绝对位置，跟中国版一样不拆段。车上的灵动贴是
  * {@code 02 01 06 | 08 02 FF 计数 按法 电量 01 02 01 | 名字 | 发射功率}。</p>
  * <ul>
  *   <li>[4] 是 02 / 03、[5] 是 FF：装按键数据的那一段在车上见过的位置。不在这里的不认：按法会写车（驾驶模式），读错了不如不读。</li>
- *   <li>[6] 计数：跟上次记下的不一样就是按了一下；0xFE 不算（「极+」）。车上按 00 → 01 → 10 → 11 → 00 走。</li>
+ *   <li>[6] 计数：跟上次记下的不一样就是按了一下；0xFE 不算（中国版）。车上按 00 → 01 → 10 → 11 → 00 走。</li>
  *   <li>[7] 按法：00 单击、02 双击、01 长按（约 3 秒、背光闪；只用来连接，不绑动作，车主 2026-11-04）。</li>
  *   <li>[8] 电量：是 25 的倍数、又不是 0 才算带了（平时是 0，长按那一下带 0x32 = 50，跟连上读的一样）。</li>
  *   <li>[9]–[11] 固件版本（两台都是 1.2.1）。</li>
@@ -47,7 +47,7 @@ public final class SmartButtonAd {
     /** 广播里的名字：扫描按它过滤（整个比、分大小写）。 */
     public static final String NAME = "ZEEKR_button";
 
-    /** 不算的计数（「极+」）。 */
+    /** 不算的计数（中国版）。 */
     static final int COUNTER_IGNORED = 0xFE;
     /** 同一下从另一路又来一遍，隔这么近算同一下；长按另给 5 秒（Lab 3.5.0 起的做法）。 */
     static final long SAME_PRESS_MS = 1_500L;
@@ -142,7 +142,7 @@ public final class SmartButtonAd {
         }
     }
 
-    /** 拆一条通知：先当字符串看是不是版本、序列号（「极+」的读法），不是的话第 0 个字节是按法。 */
+    /** 拆一条通知：先当字符串看是不是版本、序列号（中国版的读法），不是的话第 0 个字节是按法。 */
     static Reply parseNotification(byte[] value) {
         if (value == null || value.length == 0) {
             return new Reply(null, null, 0);

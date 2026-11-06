@@ -44,7 +44,7 @@ import java.util.List;
  *       熄屏判断在安卓亮屏时也叫一次（{@link #retryLinkIfFailed}）；这台车机根本没有这套接口（{@link CarLink#UNAVAILABLE}）不再试。</li>
  *   <li>要「此刻」的读数（安卓刚亮屏，记着的可能是睡前的）：{@link #reconcileNow} 立刻读一遍、立刻发布，
  *       回调排在监听者那一批后面。</li>
- *   <li>写只给灵动贴的动作（驾驶模式 2026-10-30，「极+」那一套 2026-11-04，项目所有者）：{@link #carAccess} 拿到车辆接口的读写，
+ *   <li>写只给灵动贴的动作（驾驶模式 2026-10-30，中国版那一套 2026-11-04，项目所有者）：{@link #carAccess} 拿到车辆接口的读写，
  *       写什么、什么时候不写、读回怎么算在 {@code button.CarMoves}；别处一个号都不写。</li>
  * </ul>
  *
@@ -729,7 +729,7 @@ public final class Telemetry {
     }
 
     /**
-     * 车辆接口的读写（{@link CarAccess}）：只有灵动贴的动作用（驾驶模式、「极+」那一套，项目所有者 2026-10-30、11-04）。
+     * 车辆接口的读写（{@link CarAccess}）：只有灵动贴的动作用（驾驶模式、中国版那一套，项目所有者 2026-10-30、11-04）。
      * 车辆接口没连上、断了是 null。拿到的那一份同步等车机回话：别在主线程上用（{@code button.CarMoves} 有自己的线程）。
      */
     public CarAccess carAccess() {

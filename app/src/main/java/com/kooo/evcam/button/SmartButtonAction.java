@@ -23,9 +23,9 @@ import java.util.List;
  * <ul>
  *   <li>不使用；悬浮按钮能选的全部（「应用功能」，项目所有者 2026-10-30）；驾驶模式三项、手排模式（2026-10-31：驾驶模式向上、向下，
  *       升挡、降挡）。</li>
- *   <li>2026-11-04 项目所有者定扩到中国版 7X「极+」灵动贴的那一套（2026-11-05 起）：一键运动、语音与媒体、座椅与方向盘、空调、
+ *   <li>2026-11-04 项目所有者定扩到中国版 7X 灵动贴的那一套（2026-11-05 起）：一键运动、语音与媒体、座椅与方向盘、空调、
  *       车身、灯光与香氛、场景。写车的那些怎么做在 {@link CarMoves}，不碰车的在 {@link MediaMove}。这台车没有的功能也留着，
- *       给别的地区的车用（项目所有者）。「极+」的车门、尾门、打开应用不在这里。</li>
+ *       给别的地区的车用（项目所有者）。</li>
  * </ul>
  *
  * <p>悬浮按钮那几项直接从 {@link FloatingAction} 长出来，存的也是它的 key：悬浮按钮加一个动作，灵动贴跟着就有，
@@ -111,7 +111,7 @@ public final class SmartButtonAction {
             all.add(new SmartButtonAction(action.key, Group.APP, 0, action, 0, 0, 0, null, null));
         }
 
-        // 驾驶：驾驶模式三项、手排模式（2026-10-30、31），一键运动（「极+」：超级省电时不执行）
+        // 驾驶：驾驶模式三项、手排模式（2026-10-30、31），一键运动（中国版：超级省电时不执行）
         all.add(new SmartButtonAction("drive_mode_comfort", Group.DRIVE, 0, null, Signal.DRIVE_MODE_COMFORT, 0, 0, null, null));
         all.add(new SmartButtonAction("drive_mode_standard", Group.DRIVE, 0, null, Signal.DRIVE_MODE_STANDARD, 0, 0, null, null));
         all.add(new SmartButtonAction("drive_mode_sport", Group.DRIVE, 0, null, Signal.DRIVE_MODE_SPORT, 0, 0, null, null));
@@ -121,7 +121,7 @@ public final class SmartButtonAction {
         all.add(new SmartButtonAction("gear_up", Group.DRIVE, R.string.smart_button_action_gear_up, null, 0, 0, 1, null, null));
         all.add(new SmartButtonAction("gear_down", Group.DRIVE, R.string.smart_button_action_gear_down, null, 0, 0, -1, null, null));
 
-        // 语音与媒体（音量照「极+」超级省电时不执行）
+        // 语音与媒体（音量照中国版超级省电时不执行）
         all.add(media("voice_assistant", R.string.smart_button_action_voice, MediaMove.VOICE));
         all.add(media("media_play_pause", R.string.smart_button_action_play_pause, MediaMove.PLAY_PAUSE));
         all.add(media("media_previous", R.string.smart_button_action_previous, MediaMove.PREVIOUS));
@@ -130,7 +130,7 @@ public final class SmartButtonAction {
         all.add(car("volume_up", Group.MEDIA, R.string.smart_button_action_volume_up, CarMoves.saving(CarMoves.volume(1))));
         all.add(car("volume_down", Group.MEDIA, R.string.smart_button_action_volume_down, CarMoves.saving(CarMoves.volume(-1))));
 
-        // 座椅与方向盘（「极+」：超级省电时不执行；座椅恢复还要车停稳）
+        // 座椅与方向盘（中国版：超级省电时不执行；座椅恢复还要车停稳）
         all.add(car("steering_wheel_heat", Group.SEATS, R.string.smart_button_action_steering_heat,
                 CarMoves.saving(CarMoves.levels("IHvac", "HVAC_FUNC_STEERING_WHEEL_HEAT", CarNames.ALL))));
         all.add(car("seat_vent_driver", Group.SEATS, R.string.smart_button_action_seat_vent_driver,

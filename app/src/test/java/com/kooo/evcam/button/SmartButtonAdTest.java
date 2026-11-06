@@ -19,8 +19,8 @@ import org.junit.Test;
 import java.nio.charset.StandardCharsets;
 
 /**
- * 灵动贴的读法（{@link SmartButtonAd}）：广播照 zeekr-shortcut-lab 车上抓的那几份（findings §2.61、§2.93）、按「极+」的下标读；
- * 通知、查询照「极+」（§2.92）和 2026-11-04 车上的回话。
+ * 灵动贴的读法（{@link SmartButtonAd}）：广播照 zeekr-shortcut-lab 车上抓的那几份（findings §2.61、§2.93）、按中国版的下标读；
+ * 通知、查询照中国版（§2.92）和 2026-11-04 车上的回话。
  */
 public class SmartButtonAdTest {
 
@@ -129,7 +129,7 @@ public class SmartButtonAdTest {
         assertEquals("ABC123", SmartButtonAd.parseNotification("psn=ABC123".getBytes(StandardCharsets.US_ASCII)).serial);
     }
 
-    /** 查询照「极+」：A5 A5 03 06 参数 校验，校验是前面几个字节相加的低 8 位。 */
+    /** 查询照中国版：A5 A5 03 06 参数 校验，校验是前面几个字节相加的低 8 位。 */
     @Test
     public void queriesMatchTheOfficialFrames() {
         assertArrayEquals(new byte[]{(byte) 0xA5, (byte) 0xA5, 0x03, 0x06, 0x01, 0x54}, SmartButtonAd.askVersion());

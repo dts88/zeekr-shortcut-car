@@ -56,13 +56,13 @@ import java.util.Set;
 
 /**
  * 灵动贴（广播名 ZEEKR_button；项目所有者 2026-10-30 从 zeekr-shortcut-lab 搬来；2026-11-04 扫描、连接、绑定照 Lab 3.5.x 重写，车主定）。
- * 做法是 Lab 在车上验证过、又对过中国版「极+」的那一套（Lab {@code docs/bluetooth-button.md} 第十一节、findings §2.92、§2.93），
+ * 做法是 Lab 在车上验证过、又对过中国版的那一套（Lab {@code docs/bluetooth-button.md} 第十一节、findings §2.92、§2.93），
  * 代码在这里按本项目重写。
  *
  * <h3>怎么听</h3>
  * <ul>
  *   <li>扫描按名字过滤（{@link SmartButtonAd#NAME}），结果用 PendingIntent 由系统交给 {@link ScanReceiver}：应用在后台、被系统收掉了也送得到。
- *       低延迟、积极匹配、每包都报、只收传统广播（「极+」的设置）。</li>
+ *       低延迟、积极匹配、每包都报、只收传统广播（中国版的设置）。</li>
  *   <li>按名字过滤以后只有按下时才有广播，平时没有是正常的；带过滤的扫描安卓也不会因为扫得久就降级。所以扫描开着就不动（车主 2026-11-01：
  *       不反复强行启动），只在这些时候停、开：灵动贴的开关、绑定（一台都没绑时）、蓝牙开关、车机睡醒、扫描起不来、退出，还有连接重试（见下）。</li>
  *   <li>开之前先停一次、隔 {@link #START_DELAY_MS} 再开：上一个进程开的 PendingIntent 扫描不会跟着进程停。安卓 12 一个 uid 30 秒里开扫描超过 5 次
@@ -78,17 +78,17 @@ import java.util.Set;
  * <ul>
  *   <li>广播里的计数变了就是按了一下（{@link SmartButtonAd}）。计数存着，进程重启后照样接得上。</li>
  *   <li>单击、双击查这一台选的动作（{@link SmartButtonAction}），在主线程上做：悬浮按钮那几项走 {@link QuickActions}（同一份），
- *       写车的（驾驶模式、「极+」那一套）交给 {@link CarMoves}，媒体、语音走 {@link MediaMove}，升挡、降挡交给模拟声浪
+ *       写车的（驾驶模式、中国版那一套）交给 {@link CarMoves}，媒体、语音走 {@link MediaMove}，升挡、降挡交给模拟声浪
  *       （{@link DriveSound#shift}）。写车的没做成提示一句（{@link #carResult}）。没开启灵动贴、用户退出以后什么都不做。</li>
  *   <li>长按（约 3 秒、背光闪）只用来连接，不绑动作（车主 2026-11-04）。</li>
  *   <li>同一下从广播、通知各来一遍只算一次（{@link SmartButtonAd#samePress}）。</li>
- *   <li>正在绑定时绑过的按了不做（「极+」）；拿绑过的来长按，告诉一声，这次绑定结束。</li>
+ *   <li>正在绑定时绑过的按了不做（中国版）；拿绑过的来长按，告诉一声，这次绑定结束。</li>
  * </ul>
  *
  * <h3>连接</h3>
  * <p>只在长按时连（{@link ButtonLink}）：订按键通知、查版本、读电量、查序列号，之后连着，灵动贴最后一下按完 15 秒自己断开。连着时它不广播，
  * 按键从通知来，照样做选的动作。同时只连一台：另一台长按时，连好的那一台断开、换它，还在连的不换。第一次连时扫描开着，第二次起先停扫描再连，
- * 连好了、不连了接着扫。连上过的断开以后，记着的计数作废：连着时按的几下没走广播，下一包广播一定是新按的（「极+」连上就作废，一个意思）。</p>
+ * 连好了、不连了接着扫。连上过的断开以后，记着的计数作废：连着时按的几下没走广播，下一包广播一定是新按的（中国版连上就作废，一个意思）。</p>
  *
  * <h3>电量、版本、序列号</h3>
  * <p>电量取广播里带的（长按那一下带）和连着时读到、推来的：按键那一下会掉到 0 / 25，连着时取 {@link #BATTERY_WINDOW_MS} 里最高的（Lab 3.5.4）。
@@ -96,7 +96,7 @@ import java.util.Set;
  *
  * <h3>绑定</h3>
  * <p>设置里点「绑定灵动贴」（{@link #startBinding}）：{@link #BIND_WINDOW_MS} 里长按一台没绑过的，连上、订好按键通知就算绑上
- * （「极+」也是），顺便查好版本、电量、序列号。最多 {@link #MAX_BOUND} 台，按地址记。</p>
+ * （中国版也是），顺便查好版本、电量、序列号。最多 {@link #MAX_BOUND} 台，按地址记。</p>
  *
  * <h3>线程</h3>
  * <p>蓝牙的事都在自己的线程上（{@code SmartButton}）；扫描结果从主线程（{@link ScanReceiver}）转过去。绑定的结果、设置页要的变化、
@@ -112,18 +112,18 @@ public final class SmartButtons {
     static final long SETTLE_MS = 10_000L;
     /** 在扫的时候多久看一眼蓝牙开着没有。 */
     static final long WATCH_MS = 2_000L;
-    /** 先停、隔这么久再开（「极+」）。 */
+    /** 先停、隔这么久再开（中国版）。 */
     static final long START_DELAY_MS = 500L;
     /** 开扫描的次数按这么长一阵算，一阵里最多开 {@link #MAX_STARTS} 次（安卓 12 按 uid 算 5 次，容器里别的应用也算，Lab 3.5.4）。 */
     static final long STARTS_WINDOW_MS = 30_000L;
     static final int MAX_STARTS = 3;
     /** 连按驾驶模式向上、向下时，这么久（毫秒）之内接着上一次的目标算。 */
     static final long DRIVE_TARGET_MS = 2000L;
-    /** 绑定等多久（「极+」15 秒；长按要 3 秒，再给连接留点，Lab）。 */
+    /** 绑定等多久（中国版 15 秒；长按要 3 秒，再给连接留点，Lab）。 */
     static final long BIND_WINDOW_MS = 30_000L;
     /** 绑定的时间到了还在连：隔这么久再看（连接自己的超时管着它）。 */
     static final long BIND_RECHECK_MS = 1_000L;
-    /** 最多绑几台（「极+」）。 */
+    /** 最多绑几台（中国版）。 */
     public static final int MAX_BOUND = 10;
     /** 连着时电量取这么久里最高的：按键那一下会掉（Lab 3.5.3 车上）。 */
     static final long BATTERY_WINDOW_MS = 10_000L;
@@ -740,7 +740,7 @@ public final class SmartButtons {
             gattStale = false;
             refreshGatt();
         }
-        // 上一个进程、上一轮开的 PendingIntent 扫描不会自己停：先停一次，隔一会儿再开（「极+」的做法）
+        // 上一个进程、上一轮开的 PendingIntent 扫描不会自己停：先停一次，隔一会儿再开（中国版的做法）
         stopIntentScan();
         maybeScanning = false;
         startPending = true;

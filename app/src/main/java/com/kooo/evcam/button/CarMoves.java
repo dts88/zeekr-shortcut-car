@@ -26,18 +26,18 @@ import java.util.Locale;
 import java.util.function.Consumer;
 
 /**
- * 灵动贴写车的那些动作：驾驶模式（项目所有者 2026-10-30）和中国版 7X「极+」灵动贴能绑的那一套（2026-11-04 车主定）。
- * 每一项读什么、怎么换下一个值、什么时候不执行照「极+」和 zeekr-shortcut-lab 3.5.x 在车上试过的（Lab findings §2.92、§2.93），
+ * 灵动贴写车的那些动作：驾驶模式（项目所有者 2026-10-30）和中国版 7X 灵动贴能绑的那一套（2026-11-04 车主定）。
+ * 每一项读什么、怎么换下一个值、什么时候不执行照中国版和 zeekr-shortcut-lab 3.5.x 在车上试过的（Lab findings §2.92、§2.93），
  * 代码在这里按本项目重写；功能号、区域按系统里的常量名取（{@link CarNames}），这台车机上没有的就是做不了。
  *
  * <ul>
  *   <li>按了先读现在的值，照规则写下一个；写完每 {@link #BACK_STEP_MS} 读回一次，{@link #BACK_MS} 内变成写的值才算成了（{@link Result#DONE}）。
  *       车机受理了、车没变是 {@link Result#NO_CHANGE}：这台车多半没有这个功能（比如这台车的座椅加热，Lab 3.5.3 车上），选项照留，
  *       给别的地区的车用（项目所有者 2026-11-04）。</li>
- *   <li>执行前看（照「极+」）：超级省电时座椅、方向盘、音量、一键运动不执行（{@link #saving}）。座椅恢复会动座椅，后视镜、充电口盖
+ *   <li>执行前看（照中国版）：超级省电时座椅、方向盘、音量、一键运动不执行（{@link #saving}）。座椅恢复会动座椅，后视镜、充电口盖
  *       会动车身，要车停稳才执行：车速读得到、不超过 {@link #STANDSTILL_KMH}（{@link #standstill}；座椅恢复的是 Lab 加的，后视镜、
- *       充电口盖的是我们加的，「极+」都不看）。不看挡位，按了就写、不恢复（项目所有者 2026-10-27、11-04）。</li>
- *   <li>全车的读写照「极+」带「全车」区域，车机不认（读不到、写不进）再不带区域（Lab：驾驶模式以前就是不带区域写通的）。
+ *       充电口盖的是我们加的，中国版都不看）。不看挡位，按了就写、不恢复（项目所有者 2026-10-27、11-04）。</li>
+ *   <li>全车的读写照中国版带「全车」区域，车机不认（读不到、写不进）再不带区域（Lab：驾驶模式以前就是不带区域写通的）。
  *       驾驶模式、一键运动照本项目车上验证过的不带区域读写（{@link Car#setPlain}）。</li>
  *   <li>一件一件做，在自己的线程上（{@code SmartButtonCar}）：读回要等，不占主线程，也不占车辆信号的线程（{@link CarAccess}）。
  *       每件一行黑匣子「灵动贴动作」：哪一件、结果、读到写下的值。结果交给主线程（提示在 {@code SmartButtons}）。</li>
@@ -50,9 +50,9 @@ final class CarMoves {
     /** 读回最多等多久（Lab 3.5.4：座椅通风这些车上慢的要 600 毫秒）。 */
     static final long BACK_MS = 1000;
     static final long BACK_STEP_MS = 100;
-    /** 超过这个车速（km/h）不算停稳（「极+」）。 */
+    /** 超过这个车速（km/h）不算停稳（中国版）。 */
     static final double STANDSTILL_KMH = 1.0;
-    /** 香氛刚打开时隔这么久再看一眼开关，没开上再写一次（「极+」）。 */
+    /** 香氛刚打开时隔这么久再看一眼开关，没开上再写一次（中国版）。 */
     static final long FRAGRANCE_RECHECK_MS = 400;
     /** 一键运动记下的原来的驾驶模式（运行状态，在 {@code smart_button_state} 里）。 */
     static final String SPORT_SAVED = "sport_saved_mode";
@@ -316,7 +316,7 @@ final class CarMoves {
 
     // ================================================================= 执行前的检查
 
-    /** 超级省电时不执行（「极+」：座椅、方向盘、音量、一键运动）。 */
+    /** 超级省电时不执行（中国版：座椅、方向盘、音量、一键运动）。 */
     static Job saving(Job job) {
         return c -> c.powerSaving() ? Result.POWER_SAVING : job.run(c);
     }
@@ -328,7 +328,7 @@ final class CarMoves {
 
     // ================================================================= 几种换法
 
-    /** 0 / 1 互换（读到别的不写：比如哨兵锁车后的那个值，「极+」也不写）。 */
+    /** 0 / 1 互换（读到别的不写：比如哨兵锁车后的那个值，中国版也不写）。 */
     static Job toggle(String iface, String field, String zoneName) {
         return toggleAny(field, zoneName, iface);
     }
@@ -352,7 +352,7 @@ final class CarMoves {
     }
 
     /**
-     * 后视镜折叠 / 展开（「极+」：读到几就写几，这个号读、写的意思像是反着的，Lab findings §2.92；这台车上还没试）：
+     * 后视镜折叠 / 展开（中国版：读到几就写几，这个号读、写的意思像是反着的，Lab findings §2.92；这台车上还没试）：
      * 只认 0 / 1；写完读到的变了算成了。
      */
     static Job mirrors() {
@@ -374,7 +374,7 @@ final class CarMoves {
         };
     }
 
-    /** 是 1 写 0，别的都写 1（「极+」的 360、充电灯语）。 */
+    /** 是 1 写 0，别的都写 1（中国版的 360、充电灯语）。 */
     static Job onUnlessOn(String iface, String field, String zoneName) {
         return c -> {
             Integer id = c.function(field, iface);
@@ -414,7 +414,7 @@ final class CarMoves {
         };
     }
 
-    /** 座椅按摩（「极+」）：开关关着就打开、调到 3 档；已经 1 档就关开关；不然往下一档。 */
+    /** 座椅按摩（中国版）：开关关着就打开、调到 3 档；已经 1 档就关开关；不然往下一档。 */
     static Job massage(String zoneName) {
         return c -> {
             Integer sw = c.function("HVAC_FUNC_SEAT_MASSAGE_SWITCH", "IHvac");
@@ -436,7 +436,7 @@ final class CarMoves {
         };
     }
 
-    /** 循环模式：自动 → 外循环 → 内循环 → 自动；读到别的写外循环（「极+」）。值是功能号加 3（自动）、2（外）、1（内）。 */
+    /** 循环模式：自动 → 外循环 → 内循环 → 自动；读到别的写外循环（中国版）。值是功能号加 3（自动）、2（外）、1（内）。 */
     static Job circulation() {
         return c -> {
             Integer id = c.function("HVAC_FUNC_CIRCULATION", "IHvac");
@@ -456,7 +456,7 @@ final class CarMoves {
         };
     }
 
-    /** 行车灯语（「极+」）：照位置灯那个开关现在的状态，日行灯、位置灯两个开关一起换（是 1 写 0，别的写 1）。 */
+    /** 行车灯语（中国版）：照位置灯那个开关现在的状态，日行灯、位置灯两个开关一起换（是 1 写 0，别的写 1）。 */
     static Job drivingLights() {
         return c -> {
             Integer day = c.function("BCM_FUNC_AUX_DAY_TI_RUNNG_LI_SWITCH", "ILamp");
@@ -506,7 +506,7 @@ final class CarMoves {
     }
 
     /**
-     * 香氛（「极+」）：三个香槽有一个装了才算有。开关关着就打开、在用的那个香槽调到淡雅（{@link #FRAGRANCE_RECHECK_MS} 后开关还关着
+     * 香氛（中国版）：三个香槽有一个装了才算有。开关关着就打开、在用的那个香槽调到淡雅（{@link #FRAGRANCE_RECHECK_MS} 后开关还关着
      * 就再写一次）；开着就往下一档：淡雅 → 适中 → 馥郁 → 关，到关把开关也关掉。香槽、档位的值是各自的功能号加 1、2、3。
      */
     static Job fragrance() {
@@ -560,7 +560,7 @@ final class CarMoves {
         return c -> c.setPlain(Signal.DRIVE_MODE.id, mode);
     }
 
-    /** 一键运动（「极+」）：不在运动就记下现在的模式、切运动；已经是运动就回到记下的（没记过是标准）。 */
+    /** 一键运动（中国版）：不在运动就记下现在的模式、切运动；已经是运动就回到记下的（没记过是标准）。 */
     static Job sport() {
         return c -> {
             int id = Signal.DRIVE_MODE.id;
@@ -575,7 +575,7 @@ final class CarMoves {
         };
     }
 
-    /** 媒体音量加一格、减一格（「极+」调媒体用途的音量；这里调安卓的媒体音量），显示系统的音量条。 */
+    /** 媒体音量加一格、减一格（中国版调媒体用途的音量；这里调安卓的媒体音量），显示系统的音量条。 */
     static Job volume(int direction) {
         return c -> {
             AudioManager audio = c.app == null ? null : c.app.getSystemService(AudioManager.class);
@@ -617,7 +617,7 @@ final class CarMoves {
         return next(cur, id + 3, 0, id + 3, id + 2, id + 1);
     }
 
-    /** 香槽装了没有：「极+」是不为 0 就算；255、负数这些占位值不算（这台车上读到过 -65535，Lab 3.5.3）。 */
+    /** 香槽装了没有：中国版是不为 0 就算；255、负数这些占位值不算（这台车上读到过 -65535，Lab 3.5.3）。 */
     static boolean fitted(Integer type) {
         return type != null && type > 0 && type != 255;
     }

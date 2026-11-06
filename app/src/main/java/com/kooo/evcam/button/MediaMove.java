@@ -16,7 +16,7 @@ import android.view.KeyEvent;
 import com.kooo.evcam.AppLog;
 
 /**
- * 灵动贴「语音与媒体」那几项里不碰车的（2026-11-05，照「极+」的那一组；「极+」用极氪的接口，这里用安卓标准的做法，Lab 3.5.x）：
+ * 灵动贴「语音与媒体」那几项里不碰车的（2026-11-05，照中国版的那一组；中国版用极氪的接口，这里用安卓标准的做法，Lab 3.5.x）：
  * 唤醒语音助手、媒体键、媒体静音。在主线程上做，做成了返回 true。音量加减要先看超级省电，走 {@link CarMoves#volume}。
  */
 enum MediaMove {
