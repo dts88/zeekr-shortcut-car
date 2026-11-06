@@ -175,6 +175,10 @@ EngineV1 only supplied facts (see [NOTICE.md](NOTICE.md)).
 - **[FerixzTanz](https://github.com/FerixzTanz)** — the original code and on-car research for Blind spot view, and
   showing it on the HUD (from his CAMCORDER). Its default angles and window size, and the HUD picture defaults, are the
   ones he tuned on his own 7X. Many thanks for his careful parameter tuning.
+- **[jlunnn](https://github.com/jlunnn)** — the Rear fog lamp flash action for smart buttons (from his 7X-U) and a
+  fix that lets the unit tests pass on Windows. Also the author of CarPiano.
+- **[calvinbui](https://github.com/calvinbui)** — on-car findings from his Australian 7X: climate, driving and safety
+  settings.
 - **SW** — active testing and feedback. Many thanks.
 
 Origins, third-party licences and boundaries: [NOTICE.md](NOTICE.md).

@@ -1,6 +1,7 @@
 /*
  * Zeekr Shortcut - https://github.com/dts88/zeekr-shortcut-car
  * Copyright (C) 2026 dts88
+ * Portions Copyright (C) 2026 jlunnn - https://github.com/jlunnn
  * SPDX-License-Identifier: GPL-3.0-only
  * Additional terms under GPL-3.0 section 7 apply to dts88's code; see NOTICE.md.
  */
@@ -56,11 +57,11 @@ final class CarMoves {
     /** 一键运动记下的原来的驾驶模式（运行状态，在 {@code smart_button_state} 里）。 */
     static final String SPORT_SAVED = "sport_saved_mode";
 
-    /** 后雾灯闪烁（红掣动作）：闪几下（7X=U 的 fog_count 默认 3）。 */
+    /** 后雾灯闪烁：闪几下（照 jlunnn 的 7X-U，fog_count 默认 3）。 */
     static final int FOG_FLASHES = 3;
-    /** 后雾灯闪烁：亮多久 ms（7X=U 的 fog_on_ms 默认 350）。 */
+    /** 后雾灯闪烁：亮多久 ms（7X-U 的 fog_on_ms 默认 350）。 */
     static final long FOG_ON_MS = 350;
-    /** 后雾灯闪烁：灭多久 ms（7X=U 的 fog_off_ms 默认 350）。 */
+    /** 后雾灯闪烁：灭多久 ms（7X-U 的 fog_off_ms 默认 350）。 */
     static final long FOG_OFF_MS = 350;
 
     /** 一件的结果。 */
@@ -472,8 +473,8 @@ final class CarMoves {
     }
 
     /**
-     * 后雾灯闪烁（红掣动作，2026-11-05 从 7X=U 项目搬来，那边在 7X 车上实证过）：{@link Signal#REAR_FOG}
-     * （0x21050500）不带区域写，闪三下（亮 {@link #FOG_ON_MS}、灭 {@link #FOG_OFF_MS}，完结回到 0）。
+     * 后雾灯闪烁（jlunnn 的 PR #160，项目所有者 2026-11-06 收录：从他的 7X-U 搬来，他在 7X 车上实测过）：
+     * {@link Signal#REAR_FOG} 不带区域写，闪三下（亮 {@link #FOG_ON_MS}、灭 {@link #FOG_OFF_MS}，最后回到 0）。
      * 这是 hazard 式的行车灯语，不看车速、不看省电（跟行车灯语一样）；定时一串写，读回不像别的那样等满一秒，
      * 闪的时候每步读一笔记在 detail 里：有一下读到 1 就算闪成了；车机全部拒绝是做不了、受理了但一直读回原值是没生效。
      */

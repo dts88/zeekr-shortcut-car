@@ -1,6 +1,7 @@
 /*
  * Zeekr Shortcut - https://github.com/dts88/zeekr-shortcut-car
  * Copyright (C) 2026 dts88
+ * Portions Copyright (C) 2026 jlunnn - https://github.com/jlunnn
  * SPDX-License-Identifier: GPL-3.0-only
  * Additional terms under GPL-3.0 section 7 apply to dts88's code; see NOTICE.md.
  */
@@ -29,7 +30,7 @@ final class FallbackVolumes {
     private FallbackVolumes() {
     }
 
-    /** 統一成 / 分隔：同一個測試也會在 Windows 上跑（打包機），File 的路徑分隔符不是 '/'。 */
+    /** 统一成 / 分隔：同一个测试也会在 Windows 上跑（打包机），那里 File 的路径分隔符不是 '/'（jlunnn，PR #160）。 */
     static String path(File f) {
         return f.getPath().replace('\\', '/');
     }

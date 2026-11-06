@@ -153,3 +153,24 @@ binaries and decompiled source are not included in this documentation change.
 | AM4 accepted Comfort command and separate observation | `0.26-comfort-command-test` | `d7c312ea426fdcf2e2ed26ed2dcee320da2a1e7068b240f6a77a86345cebd0ec` |
 | Door-and-seat off/on signals and provider metadata | `0.30-combined-checks` | `e012d1660c384470da846da7db21b21efe55ce8918ab0c85fc8d35f1d2ca1bc8` |
 | Automatic Comfort on one warm off/on cycle | `0.31-comfort-vehicle-wake` | `35b4eeb27b116f80269cf82e0cfb06dfd6ea15132ef1c52625d671c427a9ec57` |
+
+## 8. Zeekr Shortcut notes (2026-11-06)
+
+- Remembering this setting between drives ([#138](https://github.com/dts88/zeekr-shortcut-car/issues/138)) will be
+  built into Zeekr Shortcut's upcoming geofence feature (project owner, 2026-11-06).
+
+**Already verified by Zeekr Shortcut** on its own 7X (Singapore), from black-box recordings; details are in
+[the platform notes](zeekr-platform-notes.md) section 3.6 and the [lifecycle spec](lifecycle-spec.md). They answer
+the long-sleep and restart questions above for an App Lab app, though not for this command itself:
+
+- Parked, the head unit is in deep sleep most of the time (20.8 of 26 hours in one record). It falls asleep about 6 s
+  after the screen goes off, and apps get no notice beforehand. Afterwards an app can tell how long it slept by
+  comparing `elapsedRealtime()` with `uptimeMillis()`.
+- A deep sleep without a power-down doesn't end the app's process: across two long sleeps (19 and 53 minutes) it was
+  the same process before and after.
+- With Sentry Mode off, the head unit powers down about 4 minutes after the driver leaves. 3 to 5 s after the screen
+  goes off, the process is ended or frozen, even with a foreground service.
+- Android's screen-on broadcast doesn't arrive after a deep sleep. The screen-off broadcast arrives only when the head
+  unit powers down, not when the centre screen merely goes dark.
+- After a real head-unit restart, the boot-completed broadcast didn't reach the app (three restarts, 2026-09-22 to
+  09-26), although something else started the process again within about a minute.

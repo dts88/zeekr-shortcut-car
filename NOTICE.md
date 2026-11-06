@@ -51,14 +51,20 @@ dts88 写的部分另有两条 GPL-3.0 第 7 条允许的附加条款（署名�
 
 ---
 
-## 2. 贡献者的代码（GPL-3.0）
+## 2. 贡献者的代码和资料（GPL-3.0）
 
-下面这些不是从 EVCam 来的，是别的开发者为本项目写的。随 PR 直接合并的，作者记在 git 历史里；
-没有直接合并、由本项目挑出来用的，在这里写明出处，代码文件的类说明里也各写一行。
+下面这些不是从 EVCam 来的，是别的开发者为本项目做的。随 PR 直接合并的，作者也记在 git 历史里；
+没有直接合并、由本项目挑出来用的，在这里写明出处，代码文件的类说明和版权头里也各写一行。
+本项目读过贡献者的 PR、照它的思路自己重写、再把原 PR 关掉的，也记在这里。
 
-- **wysie**（<https://github.com/wysie>）：超级镜子的方向标签（PR #17，直接合并）；下载更新时核对安装包的 sha256 和大小、只走 https（`DownloadIntegrity`，PR #38，直接合并）；
-  盲区画面里的关闭按钮只关这一次（`SideViewDismissal`）、转的角度大时收窄视野不出黑块（`SideViewFraming`）、
-  纵向视野随窗口形状变（`SideViewProjection.Rays`），取自 PR #19。
+- **wysie**（<https://github.com/wysie>）：
+  - 直接合并：超级镜子的方向标签（PR #17）；去掉没用到的麦克风权限检查（PR #28）；
+    下载更新时核对安装包的 sha256 和大小、只走 https（`DownloadIntegrity`，PR #38）。
+  - 取自 PR #19：盲区画面里的关闭按钮只关这一次（`SideViewDismissal`）、转的角度大时收窄视野不出黑块（`SideViewFraming`）、
+    纵向视野随窗口形状变（`SideViewProjection.Rays`）、原厂画面在时不备着（`SideViewDecision` 里的一条）。
+  - 照他的思路由本项目重写（原 PR 读过后关掉）：每个设置页按小标题分组（PR #62，来自 PR #31）；
+    主界面预览停画时盖一层提示（PR #67，来自 PR #36 的核心一点）；字号不一致的问题由他的 PR #45 查出，
+    本项目改成一律照设计规范的字号（PR #69）。
 - **FerixzTanz**（<https://github.com/FerixzTanz>）：打转向灯时显示侧方摄像头画面的最初代码和实车研究（PR #4，已并入 PR #19）——
   打灯判定（`SideViewDecision`）、转过角度的虚拟相机（`SideViewProjection`）、按调用方给的反投影切网格（`FisheyeMesh.SourceMap`），
   以及对应的测试。
@@ -67,7 +73,14 @@ dts88 写的部分另有两条 GPL-3.0 第 7 条允许的附加条款（署名�
   画面的位置大小 / 对比度 / 透明度 / 边缘渐隐的公式（`HudPicture`）、用 Presentation 投 HUD 的窗口画法（`SideViewHudWindow`），
   以及全部 HUD 设置项和他在自己 7X 上调出的默认值。
 
-盲区画面的服务和窗口（`SideViewService`、`SideViewWindow`）里读车辆信号、备着 / 显示两种状态的写法，也照两位 PR 里的侧视弹窗写。
+- **jlunnn**（<https://github.com/jlunnn>，CarPiano、7X-U 的作者）：灵动贴的「后雾灯闪烁」动作（`CarMoves.rearFogFlash`，
+  从他的 7X-U 搬来，他在 7X 上实测过）；比较盘的路径时统一用 / 分隔，单元测试在 Windows 上也能通过（`FallbackVolumes`）。
+  都是 PR #160，2026-11-06 收录，项目所有者照界面文字规范改了动作的名字。
+- **calvinbui**（Calvin Bui，<https://github.com/calvinbui>）：在他的澳洲 7X（固件 2.1.1c）上实测 6 项设置的记录：
+  内外循环、二排空调、自动远光、低速紧急制动、陡坡缓降、舒适加速（`docs/australian-7x-*.md`，PR #145，2026-11-06 收录）。
+  他没核实、本项目实测过的休眠、下电、重启，补在舒适加速那一篇的第 8 节。
+
+盲区画面的服务和窗口（`SideViewService`、`SideViewWindow`）里读车辆信号、备着 / 显示两种状态的写法，也照 wysie、FerixzTanz 两位 PR 里的侧视弹窗写。
 这些代码照本仓库的 GPL-3.0 发布。碰相机的部分（窗口怎么挂、画布怎么交给通道调度）由本项目照通道调度重写，没有用 PR 里的那一套。
 
 ---

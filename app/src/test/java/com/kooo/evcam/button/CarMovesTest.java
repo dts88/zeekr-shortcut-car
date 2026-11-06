@@ -1,6 +1,7 @@
 /*
  * Zeekr Shortcut - https://github.com/dts88/zeekr-shortcut-car
  * Copyright (C) 2026 dts88
+ * Portions Copyright (C) 2026 jlunnn - https://github.com/jlunnn
  * SPDX-License-Identifier: GPL-3.0-only
  * Additional terms under GPL-3.0 section 7 apply to dts88's code; see NOTICE.md.
  */
@@ -394,7 +395,7 @@ public class CarMovesTest {
         assertEquals(Signal.DRIVE_MODE.id + "=" + Signal.DRIVE_MODE_SPORT, car.writes.get(0));
     }
 
-    // ---- 红掣（后雾灯闪烁，7X=U 搬来）
+    // ---- 后雾灯闪烁（jlunnn 的 PR #160，从 7X-U 搬来）
 
     /** 闪三下：亮灭各 350ms，三次「亮=1、灭=0」，完结回 0；有一下读到 1 算成了。 */
     @Test
@@ -402,7 +403,7 @@ public class CarMovesTest {
         FakeCar car = new FakeCar();
         car.set(Signal.REAR_FOG.id, ALL, 0);
         assertEquals(CarMoves.Result.DONE, run(car, CarMoves.rearFogFlash()));
-        assertEquals(6, car.writes.size());                       // 每吓一开一关，三吓六笔
+        assertEquals(6, car.writes.size());                       // 每下一开一关，三下六笔
         assertEquals(Signal.REAR_FOG.id + "=1", car.writes.get(0));            // 亮
         assertEquals(Signal.REAR_FOG.id + "=0", car.writes.get(1));            // 灭
         assertEquals(Signal.REAR_FOG.id + "=0", car.writes.get(5));            // 完结回 0

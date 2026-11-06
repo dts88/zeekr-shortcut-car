@@ -142,3 +142,10 @@ The same reports also support the second-row AC finding.
 |---|---|---|
 | AC1/AC2/AC3 comparison (final cumulative report) | v0.20 | `074dd6e90ed092f0608d5ebca3226442ecebdbbfa836d0d60de1eeb27a7ad85d` |
 | One-cycle restore and later snapshot | v0.21 | `26f0897da5f072c3fec743635434e123142de452624482baedb5be0828d39197` |
+
+## 6. Zeekr Shortcut notes (2026-11-06)
+
+- Remembering this setting between drives ([#138](https://github.com/dts88/zeekr-shortcut-car/issues/138)) will be
+  built into Zeekr Shortcut's upcoming geofence feature (project owner, 2026-11-06).
+- What Zeekr Shortcut has already verified about deep sleep, power-down and restarts on its own 7X is summarised in
+  [Comfort acceleration, section 8](australian-7x-acceleration-findings.md#8-zeekr-shortcut-notes-2026-11-06).
