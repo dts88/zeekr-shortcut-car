@@ -105,3 +105,13 @@ included in this documentation change.
 | Six factory comparisons, including LB1/LB2/LB3 | v0.22 | `8f6dc39f78488f4087b153de58c485bf1f37bf043ea3c50a9f6b0d2e9d2972ca` |
 | OFF command and LB4 snapshot | v0.23 | `63d72ebc95ca2222d92eeb6031bfde780843c0ad144a34858e644defe89ba294` |
 | Later HD4 snapshot retaining PEB OFF | v0.23 | `7e3a7086a6c583dce22900796084f2a8a70814b5e16c6a2c08d238505f5ee1d6` |
+
+## 6. Zeekr Shortcut notes (2026-11-06)
+
+- Remembering this setting between drives ([#138](https://github.com/dts88/zeekr-shortcut-car/issues/138)) will be
+  built into Zeekr Shortcut's upcoming geofence feature (project owner, 2026-11-06).
+- The home geofence proposal in section 4 is recorded here. Whether Zeekr Shortcut ships it will be decided when
+  the geofence feature is built (project owner, 2026-11-06). Zeekr Shortcut hasn't verified location inside App Lab
+  either.
+- What Zeekr Shortcut has already verified about deep sleep, power-down and restarts on its own 7X is summarised in
+  [Comfort acceleration, section 8](australian-7x-acceleration-findings.md#8-zeekr-shortcut-notes-2026-11-06).

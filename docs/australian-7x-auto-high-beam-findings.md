@@ -294,3 +294,9 @@ The ECARX enum/setter check also used the car's exported adapter implementation:
 `CarFuncImplLamp`'s value map and setter, `BidirectionalSparseIntArray`, and
 `VehiclePropertyMWIds`. Its exterior-light function maps to raw `0x22400F59`; that is separate
 from the raw AHB-switch candidate `0x21408E18` above.
+
+## 8. Zeekr Shortcut notes (2026-11-06)
+
+- Remembering settings between drives ([#138](https://github.com/dts88/zeekr-shortcut-car/issues/138)) will be built
+  into Zeekr Shortcut's upcoming geofence feature (project owner, 2026-11-06). Automatic high beam can join it only
+  once a working write path exists.

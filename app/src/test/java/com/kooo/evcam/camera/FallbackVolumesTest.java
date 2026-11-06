@@ -1,6 +1,7 @@
 /*
  * Zeekr Shortcut - https://github.com/dts88/zeekr-shortcut-car
  * Copyright (C) 2026 dts88
+ * Portions Copyright (C) 2026 jlunnn - https://github.com/jlunnn
  * SPDX-License-Identifier: GPL-3.0-only
  * Additional terms under GPL-3.0 section 7 apply to dts88's code; see NOTICE.md.
  */
@@ -31,8 +32,8 @@ public class FallbackVolumesTest {
     private static final File SMALL = new File("/storage/AAAA-0001");
     private static final File INTERNAL = new File("/storage/emulated/0");
 
-    // 路徑用字串常數而唔用 File#getAbsolutePath：打包機係 Windows，getAbsolutePath 會變成
-    // C:\storage\...，同 /storage/ 前綴對唔上（2026-11-05 PC build 就係咁死）。
+    // 路径用字符串常量，不用 File#getAbsolutePath：打包机是 Windows 时，getAbsolutePath 会变成
+    // C:\storage\...，和 /storage/ 前缀对不上（jlunnn 2026-11-05 在电脑上打包就是这样失败的，PR #160）。
     private static final String SSD_PATH = "/storage/1D8C-1D23";
     private static final String STICK_PATH = "/storage/B905-2EDD";
 
