@@ -56,6 +56,13 @@ final class CarMoves {
     /** 一键运动记下的原来的驾驶模式（运行状态，在 {@code smart_button_state} 里）。 */
     static final String SPORT_SAVED = "sport_saved_mode";
 
+    /** 后雾灯闪烁（红掣动作）：闪几下（7X=U 的 fog_count 默认 3）。 */
+    static final int FOG_FLASHES = 3;
+    /** 后雾灯闪烁：亮多久 ms（7X=U 的 fog_on_ms 默认 350）。 */
+    static final long FOG_ON_MS = 350;
+    /** 后雾灯闪烁：灭多久 ms（7X=U 的 fog_off_ms 默认 350）。 */
+    static final long FOG_OFF_MS = 350;
+
     /** 一件的结果。 */
     enum Result {
         /** 读回变成写的值了。 */
@@ -461,6 +468,39 @@ final class CarMoves {
             int v = cur != null && cur == 1 ? 0 : 1;
             c.write(day, zone, v);
             return c.set(position, zone, v);
+        };
+    }
+
+    /**
+     * 后雾灯闪烁（红掣动作，2026-11-05 从 7X=U 项目搬来，那边在 7X 车上实证过）：{@link Signal#REAR_FOG}
+     * （0x21050500）不带区域写，闪三下（亮 {@link #FOG_ON_MS}、灭 {@link #FOG_OFF_MS}，完结回到 0）。
+     * 这是 hazard 式的行车灯语，不看车速、不看省电（跟行车灯语一样）；定时一串写，读回不像别的那样等满一秒，
+     * 闪的时候每步读一笔记在 detail 里：有一下读到 1 就算闪成了；车机全部拒绝是做不了、受理了但一直读回原值是没生效。
+     */
+    static Job rearFogFlash() {
+        return c -> {
+            int id = Signal.REAR_FOG.id;
+            Integer before = c.access.read(id);
+            c.note("before " + hex(before));
+            boolean accepted = false;
+            boolean sawOn = false;
+            for (int i = 0; i < FOG_FLASHES; i++) {
+                boolean on = c.access.write(id, 1);
+                accepted |= on;
+                c.sleeper.sleep(FOG_ON_MS);
+                Integer mid = c.access.read(id);
+                boolean off = c.access.write(id, 0);
+                accepted |= off;
+                c.sleeper.sleep(FOG_OFF_MS);
+                Integer after = c.access.read(id);
+                sawOn |= mid != null && mid == 1;
+                c.note("flash " + (i + 1) + ": on " + (on ? "ok" : "refused") + "->" + hex(mid)
+                        + ", off " + (off ? "ok" : "refused") + "->" + hex(after));
+            }
+            if (!accepted) {
+                return Result.UNAVAILABLE;
+            }
+            return sawOn ? Result.DONE : Result.NO_CHANGE;
         };
     }
 
