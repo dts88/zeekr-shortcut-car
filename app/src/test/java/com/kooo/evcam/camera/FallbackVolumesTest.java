@@ -1,6 +1,7 @@
 /*
  * Zeekr Shortcut - https://github.com/dts88/zeekr-shortcut-car
  * Copyright (C) 2026 dts88
+ * Portions Copyright (C) 2026 jlunnn - https://github.com/jlunnn
  * SPDX-License-Identifier: GPL-3.0-only
  * Additional terms under GPL-3.0 section 7 apply to dts88's code; see NOTICE.md.
  */
@@ -31,6 +32,11 @@ public class FallbackVolumesTest {
     private static final File SMALL = new File("/storage/AAAA-0001");
     private static final File INTERNAL = new File("/storage/emulated/0");
 
+    // 路径用字符串常量，不用 File#getAbsolutePath：打包机是 Windows 时，getAbsolutePath 会变成
+    // C:\storage\...，和 /storage/ 前缀对不上（jlunnn 2026-11-05 在电脑上打包就是这样失败的，PR #160）。
+    private static final String SSD_PATH = "/storage/1D8C-1D23";
+    private static final String STICK_PATH = "/storage/B905-2EDD";
+
     private static long free(File root) {
         if (root.equals(SSD)) {
             return 2L << 30;
@@ -50,7 +56,7 @@ public class FallbackVolumesTest {
 
     @Test
     public void skipsDeadVolumesAndOrdersByFreeSpace() {
-        List<File> out = FallbackVolumes.rank(Arrays.asList(SSD, SMALL, STICK), SSD.getAbsolutePath(),
+        List<File> out = FallbackVolumes.rank(Arrays.asList(SSD, SMALL, STICK), SSD_PATH,
                 new HashSet<>(Collections.singletonList("1D8C-1D23")), FallbackVolumesTest::free, null);
         assertEquals(Arrays.asList(STICK, SMALL), out);
     }
@@ -58,7 +64,7 @@ public class FallbackVolumesTest {
     /** 设定的盘回来了就先回它那里去。 */
     @Test
     public void chosenVolumeComesFirstWhenAlive() {
-        List<File> out = FallbackVolumes.rank(Arrays.asList(SMALL, STICK, SSD), SSD.getAbsolutePath(),
+        List<File> out = FallbackVolumes.rank(Arrays.asList(SMALL, STICK, SSD), SSD_PATH,
                 new HashSet<>(Collections.singletonList("B905-2EDD")), FallbackVolumesTest::free, null);
         assertEquals(Arrays.asList(SSD, SMALL), out);
     }
@@ -78,10 +84,10 @@ public class FallbackVolumesTest {
     @Test
     public void homeIsThePinnedOrLastDetectedDrive() {
         List<File> both = Arrays.asList(SSD, STICK);
-        assertEquals(STICK, FallbackVolumes.home(both, STICK.getAbsolutePath(), null));
-        assertNull(FallbackVolumes.home(Collections.singletonList(SSD), STICK.getAbsolutePath(), null));
-        assertEquals(STICK, FallbackVolumes.home(both, null, STICK.getAbsolutePath()));
+        assertEquals(STICK, FallbackVolumes.home(both, STICK_PATH, null));
+        assertNull(FallbackVolumes.home(Collections.singletonList(SSD), STICK_PATH, null));
+        assertEquals(STICK, FallbackVolumes.home(both, null, STICK_PATH));
         assertEquals(SSD, FallbackVolumes.home(both, "", null));
-        assertNull(FallbackVolumes.home(Collections.emptyList(), null, STICK.getAbsolutePath()));
+        assertNull(FallbackVolumes.home(Collections.emptyList(), null, STICK_PATH));
     }
 }

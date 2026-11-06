@@ -148,6 +148,9 @@ cd zeekr-shortcut-car && ./gradlew assembleRelease
 - **[wysie](https://github.com/wysie)**：大量设计以及代码。
 - **[FerixzTanz](https://github.com/FerixzTanz)**：盲区画面的最初代码和实车研究，以及把盲区画面投到 HUD 上的做法（来自他的 CAMCORDER）。
   盲区画面默认的角度和窗口大小、HUD 上画面的默认设置，都是他在自己的 7X 上实车调出来的，非常感谢他细致的参数调整。
+- **[jlunnn](https://github.com/jlunnn)**：灵动贴的「后雾灯闪烁」动作（来自他的 7X-U），以及让单元测试在 Windows 上也能通过的修正。
+  也是 CarPiano 的作者。
+- **[calvinbui](https://github.com/calvinbui)**：在他的澳洲 7X 上实测空调、驾驶和安全相关的设置，并整理成文档。
 - **SW**：积极测试和反馈，非常感谢。
 
 来源、第三方组件许可与边界说明见 [NOTICE.md](NOTICE.md)，完整条款见 [LICENSE](LICENSE)。

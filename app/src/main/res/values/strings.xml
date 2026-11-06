@@ -205,6 +205,7 @@
     <string name="smart_button_action_welcome_light">迎宾灯语</string>
     <string name="smart_button_action_charging_light">充电灯语</string>
     <string name="smart_button_action_driving_light">行车灯语</string>
+    <string name="smart_button_action_rear_fog_flash">后雾灯闪烁</string>
     <string name="smart_button_action_fragrance">香氛</string>
     <string name="smart_button_action_theater_driver">观影模式（主驾）</string>
     <string name="smart_button_action_theater_passenger">观影模式（副驾）</string>
