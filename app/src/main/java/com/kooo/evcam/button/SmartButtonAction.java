@@ -179,6 +179,7 @@ public final class SmartButtonAction {
         all.add(car("charging_light", Group.LIGHTS, R.string.smart_button_action_charging_light,
                 CarMoves.onUnlessOn("ICharging", "CHARGE_FUNC_CHARGING_LIGHT_SWITCH", CarNames.ALL)));
         all.add(car("driving_light", Group.LIGHTS, R.string.smart_button_action_driving_light, CarMoves.drivingLights()));
+        all.add(car("rear_fog_flash", Group.LIGHTS, R.string.smart_button_action_rear_fog_flash, CarMoves.rearFogFlash()));
         all.add(car("fragrance", Group.LIGHTS, R.string.smart_button_action_fragrance, CarMoves.fragrance()));
 
         // 场景

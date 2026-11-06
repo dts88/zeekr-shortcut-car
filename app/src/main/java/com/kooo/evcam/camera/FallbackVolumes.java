@@ -1,6 +1,7 @@
 /*
  * Zeekr Shortcut - https://github.com/dts88/zeekr-shortcut-car
  * Copyright (C) 2026 dts88
+ * Portions Copyright (C) 2026 jlunnn - https://github.com/jlunnn
  * SPDX-License-Identifier: GPL-3.0-only
  * Additional terms under GPL-3.0 section 7 apply to dts88's code; see NOTICE.md.
  */
@@ -29,6 +30,11 @@ final class FallbackVolumes {
     private FallbackVolumes() {
     }
 
+    /** 统一成 / 分隔：同一个测试也会在 Windows 上跑（打包机），那里 File 的路径分隔符不是 '/'（jlunnn，PR #160）。 */
+    static String path(File f) {
+        return f.getPath().replace('\\', '/');
+    }
+
     /**
      * @param mounted  此刻挂着的 U 盘根目录
      * @param chosen   设置里选的盘的路径，可为 null
@@ -40,20 +46,20 @@ final class FallbackVolumes {
     static List<File> rank(List<File> mounted, String chosen, Set<String> dead, FreeBytes free, File internal) {
         List<File> out = new ArrayList<>();
         for (File root : mounted) {
-            if (!dead.contains(StorageHelper.volumeOf(root.getAbsolutePath()))) {
+            if (!dead.contains(StorageHelper.volumeOf(path(root)))) {
                 out.add(root);
             }
         }
         out.sort((a, b) -> Long.compare(free.of(b), free.of(a)));
         if (chosen != null) {
             for (int i = 0; i < out.size(); i++) {
-                if (out.get(i).getAbsolutePath().equals(chosen)) {
+                if (path(out.get(i)).equals(chosen)) {
                     out.add(0, out.remove(i));
                     break;
                 }
             }
         }
-        if (internal != null && !dead.contains(StorageHelper.volumeOf(internal.getAbsolutePath()))) {
+        if (internal != null && !dead.contains(StorageHelper.volumeOf(path(internal)))) {
             out.add(internal);
         }
         return out;
@@ -69,14 +75,14 @@ final class FallbackVolumes {
     static File home(List<File> mounted, String pinned, String lastDetected) {
         if (pinned != null && !pinned.isEmpty()) {
             for (File root : mounted) {
-                if (root.getAbsolutePath().equals(pinned)) {
+                if (path(root).equals(pinned)) {
                     return root;
                 }
             }
             return null;
         }
         for (File root : mounted) {
-            if (root.getAbsolutePath().equals(lastDetected)) {
+            if (path(root).equals(lastDetected)) {
                 return root;
             }
         }

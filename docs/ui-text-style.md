@@ -569,7 +569,15 @@
 下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
 可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
 
-- （现在没有。）
+- 2026-11-06 加（jlunnn 的 PR #160 收录，项目所有者要求照规范改名；「后雾灯」照 vi_rear_fog）：灵动贴动作
+  smart_button_action_rear_fog_flash「后雾灯闪烁」/ Rear fog lamp flash / Kelip lampu kabus belakang（原稿带「（红掣）」/ (red button) /
+  (butang merah)，去掉了；放进「灯光与香氛」组，和三种灯语在一起）。
+- 2026-11-06 加（关于页署名，项目所有者要求补齐贡献者记录；关于页只有中英两份）：
+  - about_credits_contributors 末尾加「• jlunnn（GitHub）—— 灵动贴的「后雾灯闪烁」动作（来自他的 7X-U）。」；
+    English「• jlunnn (GitHub) — the Rear fog lamp flash action for smart buttons (from his 7X-U).」
+  - about_thanks_body 在 LEO 前加「• Calvin Bui（GitHub，澳洲 7X 车主）—— 在自己的车上实测了空调、驾驶和安全相关的设置，并整理成文档。」；
+    English「• Calvin Bui (GitHub, Australian 7X owner) — tested climate, driving and safety settings on his own car and wrote
+    up the findings.」
 
 ---
 
