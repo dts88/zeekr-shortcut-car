@@ -11,6 +11,10 @@ commit message, not here.
 
 Nothing yet.
 
+## [3.5.2-alpha] - 2026-11-05
+
+- Smart buttons: new action, rear fog lamp flash (three flashes), for the red button.
+
 ## [3.5.1-beta] - 2026-11-05
 
 **New since 2.93.3-beta**
