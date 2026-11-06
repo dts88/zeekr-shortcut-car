@@ -72,7 +72,6 @@ dts88 写的部分另有两条 GPL-3.0 第 7 条允许的附加条款（署名�
   盲区画面投到 HUD 上（2026-10-21）照他的 CAMCORDER（<https://github.com/FerixzTanz/CAMCORDER>）：找 HUD 那块屏的规则（`HudScreen`）、
   画面的位置大小 / 对比度 / 透明度 / 边缘渐隐的公式（`HudPicture`）、用 Presentation 投 HUD 的窗口画法（`SideViewHudWindow`），
   以及全部 HUD 设置项和他在自己 7X 上调出的默认值。
-
 - **jlunnn**（<https://github.com/jlunnn>，CarPiano、7X-U 的作者）：灵动贴的「后雾灯闪烁」动作（`CarMoves.rearFogFlash`，
   从他的 7X-U 搬来，他在 7X 上实测过）；比较盘的路径时统一用 / 分隔，单元测试在 Windows 上也能通过（`FallbackVolumes`）。
   都是 PR #160，2026-11-06 收录，项目所有者照界面文字规范改了动作的名字。
