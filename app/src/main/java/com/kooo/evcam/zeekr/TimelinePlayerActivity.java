@@ -1426,24 +1426,7 @@ public class TimelinePlayerActivity extends AppCompatActivity {
     }
 
     private void deleteChosen(List<LaneTrack.Clip> files) {
-        // 正在播的那一段可能也在里面，先停下，否则删的是一个还开着的文件
-        for (Lane lane : lanes) {
-            resetLane(lane);
-        }
-        int deleted = 0;
-        int kept = 0;
-        for (LaneTrack.Clip clip : files) {
-            File file = new File(clip.path);
-            if (isLocked(clip.path)) {
-                kept++;
-            } else if (file.exists() && file.delete()) {
-                deleted++;
-            }
-        }
-        AppLog.i(TAG, "多选删除：" + deleted + "/" + files.size() + " 个文件，锁定的留下 " + kept + " 个");
-        Toast.makeText(this, deletedText(deleted, kept), Toast.LENGTH_SHORT).show();
-        setSelecting(false);
-        loadTimelines();
+        deleteClips(files, -1, () -> setSelecting(false));
     }
 
     private void confirmDeleteSession(int index, List<LaneTrack.Clip> files) {
@@ -1456,33 +1439,51 @@ public class TimelinePlayerActivity extends AppCompatActivity {
     }
 
     private void deleteSession(int index, List<LaneTrack.Clip> files) {
-        // 先停下，否则删的是一个还开着的文件。不只是在播这一条的时候：这一条的座舱文件
-        // 也可能正在相邻那一条的画面上（跨着两条的归重叠得多的那条，见 LaneTrack#belongingTo）。
-        // 删完反正要重扫、重开
+        deleteClips(files, index, null);
+    }
+
+    /**
+     * 删这一批录像。先停下各路，否则删的是还开着的文件 —— 不只是在播这一条的时候：这一条的座舱文件
+     * 也可能正在相邻那一条的画面上（跨着两条的归重叠得多的那条，见 LaneTrack#belongingTo）。
+     * 删交给 {@link com.kooo.evcam.storage.FootageLocks#deleteUnlocked}：不在主线程上删，删之前重读一次锁定清单，
+     * 这里打开以后别处才锁上的也留下（锁定的文件回放里不能直接删，先解锁；锁定影像关着时不算）。删完重扫、重开。
+     *
+     * @param session 删的是第几条；多选删时是 -1（只用来写日志）
+     */
+    private void deleteClips(List<LaneTrack.Clip> clips, int session, Runnable after) {
         for (Lane lane : lanes) {
             resetLane(lane);
         }
-        int deleted = 0;
-        int kept = 0;
-        for (LaneTrack.Clip clip : files) {
-            File file = new File(clip.path);
-            if (isLocked(clip.path)) {
-                kept++;
-            } else if (file.exists() && file.delete()) {
-                deleted++;
-            }
+        final List<File> files = new ArrayList<>();
+        for (LaneTrack.Clip clip : clips) {
+            files.add(new File(clip.path));
         }
-        AppLog.i(TAG, "删除时间轴 " + index + "：" + deleted + "/" + files.size() + " 个文件，锁定的留下 " + kept + " 个");
-        Toast.makeText(this, deletedText(deleted, kept), Toast.LENGTH_SHORT).show();
-        loadTimelines();
+        com.kooo.evcam.storage.FootageLocks.deleteUnlocked(this, StorageHelper.getVideoDir(getApplicationContext()),
+                lockEnabled ? lockedVideos : java.util.Collections.<String>emptySet(), keep -> {
+                    int deleted = 0;
+                    int kept = 0;
+                    for (File file : files) {
+                        if (keep.contains(file.getName())) {
+                            kept++;
+                        } else if (file.exists() && file.delete()) {
+                            deleted++;
+                        }
+                    }
+                    return new int[] {deleted, kept};
+                }, counts -> {
+                    AppLog.i(TAG, (session < 0 ? "多选删除" : "删除时间轴 " + session) + "：" + counts[0] + "/" + files.size() + " 个文件，锁定的留下 " + counts[1] + " 个");
+                    if (isDestroyed()) {
+                        return;
+                    }
+                    Toast.makeText(this, deletedText(counts[0], counts[1]), Toast.LENGTH_SHORT).show();
+                    if (after != null) {
+                        after.run();
+                    }
+                    loadTimelines();
+                });
     }
 
     // ------------------------------------------------------------------ 锁定影像
-
-    /** 锁定的文件回放里不能直接删：先解锁（锁定影像关着时不算）。 */
-    private boolean isLocked(String path) {
-        return lockEnabled && lockedVideos.contains(new File(path).getName());
-    }
 
     private String deletedText(int deleted, int kept) {
         return getResources().getQuantityString(R.plurals.player_deleted, deleted, deleted)

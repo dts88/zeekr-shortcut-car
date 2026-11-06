@@ -48,6 +48,8 @@ import java.util.concurrent.Executors;
  *       换不上时原来那份原样留着；中途断电、拔盘，盘上也总有一份完整的清单。</li>
  *   <li>自动清理「读清单 → 决定 → 删」整段拿着 {@link #guard()}，中间没人改得了清单 ——
  *       否则刚锁上的文件可能正好在这一轮的删除名单里。</li>
+ *   <li>回放里删除也一样（{@link #deleteUnlocked}）：跟锁 / 解锁排在同一条线程上，删之前重读一次清单 ——
+ *       回放打开以后别处才锁上的也留下。</li>
  *   <li>开关关着时清理不看清单（{@link #protectedNames} 给空集合），清单本身留着，重新打开恢复保护；
  *       被删掉的文件从清单里拿掉（{@link #forget}）。</li>
  * </ul>
@@ -160,7 +162,7 @@ public final class FootageLocks {
         return names != null ? names : new TreeSet<String>();
     }
 
-    /** 自动清理「读清单 → 决定 → 删」整段拿着它。 */
+    /** 自动清理、回放里删除「读清单 → 决定 → 删」整段拿着它。 */
     public static Object guard() {
         return GUARD;
     }
@@ -218,6 +220,42 @@ public final class FootageLocks {
         if (!listed.isEmpty()) {
             update(dir, listed, false);
             AppLog.i(TAG, "清单里拿掉已删掉的 " + listed.size() + " 个文件");
+        }
+    }
+
+    // ================================================================= 回放里删
+
+    /** 回放里删：{@code keep} 是这一刻不能删的文件名，其余的删掉，返回调用方要的结果。在后台线程上跑。 */
+    public interface Deletion<T> {
+        T run(Set<String> keep);
+    }
+
+    /** 回放里删完，在主线程上回调。 */
+    public interface Deleted<T> {
+        void done(T result);
+    }
+
+    /**
+     * 回放里删除（{@code dir} 里的录像或照片）：跟锁 / 解锁排在同一条线程上、拿着 {@link #guard()}，
+     * 删之前重读一次清单 —— 回放打开以后别处才锁上的也留下，跟自动清理一个规矩。
+     * 锁定影像关着时什么都不留；清单读不出来时留回放上显示锁着的那些（{@code shown}）。
+     * {@code deletion} 在后台线程上跑，{@code deleted} 回主线程。
+     */
+    public static <T> void deleteUnlocked(Context context, File dir, Collection<String> shown,
+                                          Deletion<T> deletion, Deleted<T> deleted) {
+        final Context app = context.getApplicationContext();
+        final Set<String> fallback = new TreeSet<>(shown);
+        IO.execute(() -> {
+            T result = deleteNow(dir, enabled(app), fallback, deletion);
+            new Handler(Looper.getMainLooper()).post(() -> deleted.done(result));
+        });
+    }
+
+    /** {@link #deleteUnlocked} 在后台线程上做的那一段。 */
+    static <T> T deleteNow(File dir, boolean enabled, Set<String> shown, Deletion<T> deletion) {
+        synchronized (GUARD) {
+            Set<String> keep = enabled ? read(dir) : Collections.<String>emptySet();
+            return deletion.run(keep != null ? keep : shown);
         }
     }
 

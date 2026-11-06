@@ -901,52 +901,78 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
                 .setPositiveButton(R.string.action_delete, (dialog, which) -> {
                     // selectedGroups 就是 adapter 手里那个集合，下面会被清空，
                     // 先留一份 —— 删完还要拿它对一下预览区放的是不是其中之一
-                    Set<PhotoGroup> deleted = new HashSet<>(selectedGroups);
-                    int deletedCount = 0;
-                    int keptCount = 0;
-                    
-                    // 删除选中的图片组：锁定的留下（锁定影像关着时不算），留下的那几组还在列表里
-                    Set<String> keep = lockEnabled ? lockedPhotos : new HashSet<String>();
-                    for (PhotoGroup group : new HashSet<>(deleted)) {
-                        deletedCount += group.deleteAllExcept(keep);
-                        if (group.getPhotoCount() > 0) {
-                            keptCount += group.getPhotoCount();
-                            deleted.remove(group);
-                        }
+                    final Set<PhotoGroup> chosen = new HashSet<>(selectedGroups);
+                    final List<File> files = new ArrayList<>();
+                    for (PhotoGroup group : chosen) {
+                        files.addAll(group.files());
                     }
-                    
-                    // 从日期分组中移除已删除的组
-                    for (DateSection<PhotoGroup> section : dateSections) {
-                        section.getItems().removeAll(deleted);
-                    }
-                    
-                    // 移除空的日期分组
-                    dateSections.removeIf(section -> section.getItemCount() == 0);
-
-                    adapter.clearSelection();
-                    adapter.buildFlattenedList();
-                    // 预览区放的那一组也在这一批里的话，别再挂着已经删掉的照片
-                    if (currentGroup != null && deleted.contains(currentGroup)) {
-                        showNoSelection();
-                    } else {
-                        adapter.setSelectedGroup(currentGroup);
-                    }
-                    adapter.notifyDataSetChanged();
-                    updateSelectedCount();
-
-                    android.widget.Toast.makeText(PhotoPlaybackActivity.this,
-                            getResources().getQuantityString(R.plurals.msg_photos_deleted,
-                                    deletedCount, deletedCount)
-                                    + (keptCount > 0 ? getResources().getQuantityString(
-                                            R.plurals.msg_kept_locked, keptCount, keptCount) : ""),
-                            android.widget.Toast.LENGTH_SHORT).show();
-
-                    if (dateSections.isEmpty()) {
-                        exitMultiSelectMode();
-                        showEmptyState();
-                    }
+                    // 锁定的留下（锁定影像关着时不算）。不在主线程上删，删之前重读一次锁定清单：
+                    // 这里打开以后别处才锁上的也留下（FootageLocks#deleteUnlocked）
+                    com.kooo.evcam.storage.FootageLocks.deleteUnlocked(this, StorageHelper.getPhotoDir(this),
+                            lockEnabled ? lockedPhotos : new HashSet<String>(), keep -> {
+                                Set<String> gone = new HashSet<>();
+                                for (File file : files) {
+                                    if (!keep.contains(file.getName()) && file.delete()) {
+                                        gone.add(file.getName());
+                                    }
+                                }
+                                return gone;
+                            }, gone -> {
+                                if (!isDestroyed()) {
+                                    showDeleted(chosen, gone);
+                                }
+                            });
                 })
                 .setNegativeButton(R.string.action_cancel, null));
+    }
+
+    /** 删完（{@link #deleteSelected}）：组里拿掉删掉了的，删空的组从列表里拿掉，留下的那几组还在列表里。 */
+    private void showDeleted(Set<PhotoGroup> chosen, Set<String> gone) {
+        int keptCount = 0;
+        Set<PhotoGroup> emptied = new HashSet<>();
+        for (PhotoGroup group : chosen) {
+            group.dropDeleted(gone);
+            if (group.getPhotoCount() > 0) {
+                keptCount += group.getPhotoCount();
+            } else {
+                emptied.add(group);
+            }
+        }
+
+        // 从日期分组中移除已删除的组
+        for (DateSection<PhotoGroup> section : dateSections) {
+            section.getItems().removeAll(emptied);
+        }
+
+        // 移除空的日期分组
+        dateSections.removeIf(section -> section.getItemCount() == 0);
+
+        // 删的时候重读过清单：这里打开以后别处才锁上的，列表上也标出来
+        lockedPhotos = com.kooo.evcam.storage.FootageLocks.shown(this, StorageHelper.getPhotoDir(this));
+        adapter.setLockedNames(lockedPhotos);
+        updateLockButton();
+
+        adapter.clearSelection();
+        adapter.buildFlattenedList();
+        // 预览区放的那一组也在这一批里的话，别再挂着已经删掉的照片
+        if (currentGroup != null && emptied.contains(currentGroup)) {
+            showNoSelection();
+        } else {
+            adapter.setSelectedGroup(currentGroup);
+        }
+        adapter.notifyDataSetChanged();
+        updateSelectedCount();
+
+        android.widget.Toast.makeText(this,
+                getResources().getQuantityString(R.plurals.msg_photos_deleted, gone.size(), gone.size())
+                        + (keptCount > 0 ? getResources().getQuantityString(
+                                R.plurals.msg_kept_locked, keptCount, keptCount) : ""),
+                android.widget.Toast.LENGTH_SHORT).show();
+
+        if (dateSections.isEmpty()) {
+            exitMultiSelectMode();
+            showEmptyState();
+        }
     }
 
     /**

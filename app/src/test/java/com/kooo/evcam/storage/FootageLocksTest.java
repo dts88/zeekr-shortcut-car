@@ -26,7 +26,7 @@ import java.util.TreeSet;
 
 /**
  * 锁定清单（U 盘上的 locked.txt）的读写格式：一行一个文件名，只认本应用的文件名。
- * 换清单：换不上时原来那份留着，换到一半断了读旧的那份。
+ * 换清单：换不上时原来那份留着，换到一半断了读旧的那份。回放里删：删之前重读一次清单。
  */
 public class FootageLocksTest {
 
@@ -115,6 +115,46 @@ public class FootageLocksTest {
         FootageLocks.forget(dir, Collections.singletonList(A));
         assertTrue(FootageLocks.read(dir).isEmpty());
         assertFalse(new File(dir, "locked.txt.old").exists());
+    }
+
+    /** 回放里删：回放打开以后别处才锁上的（清单里有、回放上没显示）也留下。 */
+    @Test
+    public void aPlaybackDeleteKeepsWhatWasLockedAfterPlaybackOpened() throws IOException {
+        File dir = temp.newFolder();
+        File a = file(dir, A);
+        File b = file(dir, B);
+        write(dir, FootageLocks.FILE_NAME, A);
+        assertEquals(names(B), FootageLocks.deleteNow(dir, true, names(), keep -> deleteAllBut(keep, a, b)));
+        assertTrue(a.exists());
+        assertFalse(b.exists());
+    }
+
+    /** 锁定影像关着：清单里有的、回放上显示锁着的，都照删。 */
+    @Test
+    public void withLockingOffAPlaybackDeleteKeepsNothing() throws IOException {
+        File dir = temp.newFolder();
+        File a = file(dir, A);
+        File b = file(dir, B);
+        write(dir, FootageLocks.FILE_NAME, A);
+        assertEquals(names(A, B), FootageLocks.deleteNow(dir, false, names(A), keep -> deleteAllBut(keep, a, b)));
+        assertFalse(a.exists());
+        assertFalse(b.exists());
+    }
+
+    private static File file(File dir, String name) throws IOException {
+        File file = new File(dir, name);
+        assertTrue(file.createNewFile());
+        return file;
+    }
+
+    private static Set<String> deleteAllBut(Set<String> keep, File... files) {
+        Set<String> gone = new TreeSet<>();
+        for (File file : files) {
+            if (!keep.contains(file.getName()) && file.delete()) {
+                gone.add(file.getName());
+            }
+        }
+        return gone;
     }
 
     private static File write(File dir, String name, String... names) throws IOException {
