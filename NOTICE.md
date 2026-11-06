@@ -47,6 +47,7 @@
 
 GPL-3.0 是传染性（copyleft）许可证。因此**本项目整体以 GPL-3.0 发布**，
 分发时必须提供对应源代码、保留版权与许可声明，且不得添加额外限制。
+dts88 写的部分另有两条 GPL-3.0 第 7 条允许的附加条款（署名、改版须标明），见第 8 节。
 
 ---
 
@@ -127,6 +128,43 @@ GPL-3.0 是传染性（copyleft）许可证。因此**本项目整体以 GPL-3.0
 
 > Uses code / findings from [Zeekr Shortcut](https://github.com/dts88/zeekr-shortcut-car) by dts88 (GPL-3.0).
 
-- **代码**：GPL-3.0，保留版权和许可声明本来就是必须的。其中含 EVCam（第 1 节）或贡献者（第 2 节）的部分，
+- **代码**：GPL-3.0，保留版权和许可声明本来就是必须的；dts88 写的部分还要照第 8 节的附加条款，
+  在「关于」或致谢页里保留署名，改过的版本要标明不是原版。其中含 EVCam（第 1 节）或贡献者（第 2 节）的部分，
   也请一并保留他们的署名。
 - **事实**：事实不受许可证约束，所以这一点是请求，不是许可条款。本项目对 CarPiano 和 EngineV1（第 5 节）也是这样做的。
+
+---
+
+## 8. 附加条款（GPL-3.0 第 7 条）
+
+dts88 为本项目写的代码，在 GPL-3.0 之外附加两条：
+
+1. **署名**：用到这些代码的作品（改没改都算），要在它显示的版权与许可声明里（应用就是「关于」或致谢页）保留署名，
+   让用户看得见。原样分发的，保留「极氪即刻 © 2026 dts88」这一行（或它的译文）；改过的版本、或者把代码用进别的作品，
+   写「Based on Zeekr Shortcut by dts88 (https://github.com/dts88/zeekr-shortcut-car)」。源文件开头的版权头也要保留。
+2. **改版要标明**：改过的版本不能冒充原版，不能说是 dts88 出的，要用合理的方式标明和原版不同，
+   比如换一个应用名，或者在名字旁边写「修改版」。
+
+这是 GPL-3.0 第 7 条 b、c 两款明确允许的附加条款，不是第 10 条说的「额外限制」。本项目仍然是 GPL-3.0 的开源软件：
+任何人照样可以使用、修改、再发布，包括商用。
+
+- 只管 dts88 写的部分。EVCam（第 1 节）和贡献者（第 2 节）的代码照原来的 GPL-3.0，不受这两条约束。
+- 从加上本节的那个提交起生效；之前的提交和已经发布的版本照原来的条款。
+- 每个源文件开头的版权头写明谁有版权、许可证是什么，并指向这里（GPL-3.0 第 7 条要求写明附加条款在哪）。
+- 以下面的英文原文为准。
+
+> **Additional terms under section 7 of the GNU General Public License, version 3**
+>
+> These terms apply to the material authored by dts88 in this repository, that is, everything except the EVCam code
+> and the contributors' code described in sections 1 and 2 of this file. They apply from the commit that adds this
+> section onward; earlier commits and releases stay under the terms they were released with.
+>
+> 1. **Attribution (section 7(b)).** Any work that contains this material must keep, in the Appropriate Legal Notices
+>    it displays (for an app, its About or credits screen) and reasonably visible to users, the line
+>    "Zeekr Shortcut © 2026 dts88" (or its translation) for an unmodified copy, or
+>    "Based on Zeekr Shortcut by dts88 (https://github.com/dts88/zeekr-shortcut-car)" for a modified version or a
+>    larger work. The copyright notices at the top of the source files must be kept as well.
+> 2. **Modified versions (section 7(c)).** A modified version must not misrepresent its origin. It must not be
+>    presented as the original Zeekr Shortcut or as coming from dts88, and must be marked in reasonable ways as
+>    different from the original, for example by a different app name or the words "modified version" next to its
+>    name.

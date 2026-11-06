@@ -1,3 +1,9 @@
+/*
+ * Zeekr Shortcut - https://github.com/dts88/zeekr-shortcut-car
+ * Copyright (C) suyunkai and the EVCam contributors - https://github.com/suyunkai/EVCam
+ * SPDX-License-Identifier: GPL-3.0-only
+ */
+
 package com.kooo.evcam;
 
 import org.junit.Test;
