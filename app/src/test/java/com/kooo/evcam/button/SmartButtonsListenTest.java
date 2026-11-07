@@ -9,16 +9,18 @@ package com.kooo.evcam.button;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 
 /**
  * 灵动贴什么时候开扫描、电量怎么取（{@link SmartButtons#waitToSettle}、{@link SmartButtons#startWait}、
- * {@link SmartButtons.BatteryWindow}、{@link SmartButtons#linksDropped}、{@link ScanProbe#aboutBluetooth}）。
+ * {@link SmartButtons.BatteryWindow}、{@link SmartButtons.PhoneLink}、{@link ScanProbe#aboutBluetooth}）。
  */
 public class SmartButtonsListenTest {
 
@@ -74,28 +76,55 @@ public class SmartButtonsListenTest {
         assertEquals(25, window.add(START + 10_001, 25));
     }
 
-    /** 手机的蓝牙电话、音乐：上次连着的这次断了才算；本来就没连的、刚连上的、读不到的不算。 */
+    private static final String PHONE = "00:11:22:33:44:55";
+    private static final String OTHER = "AA:BB:CC:DD:EE:FF";
+    private static final int BOTH = SmartButtons.LINK_CALLS | SmartButtons.LINK_AUDIO;
+
+    /** 手机跟车机的蓝牙：上次连着的电话、音乐或设备这次没连着才算断开；本来就没连的、刚连上的、读不到的不算。 */
     @Test
     public void phoneLinkDropsAreSeen() {
-        int both = SmartButtons.LINK_CALLS | SmartButtons.LINK_AUDIO;
-        assertTrue(SmartButtons.linksDropped(both, 0));
-        assertTrue(SmartButtons.linksDropped(both, SmartButtons.LINK_CALLS));
-        assertTrue(SmartButtons.linksDropped(SmartButtons.LINK_AUDIO, 0));
-        assertFalse(SmartButtons.linksDropped(both, both));
-        assertFalse(SmartButtons.linksDropped(0, both));
-        assertFalse(SmartButtons.linksDropped(SmartButtons.LINK_CALLS, both));
-        assertFalse(SmartButtons.linksDropped(0, 0));
-        assertFalse(SmartButtons.linksDropped(-1, 0));
-        assertFalse(SmartButtons.linksDropped(both, -1));
+        assertTrue(dropped(link(BOTH, PHONE), link(0, PHONE)));
+        assertTrue(dropped(link(BOTH, PHONE), link(SmartButtons.LINK_CALLS, PHONE)));
+        assertTrue(dropped(link(0, PHONE), link(0)));
+        assertTrue(dropped(link(BOTH, PHONE, OTHER), link(BOTH, OTHER)));
+        assertFalse(dropped(link(BOTH, PHONE), link(BOTH, PHONE)));
+        assertFalse(dropped(link(0), link(BOTH, PHONE)));
+        assertFalse(dropped(link(SmartButtons.LINK_CALLS, PHONE), link(BOTH, PHONE, OTHER)));
+        assertFalse(dropped(link(-1, PHONE), link(0, PHONE)));
+        assertFalse(dropped(devicesUnread(0), link(0)));
+        assertFalse(dropped(link(BOTH, PHONE), devicesUnread(-1)));
+        assertFalse(dropped(null, link(0)));
     }
 
     @Test
-    public void phoneLinksReadAsWords() {
-        assertEquals("calls+audio", SmartButtons.linkWords(SmartButtons.LINK_CALLS | SmartButtons.LINK_AUDIO));
-        assertEquals("calls", SmartButtons.linkWords(SmartButtons.LINK_CALLS));
-        assertEquals("audio", SmartButtons.linkWords(SmartButtons.LINK_AUDIO));
-        assertEquals("none", SmartButtons.linkWords(0));
-        assertEquals("?", SmartButtons.linkWords(-1));
+    public void phoneLinkReadsAsWords() {
+        assertEquals("calls+audio, connected 44:55", link(BOTH, PHONE).words());
+        assertEquals("calls, connected 44:55 EE:FF", link(SmartButtons.LINK_CALLS, OTHER, PHONE).words());
+        assertEquals("audio, connected none", link(SmartButtons.LINK_AUDIO).words());
+        assertEquals("none, connected none", link(0).words());
+        assertEquals("?, connected ?", devicesUnread(-1).words());
+    }
+
+    /** 黑匣子只在变了的时候记：一样的连接算相等，设备的先后不算。 */
+    @Test
+    public void samePhoneLinkIsEqual() {
+        assertEquals(link(BOTH, PHONE, OTHER), link(BOTH, OTHER, PHONE));
+        assertEquals(link(BOTH, PHONE, OTHER).hashCode(), link(BOTH, OTHER, PHONE).hashCode());
+        assertNotEquals(link(BOTH, PHONE), link(0, PHONE));
+        assertNotEquals(link(0), devicesUnread(0));
+        assertNotEquals(link(0), null);
+    }
+
+    private static boolean dropped(SmartButtons.PhoneLink before, SmartButtons.PhoneLink now) {
+        return SmartButtons.PhoneLink.dropped(before, now);
+    }
+
+    private static SmartButtons.PhoneLink link(int profiles, String... devices) {
+        return new SmartButtons.PhoneLink(profiles, new HashSet<>(Arrays.asList(devices)));
+    }
+
+    private static SmartButtons.PhoneLink devicesUnread(int profiles) {
+        return new SmartButtons.PhoneLink(profiles, null);
     }
 
     @Test
