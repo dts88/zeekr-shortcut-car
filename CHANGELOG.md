@@ -11,6 +11,15 @@ commit message, not here.
 
 Nothing yet.
 
+## [3.6.0-alpha] - 2026-11-07
+
+- Smart buttons: new action Rear fog lamp flash, under Lights and fragrance (thanks to jlunnn).
+- Lock footage: the lock list is replaced safely, so a failed save no longer loses every lock (found by wysie).
+- Playback: deleting checks the lock list again at that moment, so a file locked in the meantime is kept (idea from wysie).
+- About & credits: a copyright line; thanks to jlunnn and Calvin Bui. NOTICE.md adds GPL-3.0 section 7 terms for dts88's code.
+- Removed EVCam code and resources the app never used.
+- Unit tests also pass on Windows (thanks to jlunnn).
+
 ## [3.5.1-beta] - 2026-11-05
 
 **New since 2.93.3-beta**
