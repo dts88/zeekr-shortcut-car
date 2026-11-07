@@ -18,7 +18,7 @@ import java.util.Collections;
 
 /**
  * 灵动贴什么时候开扫描、电量怎么取（{@link SmartButtons#waitToSettle}、{@link SmartButtons#startWait}、
- * {@link SmartButtons.BatteryWindow}、{@link ScanProbe#aboutBluetooth}）。
+ * {@link SmartButtons.BatteryWindow}、{@link SmartButtons#linksDropped}、{@link ScanProbe#aboutBluetooth}）。
  */
 public class SmartButtonsListenTest {
 
@@ -72,6 +72,30 @@ public class SmartButtonsListenTest {
         assertEquals(50, window.add(START + 2_000, 25));
         assertEquals(50, window.add(START + 10_000, 25));
         assertEquals(25, window.add(START + 10_001, 25));
+    }
+
+    /** 手机的蓝牙电话、音乐：上次连着的这次断了才算；本来就没连的、刚连上的、读不到的不算。 */
+    @Test
+    public void phoneLinkDropsAreSeen() {
+        int both = SmartButtons.LINK_CALLS | SmartButtons.LINK_AUDIO;
+        assertTrue(SmartButtons.linksDropped(both, 0));
+        assertTrue(SmartButtons.linksDropped(both, SmartButtons.LINK_CALLS));
+        assertTrue(SmartButtons.linksDropped(SmartButtons.LINK_AUDIO, 0));
+        assertFalse(SmartButtons.linksDropped(both, both));
+        assertFalse(SmartButtons.linksDropped(0, both));
+        assertFalse(SmartButtons.linksDropped(SmartButtons.LINK_CALLS, both));
+        assertFalse(SmartButtons.linksDropped(0, 0));
+        assertFalse(SmartButtons.linksDropped(-1, 0));
+        assertFalse(SmartButtons.linksDropped(both, -1));
+    }
+
+    @Test
+    public void phoneLinksReadAsWords() {
+        assertEquals("calls+audio", SmartButtons.linkWords(SmartButtons.LINK_CALLS | SmartButtons.LINK_AUDIO));
+        assertEquals("calls", SmartButtons.linkWords(SmartButtons.LINK_CALLS));
+        assertEquals("audio", SmartButtons.linkWords(SmartButtons.LINK_AUDIO));
+        assertEquals("none", SmartButtons.linkWords(0));
+        assertEquals("?", SmartButtons.linkWords(-1));
     }
 
     @Test
