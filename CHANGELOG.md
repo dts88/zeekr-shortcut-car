@@ -11,6 +11,10 @@ commit message, not here.
 
 Nothing yet.
 
+## [3.6.1-alpha] - 2026-11-07
+
+- Diagnostics: smart buttons record more Bluetooth detail.
+
 ## [3.6.0-alpha] - 2026-11-07
 
 - Smart buttons: new action Rear fog lamp flash, under Lights and fragrance (thanks to jlunnn).
