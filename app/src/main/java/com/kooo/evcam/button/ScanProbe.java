@@ -26,6 +26,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.TreeSet;
 
 /**
  * 扫描起不来时看一眼为什么，只读，结果进黑匣子（2026-10-31 车主：车机唤醒后 scan failed 3，12 分钟没好，报告里看不出卡在哪）。
@@ -82,18 +83,33 @@ final class ScanProbe {
 
     private static String links(BluetoothAdapter adapter) {
         try {
-            Method isConnected = BluetoothDevice.class.getMethod("isConnected");
-            int connected = 0;
             Set<BluetoothDevice> bonded = adapter.getBondedDevices();
-            for (BluetoothDevice device : bonded) {
-                if (Boolean.TRUE.equals(isConnected.invoke(device))) {
-                    connected++;
-                }
-            }
-            return "discovering " + adapter.isDiscovering() + ", connected " + connected + " of " + bonded.size() + " bonded";
+            return "discovering " + adapter.isDiscovering() + ", connected " + connected(bonded, true).size() + " of " + bonded.size()
+                    + " bonded";
         } catch (Throwable e) {
             return "links? (" + e + ")";
         }
+    }
+
+    /** 已配对、连着的设备里不只用低功耗的那些（手机这一类；灵动贴只用低功耗，不算）的地址；读不到是 null。 */
+    static Set<String> connectedNotLe(BluetoothAdapter adapter) {
+        try {
+            return connected(adapter.getBondedDevices(), false);
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            return null;
+        }
+    }
+
+    /** 这些设备里连着的地址（走隐藏接口 isConnected）；leToo = false 时不算只用低功耗的。 */
+    private static Set<String> connected(Set<BluetoothDevice> devices, boolean leToo) throws ReflectiveOperationException {
+        Method isConnected = BluetoothDevice.class.getMethod("isConnected");
+        Set<String> out = new TreeSet<>();
+        for (BluetoothDevice device : devices) {
+            if ((leToo || device.getType() != BluetoothDevice.DEVICE_TYPE_LE) && Boolean.TRUE.equals(isConnected.invoke(device))) {
+                out.add(device.getAddress());
+            }
+        }
+        return out;
     }
 
     private static String viaAdapter(BluetoothAdapter adapter) {
