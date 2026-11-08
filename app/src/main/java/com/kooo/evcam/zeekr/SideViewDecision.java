@@ -9,6 +9,8 @@
 
 package com.kooo.evcam.zeekr;
 
+import com.kooo.evcam.camera.ChannelRules;
+
 /**
  * 盲区画面：此刻哪一侧该不该显示（左右各判各的，项目所有者 2026-11-04；先后、保留、淡出在 {@link SideViewTrigger}）。
  *
@@ -120,6 +122,19 @@ public final class SideViewDecision {
      */
     public static boolean shouldStayReady(Input in) {
         return "D".equals(in.gear) && !factoryViewActive(in);
+    }
+
+    /**
+     * 环视此刻这个样子，显示出来能不能有画面（通道调度说的，{@link ChannelRules#condition}）。
+     *
+     * <p>被别的程序拿着（车机自己的后排画面拿走后座舱相机 1 时，相机 2 跟着被挡住，平台笔记 §3.1）、在救、救不回来：
+     * 显示出来只会是一块黑框，不显示，窗口照旧备着，环视出画面了下一次读数就显示。在出画面、在起来（刚挂窗口，第一帧还没到）照常显示。
+     * 读不到当作在起来。</p>
+     */
+    public static boolean surroundCanShow(ChannelRules.Condition surround) {
+        return surround == null
+                || surround == ChannelRules.Condition.STREAMING
+                || surround == ChannelRules.Condition.BRINGING_UP;
     }
 
     /** 原厂有画面在屏幕上（或马上要有）：倒车、360、原厂弹窗、泊车辅助。 */

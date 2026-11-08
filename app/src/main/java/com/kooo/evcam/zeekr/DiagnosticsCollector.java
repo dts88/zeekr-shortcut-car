@@ -1264,6 +1264,7 @@ public final class DiagnosticsCollector {
                 .append("  在绑定=").append(buttons.binding() ? "是" : "否")
                 .append("  连着=").append(buttons.connecting() == null ? "没有" : buttons.connecting()).append('\n');
         sb.append("  蓝牙=").append(!buttons.hasBluetooth() ? "没有" : buttons.bluetoothOn() ? "开" : "关")
+                .append("  车机在搜索蓝牙=").append(buttons.discovering() ? "是" : "否")
                 .append("  扫描权限=").append(com.kooo.evcam.button.SmartButtons.canScan(context) ? "有" : "没有")
                 .append("  连接权限=").append(com.kooo.evcam.button.SmartButtons.canConnect(context) ? "有" : "没有")
                 .append('\n');
