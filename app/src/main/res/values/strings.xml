@@ -1089,6 +1089,8 @@
     <string name="dev_gpu_fisheye_video_summary">录像回放中的环视画面改用 GPU 逐像素校正。仅切换算法，是否校正仍由「鱼眼校正」按钮控制。下次打开录像回放时生效。</string>
     <string name="dev_camera_suspects_title">记录可能占用摄像头的应用</string>
     <string name="dev_camera_suspects_summary">其他应用占用或释放摄像头时，记录此前 10 秒至此后 3 秒内启动或停止前台服务、切换到前台或后台的其他应用，结果仅供参考。需授予使用情况访问权限；其他应用的包名会写入诊断报告。</string>
+    <string name="dev_smart_button_callback_title">灵动贴：回调接收</string>
+    <string name="dev_smart_button_callback_summary">直接接收灵动贴的扫描结果，不经系统广播转发；本应用被系统关闭后，按下灵动贴不会打开本应用</string>
     <string name="dev_side_view_back_title">盲区画面朝后角度</string>
     <string name="dev_side_view_back_summary">画面中心朝车尾转动的角度，负值朝车头</string>
     <string name="dev_side_view_up_title">盲区画面朝外角度</string>

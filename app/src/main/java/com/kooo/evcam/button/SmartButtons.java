@@ -12,6 +12,7 @@ import android.app.PendingIntent;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothManager;
 import android.bluetooth.le.BluetoothLeScanner;
+import android.bluetooth.le.ScanCallback;
 import android.bluetooth.le.ScanFilter;
 import android.bluetooth.le.ScanRecord;
 import android.bluetooth.le.ScanResult;
@@ -65,6 +66,9 @@ import java.util.TreeSet;
  * <ul>
  *   <li>扫描按名字过滤（{@link SmartButtonAd#NAME}），结果用 PendingIntent 由系统交给 {@link ScanReceiver}：应用在后台、被系统收掉了也送得到。
  *       低延迟、积极匹配、每包都报、只收传统广播。</li>
+ *   <li>开发者选项里可以改成回调接收（{@link #refreshReceiveMode}，车主 2026-11-08：两种方式做成选项）：结果由系统直接送进这个进程，
+ *       不经 PendingIntent 转交；进程没了就收不到，按了也叫不起应用。两种同时只开一种，换的时候停了按新的重开。
+ *       开得太勤被系统拒时，回调这一路系统不告诉应用（PendingIntent 那一路会送错误码），靠下面自己限的次数。</li>
  *   <li>按名字过滤以后只有按下时才有广播，平时没有是正常的；带过滤的扫描安卓也不会因为扫得久就降级。所以扫描开着就不动（车主 2026-11-01：
  *       不反复强行启动），只在这些时候停、开：灵动贴的开关、绑定（一台都没绑时）、蓝牙开关、车机睡醒、扫描起不来、退出、连接重试（见下），
  *       还有手机跟车机的蓝牙断开（电话、音乐或整条连接；隔 {@link #RELISTEN_MS} 重开一次）。</li>
@@ -263,6 +267,10 @@ public final class SmartButtons {
     // ---- 只在 bt 线程上碰
     /** 系统那边可能还开着我们的扫描（这次进程开过、或者上一个进程留下的）：停的时候要真的去停。 */
     private boolean maybeScanning = true;
+    /** 回调接收时这一轮的回调（{@link ResultCallback}）；每次开一个新的，停过的不再用。null = 没开着。 */
+    private ScanCallback scanCallback;
+    /** 回调接收时 PendingIntent 那一路还送来结果：这次进程记过一笔了。 */
+    private boolean strayNoted;
     /** 每停一次加一：隔一会儿再开的那一下看它变没变。 */
     private int scanGeneration;
     private boolean startPending;
@@ -297,6 +305,8 @@ public final class SmartButtons {
     /** 绑定了的几台（地址）。 */
     private volatile Set<String> bound = Collections.emptySet();
     private volatile boolean enabled;
+    /** 用回调接收扫描结果（开发者选项，{@link #refreshReceiveMode}）；false 用 PendingIntent。 */
+    private volatile boolean viaCallback;
     private volatile boolean exited;
     private volatile boolean binding;
     private volatile boolean scanning;
@@ -372,6 +382,7 @@ public final class SmartButtons {
             app.registerReceiver(adapterState, filter);
         }
         enabled = new AppConfig(app).isSmartButtonsEnabled();
+        viaCallback = new AppConfig(app).isSmartButtonCallback();
         exited = UserExit.isExited(app);
         bound = loadBound();
         boolean asleepNow = ScreenState.androidOff();
@@ -534,6 +545,23 @@ public final class SmartButtons {
     /** 开着灵动贴没有。 */
     public boolean enabled() {
         return enabled;
+    }
+
+    /**
+     * 接收方式（开发者选项「灵动贴：回调接收」）可能变了：设置里改了，或者开发者选项开、关了（关着时按 PendingIntent 算，
+     * {@code AppConfig.DEVELOPER_KEYS}）。变了就停掉这一轮、按新的方式重开；没变什么都不动。哪个线程都行。
+     */
+    public void refreshReceiveMode() {
+        boolean now = new AppConfig(app).isSmartButtonCallback();
+        bt.post(() -> {
+            if (now == viaCallback) {
+                return;
+            }
+            viaCallback = now;
+            BlackBox.noteImportant(now ? "灵动贴：改用回调接收" : "灵动贴：改用 PendingIntent 接收");
+            stopScan();
+            ensureScan();
+        });
     }
 
     /** 权限刚给了、或者别的条件变了：马上再看一次要不要扫（不等 {@link #RETRY_MS}）。在扫的不动。 */
@@ -719,6 +747,11 @@ public final class SmartButtons {
         return throttled;
     }
 
+    /** 用回调接收（开发者选项）；false 是 PendingIntent。 */
+    public boolean viaCallback() {
+        return viaCallback;
+    }
+
     /** 现在这个电量记下的时刻（墙上毫秒）；没有过是 0。 */
     public long batteryReadAt(String address) {
         return state.getLong(batteryAtKey(address), 0);
@@ -823,9 +856,13 @@ public final class SmartButtons {
             gattStale = false;
             refreshGatt();
         }
-        // 上一个进程、上一轮开的 PendingIntent 扫描不会自己停：先停一次，隔一会儿再开
+        // 上一个进程、上一轮开的 PendingIntent 扫描不会自己停：先停一次，隔一会儿再开（回调接收时也停：换方式之前留下的）
         stopIntentScan();
         maybeScanning = false;
+        if (scanCallback != null) {
+            stopCallbackScan(scanCallback);
+            scanCallback = null;
+        }
         startPending = true;
         int generation = scanGeneration;
         note(Listen.STARTING, "");
@@ -851,7 +888,6 @@ public final class SmartButtons {
         while (starts.size() > MAX_STARTS) {
             starts.pollFirst();
         }
-        maybeScanning = true;
         ScanSettings settings = new ScanSettings.Builder()
                 .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
                 .setMatchMode(ScanSettings.MATCH_MODE_AGGRESSIVE)
@@ -863,7 +899,16 @@ public final class SmartButtons {
                 new ScanFilter.Builder().setDeviceName(SmartButtonAd.NAME).build());
         int result;
         try {
-            result = s.startScan(filters, settings, scanIntent);
+            if (viaCallback) {
+                // 回调接收：每次一个新的回调；起不来的从 onScanFailed 来（ResultCallback）
+                ResultCallback callback = new ResultCallback();
+                scanCallback = callback;
+                s.startScan(filters, settings, callback);
+                result = 0;
+            } else {
+                maybeScanning = true;
+                result = s.startScan(filters, settings, scanIntent);
+            }
         } catch (RuntimeException e) {
             listenFailed("startScan: " + e);
             return;
@@ -881,11 +926,12 @@ public final class SmartButtons {
         }
         note(Listen.LISTENING, "");
         if (wokeAt != 0) {
-            BlackBox.note("灵动贴：车机醒来 " + seconds(now - wokeAt) + " 秒开始听；看到蓝牙开着 " + seconds(now - bluetoothOnSince)
+            BlackBox.note("灵动贴：车机醒来 " + seconds(now - wokeAt) + " 秒开始听" + (viaCallback ? "（回调）" : "")
+                    + "；看到蓝牙开着 " + seconds(now - bluetoothOnSince)
                     + " 秒；phone " + phoneSeen.words() + ", " + ScanProbe.scanFacts(app, adapter));
             wokeAt = 0;
         } else {
-            BlackBox.note("灵动贴：开始听；phone " + phoneSeen.words());
+            BlackBox.note("灵动贴：开始听" + (viaCallback ? "（回调）" : "") + "；phone " + phoneSeen.words());
         }
         bt.postDelayed(watch, WATCH_MS);
     }
@@ -900,6 +946,10 @@ public final class SmartButtons {
             stopIntentScan();
             maybeScanning = false;
         }
+        if (scanCallback != null) {
+            stopCallbackScan(scanCallback);
+            scanCallback = null;
+        }
         scanning = false;
     }
 
@@ -911,6 +961,19 @@ public final class SmartButtons {
         }
         try {
             s.stopScan(scanIntent);
+        } catch (RuntimeException ignored) {
+            // 蓝牙已经关了之类：停不了就算了
+        }
+    }
+
+    /** 停回调接收的那一轮（bt 线程）。蓝牙关着时停不了，系统那边的扫描跟着蓝牙一起没了。 */
+    private void stopCallbackScan(ScanCallback callback) {
+        BluetoothLeScanner s = scanner();
+        if (s == null) {
+            return;
+        }
+        try {
+            s.stopScan(callback);
         } catch (RuntimeException ignored) {
             // 蓝牙已经关了之类：停不了就算了
         }
@@ -1080,7 +1143,18 @@ public final class SmartButtons {
             return;
         }
         long at = SystemClock.elapsedRealtime();
-        bt.post(() -> onScanResults(error, results, at));
+        bt.post(() -> {
+            if (viaCallback) {
+                // 回调接收时 PendingIntent 那一路不该还开着（上一个进程、换方式之前留下的）：停掉，结果不要
+                stopIntentScan();
+                if (!strayNoted) {
+                    strayNoted = true;
+                    BlackBox.note("灵动贴：回调接收时 PendingIntent 那一路还送来结果，停掉");
+                }
+                return;
+            }
+            onScanResults(error, results, at);
+        });
     }
 
     @SuppressWarnings("deprecation")
@@ -1109,6 +1183,44 @@ public final class SmartButtons {
             packets = packets + 1;
             heardAt = at;
             offer(result);
+        }
+    }
+
+    /**
+     * 回调接收（开发者选项）：结果在主线程上来，转给 bt 线程，跟 PendingIntent 送来的走同一条路（{@link #onScanResults}）。
+     * 停过、换过的那一个再来的不要。
+     */
+    private final class ResultCallback extends ScanCallback {
+        @Override
+        public void onScanResult(int callbackType, ScanResult result) {
+            deliver(Collections.singletonList(result));
+        }
+
+        @Override
+        public void onBatchScanResults(List<ScanResult> results) {
+            deliver(results == null ? Collections.emptyList() : new ArrayList<>(results));
+        }
+
+        @Override
+        public void onScanFailed(int errorCode) {
+            bt.post(() -> {
+                if (scanCallback != this) {
+                    return;
+                }
+                scanCallback = null;
+                if (scanning) {
+                    listenFailed("scan failed " + errorCode);
+                }
+            });
+        }
+
+        private void deliver(List<ScanResult> results) {
+            long at = SystemClock.elapsedRealtime();
+            bt.post(() -> {
+                if (scanCallback == this) {
+                    onScanResults(0, results, at);
+                }
+            });
         }
     }
 

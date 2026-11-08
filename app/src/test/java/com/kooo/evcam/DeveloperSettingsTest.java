@@ -59,6 +59,8 @@ public class DeveloperSettingsTest {
         ROWS.put("pref_watermark_brand", NONE);
         // 车辆状态（2026-10-23 从界面页挪来）
         ROWS.put("pref_vehicle_status", Arrays.asList("vehicle_status_panel"));
+        // 灵动贴：回调接收（2026-11-08）
+        ROWS.put("pref_smart_button_callback", Arrays.asList("smart_buttons_callback"));
         // 画面调节的参数只在开着时用到，不按没存过算（理由见 DEVELOPER_KEYS）；「恢复默认值」2026-10-23 起是这一行行尾的按钮
         ROWS.put("pref_image_adjust", Arrays.asList("image_adjust_enabled"));
         ROWS.put("pref_camera_mapping", Arrays.asList("zeekr_camera_override_front",

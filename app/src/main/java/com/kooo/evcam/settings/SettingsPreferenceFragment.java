@@ -1751,6 +1751,15 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         bindSwitch("pref_camera_holder_suspects", appConfig.isCameraHolderSuspectsEnabled(),
                 appConfig::setCameraHolderSuspectsEnabled);
 
+        // 灵动贴：回调接收（2026-11-08）：存好以后叫灵动贴按新的方式重开
+        bindSwitch("pref_smart_button_callback", appConfig.isSmartButtonCallback(), on -> {
+            appConfig.setSmartButtonCallback(on);
+            com.kooo.evcam.button.SmartButtons buttons = com.kooo.evcam.button.SmartButtons.get();
+            if (buttons != null) {
+                buttons.refreshReceiveMode();
+            }
+        });
+
         // 盲区画面标定（2026-10-23 三根拖动条合成一行）：每一路画面的朝向是猜的（SideViewProjection），上车标定之后定默认值
         ValueActionPreference calibration = findPreference("pref_side_view_calibration");
         if (calibration != null) {

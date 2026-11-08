@@ -531,6 +531,15 @@
             android:title="@string/set_vehicle_status_title"
             android:summary="@string/set_vehicle_status_summary" />
 
+        <!--
+          灵动贴：回调接收（2026-11-08 项目所有者：灵动贴的两种接收方式做成选项，放在开发者选项）。关着用 PendingIntent（默认）。
+          一组一行的不成组（ui-spec §三），和车辆状态一样单独一行
+        -->
+        <SwitchPreferenceCompat
+            android:key="pref_smart_button_callback"
+            android:title="@string/dev_smart_button_callback_title"
+            android:summary="@string/dev_smart_button_callback_summary" />
+
         <PreferenceCategory
             android:title="@string/set_section_recording">
 

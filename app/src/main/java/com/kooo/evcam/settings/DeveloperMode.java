@@ -89,6 +89,11 @@ public final class DeveloperMode {
         com.kooo.evcam.blackbox.BlackBox.noteImportant(value ? "开发者模式：打开" : "开发者模式：关闭");
         // 没验证的信号算不算数跟着它走：信息条那份快照重新滤一次
         com.kooo.evcam.telemetry.Telemetry.get().selectionChanged();
+        // 灵动贴的接收方式归开发者选项管（关着时按 PendingIntent 算）：跟着它当场换
+        com.kooo.evcam.button.SmartButtons buttons = com.kooo.evcam.button.SmartButtons.get();
+        if (buttons != null) {
+            buttons.refreshReceiveMode();
+        }
     }
 
     private static SharedPreferences prefs(Context context) {

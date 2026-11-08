@@ -718,6 +718,7 @@ public class AppConfig {
                 KEY_SIDE_VIEW_BACK,                   // 盲区画面的三个标定角度 → 默认
                 KEY_SIDE_VIEW_UP,
                 KEY_SIDE_VIEW_FOV,
+                KEY_SMART_BUTTON_CALLBACK,            // 灵动贴回调接收 → 关（用 PendingIntent）
                 KEY_VEHICLE_STATUS));                 // 主界面的车辆状态面板 → 关（2026-10-23 挪进开发者选项）
         for (String slot : CAMERA_OVERRIDE_SLOTS) {
             keys.add(KEY_CAMERA_OVERRIDE_PREFIX + slot);  // 相机映射 → 自动分配
@@ -2338,6 +2339,8 @@ public class AppConfig {
     private static final String KEY_SMART_BUTTONS_ENABLED = "smart_buttons_enabled";
     /** 每一台单击 / 双击做什么：{@code smart_button_action.<地址>.<1 或 2>}，值是 {@code button.SmartButtonAction} 的 key。 */
     private static final String KEY_SMART_BUTTON_ACTION_PREFIX = "smart_button_action.";
+    /** 灵动贴用回调接收扫描结果（开发者选项，2026-11-08 车主：两种接收方式做成选项）；默认关，用 PendingIntent。 */
+    private static final String KEY_SMART_BUTTON_CALLBACK = "smart_buttons_callback";
 
     /** 灵动贴开着没有；默认开：一台都没绑的本来就不扫。 */
     public boolean isSmartButtonsEnabled() {
@@ -2346,6 +2349,15 @@ public class AppConfig {
 
     public void setSmartButtonsEnabled(boolean enabled) {
         prefs.edit().putBoolean(KEY_SMART_BUTTONS_ENABLED, enabled).apply();
+    }
+
+    /** 灵动贴用回调接收扫描结果；归开发者选项管，关着时按关算（{@link #DEVELOPER_KEYS}）。 */
+    public boolean isSmartButtonCallback() {
+        return readBoolean(KEY_SMART_BUTTON_CALLBACK, false);
+    }
+
+    public void setSmartButtonCallback(boolean on) {
+        prefs.edit().putBoolean(KEY_SMART_BUTTON_CALLBACK, on).apply();
     }
 
     /** 绑定的灵动贴，按绑定先后。 */

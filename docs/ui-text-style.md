@@ -578,7 +578,12 @@
 下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
 可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
 
-- （现在没有。）
+- 2026-11-08（开发者选项「灵动贴：回调接收」，项目所有者当天要求把灵动贴的两种接收方式做成选项）：
+  dev_smart_button_callback_title「灵动贴：回调接收」/ Smart buttons: receive by callback / Butang pintar: terima melalui panggilan balik；
+  dev_smart_button_callback_summary「直接接收灵动贴的扫描结果，不经系统广播转发；本应用被系统关闭后，按下灵动贴不会打开本应用」/
+  「Receives smart button scan results directly instead of through a system broadcast; if the system closes the app,
+  pressing a smart button doesn't open it」/「Menerima hasil imbasan butang pintar secara terus, bukan melalui siaran sistem;
+  jika sistem menutup apl, menekan butang pintar tidak membuka apl」。术语表加「回调接收」。
 
 ---
 
@@ -641,3 +646,4 @@
 | 设置分区与页面 | 录制、存储、超级镜子、悬浮键与灵动贴、界面、系统、开发者选项、检查更新、关于与致谢 | Recording、Storage、Super mirror、Floating button and smart buttons、Interface、System、Developer options、Check for updates、About & credits | Rakaman、Storan、Cermin super、Butang terapung dan butang pintar、Antara muka、Sistem、Pilihan pembangun、Semak kemas kini、Perihal & penghargaan | 关于页没有马来文，见 §5 |
 | 灵动贴 | 灵动贴（只有页名里和「悬浮键」连着写，别处的悬浮按钮照旧） | smart button | butang pintar | — |
 | 绑定（灵动贴） | 绑定：绑定灵动贴、已绑定 | pair：Pair smart button、paired | pasangkan：Pasangkan butang pintar、dipasangkan | 「连接」只指连上蓝牙的那一下（长按时）；不用「搜索」「登记」「配对」（2026-11-04 加，2026-11-05 项目所有者批准） |
+| 回调接收（灵动贴） | 回调接收（开发者选项：扫描结果由系统直接交给本应用）；默认的方式是经系统广播转发 | receive by callback；through a system broadcast | terima melalui panggilan balik；melalui siaran sistem | 只在开发者选项里出现（2026-11-08 加，待项目所有者确认） |

@@ -1093,6 +1093,8 @@
     <string name="dev_gpu_fisheye_video_summary">Corrects the surround view in video playback pixel by pixel on the GPU. Picks the method only; the Straighten button still turns correction on and off. Takes effect the next time video playback opens.</string>
     <string name="dev_camera_suspects_title">Log apps that may be using a camera</string>
     <string name="dev_camera_suspects_summary">Records which other apps started or stopped a foreground service or moved to the foreground or background from 10 seconds before to 3 seconds after another app takes or releases a camera, for reference only. Requires usage access; other apps\' package names are written to the diagnostics report.</string>
+    <string name="dev_smart_button_callback_title">Smart buttons: receive by callback</string>
+    <string name="dev_smart_button_callback_summary">Receives smart button scan results directly instead of through a system broadcast; if the system closes the app, pressing a smart button doesn\'t open it</string>
     <string name="dev_side_view_back_title">Blind spot view rear angle</string>
     <string name="dev_side_view_back_summary">Turns the view centre toward the rear; negative values turn it toward the front</string>
     <string name="dev_side_view_up_title">Blind spot view outward angle</string>

@@ -1260,6 +1260,7 @@ public final class DiagnosticsCollector {
         }
         String detail = buttons.listenDetail();
         sb.append("  开关=").append(config.isSmartButtonsEnabled() ? "开" : "关")
+                .append("  接收=").append(buttons.viaCallback() ? "回调" : "PendingIntent")
                 .append("  听=").append(listenName(buttons.listen())).append(detail.isEmpty() ? "" : "（" + detail + "）")
                 .append("  在绑定=").append(buttons.binding() ? "是" : "否")
                 .append("  连着=").append(buttons.connecting() == null ? "没有" : buttons.connecting()).append('\n');
