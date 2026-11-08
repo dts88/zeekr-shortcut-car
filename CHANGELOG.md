@@ -9,6 +9,10 @@ commit message, not here.
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [3.7.0-alpha] - 2026-11-08
+
 - Blind spot view: no black window while the surround view can't give a picture (for example the car is using the camera); it says so once and shows again as soon as the picture is back (thanks to lelelolo).
 - Blind spot view: while that side's mirror light is on, the picture gets an edge: yellow for the blind spot light, blinking when you signal toward it; blinking red for the door open warning. Follows the Blind spot alert and Door open warning options (thanks to lelelolo).
 
