@@ -80,20 +80,25 @@ public class SmartButtonsListenTest {
     private static final String OTHER = "AA:BB:CC:DD:EE:FF";
     private static final int BOTH = SmartButtons.LINK_CALLS | SmartButtons.LINK_AUDIO;
 
-    /** 手机跟车机的蓝牙：上次连着的电话、音乐或设备这次没连着才算断开；本来就没连的、刚连上的、读不到的不算。 */
+    /** 车机的蓝牙搜索停了以后 200 毫秒重开一次扫描。 */
     @Test
-    public void phoneLinkDropsAreSeen() {
-        assertTrue(dropped(link(BOTH, PHONE), link(0, PHONE)));
-        assertTrue(dropped(link(BOTH, PHONE), link(SmartButtons.LINK_CALLS, PHONE)));
-        assertTrue(dropped(link(0, PHONE), link(0)));
-        assertTrue(dropped(link(BOTH, PHONE, OTHER), link(BOTH, OTHER)));
-        assertFalse(dropped(link(BOTH, PHONE), link(BOTH, PHONE)));
-        assertFalse(dropped(link(0), link(BOTH, PHONE)));
-        assertFalse(dropped(link(SmartButtons.LINK_CALLS, PHONE), link(BOTH, PHONE, OTHER)));
-        assertFalse(dropped(link(-1, PHONE), link(0, PHONE)));
-        assertFalse(dropped(devicesUnread(0), link(0)));
-        assertFalse(dropped(link(BOTH, PHONE), devicesUnread(-1)));
-        assertFalse(dropped(null, link(0)));
+    public void relistenTwoHundredMillisecondsAfterDiscoveryStops() {
+        assertEquals(200L, SmartButtons.DISCOVERY_SETTLE_MS);
+    }
+
+    /** 手机跟车机的蓝牙：这次连着的设备里有上次没连着的才算连上（连之前会取消搜索）；电话、音乐变了、断开的、读不到的不算。 */
+    @Test
+    public void phoneLinkJoinsAreSeen() {
+        assertTrue(joined(link(0), link(0, PHONE)));
+        assertTrue(joined(link(BOTH, PHONE), link(BOTH, PHONE, OTHER)));
+        assertTrue(joined(link(BOTH, OTHER), link(0, PHONE)));
+        assertFalse(joined(link(0, PHONE), link(BOTH, PHONE)));
+        assertFalse(joined(link(BOTH, PHONE), link(0, PHONE)));
+        assertFalse(joined(link(BOTH, PHONE, OTHER), link(BOTH, OTHER)));
+        assertFalse(joined(link(0, PHONE), link(0)));
+        assertFalse(joined(devicesUnread(0), link(0, PHONE)));
+        assertFalse(joined(link(0), devicesUnread(0)));
+        assertFalse(joined(null, link(0, PHONE)));
     }
 
     @Test
@@ -115,8 +120,8 @@ public class SmartButtonsListenTest {
         assertNotEquals(link(0), null);
     }
 
-    private static boolean dropped(SmartButtons.PhoneLink before, SmartButtons.PhoneLink now) {
-        return SmartButtons.PhoneLink.dropped(before, now);
+    private static boolean joined(SmartButtons.PhoneLink before, SmartButtons.PhoneLink now) {
+        return SmartButtons.PhoneLink.joined(before, now);
     }
 
     private static SmartButtons.PhoneLink link(int profiles, String... devices) {
