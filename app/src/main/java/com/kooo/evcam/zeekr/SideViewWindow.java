@@ -40,7 +40,8 @@ import com.kooo.evcam.R;
  * <h3>画法和超级镜子一样</h3>
  *
  * <p>子视图是普通 TextureView，本容器在 {@code dispatchDraw} 里分格反投影，画面本身和「不显示过时的画面」那条规矩在
- * {@link SideViewPicture}（HUD 的窗口共用）。不新建 GL 管线，不动相机会话（为什么见 {@link RearViewMirrorView}）。</p>
+ * {@link SideViewPicture}（HUD 的窗口共用）。不新建 GL 管线，不动相机会话（为什么见 {@link RearViewMirrorView}）。
+ * 这一侧后视镜上的灯亮着时，画面四周描一圈边（{@link SideViewAlert}，画在 {@link SideViewEdge}）。</p>
  *
  * <p>一个窗口一个画面。中控屏上有两块画布时左右各一个窗口（项目所有者 2026-11-04：后视镜上的灯左右可能同时亮），
  * 只有一块时这一个窗口显示优先的那一侧、换侧就挪过去（{@link SideViewTrigger.Result#lane}）。</p>
@@ -67,12 +68,16 @@ public class SideViewWindow extends ViewGroup implements SideViewOutputWindow {
     /** 关闭按钮的直径、离窗口边多远（dp）。 */
     private static final float CLOSE_SIZE_DP = 48f;
     private static final float CLOSE_MARGIN_DP = 10f;
+    /** 边框多粗（dp，{@link SideViewAlert}）。 */
+    private static final float EDGE_DP = 6f;
 
     private final WindowManager windowManager;
     private final AppConfig appConfig;
     private final AutoFitTextureView textureView;
     private final CloseButton closeButton;
     private final SideViewPicture picture;
+    /** 后视镜上的灯亮着时的边框（{@link SideViewAlert}）。 */
+    private final SideViewEdge edge = new SideViewEdge();
     private final FisheyeMesh.Painter paintTexture = this::drawTextureOnce;
     private final Handler handler = new Handler(Looper.getMainLooper());
     /** 收起前的淡出（{@link #fadeOut}）。 */
@@ -89,10 +94,16 @@ public class SideViewWindow extends ViewGroup implements SideViewOutputWindow {
             if (!attached || !shown) {
                 return;
             }
+            boolean redraw = false;
             if (picture.checkStale(SystemClock.uptimeMillis())) {
                 if (picture.isStale()) {
                     AppLog.i(TAG, "盲区画面 " + SideViewPicture.STALE_MS + " ms 没有新帧：盖上");
                 }
+                redraw = true;
+            }
+            // 边框在闪就换亮暗（闪跟着这一下走，见 SideViewEdge）
+            redraw |= edge.tick(lane == LaneCycle.LEFT, lane == LaneCycle.RIGHT);
+            if (redraw) {
                 invalidate();
             }
             handler.postDelayed(this, TICK_MS);
@@ -162,6 +173,14 @@ public class SideViewWindow extends ViewGroup implements SideViewOutputWindow {
     @Override
     public void applyAim() {
         invalidate();
+    }
+
+    /** 两侧各记一级（这个窗口换侧时跟着换），画的是此刻显示的那一侧的。 */
+    @Override
+    public void setAlert(int side, int level, boolean motion) {
+        if (edge.set(side, level, motion) && attached && shown && lane == side) {
+            invalidate();
+        }
     }
 
     // ------------------------------------------------------------------ 窗口
@@ -338,6 +357,7 @@ public class SideViewWindow extends ViewGroup implements SideViewOutputWindow {
                 + " canvas=" + (textureView.isAvailable() ? "ready" : "none")
                 + " geometry=" + (hasGeometry() ? "known" : "unknown")
                 + " covered=" + (shown && picture.covered())
+                + " edge=" + edge.describe(lane)
                 + " fov=" + Math.round(picture.effectiveFovDegrees()) + "°";
     }
 
@@ -384,6 +404,8 @@ public class SideViewWindow extends ViewGroup implements SideViewOutputWindow {
             return;
         }
         picture.draw(canvas, width, height, lane, paintTexture);
+        // 边框压在画面上（盖黑时也画：灯亮着是车给的，不靠画面），关闭按钮在最上面
+        edge.draw(canvas, lane, width, height, EDGE_DP * getResources().getDisplayMetrics().density);
         drawChild(canvas, closeButton, getDrawingTime());
     }
 

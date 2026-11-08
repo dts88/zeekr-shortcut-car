@@ -9,7 +9,7 @@ commit message, not here.
 
 ## [Unreleased]
 
-Nothing yet.
+- Blind spot view: while that side's mirror light is lit, the picture gets an edge like the light: yellow while a car is in the blind spot, blinking red when you signal toward it or the door open warning is on (follows the Blind spot alert and Door open warning options).
 
 ## [3.6.1-alpha] - 2026-11-07
 

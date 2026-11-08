@@ -52,7 +52,8 @@ import com.kooo.evcam.AutoFitTextureView;
  * <h3>HUD 是投影</h3>
  *
  * <p>黑色是不亮：黑底、盖黑在 HUD 上都是「什么也没有」。画面过一条对比度曲线（白天、夜间各一档），四边渐隐到黑，
- * 可以左右翻转（像车门上的后视镜）；窗口按设置的透明度显示，夜间模式时再乘夜间亮度（{@link HudPicture}）。</p>
+ * 可以左右翻转（像车门上的后视镜）；窗口按设置的透明度显示，夜间模式时再乘夜间亮度（{@link HudPicture}）。
+ * 这一侧后视镜上的灯亮着时，画面四周描一圈边（{@link SideViewAlert}），画在对比度曲线和四边渐隐之外，粗细跟着画面大小。</p>
  *
  * <p>备着、显示和中控屏一样：备着时窗口 alpha 0、画布建好后不可见、画面留在环视的会话里。</p>
  *
@@ -93,6 +94,8 @@ public class SideViewHudWindow extends ViewGroup implements SideViewOutputWindow
     private final Handler handler = new Handler(Looper.getMainLooper());
     /** 四边渐隐用的（和收起前的淡出不是一回事）。 */
     private final Paint fadePaint = new Paint();
+    /** 后视镜上的灯亮着时的边框（{@link SideViewAlert}），两侧各一级。 */
+    private final SideViewEdge edge = new SideViewEdge();
 
     private Presentation presentation;
     private FrameLayout root;
@@ -123,6 +126,10 @@ public class SideViewHudWindow extends ViewGroup implements SideViewOutputWindow
                     }
                     invalidate();
                 }
+            }
+            // 边框在闪就换亮暗（闪跟着这一下走，见 SideViewEdge）
+            if (edge.tick(left.shown, right.shown)) {
+                invalidate();
             }
             handler.postDelayed(this, TICK_MS);
         }
@@ -186,6 +193,13 @@ public class SideViewHudWindow extends ViewGroup implements SideViewOutputWindow
     @Override
     public void applyAim() {
         invalidate();
+    }
+
+    @Override
+    public void setAlert(int side, int level, boolean motion) {
+        if (edge.set(side, level, motion) && isShowing(side)) {
+            invalidate();
+        }
     }
 
     /** 车辆是不是夜间模式：夜间换夜间对比度，透明度再乘夜间亮度。服务每次判定时给。 */
@@ -400,8 +414,9 @@ public class SideViewHudWindow extends ViewGroup implements SideViewOutputWindow
                 + " geometry=" + (hasGeometry() ? "known" : "unknown") + " night=" + night;
     }
 
-    private static String describe(Picture p) {
-        return !p.shown ? "hidden" : (p.picture.covered() ? "covered" : "live") + (p.fade.isFading() ? "+fading" : "");
+    private String describe(Picture p) {
+        return !p.shown ? "hidden" : (p.picture.covered() ? "covered" : "live") + (p.fade.isFading() ? "+fading" : "")
+                + "+edge:" + edge.describe(p.lane);
     }
 
     // ------------------------------------------------------------------ 布局与绘制
@@ -456,9 +471,12 @@ public class SideViewHudWindow extends ViewGroup implements SideViewOutputWindow
             canvas.saveLayerAlpha(0f, 0f, width, height, Math.round(255 * Math.max(0f, p.alpha)));
         }
         canvas.drawColor(0xFF000000);
+        // 边框（SideViewAlert）：画在画面之后、对比度曲线和四边渐隐之外，不被它们改色、擦掉；收起前的淡出照乘
+        float edgePx = SideViewAlert.hudStrokePx(width, height);
         if (!p.picture.live()) {
-            // 盖着：画一次子视图（不画就不取帧），再盖黑 —— HUD 上什么也没有
+            // 盖着：画一次子视图（不画就不取帧），再盖黑 —— HUD 上什么也没有（灯亮着照样描边：那是车给的，不靠画面）
             p.picture.draw(canvas, width, height, p.lane, paintTexture);
+            edge.draw(canvas, p.lane, width, height, edgePx);
             canvas.restoreToCount(outer);
             return;
         }
@@ -476,6 +494,7 @@ public class SideViewHudWindow extends ViewGroup implements SideViewOutputWindow
             eraseEdges(canvas, width, height, fade);
         }
         canvas.restoreToCount(save);
+        edge.draw(canvas, p.lane, width, height, edgePx);
         canvas.restoreToCount(outer);
     }
 

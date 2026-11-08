@@ -506,6 +506,9 @@ public class SideViewService extends Service {
         /** 这一次显示的时刻、第一帧来没来：黑匣子里看「打灯后多久出画面」。 */
         long shownAtMs;
         boolean firstFrameSeen;
+        /** 黑匣子记过的边框（{@link SideViewAlert}），左、右：显示着的那一侧变了才记一行。 */
+        int edgeLeft = SideViewAlert.NONE;
+        int edgeRight = SideViewAlert.NONE;
 
         Output(ChannelRules.Kind kind) {
             this.kind = kind;
@@ -644,6 +647,40 @@ public class SideViewService extends Service {
                     BlackBox.note("盲区画面" + label() + "：收起「" + LaneCycle.labelOf(lane) + "」"
                             + (w.isShowing() ? "" : "，窗口备着"));
                 }
+            }
+            // 边框（SideViewAlert）：照这一刻后视镜上的灯描；不归它管的那一侧不描。窗口只在那一侧显示着时画
+            for (int lane : new int[]{LaneCycle.LEFT, LaneCycle.RIGHT}) {
+                boolean mine = manages(lanes, lane);
+                w.setAlert(lane, mine ? SideViewAlert.level(in, lane) : SideViewAlert.NONE, in.fade);
+                noteEdge(w, lane, mine ? in : null);
+            }
+        }
+
+        /**
+         * 黑匣子：显示着的那一侧边框变了记一行（收起了不记，下一次显示再从头算）。
+         *
+         * @param in null：这一侧不归它管
+         */
+        private void noteEdge(SideViewOutputWindow w, int lane, SideViewDecision.Input in) {
+            boolean visible = w.isShowing(lane);
+            int level = visible && in != null ? SideViewAlert.level(in, lane) : SideViewAlert.NONE;
+            int before = lane == LaneCycle.LEFT ? edgeLeft : edgeRight;
+            if (level == before) {
+                return;
+            }
+            if (lane == LaneCycle.LEFT) {
+                edgeLeft = level;
+            } else {
+                edgeRight = level;
+            }
+            if (visible && in != null) {
+                BlackBox.note("盲区画面" + label() + "「" + LaneCycle.labelOf(lane) + "」边框："
+                        + (level == SideViewAlert.NONE ? "去掉"
+                        : level == SideViewAlert.CAUTION ? "黄（盲区指示灯亮）"
+                        : SideViewAlert.doorWarningLit(in, lane) ? "红（开门预警亮）"
+                        : "红（盲区指示灯亮、往这一侧打着转向灯）")
+                        + (level != SideViewAlert.WARNING ? ""
+                        : SideViewAlert.blinks(level, in.fade) ? "，闪" : "，不闪（装饰动效放不了）"));
             }
         }
 
@@ -796,6 +833,8 @@ public class SideViewService extends Service {
         /** 移走窗口：放开登记、撤回输出，再当场移走（画布在移走那一下交给管线，见 {@link #handCanvasToPipeline}）。 */
         void detach() {
             cancelRetry();
+            edgeLeft = SideViewAlert.NONE;
+            edgeRight = SideViewAlert.NONE;
             SideViewOutputWindow w = window;
             if (w == null) {
                 unbindCamera();
