@@ -80,6 +80,10 @@ dts88 写的部分另有两条 GPL-3.0 第 7 条允许的附加条款（署名�
 - **calvinbui**（Calvin Bui，<https://github.com/calvinbui>）：在他的澳洲 7X（固件 2.1.1c）上实测 6 项设置的记录：
   内外循环、二排空调、自动远光、低速紧急制动、陡坡缓降、舒适加速（`docs/australian-7x-*.md`，PR #145，2026-11-06 收录）。
   他没核实、本项目实测过的休眠、下电、重启，补在舒适加速那一篇的第 8 节。
+- **lelelolo**（<https://github.com/lelelolo>）：盲区画面的两处改进，2026-11-08 随 PR 合并：
+  - 环视被车机占用、在恢复或恢复不了时不显示黑框，提示一次（`SideViewDecision.surroundCanShow`，PR #173）；
+  - 后视镜上的灯亮着时画面描边（`SideViewAlert`、`SideViewEdge`，PR #174）。
+  合并后项目所有者改了提示文字（只留前半句）和配色（盲区一直黄色、往这一侧打灯时闪，红色只给开门预警）。
 
 盲区画面的服务和窗口（`SideViewService`、`SideViewWindow`）里读车辆信号、备着 / 显示两种状态的写法，也照 wysie、FerixzTanz 两位 PR 里的侧视弹窗写。
 这些代码照本仓库的 GPL-3.0 发布。碰相机的部分（窗口怎么挂、画布怎么交给通道调度）由本项目照通道调度重写，没有用 PR 里的那一套。

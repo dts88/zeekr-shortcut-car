@@ -84,10 +84,12 @@ final class SideViewEdge {
         canvas.drawRect(half, half, width - half, height - half, paint);
     }
 
-    /** {@code describe()} 里的记号：none / yellow / red / red+blink。 */
+    /** {@code describe()} 里的记号：none / yellow / yellow+blink / red / red+blink。 */
     String describe(int side) {
         int level = level(side);
-        return level == SideViewAlert.NONE ? "none" : level == SideViewAlert.CAUTION ? "yellow"
-                : SideViewAlert.blinks(level, motion) ? "red+blink" : "red";
+        if (level == SideViewAlert.NONE) {
+            return "none";
+        }
+        return (level == SideViewAlert.WARNING ? "red" : "yellow") + (SideViewAlert.blinks(level, motion) ? "+blink" : "");
     }
 }
