@@ -11,6 +11,10 @@ commit message, not here.
 
 Nothing yet.
 
+## [3.6.2-alpha] - 2026-11-08
+
+- Diagnostics: smart buttons record Bluetooth discovery.
+
 ## [3.6.1-alpha] - 2026-11-07
 
 - Diagnostics: smart buttons record more Bluetooth detail.
