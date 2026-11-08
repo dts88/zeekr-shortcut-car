@@ -67,7 +67,8 @@ import java.util.TreeSet;
  *       低延迟、积极匹配、每包都报、只收传统广播。</li>
  *   <li>按名字过滤以后只有按下时才有广播，平时没有是正常的；带过滤的扫描安卓也不会因为扫得久就降级。所以扫描开着就不动（车主 2026-11-01：
  *       不反复强行启动），只在这些时候停、开：灵动贴的开关、绑定（一台都没绑时）、蓝牙开关、车机睡醒、扫描起不来、退出、连接重试（见下），
- *       还有手机跟车机的蓝牙断开（电话、音乐或整条连接；隔 {@link #RELISTEN_MS} 重开一次）。</li>
+ *       还有蓝牙刚开（进程刚起来、蓝牙关过、车机睡过）或手机跟车机的蓝牙变了以后，{@link #RELISTEN_MS} 里没再变，重开一次
+ *       （{@link #relistenLater}）。</li>
  *   <li>开之前先停一次、隔 {@link #START_DELAY_MS} 再开：上一个进程开的 PendingIntent 扫描不会跟着进程停。安卓 12 一个 uid 30 秒里开扫描超过 5 次
  *       会被悄悄拒，容器里别的应用也算在这个 uid 上：{@link #STARTS_WINDOW_MS} 里最多开 {@link #MAX_STARTS} 次（{@link #startWait}）。</li>
  *   <li>没开启灵动贴（设置里的开关）、没有绑定的也没在绑定、用户退出了：不扫（车主 2026-11-04：Lab 同时开着时，Lab 好用蓝牙做测试）。
@@ -76,6 +77,7 @@ import java.util.TreeSet;
  *       再开始扫描（{@link #headUnitWoke}，车主 2026-11-01）。蓝牙跟着点火走，开关的广播车上没收到过：扫描开着时每 {@link #WATCH_MS} 看一眼蓝牙开着没有、
  *       手机跟车机的蓝牙连着没有（{@link PhoneLink}，变了记一笔）；
  *       蓝牙没开、扫描起不来的，隔 {@link #RETRY_MS} 再试，一阵里第一次起不来把现场记进黑匣子（{@link ScanProbe}）。</li>
+ *   <li>CarPlay 服务的状态通知（{@link #CARPLAY_STATUS}，CarPlay 连接状态每变一次发一次）收到就记进黑匣子，只记，不动扫描。</li>
  * </ul>
  *
  * <h3>按法</h3>
@@ -116,14 +118,17 @@ public final class SmartButtons {
     static final long SETTLE_MS = 10_000L;
     /** 在扫的时候多久看一眼蓝牙开着没有。 */
     static final long WATCH_MS = 2_000L;
-    /** 手机跟车机的蓝牙断开以后隔这么久重开一次扫描。 */
-    static final long RELISTEN_MS = 3_000L;
+    /** 蓝牙刚开、或手机跟车机的蓝牙变了以后，这么久没再变就重开一次扫描（{@link #relistenLater}）。 */
+    static final long RELISTEN_MS = 90_000L;
     /** {@code BluetoothProfile.HEADSET_CLIENT}、{@code A2DP_SINK}（系统 API，公开 SDK 里没有）：车机这一端的蓝牙电话、音乐。 */
     private static final int PROFILE_HEADSET_CLIENT = 16;
     private static final int PROFILE_A2DP_SINK = 11;
     /** {@link PhoneLink#profiles} 的位：手机的蓝牙电话、蓝牙音乐连着。 */
     static final int LINK_CALLS = 1;
     static final int LINK_AUDIO = 2;
+    /** CarPlay 服务的状态通知（CarPlay 连接状态每变一次发一次，不要权限）和里面的「激活了没有」。 */
+    static final String CARPLAY_STATUS = "ts.carplay.STATUS_CHANGED";
+    private static final String CARPLAY_ACTIVATED = "isActivated";
     /** 先停、隔这么久再开。 */
     static final long START_DELAY_MS = 500L;
     /** 开扫描的次数按这么长一阵算，一阵里最多开 {@link #MAX_STARTS} 次（安卓 12 按 uid 算 5 次，容器里别的应用也算，Lab 3.5.4）。 */
@@ -280,6 +285,8 @@ public final class SmartButtons {
     private boolean gattStale;
     /** 上次看到的手机跟车机的蓝牙（{@link #readPhoneLink}）；null = 不知道。 */
     private PhoneLink phoneSeen;
+    /** 蓝牙刚开（进程刚起来、蓝牙关过、车机睡过）：这一轮开起来以后过 {@link #RELISTEN_MS} 再重开一次。 */
+    private boolean freshBluetooth = true;
     /** 正在连的、连着的那一台；同时只有一台。 */
     private ButtonLink link;
     /** 绑定到这一刻为止（{@link SystemClock#elapsedRealtime}）。 */
@@ -366,10 +373,13 @@ public final class SmartButtons {
 
     private void start() {
         IntentFilter filter = new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED);
+        IntentFilter carPlay = new IntentFilter(CARPLAY_STATUS);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             app.registerReceiver(adapterState, filter, Context.RECEIVER_NOT_EXPORTED);
+            app.registerReceiver(carPlayStatus, carPlay, Context.RECEIVER_EXPORTED);
         } else {
             app.registerReceiver(adapterState, filter);
+            app.registerReceiver(carPlayStatus, carPlay);
         }
         enabled = new AppConfig(app).isSmartButtonsEnabled();
         exited = UserExit.isExited(app);
@@ -453,16 +463,6 @@ public final class SmartButtons {
         PhoneLink(int profiles, Set<String> devices) {
             this.profiles = profiles;
             this.devices = devices == null ? null : Collections.unmodifiableSet(new TreeSet<>(devices));
-        }
-
-        /** 有没有断开（纯逻辑）：上次连着的电话、音乐或设备，这次没连着；哪一次读不到都不算。 */
-        static boolean dropped(PhoneLink before, PhoneLink now) {
-            if (before == null || now == null) {
-                return false;
-            }
-            boolean profileLost = before.profiles > 0 && now.profiles >= 0 && (before.profiles & ~now.profiles) != 0;
-            boolean deviceLost = before.devices != null && now.devices != null && !now.devices.containsAll(before.devices);
-            return profileLost || deviceLost;
         }
 
         /** 记黑匣子用：「calls+audio, connected 44:55」；哪样都没有是 none，读不到是 ?。地址只记后两段。 */
@@ -880,12 +880,19 @@ public final class SmartButtons {
             gattNote = "";
         }
         note(Listen.LISTENING, "");
+        boolean fresh = freshBluetooth;
+        freshBluetooth = false;
         if (wokeAt != 0) {
             BlackBox.note("灵动贴：车机醒来 " + seconds(now - wokeAt) + " 秒开始听；看到蓝牙开着 " + seconds(now - bluetoothOnSince)
-                    + " 秒；phone " + phoneSeen.words() + ", " + ScanProbe.scanFacts(app, adapter));
+                    + " 秒；phone " + phoneSeen.words() + ", " + ScanProbe.scanFacts(app, adapter)
+                    + (fresh ? "；" + RELISTEN_MS / 1000 + " 秒没有变化就重开一次" : ""));
             wokeAt = 0;
         } else {
-            BlackBox.note("灵动贴：开始听；phone " + phoneSeen.words());
+            BlackBox.note("灵动贴：开始听；phone " + phoneSeen.words()
+                    + (fresh ? "；" + RELISTEN_MS / 1000 + " 秒没有变化就重开一次" : ""));
+        }
+        if (fresh) {
+            relistenLater();
         }
         bt.postDelayed(watch, WATCH_MS);
     }
@@ -947,25 +954,28 @@ public final class SmartButtons {
         }
         PhoneLink phone = readPhoneLink();
         if (!phone.equals(phoneSeen)) {
-            boolean dropped = PhoneLink.dropped(phoneSeen, phone);
             BlackBox.note("灵动贴：手机蓝牙 " + (phoneSeen == null ? "?" : phoneSeen.words()) + " → " + phone.words()
-                    + (dropped ? "；断开了，" + RELISTEN_MS / 1000 + " 秒后重开扫描" : ""));
-            if (dropped) {
-                bt.removeCallbacks(relisten);
-                bt.postDelayed(relisten, RELISTEN_MS);
-            }
+                    + "；" + RELISTEN_MS / 1000 + " 秒没有变化就重开一次");
             phoneSeen = phone;
+            relistenLater();
         }
         bt.postDelayed(watch, WATCH_MS);
     }
 
-    /** 手机跟车机的蓝牙断开以后重开一次扫描（{@link #watchBluetooth}）：这时还在扫才重开。 */
+    /** 到点了（{@link #relistenLater}）：还在扫就停了重开一次。 */
     private final Runnable relisten = () -> {
         if (scanning) {
+            BlackBox.note("灵动贴：" + RELISTEN_MS / 1000 + " 秒没有变化，重开扫描");
             stopScan();
             ensureScan();
         }
     };
+
+    /** {@link #RELISTEN_MS} 以后重开一次扫描；还没到又叫，从这一刻重新算。 */
+    private void relistenLater() {
+        bt.removeCallbacks(relisten);
+        bt.postDelayed(relisten, RELISTEN_MS);
+    }
 
     /** 手机跟车机这一刻的蓝牙（{@link PhoneLink}）；没有连接权限时都是读不到。只是读一下状态。 */
     private PhoneLink readPhoneLink() {
@@ -991,10 +1001,11 @@ public final class SmartButtons {
         }
     }
 
-    /** 蓝牙重启过（车机睡过、蓝牙关过）：手里的服务不能用了。 */
+    /** 蓝牙重启过（车机睡过、蓝牙关过）：手里的服务不能用了；下一轮开起来以后再重开一次（{@link #freshBluetooth}）。 */
     private void bluetoothRestarted() {
         bluetoothOnSince = 0;
         gattStale = true;
+        freshBluetooth = true;
     }
 
     /** 向系统要一份现在的蓝牙服务：容器手里那份死了就换（{@link StaleGatt}），活着什么都不动。情况一样的不再记。换了返回 true。 */
@@ -1508,6 +1519,18 @@ public final class SmartButtons {
         state.edit().putString(serialKey(address), serial).apply();
         return true;
     }
+
+    /** CarPlay 服务的状态通知（{@link #CARPLAY_STATUS}）：有绑定的灵动贴时记进黑匣子，只记。 */
+    private final BroadcastReceiver carPlayStatus = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (intent == null || bound.isEmpty()) {
+                return;
+            }
+            BlackBox.note("灵动贴：CarPlay " + (!intent.hasExtra(CARPLAY_ACTIVATED) ? "?"
+                    : intent.getBooleanExtra(CARPLAY_ACTIVATED, false) ? "已激活" : "未激活"));
+        }
+    };
 
     /** 蓝牙开关：开了接着听，关了先停（正在连的也收尾）。 */
     private final BroadcastReceiver adapterState = new BroadcastReceiver() {
