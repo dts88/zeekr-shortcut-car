@@ -570,6 +570,9 @@
   - about_thanks_body 在 LEO 前「• Calvin Bui（GitHub，澳洲 7X 车主）—— 在自己的车上实测了空调、驾驶和安全相关的设置，并整理成文档。」；
     English「• Calvin Bui (GitHub, Australian 7X owner) — tested climate, driving and safety settings on his own car and wrote
     up the findings.」
+- 2026-11-08 批准（lelelolo 的 PR #173：盲区画面该显示、环视被车机占用时提示一次；项目所有者只留前半句）：
+  msg_side_view_camera_in_use「无法显示盲区画面：摄像头正被车机使用」/ Can't show Blind spot view: the car is using the camera /
+  Tidak dapat memaparkan Paparan titik buta: kamera sedang digunakan oleh kereta（一句话，按 §3 不带句号）。
 - vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
 - 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
 
@@ -578,11 +581,7 @@
 下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
 可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
 
-- msg_side_view_camera_in_use「无法显示盲区画面：摄像头正被车机使用。如需同时查看后座舱，请将「设置 → 超级镜子 → 切换范围」设为「后视 + 后座舱」。」/
-  Can't show Blind spot view: the car is using the camera. To see the rear cabin as well, set Settings → Super mirror → Views
-  to Rear + rear cabin. / Tidak dapat memaparkan Paparan titik buta: kamera sedang digunakan oleh kereta. Untuk melihat kabin
-  belakang juga, tetapkan Tetapan → Cermin super → Paparan kepada Belakang + kabin belakang.（盲区画面该显示、环视被车机拿着时
-  说一次，最常见的是车机自己的后排画面；后半句指向本应用的后座舱画面：两路在同一进程里，不互相挡）。
+- （现在没有。）
 
 ---
 

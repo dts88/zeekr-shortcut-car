@@ -14,8 +14,8 @@ import static org.junit.Assert.assertTrue;
 import org.junit.Test;
 
 /**
- * {@link SideViewAlert}：盲区指示灯亮黄、往那一侧打灯变红闪、开门预警红闪；读不到、设置没开不描边；没有「安全」的颜色；
- * 装饰动效放不了时不闪。
+ * {@link SideViewAlert}：盲区指示灯亮黄、往那一侧打灯黄闪、开门预警红闪（红色只给开门预警，项目所有者 2026-11-08）；
+ * 读不到、设置没开不描边；没有「安全」的颜色；装饰动效放不了时不闪。
  */
 public class SideViewAlertTest {
 
@@ -41,13 +41,24 @@ public class SideViewAlertTest {
         assertEquals(SideViewAlert.YELLOW, SideViewAlert.color(SideViewAlert.CAUTION, true, false));
     }
 
-    /** 车上那盏灯这时闪（7X 手册「盲区辅助」），Tesla 这时画红条。 */
+    /** 车上那盏灯这时闪（7X 手册「盲区辅助」）：边框照样黄色，跟着闪。 */
     @Test
-    public void signallingTowardALitSideIsRedAndBlinks() {
+    public void signallingTowardALitSideBlinksYellow() {
         SideViewDecision.Input in = driving(2);
         in.blindSpotRight = true;
-        assertEquals(SideViewAlert.WARNING, SideViewAlert.level(in, LaneCycle.RIGHT));
-        assertTrue(SideViewAlert.blinks(SideViewAlert.WARNING, true));
+        assertEquals(SideViewAlert.CAUTION_BLINK, SideViewAlert.level(in, LaneCycle.RIGHT));
+        assertTrue(SideViewAlert.blinks(SideViewAlert.CAUTION_BLINK, true));
+        assertEquals(SideViewAlert.YELLOW, SideViewAlert.color(SideViewAlert.CAUTION_BLINK, true, true));
+        assertEquals("暗的那一半同色", SideViewAlert.YELLOW & 0x00FFFFFF,
+                SideViewAlert.color(SideViewAlert.CAUTION_BLINK, true, false) & 0x00FFFFFF);
+    }
+
+    /** 红色只给开门预警：盲区指示灯亮，打不打灯都是黄色。 */
+    @Test
+    public void onlyTheDoorWarningIsRed() {
+        for (int level : new int[]{SideViewAlert.CAUTION, SideViewAlert.CAUTION_BLINK}) {
+            assertEquals(SideViewAlert.YELLOW, SideViewAlert.color(level, true, true));
+        }
         assertEquals(SideViewAlert.RED, SideViewAlert.color(SideViewAlert.WARNING, true, true));
     }
 
@@ -99,7 +110,8 @@ public class SideViewAlertTest {
         in.blindSpotLeft = false;
         in.doorWarningLeft = false;
         assertEquals(SideViewAlert.NONE, SideViewAlert.level(in, LaneCycle.LEFT));
-        for (int level : new int[]{SideViewAlert.NONE, SideViewAlert.CAUTION, SideViewAlert.WARNING}) {
+        for (int level : new int[]{SideViewAlert.NONE, SideViewAlert.CAUTION, SideViewAlert.CAUTION_BLINK,
+                SideViewAlert.WARNING}) {
             int color = SideViewAlert.color(level, true, true);
             int green = (color >> 8) & 0xFF;
             int red = (color >> 16) & 0xFF;

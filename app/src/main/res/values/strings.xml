@@ -466,7 +466,7 @@
     <string name="info_read_failed">无法读取</string>
     <string name="msg_rearview_on">超级镜子已开启：拖动两侧移动窗口，中间上下滑动调整取景</string>
     <string name="msg_side_view_unavailable">无法显示盲区画面</string>
-    <string name="msg_side_view_camera_in_use">无法显示盲区画面：摄像头正被车机使用。如需同时查看后座舱，请将「设置 → 超级镜子 → 切换范围」设为「后视 + 后座舱」。</string>
+    <string name="msg_side_view_camera_in_use">无法显示盲区画面：摄像头正被车机使用</string>
     <string name="msg_rearview_reset">超级镜子窗口与画面已重置</string>
     <string name="msg_floating_reset">悬浮按钮已重置</string>
     <string name="msg_adjust_opened">已打开画面调节窗口，返回主界面查看效果</string>

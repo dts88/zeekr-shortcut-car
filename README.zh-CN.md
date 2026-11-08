@@ -151,6 +151,7 @@ cd zeekr-shortcut-car && ./gradlew assembleRelease
 - **[jlunnn](https://github.com/jlunnn)**：灵动贴的「后雾灯闪烁」动作（来自他的 7X-U），以及让单元测试在 Windows 上也能通过的修正。
   也是 CarPiano 的作者。
 - **[calvinbui](https://github.com/calvinbui)**：在他的澳洲 7X 上实测空调、驾驶和安全相关的设置，并整理成文档。
+- **[lelelolo](https://github.com/lelelolo)**：盲区画面的两处改进：车机占用摄像头时不再显示黑框；后视镜上的灯亮着时，画面描一圈同色的边框。非常感谢。
 - **SW**：积极测试和反馈，非常感谢。
 
 来源、第三方组件许可与边界说明见 [NOTICE.md](NOTICE.md)，完整条款见 [LICENSE](LICENSE)。

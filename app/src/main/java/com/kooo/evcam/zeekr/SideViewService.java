@@ -719,10 +719,10 @@ public class SideViewService extends Service {
             if (visible && in != null) {
                 BlackBox.note("盲区画面" + label() + "「" + LaneCycle.labelOf(lane) + "」边框："
                         + (level == SideViewAlert.NONE ? "去掉"
-                        : level == SideViewAlert.CAUTION ? "黄（盲区指示灯亮）"
-                        : SideViewAlert.doorWarningLit(in, lane) ? "红（开门预警亮）"
-                        : "红（盲区指示灯亮、往这一侧打着转向灯）")
-                        + (level != SideViewAlert.WARNING ? ""
+                        : level == SideViewAlert.WARNING ? "红（开门预警亮）"
+                        : level == SideViewAlert.CAUTION_BLINK ? "黄（盲区指示灯亮、往这一侧打着转向灯）"
+                        : "黄（盲区指示灯亮）")
+                        + (!SideViewAlert.blinks(level, true) ? ""
                         : SideViewAlert.blinks(level, in.fade) ? "，闪" : "，不闪（装饰动效放不了）"));
             }
         }

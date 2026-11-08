@@ -179,6 +179,8 @@ EngineV1 only supplied facts (see [NOTICE.md](NOTICE.md)).
   fix that lets the unit tests pass on Windows. Also the author of CarPiano.
 - **[calvinbui](https://github.com/calvinbui)** — on-car findings from his Australian 7X: climate, driving and safety
   settings.
+- **[lelelolo](https://github.com/lelelolo)** — two Blind spot view improvements: no black window while the car is
+  using the camera, and an edge in the mirror light's colour while that light is on. Many thanks.
 - **SW** — active testing and feedback. Many thanks.
 
 Origins, third-party licences and boundaries: [NOTICE.md](NOTICE.md).
