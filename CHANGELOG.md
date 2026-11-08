@@ -9,7 +9,7 @@ commit message, not here.
 
 ## [Unreleased]
 
-Nothing yet.
+- Blind spot view: while the surround view can't give a picture (the car is using the cameras, for example its own rear-seat view, or the surround view is being recovered), it no longer shows a black window; it says once that it can't show (when the car is using the camera, it also points to Settings → Super mirror → Views → Rear + rear cabin), and appears as soon as the picture is back.
 
 ## [3.6.2-alpha] - 2026-11-08
 

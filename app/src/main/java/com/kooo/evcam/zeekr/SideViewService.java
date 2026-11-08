@@ -111,6 +111,8 @@ public class SideViewService extends Service {
     private boolean destroyed;
     /** 这一段里打灯时已经提示过一次「无法显示盲区画面」。 */
     private boolean refusalShown;
+    /** 环视出不了画面的这一阵里，打灯时已经提示过一次。环视能显示了才重新算（{@link #noteSurroundUnavailable}）。 */
+    private boolean unavailableShown;
     private Runnable watchdog;
     /** HUD 那块屏（{@link HudScreen}）：上一次问系统的时刻和结果。 */
     private long hudCheckedAt;
@@ -285,6 +287,7 @@ public class SideViewService extends Service {
         centerSecond.stop();
         hud.stop();
         refusalShown = false;
+        unavailableShown = false;
         AppLog.i(TAG, "盲区画面：停止监听");
     }
 
@@ -332,16 +335,19 @@ public class SideViewService extends Service {
         SideViewDecision.Input hudIn = input(s, r, lamps, 0);
         SideViewTrigger.Result centerResult = centerTrigger.update(now, in, dark);
         SideViewTrigger.Result hudResult = hudTrigger.update(now, hudIn, dark);
+        ChannelRules.Condition surround = surroundCondition();
         // 中控屏：两块画布左右各管一侧；第二块这一段让出来了，第一块显示优先的那一侧
         boolean pair = !centerSecond.refused;
         center.evaluate(useCenter ? centerResult : null, in,
-                pair ? new int[]{LaneCycle.LEFT} : new int[]{centerResult.lane});
-        centerSecond.evaluate(useCenter ? centerResult : null, in, new int[]{LaneCycle.RIGHT});
-        hud.evaluate(useHud ? hudResult : null, hudIn, new int[]{LaneCycle.LEFT, LaneCycle.RIGHT});
+                pair ? new int[]{LaneCycle.LEFT} : new int[]{centerResult.lane}, surround);
+        centerSecond.evaluate(useCenter ? centerResult : null, in, new int[]{LaneCycle.RIGHT}, surround);
+        hud.evaluate(useHud ? hudResult : null, hudIn, new int[]{LaneCycle.LEFT, LaneCycle.RIGHT}, surround);
         if (hud.window instanceof SideViewHudWindow) {
             ((SideViewHudWindow) hud.window).setNight(night);
         }
         noteRefusal(useCenter && centerResult.shown, useHud && hudResult.shown);
+        noteSurroundUnavailable((useCenter && centerResult.shown && !center.refused)
+                || (useHud && hudResult.shown && !hud.refused), surround);
 
         long wakeAt = centerResult.wakeAt;
         if (hudResult.wakeAt > 0 && (wakeAt == 0 || hudResult.wakeAt < wakeAt)) {
@@ -386,8 +392,33 @@ public class SideViewService extends Service {
         boolean refusedWanted = (centerWants && center.refused) || (hudWants && hud.refused);
         if (refusedWanted && !center.showing() && !centerSecond.showing() && !hud.showing() && !refusalShown) {
             refusalShown = true;
-            showRefusal();
+            showToast(R.string.msg_side_view_unavailable);
         }
+    }
+
+    /**
+     * 该显示（打了灯、后视镜上的灯亮了）、环视此刻出不了画面（{@link SideViewDecision#surroundCanShow}）：窗口不显示，说一句为什么 —— 这一阵只说一次，
+     * 环视能显示了才重新算。被别的程序拿着时说是车机在用摄像头（最常见的是车机自己的后排画面），别的情形只说显示不了。
+     */
+    private void noteSurroundUnavailable(boolean wanted, ChannelRules.Condition surround) {
+        if (SideViewDecision.surroundCanShow(surround)) {
+            unavailableShown = false;
+            return;
+        }
+        if (wanted && !unavailableShown) {
+            unavailableShown = true;
+            showToast(surround == ChannelRules.Condition.TAKEN
+                    ? R.string.msg_side_view_camera_in_use : R.string.msg_side_view_unavailable);
+        }
+    }
+
+    /** 环视那一路此刻怎样（通道调度说的）；管线还没建好、已经放了，当作在起来。 */
+    private static ChannelRules.Condition surroundCondition() {
+        MultiCameraManager manager = CameraManagerHolder.getInstance().getCameraManager();
+        if (manager == null || manager.isReleased()) {
+            return ChannelRules.Condition.BRINGING_UP;
+        }
+        return manager.channelScheduler().condition(CameraSlots.KEY_SURROUND);
     }
 
     /** HUD 那块屏，最多每 {@link #HUD_CHECK_MS} 问一次系统；找得到、找不到变了才记一行。 */
@@ -415,10 +446,10 @@ public class SideViewService extends Service {
         evaluate();
     }
 
-    private void showRefusal() {
+    private void showToast(int message) {
         try {
             android.widget.Toast.makeText(com.kooo.evcam.settings.Languages.localized(this),
-                    R.string.msg_side_view_unavailable, android.widget.Toast.LENGTH_LONG).show();
+                    message, android.widget.Toast.LENGTH_LONG).show();
         } catch (Exception e) {
             AppLog.w(TAG, "提示弹不出来: " + e);
         }
@@ -506,6 +537,8 @@ public class SideViewService extends Service {
         /** 这一次显示的时刻、第一帧来没来：黑匣子里看「打灯后多久出画面」。 */
         long shownAtMs;
         boolean firstFrameSeen;
+        /** 该显示却没显示：环视此刻出不了画面（{@link SideViewDecision#surroundCanShow}）。黑匣子只在它变的时候记一行。 */
+        boolean heldBack;
 
         Output(ChannelRules.Kind kind) {
             this.kind = kind;
@@ -540,6 +573,7 @@ public class SideViewService extends Service {
 
         /** 熄屏、服务退出：这一段结束，窗口移走（判定由服务从头来）。 */
         void stop() {
+            heldBack = false;
             if (refused) {
                 // 熄屏也是这一段的结束（同离开 D 挡 30 秒、原厂画面）：亮屏后再挂窗口时重试。服务退出也走这里，那就只是结束
                 refused = false;
@@ -552,16 +586,19 @@ public class SideViewService extends Service {
         /**
          * 照这一刻的判定做事。
          *
-         * @param result 这个出口的判定；null 是这一刻不用这个出口（显示位置不含它、找不到 HUD、只选 HUD 而 HUD 用得上）
-         * @param lanes  这个出口这一刻管哪几侧：中控屏两块各一侧（只剩第一块时是优先的那一侧），HUD 两侧
+         * @param result   这个出口的判定；null 是这一刻不用这个出口（显示位置不含它、找不到 HUD、只选 HUD 而 HUD 用得上）
+         * @param lanes    这个出口这一刻管哪几侧：中控屏两块各一侧（只剩第一块时是优先的那一侧），HUD 两侧
+         * @param surround 环视那一路此刻怎样：出不了画面时该显示也不显示（{@link SideViewDecision#surroundCanShow}）
          */
-        void evaluate(SideViewTrigger.Result result, SideViewDecision.Input in, int[] lanes) {
+        void evaluate(SideViewTrigger.Result result, SideViewDecision.Input in, int[] lanes,
+                      ChannelRules.Condition surround) {
             if (result == null) {
                 if (window != null) {
                     BlackBox.note("盲区画面" + label() + "：这一刻不用这一处，移走窗口");
                     detach();
                 }
                 refused = false;
+                heldBack = false;
                 return;
             }
             if (refused && !result.attached) {
@@ -570,11 +607,12 @@ public class SideViewService extends Service {
                 BlackBox.note("盲区画面" + label() + "：不带它的这一段结束，下一次挂窗口时重试");
             }
             if (!refused) {
-                apply(result, in, lanes);
+                apply(result, in, lanes, surround);
             }
         }
 
-        private void apply(SideViewTrigger.Result result, SideViewDecision.Input in, int[] lanes) {
+        private void apply(SideViewTrigger.Result result, SideViewDecision.Input in, int[] lanes,
+                           ChannelRules.Condition surround) {
             SideViewOutputWindow w = window;
             if (w != null && !w.isAttached()) {
                 // 窗口不是我们收的（HUD 那块屏没了，系统收掉了 Presentation）：这一段不再挂
@@ -582,6 +620,10 @@ public class SideViewService extends Service {
                 refuse();
                 return;
             }
+            // 环视出不了画面（被别的程序拿着、在救、救不回来）：该显示也不显示，只会是一块黑框；窗口照旧备着，
+            // 环视出画面了下一次读数就显示
+            boolean canShow = SideViewDecision.surroundCanShow(surround);
+            noteHeldBack(!canShow && wantsAny(result, lanes), surround);
             if (!result.attached) {
                 if (w != null) {
                     BlackBox.note("盲区画面" + label() + "：移走窗口（" + (ScreenState.dark() ? "熄屏"
@@ -596,7 +638,7 @@ public class SideViewService extends Service {
             }
             int first = SideViewDecision.NONE;
             for (int lane : lanes) {
-                if (result.side(lane).shown) {
+                if (canShow && result.side(lane).shown) {
                     first = lane;
                     break;
                 }
@@ -608,6 +650,7 @@ public class SideViewService extends Service {
                         + (firstCause == SideViewTrigger.Cause.BLIND_SPOT ? "（盲区指示灯亮）"
                         : firstCause == SideViewTrigger.Cause.DOOR_WARNING ? "（开门预警亮）" : "")
                         + "（窗口没备着，现在挂）"
+                        : heldBack ? "盲区画面" + label() + "：该显示，环视出不了画面，窗口先备着"
                         : "盲区画面" + label() + "：D 挡，窗口备着");
                 open(first != SideViewDecision.NONE ? first : lanes.length > 0 ? lanes[0] : result.lane,
                         first != SideViewDecision.NONE);
@@ -618,7 +661,7 @@ public class SideViewService extends Service {
             }
             for (int lane : lanes) {
                 SideViewTrigger.Side side = result.side(lane);
-                if (!side.shown) {
+                if (!canShow || !side.shown) {
                     continue;
                 }
                 if (!w.isShowing(lane)) {
@@ -636,9 +679,9 @@ public class SideViewService extends Service {
                     w.fadeOut(lane, side.fadeMs);
                 }
             }
-            // 不归它管了的、不再显示的那几侧收起（只剩第一块时它换到另一侧，show 已经挪过去了）
+            // 不归它管了的、不再显示的那几侧收起（只剩第一块时它换到另一侧，show 已经挪过去了）；环视出不了画面时都收起
             for (int lane : new int[]{LaneCycle.LEFT, LaneCycle.RIGHT}) {
-                if (w.isShowing(lane) && !(manages(lanes, lane) && result.side(lane).shown)) {
+                if (w.isShowing(lane) && !(canShow && manages(lanes, lane) && result.side(lane).shown)) {
                     noteIfNoFrame();
                     w.conceal(lane);
                     BlackBox.note("盲区画面" + label() + "：收起「" + LaneCycle.labelOf(lane) + "」"
@@ -650,6 +693,16 @@ public class SideViewService extends Service {
         private boolean manages(int[] lanes, int lane) {
             for (int one : lanes) {
                 if (one == lane) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /** 它管的那几侧有没有一侧该显示（不看环视）。 */
+        private boolean wantsAny(SideViewTrigger.Result result, int[] lanes) {
+            for (int lane : lanes) {
+                if (result.side(lane).shown) {
                     return true;
                 }
             }
@@ -822,6 +875,17 @@ public class SideViewService extends Service {
         private void noteShown() {
             shownAtMs = SystemClock.uptimeMillis();
             firstFrameSeen = false;
+        }
+
+        /** 打着灯却因为环视出不了画面没显示：开始、结束各记一行（读数每 200 ms 来一次，不逐次记）。 */
+        private void noteHeldBack(boolean now, ChannelRules.Condition surround) {
+            if (now == heldBack) {
+                return;
+            }
+            heldBack = now;
+            BlackBox.note(now
+                    ? "盲区画面" + label() + "：该显示，环视此刻 " + surround + "，不显示（只会是一块黑框），窗口备着"
+                    : "盲区画面" + label() + "：不再因为环视拦着（灯灭了或环视能显示了，环视此刻 " + surround + "）");
         }
 
         /** 显示过、到收起时一帧都没来：记下来，诊断报告里看得到（PR #19 的做法）。 */
