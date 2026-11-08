@@ -70,6 +70,7 @@ public final class SideViewDecision {
         /**
          * 收起前淡出（项目所有者 2026-11-04，{@link SideViewTrigger#FADE_MS}）：装饰动效此刻放不放（{@code ui.MotionPolicy}：
          * 「录制时减少动效」开着而在录、系统关了动画时不放）。不放就和以前一样，留够就收。
+         * 边框闪不闪也看它（{@link SideViewAlert}）：不放就常亮。
          */
         public boolean fade;
     }

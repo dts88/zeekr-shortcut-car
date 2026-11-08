@@ -10,6 +10,7 @@ commit message, not here.
 ## [Unreleased]
 
 - Blind spot view: while the surround view can't give a picture (the car is using the cameras, for example its own rear-seat view, or the surround view is being recovered), it no longer shows a black window; it says once that it can't show (when the car is using the camera, it also points to Settings → Super mirror → Views → Rear + rear cabin), and appears as soon as the picture is back.
+- Blind spot view: while that side's mirror light is lit, the picture gets an edge like the light: yellow while a car is in the blind spot, blinking red when you signal toward it or the door open warning is on (follows the Blind spot alert and Door open warning options).
 
 ## [3.6.2-alpha] - 2026-11-08
 
