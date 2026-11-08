@@ -3,6 +3,7 @@
  * Copyright (C) 2026 dts88
  * Portions Copyright (C) 2026 wysie - https://github.com/wysie
  * Portions Copyright (C) 2026 FerixzTanz - https://github.com/FerixzTanz
+ * Portions Copyright (C) 2026 lelelolo - https://github.com/lelelolo
  * SPDX-License-Identifier: GPL-3.0-only
  * Additional terms under GPL-3.0 section 7 apply to dts88's code; see NOTICE.md.
  */
