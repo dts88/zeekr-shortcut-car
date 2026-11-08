@@ -67,14 +67,19 @@ import java.util.TreeSet;
  *       低延迟、积极匹配、每包都报、只收传统广播。</li>
  *   <li>按名字过滤以后只有按下时才有广播，平时没有是正常的；带过滤的扫描安卓也不会因为扫得久就降级。所以扫描开着就不动（车主 2026-11-01：
  *       不反复强行启动），只在这些时候停、开：灵动贴的开关、绑定（一台都没绑时）、蓝牙开关、车机睡醒、扫描起不来、退出、连接重试（见下），
- *       还有手机跟车机的蓝牙断开（电话、音乐或整条连接；隔 {@link #RELISTEN_MS} 重开一次）。</li>
+ *       还有车机的蓝牙搜索停了以后（{@link #DISCOVERY_SETTLE_MS} 后重开一次，见下一条）。</li>
+ *   <li>车机的蓝牙搜索（经典蓝牙的搜索设备）停了（搜完了、或者被取消），已经开着的扫描在这台车上就收不到东西了（登记还在），
+ *       重新登记才好（车主 2026-11-08：车机「搜索蓝牙」页在搜时灵动贴有效，停了就失效，再搜又好）。取消时没在搜，也会走一遍「搜索结束」（安卓的做法）。
+ *       搜索停了从三处看：系统的通知（{@link #adapterState}；App Lab 里蓝牙的通知没收到过，收到也算）；每 {@link #WATCH_MS} 看一眼在不在搜，
+ *       在搜变成不搜；手机跟车机的蓝牙连上了（{@link PhoneLink#joined}）：连之前要先取消搜索（CarPlay 每次用蓝牙连 iPhone 之前都取消一次），
+ *       当时没在搜的话，App Lab 里只有这一处看得出来。</li>
  *   <li>开之前先停一次、隔 {@link #START_DELAY_MS} 再开：上一个进程开的 PendingIntent 扫描不会跟着进程停。安卓 12 一个 uid 30 秒里开扫描超过 5 次
  *       会被悄悄拒，容器里别的应用也算在这个 uid 上：{@link #STARTS_WINDOW_MS} 里最多开 {@link #MAX_STARTS} 次（{@link #startWait}）。</li>
  *   <li>没开启灵动贴（设置里的开关）、没有绑定的也没在绑定、用户退出了：不扫（车主 2026-11-04：Lab 同时开着时，Lab 好用蓝牙做测试）。
  *       退出时当场停（{@link #userExits}），不然进程没了系统还接着扫，又把应用叫起来。</li>
  *   <li>车机要睡时和相机一样放开，扫描、连接都停（{@link #headUnitSleeps}）。醒来等 {@link #SETTLE_MS}，向系统重新要蓝牙服务（{@link StaleGatt}），
  *       再开始扫描（{@link #headUnitWoke}，车主 2026-11-01）。蓝牙跟着点火走，开关的广播车上没收到过：扫描开着时每 {@link #WATCH_MS} 看一眼蓝牙开着没有、
- *       手机跟车机的蓝牙连着没有（{@link PhoneLink}，变了记一笔）；
+ *       在不在搜索、手机跟车机的蓝牙连着没有（{@link PhoneLink}，变了记一笔）；
  *       蓝牙没开、扫描起不来的，隔 {@link #RETRY_MS} 再试，一阵里第一次起不来把现场记进黑匣子（{@link ScanProbe}）。</li>
  * </ul>
  *
@@ -116,8 +121,8 @@ public final class SmartButtons {
     static final long SETTLE_MS = 10_000L;
     /** 在扫的时候多久看一眼蓝牙开着没有。 */
     static final long WATCH_MS = 2_000L;
-    /** 手机跟车机的蓝牙断开以后隔这么久重开一次扫描。 */
-    static final long RELISTEN_MS = 3_000L;
+    /** 车机的蓝牙搜索停了以后隔这么久重开一次扫描（{@link #discoveryStopped}）。 */
+    static final long DISCOVERY_SETTLE_MS = 200L;
     /** {@code BluetoothProfile.HEADSET_CLIENT}、{@code A2DP_SINK}（系统 API，公开 SDK 里没有）：车机这一端的蓝牙电话、音乐。 */
     private static final int PROFILE_HEADSET_CLIENT = 16;
     private static final int PROFILE_A2DP_SINK = 11;
@@ -280,6 +285,8 @@ public final class SmartButtons {
     private boolean gattStale;
     /** 上次看到的手机跟车机的蓝牙（{@link #readPhoneLink}）；null = 不知道。 */
     private PhoneLink phoneSeen;
+    /** 上次看到车机在不在搜索蓝牙（{@link #watchBluetooth}、{@link #adapterState}）。 */
+    private boolean discoveringSeen;
     /** 正在连的、连着的那一台；同时只有一台。 */
     private ButtonLink link;
     /** 绑定到这一刻为止（{@link SystemClock#elapsedRealtime}）。 */
@@ -366,6 +373,8 @@ public final class SmartButtons {
 
     private void start() {
         IntentFilter filter = new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED);
+        filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_STARTED);
+        filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             app.registerReceiver(adapterState, filter, Context.RECEIVER_NOT_EXPORTED);
         } else {
@@ -455,14 +464,10 @@ public final class SmartButtons {
             this.devices = devices == null ? null : Collections.unmodifiableSet(new TreeSet<>(devices));
         }
 
-        /** 有没有断开（纯逻辑）：上次连着的电话、音乐或设备，这次没连着；哪一次读不到都不算。 */
-        static boolean dropped(PhoneLink before, PhoneLink now) {
-            if (before == null || now == null) {
-                return false;
-            }
-            boolean profileLost = before.profiles > 0 && now.profiles >= 0 && (before.profiles & ~now.profiles) != 0;
-            boolean deviceLost = before.devices != null && now.devices != null && !now.devices.containsAll(before.devices);
-            return profileLost || deviceLost;
+        /** 有没有设备连上（纯逻辑）：这次连着的设备里有上次没连着的；哪一次读不到都不算。 */
+        static boolean joined(PhoneLink before, PhoneLink now) {
+            return before != null && now != null && before.devices != null && now.devices != null
+                    && !before.devices.containsAll(now.devices);
         }
 
         /** 记黑匣子用：「calls+audio, connected 44:55」；哪样都没有是 none，读不到是 ?。地址只记后两段。 */
@@ -874,6 +879,7 @@ public final class SmartButtons {
         }
         scanning = true;
         phoneSeen = readPhoneLink();
+        discoveringSeen = discovering();
         if (failures > 0) {
             BlackBox.note("灵动贴：扫描开起来了（之前起不来 " + failures + " 次）");
             failures = 0;
@@ -947,19 +953,42 @@ public final class SmartButtons {
         }
         PhoneLink phone = readPhoneLink();
         if (!phone.equals(phoneSeen)) {
-            boolean dropped = PhoneLink.dropped(phoneSeen, phone);
+            boolean joined = PhoneLink.joined(phoneSeen, phone);
             BlackBox.note("灵动贴：手机蓝牙 " + (phoneSeen == null ? "?" : phoneSeen.words()) + " → " + phone.words()
-                    + (dropped ? "；断开了，" + RELISTEN_MS / 1000 + " 秒后重开扫描" : ""));
-            if (dropped) {
-                bt.removeCallbacks(relisten);
-                bt.postDelayed(relisten, RELISTEN_MS);
-            }
+                    + (joined ? "；连上了（连之前会取消蓝牙搜索），" + DISCOVERY_SETTLE_MS + " 毫秒后重开扫描" : ""));
             phoneSeen = phone;
+            if (joined) {
+                discoveryStopped();
+            }
+        }
+        boolean searching = discovering();
+        if (searching != discoveringSeen) {
+            discoveringSeen = searching;
+            BlackBox.note(searching ? "灵动贴：车机开始搜索蓝牙"
+                    : "灵动贴：车机的蓝牙搜索停了，" + DISCOVERY_SETTLE_MS + " 毫秒后重开扫描");
+            if (!searching) {
+                discoveryStopped();
+            }
         }
         bt.postDelayed(watch, WATCH_MS);
     }
 
-    /** 手机跟车机的蓝牙断开以后重开一次扫描（{@link #watchBluetooth}）：这时还在扫才重开。 */
+    /** 车机的蓝牙搜索停了（{@link #watchBluetooth}、{@link #adapterState}）：隔 {@link #DISCOVERY_SETTLE_MS} 重开一次扫描。 */
+    private void discoveryStopped() {
+        bt.removeCallbacks(relisten);
+        bt.postDelayed(relisten, DISCOVERY_SETTLE_MS);
+    }
+
+    /** 车机在不在搜索蓝牙（哪个线程都行）；读不到算不在搜。 */
+    public boolean discovering() {
+        try {
+            return adapter != null && adapter.isDiscovering();
+        } catch (RuntimeException e) {
+            return false;
+        }
+    }
+
+    /** 搜索停了以后重开一次扫描（{@link #discoveryStopped}）：这时还在扫才重开。 */
     private final Runnable relisten = () -> {
         if (scanning) {
             stopScan();
@@ -1509,10 +1538,27 @@ public final class SmartButtons {
         return true;
     }
 
-    /** 蓝牙开关：开了接着听，关了先停（正在连的也收尾）。 */
+    /** 蓝牙开关：开了接着听，关了先停（正在连的也收尾）。车机的蓝牙搜索开始、停了（停了在扫的话重开一次，{@link #discoveryStopped}）。 */
     private final BroadcastReceiver adapterState = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+            if (BluetoothAdapter.ACTION_DISCOVERY_STARTED.equals(action)
+                    || BluetoothAdapter.ACTION_DISCOVERY_FINISHED.equals(action)) {
+                boolean searching = BluetoothAdapter.ACTION_DISCOVERY_STARTED.equals(action);
+                bt.post(() -> {
+                    if (!scanning) {
+                        return;
+                    }
+                    discoveringSeen = searching;
+                    BlackBox.note(searching ? "灵动贴：车机开始搜索蓝牙（系统通知）"
+                            : "灵动贴：车机的蓝牙搜索停了（系统通知），" + DISCOVERY_SETTLE_MS + " 毫秒后重开扫描");
+                    if (!searching) {
+                        discoveryStopped();
+                    }
+                });
+                return;
+            }
             int now = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, -1);
             bt.post(() -> {
                 if (!bound.isEmpty()) {
