@@ -573,15 +573,7 @@
 - 2026-11-08 批准（lelelolo 的 PR #173：盲区画面该显示、环视被车机占用时提示一次；项目所有者只留前半句）：
   msg_side_view_camera_in_use「无法显示盲区画面：摄像头正被车机使用」/ Can't show Blind spot view: the car is using the camera /
   Tidak dapat memaparkan Paparan titik buta: kamera sedang digunakan oleh kereta（一句话，按 §3 不带句号）。
-- vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
-- 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
-
-### 待项目所有者确认
-
-下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
-可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
-
-- 2026-11-09 起草（盲区画面的情境：三档和中文名字是项目所有者 2026-11-09 定的，取代「盲区画面」那一行的两个附加项）：
+- 2026-11-09 批准（盲区画面的情境：三档和中文名字是项目所有者 2026-11-09 定的，取代「盲区画面」那一行的两个附加项）：
   - 三选一的名字 opt_side_view_mode_full / _standard / _minimal「丰富」「标准」「简洁」/ Full、Standard、Minimal /
     Penuh、Piawai、Minimum。
   - 下面一行小字（照选中的那一档换）：set_side_view_mode_full_note「打转向灯，或盲区指示灯、开门预警亮起时显示该侧画面」/
@@ -606,6 +598,15 @@
     tidak dipaparkan pada skrin tengah di bawah kelajuan ini (tidak terpakai apabila lampu titik buta sebelah itu menyala, atau
     pada HUD); 0 bermaksud tiada had」。
   - 不用了、已删：set_side_view_blind_spot_chip「盲区提醒」、set_side_view_door_warning_chip「开门预警」、set_side_view_lamps_note。
+- vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
+- 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
+
+### 待项目所有者确认
+
+下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
+可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
+
+- （现在没有。）
 
 ---
 
@@ -634,7 +635,7 @@
 | 盲区画面 | 盲区画面（按情境在中控屏或 HUD 上该侧显示侧方摄像头画面的窗口，设置在「超级镜子」分区里；显示位置：中控屏 / HUD / 中控屏和 HUD） | Blind spot view（句中也大写 B） | Paparan titik buta | 2026-10-17 项目所有者批准；不用「盲区辅助」（原厂功能的名字）、「侧视弹窗」 |
 | 转向灯 | 转向灯；打转向灯 | turn signal | lampu isyarat | 双闪见「闪远光 / 双闪」 |
 | 盲区指示灯 / 开门预警 | 盲区指示灯（后视镜上那盏灯，开车时旁边有车亮）；开门预警（停车后亮，后视镜上同一盏灯） | blind spot light；door open warning | lampu titik buta；amaran buka pintu | 2026-11-03 加，项目所有者批准；2026-11-04 加的附加项名「盲区提醒」2026-11-09 随附加项去掉；「后视镜」指车外两侧的，英文 side mirror / 马来文 cermin sisi |
-| 情境（盲区画面） | 情境：丰富、标准、简洁（盲区画面那一行的三选一：什么情形显示画面，一档包含下一档） | mode：Full、Standard、Minimal | mod：Penuh、Piawai、Minimum | 2026-11-09 加，中文名字是项目所有者定的；英文、马来文待批 |
+| 情境（盲区画面） | 情境：丰富、标准、简洁（盲区画面那一行的三选一：什么情形显示画面，一档包含下一档） | mode：Full、Standard、Minimal | mod：Penuh、Piawai、Minimum | 2026-11-09 加，中文名字是项目所有者定的，2026-11-09 项目所有者批准 |
 | 方向标签 | 方向标签（超级镜子窗口左上角那块写着前、后、左、右的标签） | Direction label | Label arah | 2.12 加；标签上的字用「前 / 后 / 左 / 右」（zeekr_lane_*），后座舱写「后座舱」（slot_cabin_rear） |
 | 切换范围 | 切换范围（超级镜子在哪几路之间切）：四向、前后、后视 + 后座舱 | Views：All four、Front and rear、Rear + rear cabin | Paparan：Empat arah、Depan dan belakang、Belakang + kabin belakang | 2026-10-19 加，取代「只显示前后视」 |
 | 悬浮按钮 | 悬浮按钮；按钮大小、按钮透明度、时长文字大小 | floating button；Button opacity | butang terapung；Kelegapan butang | 「悬浮窗」只用于系统权限名「悬浮窗权限」（Overlay / Paparan di atas apl lain） |
