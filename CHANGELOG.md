@@ -9,7 +9,8 @@ commit message, not here.
 
 ## [Unreleased]
 
-Nothing yet.
+- Other apps can no longer start or stop recording, or make the floating button redraw, through the app's broadcasts.
+- Keep-alive: dropped the broadcast triggers Android never delivers to the app, and an unused network permission.
 
 ## [3.8.0-alpha] - 2026-11-09
 

@@ -154,11 +154,6 @@ public class MainActivity extends AppCompatActivity {
     private static final long RECORDING_ERROR_TOAST_INTERVAL = 20000;  // 最小显示间隔（20秒）
     private boolean shouldMoveToBackgroundOnReady = false;  // 开机自启动后，窗口准备好时移到后台
 
-    // 摄像头重连防抖相关
-    
-    // 悬浮按钮发来的广播
-    private android.content.BroadcastReceiver toggleRecordingReceiver;  // 录制切换广播接收器（来自悬浮窗）
-
     // 熄屏：屏幕状态只有 ScreenState 一份（熄屏广播 + 黑着时每 2 秒问系统一次代替亮屏广播）。
     // 唤醒锁、录像照熄屏那张表停不停 / 亮屏接回、「车机要睡」、亮屏把退下去的界面接回来，
     // 都在它那里按固定顺序做完；相机由通道调度照登记表关（熄屏时预览不算有人要）。主界面只剩界面自己的事 —— 熄屏 15 秒退后台
@@ -358,7 +353,6 @@ public class MainActivity extends AppCompatActivity {
         com.kooo.evcam.camera.CameraManagerHolder.getInstance().addReplacedListener(pipelineReplaced);
         // 生效的几路变了（离车时去掉了前座舱）：照存下的配置重新摆（见 lanesChanged），onDestroy 摘掉
         com.kooo.evcam.camera.CameraManagerHolder.getInstance().addLanesListener(lanesChanged);
-        initToggleRecordingReceiver();
     }
 
     @Override
@@ -2190,29 +2184,20 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-     * 初始化录制切换广播接收器
-     * 用于接收录制悬浮按钮的录制切换指令
+     * 悬浮按钮、灵动贴在主界面在前时切换录制（{@code overlay.QuickActions}）：和点主界面的录制键一样，在主线程上做。
+     * 进程内直接叫，不走广播 —— 安卓 12 上动态登记的广播别的应用也能发，以前谁都能借它开关录制
+     * （2026-11-10，平台笔记 §3.7）。
+     *
+     * @return 主界面在，交给它了；不在（刚关掉）返回 false，调用方照主界面不在前处理
      */
-    private void initToggleRecordingReceiver() {
-        toggleRecordingReceiver = new android.content.BroadcastReceiver() {
-            @Override
-            public void onReceive(android.content.Context context, android.content.Intent intent) {
-                String action = intent.getAction();
-                if ("com.kooo.evcam.action.TOGGLE_RECORDING".equals(action)) {
-                    AppLog.d(TAG, "收到录制切换广播（来自悬浮按钮）");
-                    // 在主线程执行录制切换
-                    runOnUiThread(() -> {
-                        toggleRecording();
-                    });
-                }
-            }
-        };
-        
-        android.content.IntentFilter filter = new android.content.IntentFilter();
-        filter.addAction("com.kooo.evcam.action.TOGGLE_RECORDING");
-        registerReceiver(toggleRecordingReceiver, filter, android.content.Context.RECEIVER_NOT_EXPORTED);
-        
-        AppLog.d(TAG, "录制切换广播接收器已注册");
+    public static boolean toggleRecordingIfOpen() {
+        MainActivity activity = instance;
+        if (activity == null || activity.isFinishing() || activity.isDestroyed()) {
+            return false;
+        }
+        AppLog.d(TAG, "录制切换（悬浮按钮 / 灵动贴，主界面在前）");
+        activity.runOnUiThread(activity::toggleRecording);
+        return true;
     }
     
     
@@ -2705,15 +2690,6 @@ public class MainActivity extends AppCompatActivity {
         // 相机管家是进程级的，录像和它的等待都不随这个界面走；只把画面反馈摘掉
         keeper.removeListener(recordingListener);
 
-        // 清理录制切换广播接收器
-        if (toggleRecordingReceiver != null) {
-            try {
-                unregisterReceiver(toggleRecordingReceiver);
-            } catch (Exception e) {
-                AppLog.w(TAG, "注销录制切换广播接收器时出错: " + e.getMessage());
-            }
-            toggleRecordingReceiver = null;
-        }
         // 熄屏退后台的那一步：界面都没了，不用退
         com.kooo.evcam.screen.ScreenState.removeListener(screenListener);
         com.kooo.evcam.camera.CameraManagerHolder.getInstance().removeReplacedListener(pipelineReplaced);
