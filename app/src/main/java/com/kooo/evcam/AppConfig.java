@@ -97,9 +97,10 @@ public class AppConfig {
     private static final String KEY_SIDE_VIEW_BACK = "side_view_back";            // 朝车尾转的角度（开发者选项）
     private static final String KEY_SIDE_VIEW_UP = "side_view_up";                // 朝车外转的角度（开发者选项）
     private static final String KEY_SIDE_VIEW_FOV = "side_view_fov";              // 横向视野（开发者选项）
-    // 后视镜上的灯亮了也显示（2026-11-03）：盲区指示灯、停车后的开门预警，各自开关
-    private static final String KEY_SIDE_VIEW_BLIND_SPOT = "side_view_blind_spot";
-    private static final String KEY_SIDE_VIEW_DOOR_WARNING = "side_view_door_warning";
+    // 情境（2026-11-09，SettingsRegistry.SIDE_VIEW_MODE）取代的两个附加项「盲区提醒」「开门预警」（2026-11-03 起）：
+    // 只在 migrateSideViewAddOnsOnce 里读一次、删掉
+    private static final String KEY_SIDE_VIEW_BLIND_SPOT_OLD = "side_view_blind_spot";
+    private static final String KEY_SIDE_VIEW_DOOR_WARNING_OLD = "side_view_door_warning";
     // 中控屏上画面的位置和大小（2026-11-03，zeekr.SideViewPlacement.Spec，千分比）：高、离边、上边
     private static final String KEY_SIDE_VIEW_PLACE_HEIGHT = "side_view_place_height";
     private static final String KEY_SIDE_VIEW_PLACE_EDGE = "side_view_place_edge";
@@ -840,6 +841,27 @@ public class AppConfig {
             repairEnum(spec);
         }
         resetPhotoViaJpegOnce();
+        migrateSideViewAddOnsOnce();
+    }
+
+    /**
+     * 盲区画面的两个附加项「盲区提醒」「开门预警」2026-11-09 换成情境（项目所有者）：勾过「盲区提醒」的用丰富，别的用标准
+     * （{@code zeekr.SideViewDecision.Mode#fromAddOns}）；情境已经存过的不动。旧的两个键读完就删，所以只做一次。
+     */
+    private void migrateSideViewAddOnsOnce() {
+        if (!prefs.contains(KEY_SIDE_VIEW_BLIND_SPOT_OLD) && !prefs.contains(KEY_SIDE_VIEW_DOOR_WARNING_OLD)) {
+            return;
+        }
+        boolean blindSpot = prefs.getBoolean(KEY_SIDE_VIEW_BLIND_SPOT_OLD, false);
+        SharedPreferences.Editor editor = prefs.edit()
+                .remove(KEY_SIDE_VIEW_BLIND_SPOT_OLD)
+                .remove(KEY_SIDE_VIEW_DOOR_WARNING_OLD);
+        if (!prefs.contains(SettingsRegistry.SIDE_VIEW_MODE.key)) {
+            String mode = com.kooo.evcam.zeekr.SideViewDecision.Mode.fromAddOns(blindSpot).value;
+            editor.putString(SettingsRegistry.SIDE_VIEW_MODE.key, mode);
+            AppLog.i(TAG, "盲区画面：两个附加项换成情境 " + mode + "（盲区提醒" + (blindSpot ? "开" : "关") + "）");
+        }
+        editor.apply();
     }
 
     /** 做过一次「拍照使用 JPEG 输出改回开」的记号（2.10.12）。 */
@@ -1466,22 +1488,23 @@ public class AppConfig {
                 Math.round(com.kooo.evcam.zeekr.SideViewProjection.MAX_FOV_DEGREES))).apply();
     }
 
-    /** 后视镜上的盲区指示灯亮了也显示那一侧，不用打转向灯、不看最低车速（项目所有者 2026-11-03）。默认关。 */
-    public boolean isSideViewBlindSpotEnabled() {
-        return prefs.getBoolean(KEY_SIDE_VIEW_BLIND_SPOT, false);
+    /** 情境：丰富（{@link SettingsRegistry#SIDE_VIEW_MODE}，{@code zeekr.SideViewDecision.Mode}）。 */
+    public static final String SIDE_VIEW_MODE_FULL = "full";
+    /** 情境：标准（默认）。 */
+    public static final String SIDE_VIEW_MODE_STANDARD = "standard";
+    /** 情境：简洁。 */
+    public static final String SIDE_VIEW_MODE_MINIMAL = "minimal";
+
+    /**
+     * 盲区画面的情境（项目所有者 2026-11-09）：哪几种情形显示画面，{@link #SIDE_VIEW_MODE_FULL} / {@link #SIDE_VIEW_MODE_STANDARD} /
+     * {@link #SIDE_VIEW_MODE_MINIMAL}；默认标准。
+     */
+    public String getSideViewMode() {
+        return readEnum(SettingsRegistry.SIDE_VIEW_MODE);
     }
 
-    public void setSideViewBlindSpotEnabled(boolean enabled) {
-        prefs.edit().putBoolean(KEY_SIDE_VIEW_BLIND_SPOT, enabled).apply();
-    }
-
-    /** 停车后开门预警亮了也显示那一侧（项目所有者 2026-11-03）。默认关。 */
-    public boolean isSideViewDoorWarningEnabled() {
-        return prefs.getBoolean(KEY_SIDE_VIEW_DOOR_WARNING, false);
-    }
-
-    public void setSideViewDoorWarningEnabled(boolean enabled) {
-        prefs.edit().putBoolean(KEY_SIDE_VIEW_DOOR_WARNING, enabled).apply();
+    public void setSideViewMode(String mode) {
+        writeEnum(SettingsRegistry.SIDE_VIEW_MODE, mode);
     }
 
     /**

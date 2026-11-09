@@ -197,8 +197,8 @@ public class SideViewHudWindow extends ViewGroup implements SideViewOutputWindow
     }
 
     @Override
-    public void setAlert(int side, int level, boolean motion) {
-        if (edge.set(side, level, motion) && isShowing(side)) {
+    public void setAlert(int side, int level) {
+        if (edge.set(side, level) && isShowing(side)) {
             invalidate();
         }
     }

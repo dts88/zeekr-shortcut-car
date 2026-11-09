@@ -71,9 +71,9 @@ interface SideViewOutputWindow {
 
     /**
      * {@code side} 那一侧画面的边框（{@link SideViewAlert}：后视镜上的灯亮着时描边）：服务每次判定都给一次，变了才重画；
-     * 只在那一侧显示着时画出来。{@code motion}：装饰动效此刻放不放，放不了就不闪。
+     * 只在那一侧显示着时画出来。
      */
-    void setAlert(int side, int level, boolean motion);
+    void setAlert(int side, int level);
 
     /** 黑匣子、卡顿报告里的一行：窗口此刻的样子（记号，不是给人读的句子）。 */
     String describe();

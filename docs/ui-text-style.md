@@ -581,7 +581,31 @@
 下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
 可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
 
-- （现在没有。）
+- 2026-11-09 起草（盲区画面的情境：三档和中文名字是项目所有者 2026-11-09 定的，取代「盲区画面」那一行的两个附加项）：
+  - 三选一的名字 opt_side_view_mode_full / _standard / _minimal「丰富」「标准」「简洁」/ Full、Standard、Minimal /
+    Penuh、Piawai、Minimum。
+  - 下面一行小字（照选中的那一档换）：set_side_view_mode_full_note「打转向灯，或盲区指示灯、开门预警亮起时显示该侧画面」/
+    「Shows that side when the turn signal is on, or when the blind spot light or door open warning comes on」/
+    「Memaparkan sebelah itu apabila lampu isyarat menyala, atau apabila lampu titik buta atau amaran buka pintu menyala」；
+    set_side_view_mode_standard_note「打转向灯，或开门预警亮起时显示该侧画面」/「Shows that side when the turn signal is on,
+    or when the door open warning comes on」/「Memaparkan sebelah itu apabila lampu isyarat menyala, atau apabila amaran buka
+    pintu menyala」；set_side_view_mode_minimal_note「往盲区指示灯亮着的一侧打转向灯，或开门预警亮起时显示该侧画面」/
+    「Shows that side when signalling toward a side whose blind spot light is on, or when the door open warning comes on」/
+    「Memaparkan sebelah itu apabila memberi isyarat ke sebelah yang lampu titik butanya menyala, atau apabila amaran buka pintu
+    menyala」。
+  - 改 2026-11-05 批的 set_side_view_summary（「打转向灯时」不再都对）：「按所选情境在屏幕该侧显示侧方摄像头画面，
+    转向灯或后视镜上的灯熄灭 1 秒后开始淡出，再过 1 秒完全消失；倒挡或原厂画面显示时不显示。挂 D 挡时环视保持开启。」/
+    「Shows the side camera on that side of the screen, depending on the chosen mode; 1 second after the turn signal or side
+    mirror light goes off it starts to fade out and is gone 1 second later; not shown in reverse or while a factory view is on
+    screen. Surround view stays on in D.」/「Memaparkan kamera sisi di sebelah skrin itu mengikut mod yang dipilih; 1 saat
+    selepas lampu isyarat atau lampu cermin sisi padam ia mula pudar dan hilang sepenuhnya 1 saat kemudian; tidak dipaparkan
+    dalam gear undur atau semasa paparan kilang dipaparkan. Paparan sekeliling kekal hidup dalam gear D.」
+  - 改 set_side_view_min_speed_summary（盲区指示灯亮时不看车速）：「打转向灯时，低于此车速中控屏上不显示，
+    该侧盲区指示灯亮时和 HUD 不受此限；0 为不限」/「When the turn signal is on, not shown on the center screen below this speed
+    (doesn't apply when that side's blind spot light is on, or on the HUD); 0 means no limit」/「Apabila lampu isyarat menyala,
+    tidak dipaparkan pada skrin tengah di bawah kelajuan ini (tidak terpakai apabila lampu titik buta sebelah itu menyala, atau
+    pada HUD); 0 bermaksud tiada had」。
+  - 不用了、已删：set_side_view_blind_spot_chip「盲区提醒」、set_side_view_door_warning_chip「开门预警」、set_side_view_lamps_note。
 
 ---
 
@@ -607,9 +631,10 @@
 | 路 / 画面 | 量词「路」（4 路、录制 3 路）；指某一路用「该路」「此路画面」；看到的内容叫「画面」 | camera；view | kamera；paparan | 不用「那一路」「换一路」；英文、马来文不用 lane / lorong（lorong 只指车道） |
 | 视频流配置 | 视频流配置；入口「编辑视频流配置」；预设：极氪7X（环视）、极氪7X（环视 + 后座舱） | Stream profile；Edit stream profile；Zeekr 7X (surround)、Zeekr 7X (surround + rear cabin) | Profil strim；Edit profil strim；Zeekr 7X (sekeliling)、Zeekr 7X (sekeliling + kabin belakang) | 同一预设在设置列表和状态条上同名；2.20 之前叫「极氪7X（环视 + 前后座舱）」 |
 | 超级镜子 | 超级镜子（2.12 起，原「超级后视镜」）；其窗口在本分区内称「窗口」 | Super mirror（句中也大写 S） | Cermin super | 「电子后视镜」只作解释；贴边标签三种语言都写 Super mirror |
-| 盲区画面 | 盲区画面（打转向灯时在中控屏或 HUD 上该侧显示侧方摄像头画面的窗口，设置在「超级镜子」分区里；显示位置：中控屏 / HUD / 中控屏和 HUD） | Blind spot view（句中也大写 B） | Paparan titik buta | 2026-10-17 项目所有者批准；不用「盲区辅助」（原厂功能的名字）、「侧视弹窗」 |
+| 盲区画面 | 盲区画面（按情境在中控屏或 HUD 上该侧显示侧方摄像头画面的窗口，设置在「超级镜子」分区里；显示位置：中控屏 / HUD / 中控屏和 HUD） | Blind spot view（句中也大写 B） | Paparan titik buta | 2026-10-17 项目所有者批准；不用「盲区辅助」（原厂功能的名字）、「侧视弹窗」 |
 | 转向灯 | 转向灯；打转向灯 | turn signal | lampu isyarat | 双闪见「闪远光 / 双闪」 |
-| 盲区指示灯 / 开门预警 | 盲区指示灯（后视镜上那盏灯，开车时旁边有车亮）；开门预警（停车后亮，后视镜上同一盏灯）；盲区提醒（盲区画面那一行的附加项名，指盲区指示灯亮） | blind spot light；door open warning；Blind spot alert | lampu titik buta；amaran buka pintu；Amaran titik buta | 2026-11-03 加，项目所有者批准；2026-11-04 加「盲区提醒」（项目所有者定的附加项名）；「后视镜」指车外两侧的，英文 side mirror / 马来文 cermin sisi |
+| 盲区指示灯 / 开门预警 | 盲区指示灯（后视镜上那盏灯，开车时旁边有车亮）；开门预警（停车后亮，后视镜上同一盏灯） | blind spot light；door open warning | lampu titik buta；amaran buka pintu | 2026-11-03 加，项目所有者批准；2026-11-04 加的附加项名「盲区提醒」2026-11-09 随附加项去掉；「后视镜」指车外两侧的，英文 side mirror / 马来文 cermin sisi |
+| 情境（盲区画面） | 情境：丰富、标准、简洁（盲区画面那一行的三选一：什么情形显示画面，一档包含下一档） | mode：Full、Standard、Minimal | mod：Penuh、Piawai、Minimum | 2026-11-09 加，中文名字是项目所有者定的；英文、马来文待批 |
 | 方向标签 | 方向标签（超级镜子窗口左上角那块写着前、后、左、右的标签） | Direction label | Label arah | 2.12 加；标签上的字用「前 / 后 / 左 / 右」（zeekr_lane_*），后座舱写「后座舱」（slot_cabin_rear） |
 | 切换范围 | 切换范围（超级镜子在哪几路之间切）：四向、前后、后视 + 后座舱 | Views：All four、Front and rear、Rear + rear cabin | Paparan：Empat arah、Depan dan belakang、Belakang + kabin belakang | 2026-10-19 加，取代「只显示前后视」 |
 | 悬浮按钮 | 悬浮按钮；按钮大小、按钮透明度、时长文字大小 | floating button；Button opacity | butang terapung；Kelegapan butang | 「悬浮窗」只用于系统权限名「悬浮窗权限」（Overlay / Paparan di atas apl lain） |

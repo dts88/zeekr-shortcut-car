@@ -188,6 +188,7 @@ public class SettingSpecTest {
         assertEquals("car_model", SettingsRegistry.CAR_MODEL.key);
         assertEquals("language", SettingsRegistry.LANGUAGE.key);
         assertEquals("action_rail_side", SettingsRegistry.ACTION_RAIL_SIDE.key);
+        assertEquals("side_view_mode", SettingsRegistry.SIDE_VIEW_MODE.key);
     }
 
     /** 默认值同样钉住：它决定全新安装后的行为。 */
@@ -198,6 +199,8 @@ public class SettingSpecTest {
         assertEquals("auto", SettingsRegistry.LANGUAGE.defaultValue);
         // 右侧是升级前唯一的摆法，老用户升级后界面不能自己换边
         assertEquals("right", SettingsRegistry.ACTION_RAIL_SIDE.defaultValue);
+        // 盲区画面的情境：新装是标准（项目所有者 2026-11-09）
+        assertEquals("standard", SettingsRegistry.SIDE_VIEW_MODE.defaultValue);
     }
 
     /**

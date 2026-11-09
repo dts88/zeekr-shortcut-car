@@ -178,8 +178,8 @@ public class SideViewWindow extends ViewGroup implements SideViewOutputWindow {
 
     /** 两侧各记一级（这个窗口换侧时跟着换），画的是此刻显示的那一侧的。 */
     @Override
-    public void setAlert(int side, int level, boolean motion) {
-        if (edge.set(side, level, motion) && attached && shown && lane == side) {
+    public void setAlert(int side, int level) {
+        if (edge.set(side, level) && attached && shown && lane == side) {
             invalidate();
         }
     }

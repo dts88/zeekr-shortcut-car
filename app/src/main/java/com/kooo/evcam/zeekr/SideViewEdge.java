@@ -22,7 +22,6 @@ final class SideViewEdge {
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private int left = SideViewAlert.NONE;
     private int right = SideViewAlert.NONE;
-    private boolean motion = true;
     /** 闪的亮那一半。 */
     private boolean bright = true;
 
@@ -35,9 +34,9 @@ final class SideViewEdge {
      *
      * @return 变了（要重画）
      */
-    boolean set(int side, int level, boolean motion) {
+    boolean set(int side, int level) {
         int before = level(side);
-        if (before == level && this.motion == motion) {
+        if (before == level) {
             return false;
         }
         if (side == LaneCycle.LEFT) {
@@ -45,8 +44,7 @@ final class SideViewEdge {
         } else {
             right = level;
         }
-        this.motion = motion;
-        if (SideViewAlert.blinks(level, motion) && !SideViewAlert.blinks(before, motion)) {
+        if (SideViewAlert.blinks(level) && !SideViewAlert.blinks(before)) {
             // 刚开始闪：先亮
             bright = true;
         }
@@ -63,8 +61,8 @@ final class SideViewEdge {
      * @return 要重画
      */
     boolean tick(boolean leftShown, boolean rightShown) {
-        boolean blinking = leftShown && SideViewAlert.blinks(left, motion)
-                || rightShown && SideViewAlert.blinks(right, motion);
+        boolean blinking = leftShown && SideViewAlert.blinks(left)
+                || rightShown && SideViewAlert.blinks(right);
         if (!blinking) {
             bright = true;
             return false;
@@ -75,7 +73,7 @@ final class SideViewEdge {
 
     /** 画在 (0, 0)–(width, height) 这一块的四周，线整个在里面；这一侧不描边就什么都不画。 */
     void draw(Canvas canvas, int side, float width, float height, float strokePx) {
-        int color = SideViewAlert.color(level(side), motion, bright);
+        int color = SideViewAlert.color(level(side), bright);
         if (color == 0 || width <= strokePx || height <= strokePx) {
             return;
         }
@@ -91,6 +89,6 @@ final class SideViewEdge {
         if (level == SideViewAlert.NONE) {
             return "none";
         }
-        return (level == SideViewAlert.WARNING ? "red" : "yellow") + (SideViewAlert.blinks(level, motion) ? "+blink" : "");
+        return (level == SideViewAlert.WARNING ? "red" : "yellow") + (SideViewAlert.blinks(level) ? "+blink" : "");
     }
 }
