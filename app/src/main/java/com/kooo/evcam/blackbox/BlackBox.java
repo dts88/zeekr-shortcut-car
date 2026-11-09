@@ -124,7 +124,7 @@ public final class BlackBox {
      * 重复调用无害，只有第一次算数。</p>
      *
      * @param starter 谁在调用，例如 {@code "ContentProvider"}、{@code "Service:CameraForegroundService"}、
-     *                {@code "Receiver:android.intent.action.SCREEN_ON"}
+     *                {@code "Receiver:android.bluetooth.device.action.ACL_CONNECTED"}
      */
     public static void attach(Context context, String starter) {
         if (context == null) {

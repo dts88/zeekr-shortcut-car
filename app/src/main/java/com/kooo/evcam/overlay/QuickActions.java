@@ -108,11 +108,12 @@ public final class QuickActions {
         AppLog.d(TAG, "toggleRecording (" + why + "), app state: " + appState);
         switch (appState) {
             case FOREGROUND:
-                // 主界面在前：交给主界面，和点它的录制键一样
-                Intent toggle = new Intent("com.kooo.evcam.action.TOGGLE_RECORDING");
-                toggle.setPackage(context.getPackageName());
-                context.sendBroadcast(toggle);
-                return;
+                // 主界面在前：交给主界面，和点它的录制键一样。进程内直接叫，不走广播（2026-11-10，平台笔记 §3.7）；
+                // 主界面刚好在这一刻没了的，照不在前处理
+                if (MainActivity.toggleRecordingIfOpen()) {
+                    return;
+                }
+                // 往下走
             case BACKGROUND:
                 try {
                     context.startService(new Intent(context, CameraRecordingService.class));

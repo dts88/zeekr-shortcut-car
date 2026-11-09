@@ -24,7 +24,6 @@ import com.kooo.evcam.camera.ChannelRules.RecordPhase;
 import com.kooo.evcam.camera.ChannelRules.RecordStop;
 import com.kooo.evcam.recovery.Recovery;
 import com.kooo.evcam.screen.ScreenState;
-import com.kooo.evcam.service.RecordingFloatingService;
 import com.kooo.evcam.storage.AutoLock;
 import com.kooo.evcam.storage.StorageState;
 
@@ -765,8 +764,8 @@ public final class CameraKeeper {
 
     /**
      * 把录像的样子推出去（主线程）：开录、停录、管线报上来、一路加入或退出、各路的样子变了都叫一次。样子变了：前台通知换字（服务在才换，
-     * 在后台时绝不为换字 startForegroundService）、悬浮按钮重画；在录、等摄像头各自多久记下来（{@link #account}）。开录落定告诉监听者
-     * 一次；监听者每次都叫（状态条上那一句跟着摘要变）。
+     * 在后台时绝不为换字 startForegroundService）；在录、等摄像头各自多久记下来（{@link #account}）。开录落定告诉监听者
+     * 一次；监听者每次都叫（状态条上那一句跟着摘要变；悬浮按钮也是监听者，样子变了自己重画，2026-11-10 起不走广播）。
      */
     private void pushView() {
         RecordingLanes.Summary summary = summary();
@@ -778,7 +777,6 @@ public final class CameraKeeper {
             liveSinceMs = now == View.RECORDING ? at : 0;
             shownView = now;
             CameraForegroundService.showText(context, titleFor(now), contentFor(now));
-            RecordingFloatingService.sendRecordingStateChanged(context);
         }
         if (summary != null && summary.settled && !settleReported) {
             settleReported = true;
