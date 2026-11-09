@@ -494,9 +494,9 @@
   「Keeps recording the surround view after you leave the car. Requires Sentry Mode to keep the head unit awake.」/
   「Terus merakam paparan sekeliling selepas anda keluar dari kereta. Memerlukan Mod Sentry supaya unit kepala kekal berjaga.」
   （不再写后座舱亮屏后恢复录制、没开哨兵模式时亮屏后恢复：行为不变，只是不写）。
-- 2026-11-05 批准（关于页致谢加 LEO，项目所有者当天要求，中文照项目所有者的原话；关于页没有马来文）：about_thanks_body 在
-  「Bilibili 极氪7X 车友圈微信群的各位成员」那一条前面加「• LEO（Bilibili 极氪7X 车友圈）—— 提供了国内车机所使用的一些重要代码数据。」/
-  「• LEO (Bilibili Zeekr 7X owners' circle) — provided important code data used by Chinese-market head units.」
+- 2026-11-05 批准（关于页致谢加 LEO，项目所有者当天要求；关于页没有马来文）：about_thanks_body 在
+  「Bilibili 极氪7X 车友圈微信群的各位成员」那一条前面加「• LEO（Bilibili 极氪7X 车友圈）—— 提供了一些重要的代码数据。」/
+  「• LEO (Bilibili Zeekr 7X owners' circle) — provided important code data.」
 - 2026-11-05 批准（灵动贴加动作，项目所有者 2026-11-04 定了做什么）：组名 smart_button_group_*
   「应用功能」「驾驶」「语音与媒体」「座椅与方向盘」「空调」「车身」「灯光与香氛」「场景」/ App、Driving、Voice and media、
   Seats and steering wheel、Climate、Body、Lights and fragrance、Scenes / Apl、Pemanduan、Suara dan media、

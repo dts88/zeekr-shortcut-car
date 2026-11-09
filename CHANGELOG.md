@@ -85,7 +85,7 @@ Nothing yet.
 - Smart buttons: long press connects and reads battery, version and serial number; each button's row shows them.
 - Smart buttons: scan filtered by name and delivered by the system; no periodic or silence restarts.
 - Smart buttons: new on/off switch; when off, no Bluetooth scanning.
-- About & credits: thanks LEO (Bilibili Zeekr 7X owners' circle) for important code data used by Chinese-market head units.
+- About & credits: thanks LEO (Bilibili Zeekr 7X owners' circle) for important code data.
 
 ## [3.3.0-alpha] - 2026-11-04
 
