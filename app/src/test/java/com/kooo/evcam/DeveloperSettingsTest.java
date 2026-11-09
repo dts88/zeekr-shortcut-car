@@ -86,7 +86,7 @@ public class DeveloperSettingsTest {
             "drive_sound_exterior_route", "drive_sound_exterior_volume", "drive_sound_standard",
             "video_storage_limit_gb", "photo_storage_limit_gb", "custom_sd_card_path",
             "exposure_compensation", "awb_mode", "car_model", "side_view_enabled", "side_view_min_speed",
-            "side_view_blind_spot", "side_view_door_warning", "side_view_place_height", "side_view_place_edge",
+            "side_view_mode", "side_view_place_height", "side_view_place_edge",
             "side_view_place_top");
 
     private static final Pattern KEY = Pattern.compile("android:key=\"([^\"]+)\"");

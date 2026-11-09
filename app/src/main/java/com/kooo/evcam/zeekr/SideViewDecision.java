@@ -10,6 +10,7 @@
 
 package com.kooo.evcam.zeekr;
 
+import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.camera.ChannelRules;
 
 /**
@@ -19,12 +20,13 @@ import com.kooo.evcam.camera.ChannelRules;
  *
  * <ul>
  *   <li>左灯只显示左侧那一路，右灯只显示右侧那一路；双闪、不打灯、读不到都不显示（{@link #turnLane}）。</li>
- *   <li><b>后视镜上的灯</b>（项目所有者 2026-11-03，设置里各自开关，默认关）：盲区指示灯、停车后的开门预警，哪一侧亮了就显示哪一侧，
- *       不用打转向灯（{@link #lit}）。不看车速（开门预警是停着车亮的，盲区灯低速也会亮）；双闪不拦。
- *       两侧都亮就两侧都显示，打着转向灯时另一侧亮着也显示（项目所有者 2026-11-04）。</li>
+ *   <li><b>情境</b>（{@link Mode}，项目所有者 2026-11-09，取代 2026-11-03 起的两个附加项）：哪几种情形显示，一档包含下一档 ——
+ *       简洁：往盲区指示灯亮的一侧打转向灯、开门预警亮；标准：再加打转向灯（盲区没车也显示）；丰富：再加盲区指示灯亮（不打转向灯也显示）。
+ *       只看同一侧；双闪不算打转向灯。后视镜上的灯（{@link #blindSpotLit}、{@link #doorWarningLit}）不看车速（开门预警是停着车亮的，
+ *       盲区灯低速也会亮）。两侧可以同时显示（项目所有者 2026-11-04）。</li>
  *   <li><b>原厂画面优先</b>：挂 R 挡、原厂 360 在显示、原厂画面弹着（360 或侧方小窗）、
  *       泊车辅助开着，任何一样成立都不显示；已经显示着的立刻收。</li>
- *   <li>打灯时车速低于设定值不显示（默认 30 km/h：再慢原厂自己会弹侧方小窗）；车速读不到不拦。
+ *   <li>只打转向灯（盲区没车）时车速低于设定值不显示（默认 30 km/h：再慢原厂自己会弹侧方小窗）；车速读不到不拦。
  *       只在「还没显示」时看车速 —— 显示出来之后减速不收，免得在门槛上来回闪。</li>
  *   <li>灯一灭就不再要（灯灭后再留多久由 {@link SideViewTrigger} 管）。</li>
  * </ul>
@@ -39,6 +41,54 @@ public final class SideViewDecision {
     public static final int NONE = -1;
 
     private SideViewDecision() {
+    }
+
+    /**
+     * 情境（项目所有者 2026-11-09）：哪几种情形显示画面，一档包含下一档（每一种情形是 {@link SideViewTrigger.Cause} 的一种）。
+     * 三档都有的：往盲区指示灯亮的一侧打转向灯、开门预警亮。
+     */
+    public enum Mode {
+        /** 简洁：只有三档都有的那两种。 */
+        MINIMAL(AppConfig.SIDE_VIEW_MODE_MINIMAL),
+        /** 标准：再加打转向灯（盲区没车也显示，看最低车速）。默认。 */
+        STANDARD(AppConfig.SIDE_VIEW_MODE_STANDARD),
+        /** 丰富：再加盲区指示灯亮（不打转向灯也显示）；就是 2026-11-03 起两个附加项都开着的样子。 */
+        FULL(AppConfig.SIDE_VIEW_MODE_FULL);
+
+        /** 设置里存的值（{@code SettingsRegistry.SIDE_VIEW_MODE}）。 */
+        public final String value;
+
+        Mode(String value) {
+            this.value = value;
+        }
+
+        /** 设置里存的值对应哪一档；不认得的当标准（默认）。 */
+        public static Mode of(String value) {
+            for (Mode mode : values()) {
+                if (mode.value.equals(value)) {
+                    return mode;
+                }
+            }
+            return STANDARD;
+        }
+
+        /**
+         * 以前两个附加项的设置换成哪一档（项目所有者 2026-11-09）：勾过「盲区提醒」的是丰富，别的（只勾了开门预警、都没勾）是标准。
+         * 只在升级后第一次读设置时用一次（{@code AppConfig}）。
+         */
+        public static Mode fromAddOns(boolean blindSpotAlert) {
+            return blindSpotAlert ? FULL : STANDARD;
+        }
+
+        /** 只打转向灯（盲区没车）也显示：标准、丰富。 */
+        boolean showsTurnSignal() {
+            return this != MINIMAL;
+        }
+
+        /** 只是盲区指示灯亮（没往那一侧打转向灯）也显示：丰富。 */
+        boolean showsBlindSpot() {
+            return this == FULL;
+        }
     }
 
     /** 一份输入：信号读不到的都是 null。 */
@@ -64,19 +114,17 @@ public final class SideViewDecision {
         /** 停车后的开门预警（亮的是后视镜上同一盏灯）：左、右亮着没有；null 读不到。 */
         public Boolean doorWarningLeft;
         public Boolean doorWarningRight;
-        /** 设置里「盲区画面」那一行开着附加项「盲区提醒」。 */
-        public boolean useBlindSpot;
-        /** 设置里「盲区画面」那一行开着附加项「开门预警」。 */
-        public boolean useDoorWarning;
+        /** 设置里选的情境（「盲区画面」那一行的三选一）。 */
+        public Mode mode = Mode.STANDARD;
         /**
          * 收起前淡出（项目所有者 2026-11-04，{@link SideViewTrigger#FADE_MS}）：装饰动效此刻放不放（{@code ui.MotionPolicy}：
          * 「录制时减少动效」开着而在录、系统关了动画时不放）。不放就和以前一样，留够就收。
-         * 边框闪不闪也看它（{@link SideViewAlert}）：不放就常亮。
+         * 边框闪不闪不看它：边框是安全提醒（{@link SideViewAlert}，项目所有者 2026-11-09）。
          */
         public boolean fade;
     }
 
-    /** 转向灯要显示哪一侧（双闪、不打灯、读不到、原厂画面在都不显示；还没显示时看车速）。 */
+    /** 打转向灯要显示哪一侧（双闪、不打灯、读不到、原厂画面在都不显示；还没显示时看车速）：情境里「打转向灯」那一种。 */
     static int turnLane(Input in) {
         if (factoryViewActive(in)) {
             return NONE;
@@ -102,17 +150,27 @@ public final class SideViewDecision {
         return lane;
     }
 
-    /** 这一侧后视镜上的灯亮着（盲区指示灯、开门预警里设置开着的那几样）。 */
+    /** 这一侧后视镜上的灯亮着（盲区指示灯或开门预警）：关闭按钮关掉「灯亮的这一次」照它（{@link SideViewTrigger#dismiss}）。 */
     static boolean lit(Input in, int lane) {
-        boolean left = lane == LaneCycle.LEFT;
-        return in.useBlindSpot && Boolean.TRUE.equals(left ? in.blindSpotLeft : in.blindSpotRight)
-                || in.useDoorWarning && Boolean.TRUE.equals(left ? in.doorWarningLeft : in.doorWarningRight);
+        return blindSpotLit(in, lane) || doorWarningLit(in, lane);
     }
 
-    /** 这一侧亮着的是盲区指示灯（不是只有开门预警）：黑匣子那一行照它写原因。 */
+    /** 这一侧的盲区指示灯亮着（读不到算没亮）。 */
     static boolean blindSpotLit(Input in, int lane) {
-        return in.useBlindSpot
-                && Boolean.TRUE.equals(lane == LaneCycle.LEFT ? in.blindSpotLeft : in.blindSpotRight);
+        return Boolean.TRUE.equals(lane == LaneCycle.LEFT ? in.blindSpotLeft : in.blindSpotRight);
+    }
+
+    /** 这一侧的开门预警亮着（读不到算没亮）。 */
+    static boolean doorWarningLit(Input in, int lane) {
+        return Boolean.TRUE.equals(lane == LaneCycle.LEFT ? in.doorWarningLeft : in.doorWarningRight);
+    }
+
+    /** 转向灯打向这一侧（双闪、不打灯、读不到都不算；不看车速）。 */
+    static boolean signalsToward(Input in, int lane) {
+        if (Boolean.TRUE.equals(in.hazard) || in.turnSignal == null) {
+            return false;
+        }
+        return lane == LaneCycle.LEFT ? in.turnSignal == 1 : in.turnSignal == 2;
     }
 
     /**

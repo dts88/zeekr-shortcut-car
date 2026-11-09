@@ -111,6 +111,16 @@ public final class SettingsRegistry {
             entry(com.kooo.evcam.AppConfig.SIDE_VIEW_TARGET_BOTH, "中控屏和 HUD", R.string.opt_side_view_target_both));
 
     /**
+     * 盲区画面的情境（项目所有者 2026-11-09）：哪几种情形显示画面，一档包含下一档（{@code zeekr.SideViewDecision.Mode}）；默认标准。
+     * 界面上是「盲区画面」那一行的三选一。
+     */
+    public static final SettingSpec SIDE_VIEW_MODE = SettingSpec.of(
+            "side_view_mode", "盲区画面情境", com.kooo.evcam.AppConfig.SIDE_VIEW_MODE_STANDARD,
+            entry(com.kooo.evcam.AppConfig.SIDE_VIEW_MODE_FULL, "丰富", R.string.opt_side_view_mode_full),
+            entry(com.kooo.evcam.AppConfig.SIDE_VIEW_MODE_STANDARD, "标准", R.string.opt_side_view_mode_standard),
+            entry(com.kooo.evcam.AppConfig.SIDE_VIEW_MODE_MINIMAL, "简洁", R.string.opt_side_view_mode_minimal));
+
+    /**
      * 录制声音用哪个来源（设置 → 录制「录制声音」的下一层；{@code camera.FootageAudio}）。项目所有者 2026-10-20：两种都做出来、上车比。
      * 名字按来源叫，不叫「机身麦克风」：Lab 怀疑那一路其实在车外，测清之前不下结论。
      */
@@ -226,6 +236,7 @@ public final class SettingsRegistry {
             ACTION_RAIL_SIDE,
             REARVIEW_VIEWS,
             SIDE_VIEW_TARGET,
+            SIDE_VIEW_MODE,
             FOOTAGE_AUDIO_SOURCE,
             SCREEN_OFF_FPS,
             DRIVE_SOUND_VOLUME,

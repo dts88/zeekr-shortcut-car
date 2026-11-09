@@ -1084,22 +1084,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 openFragment(SettingsPreferenceFragment.forSection("screen_side_view"), R.string.set_side_view_title);
                 return true;
             });
-            // 开着至少一个时盲区画面才读后视镜上的灯（SideViewService）
-            row.addOption(getString(R.string.set_side_view_blind_spot_chip), appConfig.isSideViewBlindSpotEnabled(),
-                    on -> {
-                        appConfig.setSideViewBlindSpotEnabled(on);
-                        com.kooo.evcam.blackbox.BlackBox.noteImportant(
-                                "开关变更: pref_side_view_blind_spot → " + (on ? "开" : "关"));
-                        SideViewService.applyConfig();
-                    });
-            row.addOption(getString(R.string.set_side_view_door_warning_chip), appConfig.isSideViewDoorWarningEnabled(),
-                    on -> {
-                        appConfig.setSideViewDoorWarningEnabled(on);
-                        com.kooo.evcam.blackbox.BlackBox.noteImportant(
-                                "开关变更: pref_side_view_door_warning → " + (on ? "开" : "关"));
-                        SideViewService.applyConfig();
-                    });
-            row.setOptionsNote(getString(R.string.set_side_view_lamps_note));
+            bindSideViewMode(row);
         }
         bindSegmented("pref_side_view_target", SettingsRegistry.SIDE_VIEW_TARGET,
                 appConfig.getSideViewTarget(), value -> {
@@ -1203,6 +1188,36 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         row.setValue(nameOf(SettingsRegistry.SIDE_VIEW_TARGET, appConfig.getSideViewTarget()));
     }
 
+    /**
+     * 盲区画面那一行的情境（项目所有者 2026-11-09）：开关开着时说明下面一排三选一「丰富」「标准」「简洁」，
+     * 下面一行小字说选中的这一档什么时候显示。
+     */
+    private void bindSideViewMode(SwitchNavPreference row) {
+        SettingSpec spec = SettingsRegistry.SIDE_VIEW_MODE;
+        String current = appConfig.getSideViewMode();
+        String[] names = localizedNames(spec);
+        row.setSingleChoice(true);
+        for (int i = 0; i < spec.size(); i++) {
+            String value = spec.valueAt(i);
+            row.addOption(names[i], value.equals(current), on -> {
+                appConfig.setSideViewMode(value);
+                com.kooo.evcam.blackbox.BlackBox.noteImportant("开关变更: pref_side_view_mode → " + value);
+                row.setOptionsNote(getString(sideViewModeNote(value)));
+                SideViewService.applyConfig();
+            });
+        }
+        row.setOptionsNote(getString(sideViewModeNote(current)));
+    }
+
+    /** 情境下面那一行小字：这一档什么时候显示。 */
+    private static int sideViewModeNote(String mode) {
+        if (AppConfig.SIDE_VIEW_MODE_FULL.equals(mode)) {
+            return R.string.set_side_view_mode_full_note;
+        }
+        return AppConfig.SIDE_VIEW_MODE_MINIMAL.equals(mode)
+                ? R.string.set_side_view_mode_minimal_note : R.string.set_side_view_mode_standard_note;
+    }
+
     /** 某个选项在界面上叫什么（有翻译用翻译，{@link #localizedNames}）；不认得的值照默认那一项。 */
     private String nameOf(SettingSpec spec, String value) {
         int index = spec.indexOf(spec.sanitize(value));
@@ -1219,7 +1234,8 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
 
     /**
      * 显示位置决定哪些可用：只有中控屏时 HUD 画面那一组不可用，只有 HUD 时最低车速、中控屏上的位置和大小不可用（只管中控屏）。
-     * 这一页和盲区画面的开关不在同一页，开关关着时这些照样能先调好。
+     * 情境是简洁时最低车速也不可用：简洁里没有只打转向灯的那一种（项目所有者 2026-11-09）。
+     * 这一页和盲区画面的开关、情境不在同一页，开关关着时这些照样能先调好。
      */
     private void syncSideViewRows() {
         String target = appConfig.getSideViewTarget();
@@ -1229,7 +1245,8 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         }
         Preference minSpeed = findPreference("pref_side_view_min_speed");
         if (minSpeed != null) {
-            minSpeed.setEnabled(!AppConfig.SIDE_VIEW_TARGET_HUD.equals(target));
+            minSpeed.setEnabled(!AppConfig.SIDE_VIEW_TARGET_HUD.equals(target)
+                    && !AppConfig.SIDE_VIEW_MODE_MINIMAL.equals(appConfig.getSideViewMode()));
         }
         Preference place = findPreference("pref_side_view_place");
         if (place != null) {

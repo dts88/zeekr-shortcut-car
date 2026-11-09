@@ -20,11 +20,10 @@ package com.kooo.evcam.zeekr;
  *   <li>盲区指示灯亮、转向灯打向这一侧：<b>黄、闪</b>（{@link #CAUTION_BLINK}）—— 车上那盏灯这时闪（手册）。双闪不算往哪一侧打灯。</li>
  *   <li>开门预警亮：<b>红、闪</b>（{@link #WARNING}）—— 同行驶信息条（开门预警红：停车后才亮）。红色只给开门预警，盲区一直是黄色
  *       （项目所有者 2026-11-08）。</li>
- *   <li>读不到（null）、设置里没开的那一样：不描边，和显示规则一样（{@link SideViewDecision#lit}）。</li>
+ *   <li>读不到（null）：不描边。和情境无关：画面显示着、灯亮着就描（项目所有者 2026-11-09）。</li>
  *   <li>不画绿色、不画「安全」：灯灭了不等于可以变道。</li>
- *   <li>闪是亮 / 暗交替（{@link #BLINK_HALF_MS}，约 2 Hz），暗的那一半照样看得见。装饰动效放不了时（{@code ui.MotionPolicy}，
- *       同收起前的淡出：「录制时减少动效」开着而在录、系统关了动画）不闪、常亮：这时往盲区那一侧打灯和没打灯看起来一样，
- *       开门预警照样是红色。</li>
+ *   <li>闪是亮 / 暗交替（{@link #BLINK_HALF_MS}，约 2 Hz），暗的那一半照样看得见。闪是安全提醒，不是装饰动效：
+ *       「录制时减少动效」、系统关了动画都不影响（项目所有者 2026-11-09；收起前的淡出是装饰，照 {@code ui.MotionPolicy}）。</li>
  * </ul>
  *
  * <p>纯 Java，不碰 Android，见 {@code SideViewAlertTest}；画在 {@link SideViewEdge}。</p>
@@ -54,32 +53,18 @@ public final class SideViewAlert {
 
     /** 这一侧此刻描什么边：{@link #NONE}、{@link #CAUTION}、{@link #WARNING}。 */
     public static int level(SideViewDecision.Input in, int lane) {
-        if (doorWarningLit(in, lane)) {
+        if (SideViewDecision.doorWarningLit(in, lane)) {
             return WARNING;
         }
         if (SideViewDecision.blindSpotLit(in, lane)) {
-            return signalsToward(in, lane) ? CAUTION_BLINK : CAUTION;
+            return SideViewDecision.signalsToward(in, lane) ? CAUTION_BLINK : CAUTION;
         }
         return NONE;
     }
 
-    /** 这一侧开门预警亮着，而且设置里开着（黑匣子那一行照它写原因）。 */
-    static boolean doorWarningLit(SideViewDecision.Input in, int lane) {
-        return in.useDoorWarning
-                && Boolean.TRUE.equals(lane == LaneCycle.LEFT ? in.doorWarningLeft : in.doorWarningRight);
-    }
-
-    /** 转向灯打向这一侧（双闪、不打灯、读不到都不算）。 */
-    static boolean signalsToward(SideViewDecision.Input in, int lane) {
-        if (Boolean.TRUE.equals(in.hazard) || in.turnSignal == null) {
-            return false;
-        }
-        return lane == LaneCycle.LEFT ? in.turnSignal == 1 : in.turnSignal == 2;
-    }
-
-    /** 这一级闪不闪：开门预警、往盲区那一侧打灯的闪，装饰动效放不了时都不闪。 */
-    static boolean blinks(int level, boolean motion) {
-        return (level == WARNING || level == CAUTION_BLINK) && motion;
+    /** 这一级闪不闪：开门预警、往盲区那一侧打灯的闪（一直闪，项目所有者 2026-11-09）。 */
+    static boolean blinks(int level) {
+        return level == WARNING || level == CAUTION_BLINK;
     }
 
     /**
@@ -87,9 +72,9 @@ public final class SideViewAlert {
      *
      * @param bright 闪的亮那一半（不闪时不看）
      */
-    static int color(int level, boolean motion, boolean bright) {
+    static int color(int level, boolean bright) {
         int color = level == WARNING ? RED : level == CAUTION || level == CAUTION_BLINK ? YELLOW : 0;
-        if (color == 0 || bright || !blinks(level, motion)) {
+        if (color == 0 || bright || !blinks(level)) {
             return color;
         }
         return (color & 0x00FFFFFF) | (DIM_ALPHA << 24);

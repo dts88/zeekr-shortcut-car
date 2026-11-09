@@ -16,7 +16,7 @@ import org.junit.Test;
 
 /**
  * {@link SideViewAlert}：盲区指示灯亮黄、往那一侧打灯黄闪、开门预警红闪（红色只给开门预警，项目所有者 2026-11-08）；
- * 读不到、设置没开不描边；没有「安全」的颜色；装饰动效放不了时不闪。
+ * 读不到不描边、和情境无关；没有「安全」的颜色；闪是安全提醒，不看装饰动效（项目所有者 2026-11-09）。
  */
 public class SideViewAlertTest {
 
@@ -26,9 +26,6 @@ public class SideViewAlertTest {
         in.hazard = false;
         in.gear = "D";
         in.speedKmh = 60f;
-        in.useBlindSpot = true;
-        in.useDoorWarning = true;
-        in.fade = true;
         return in;
     }
 
@@ -38,8 +35,8 @@ public class SideViewAlertTest {
         in.blindSpotLeft = true;
         assertEquals(SideViewAlert.CAUTION, SideViewAlert.level(in, LaneCycle.LEFT));
         assertEquals(SideViewAlert.NONE, SideViewAlert.level(in, LaneCycle.RIGHT));
-        assertFalse(SideViewAlert.blinks(SideViewAlert.CAUTION, true));
-        assertEquals(SideViewAlert.YELLOW, SideViewAlert.color(SideViewAlert.CAUTION, true, false));
+        assertFalse(SideViewAlert.blinks(SideViewAlert.CAUTION));
+        assertEquals(SideViewAlert.YELLOW, SideViewAlert.color(SideViewAlert.CAUTION, false));
     }
 
     /** 车上那盏灯这时闪（7X 手册「盲区辅助」）：边框照样黄色，跟着闪。 */
@@ -48,19 +45,19 @@ public class SideViewAlertTest {
         SideViewDecision.Input in = driving(2);
         in.blindSpotRight = true;
         assertEquals(SideViewAlert.CAUTION_BLINK, SideViewAlert.level(in, LaneCycle.RIGHT));
-        assertTrue(SideViewAlert.blinks(SideViewAlert.CAUTION_BLINK, true));
-        assertEquals(SideViewAlert.YELLOW, SideViewAlert.color(SideViewAlert.CAUTION_BLINK, true, true));
+        assertTrue(SideViewAlert.blinks(SideViewAlert.CAUTION_BLINK));
+        assertEquals(SideViewAlert.YELLOW, SideViewAlert.color(SideViewAlert.CAUTION_BLINK, true));
         assertEquals("暗的那一半同色", SideViewAlert.YELLOW & 0x00FFFFFF,
-                SideViewAlert.color(SideViewAlert.CAUTION_BLINK, true, false) & 0x00FFFFFF);
+                SideViewAlert.color(SideViewAlert.CAUTION_BLINK, false) & 0x00FFFFFF);
     }
 
     /** 红色只给开门预警：盲区指示灯亮，打不打灯都是黄色。 */
     @Test
     public void onlyTheDoorWarningIsRed() {
         for (int level : new int[]{SideViewAlert.CAUTION, SideViewAlert.CAUTION_BLINK}) {
-            assertEquals(SideViewAlert.YELLOW, SideViewAlert.color(level, true, true));
+            assertEquals(SideViewAlert.YELLOW, SideViewAlert.color(level, true));
         }
-        assertEquals(SideViewAlert.RED, SideViewAlert.color(SideViewAlert.WARNING, true, true));
+        assertEquals(SideViewAlert.RED, SideViewAlert.color(SideViewAlert.WARNING, true));
     }
 
     @Test
@@ -102,7 +99,7 @@ public class SideViewAlertTest {
         SideViewDecision.Input in = driving(1);
         assertEquals(SideViewAlert.NONE, SideViewAlert.level(in, LaneCycle.LEFT));
         assertEquals(SideViewAlert.NONE, SideViewAlert.level(in, LaneCycle.RIGHT));
-        assertEquals(0, SideViewAlert.color(SideViewAlert.NONE, true, true));
+        assertEquals(0, SideViewAlert.color(SideViewAlert.NONE, true));
     }
 
     @Test
@@ -113,34 +110,42 @@ public class SideViewAlertTest {
         assertEquals(SideViewAlert.NONE, SideViewAlert.level(in, LaneCycle.LEFT));
         for (int level : new int[]{SideViewAlert.NONE, SideViewAlert.CAUTION, SideViewAlert.CAUTION_BLINK,
                 SideViewAlert.WARNING}) {
-            int color = SideViewAlert.color(level, true, true);
+            int color = SideViewAlert.color(level, true);
             int green = (color >> 8) & 0xFF;
             int red = (color >> 16) & 0xFF;
             assertTrue("没有偏绿的颜色：" + Integer.toHexString(color), color == 0 || red > green);
         }
     }
 
+    /** 和情境无关：画面显示着、灯亮着就描边（项目所有者 2026-11-09）。 */
     @Test
-    public void aLightWhoseOptionIsOffIsIgnored() {
-        SideViewDecision.Input in = driving(1);
-        in.useBlindSpot = false;
-        in.useDoorWarning = false;
-        in.blindSpotLeft = true;
-        in.doorWarningRight = true;
-        assertEquals(SideViewAlert.NONE, SideViewAlert.level(in, LaneCycle.LEFT));
-        assertEquals(SideViewAlert.NONE, SideViewAlert.level(in, LaneCycle.RIGHT));
+    public void theFrameFollowsTheLightsWhateverTheMode() {
+        for (SideViewDecision.Mode mode : SideViewDecision.Mode.values()) {
+            SideViewDecision.Input in = driving(1);
+            in.mode = mode;
+            in.blindSpotLeft = true;
+            in.doorWarningRight = true;
+            assertEquals(mode.name(), SideViewAlert.CAUTION_BLINK, SideViewAlert.level(in, LaneCycle.LEFT));
+            assertEquals(mode.name(), SideViewAlert.WARNING, SideViewAlert.level(in, LaneCycle.RIGHT));
+        }
     }
 
+    /** 闪是安全提醒：开门预警、往盲区那一侧打灯一直闪，装饰动效放不了也闪（项目所有者 2026-11-09）；常亮的那一档不闪。 */
     @Test
-    public void withoutDecorativeMotionRedIsSteady() {
-        assertFalse(SideViewAlert.blinks(SideViewAlert.WARNING, false));
-        assertEquals("不闪：暗的那一半也是全亮", SideViewAlert.RED,
-                SideViewAlert.color(SideViewAlert.WARNING, false, false));
+    public void blinkingIsASafetyCueNotDecoration() {
+        assertTrue(SideViewAlert.blinks(SideViewAlert.WARNING));
+        assertTrue(SideViewAlert.blinks(SideViewAlert.CAUTION_BLINK));
+        assertFalse(SideViewAlert.blinks(SideViewAlert.CAUTION));
+        assertFalse(SideViewAlert.blinks(SideViewAlert.NONE));
+        SideViewDecision.Input in = driving(2);
+        in.fade = false;
+        in.blindSpotRight = true;
+        assertEquals(SideViewAlert.CAUTION_BLINK, SideViewAlert.level(in, LaneCycle.RIGHT));
     }
 
     @Test
     public void theDimHalfOfABlinkIsStillVisible() {
-        int dim = SideViewAlert.color(SideViewAlert.WARNING, true, false);
+        int dim = SideViewAlert.color(SideViewAlert.WARNING, false);
         assertEquals(SideViewAlert.RED & 0x00FFFFFF, dim & 0x00FFFFFF);
         int alpha = dim >>> 24;
         assertTrue("暗的那一半看得见", alpha > 0x33);
@@ -153,14 +158,12 @@ public class SideViewAlertTest {
         assertEquals(12f, SideViewAlert.hudStrokePx(660, 300), 0f);
     }
 
-    /** 黑匣子那一行照它写红的原因。 */
+    /** 开门预警哪一侧亮红哪一侧。 */
     @Test
-    public void doorWarningLitFollowsItsOption() {
+    public void doorWarningIsRedOnItsOwnSide() {
         SideViewDecision.Input in = driving(0);
         in.doorWarningRight = true;
-        assertTrue(SideViewAlert.doorWarningLit(in, LaneCycle.RIGHT));
-        assertFalse(SideViewAlert.doorWarningLit(in, LaneCycle.LEFT));
-        in.useDoorWarning = false;
-        assertFalse(SideViewAlert.doorWarningLit(in, LaneCycle.RIGHT));
+        assertEquals(SideViewAlert.WARNING, SideViewAlert.level(in, LaneCycle.RIGHT));
+        assertEquals(SideViewAlert.NONE, SideViewAlert.level(in, LaneCycle.LEFT));
     }
 }

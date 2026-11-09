@@ -42,8 +42,8 @@ import com.kooo.evcam.telemetry.Telemetry;
 import com.kooo.evcam.telemetry.VehicleState;
 
 /**
- * 盲区画面：打转向灯时在中控屏、HUD 上显示该侧摄像头的画面（issue #6、#24）；设置里开着的话，后视镜上的盲区指示灯、
- * 停车后的开门预警亮了也显示那一侧（项目所有者 2026-11-03）。窗口、相机登记、车辆信号都在这里。
+ * 盲区画面：按设置里选的情境（{@link SideViewDecision.Mode}，项目所有者 2026-11-09），打转向灯、后视镜上的盲区指示灯、
+ * 停车后的开门预警时在中控屏、HUD 上显示该侧摄像头的画面（issue #6、#24）。窗口、相机登记、车辆信号都在这里。
  *
  * <h3>三个出口，两份判定</h3>
  *
@@ -78,7 +78,7 @@ import com.kooo.evcam.telemetry.VehicleState;
  * <h3>车辆信号</h3>
  *
  * <p>亮屏时完整登记（要车速），熄屏注销、窗口移走：熄屏后不该留着监听和相机过去（同超级镜子熄屏放开登记的理由）。
- * 后视镜上的灯另登记（{@link Telemetry#acquireLamps}）：亮屏、两个选项开着至少一个时才读。
+ * 后视镜上的灯另登记（{@link Telemetry#acquireLamps}）：亮屏时就读（三档都用得到）。
  * HUD 的夜间对比度、夜间亮度看昼夜信号（{@link Signal#DAY_NIGHT}），读不到按白天。</p>
  *
  * <p>来源：打灯判定、拉直和取景借自 FerixzTanz 的 PR #4、wysie 的 PR #19（GPL-3.0）；读车辆信号、备着 / 显示的流程
@@ -158,7 +158,7 @@ public class SideViewService extends Service {
         }
     }
 
-    /** 改了最低车速、显示位置、后视镜上的灯、HUD 的设置：HUD 的窗口照新的画，灯照新的设置读不读，再照新的设置判一次。 */
+    /** 改了情境、最低车速、显示位置、HUD 的设置：HUD 的窗口照新的画，再照新的设置判一次。 */
     public static void applyConfig() {
         SideViewService svc = instance;
         if (svc != null) {
@@ -166,7 +166,6 @@ public class SideViewService extends Service {
                 if (svc.hud.window instanceof SideViewHudWindow) {
                     ((SideViewHudWindow) svc.hud.window).applyConfig();
                 }
-                svc.syncLamps();
                 svc.evaluate();
             });
         }
@@ -193,6 +192,7 @@ public class SideViewService extends Service {
             return "side view: service not running";
         }
         return "side view: listening=" + svc.listening
+                + " mode=" + svc.appConfig.getSideViewMode()
                 + " lamps=" + (svc.lampsHeld ? Telemetry.get().lamps() : "off")
                 + " claimed=" + CameraKeeper.get(svc).needs(CameraKeeper.Use.SIDE_VIEW)
                 + " center{" + svc.center.describe() + "} second{" + svc.centerSecond.describe()
@@ -269,7 +269,7 @@ public class SideViewService extends Service {
         Telemetry.get().acquire(this, TELEMETRY_USER);
         Telemetry.get().addListener(readingsListener);
         syncLamps();
-        AppLog.i(TAG, "盲区画面：开始听转向灯和挡位" + (lampsHeld ? "，还有后视镜上的灯" : ""));
+        AppLog.i(TAG, "盲区画面：开始听转向灯、挡位和后视镜上的灯（情境 " + appConfig.getSideViewMode() + "）");
         evaluate();
     }
 
@@ -292,10 +292,9 @@ public class SideViewService extends Service {
         AppLog.i(TAG, "盲区画面：停止监听");
     }
 
-    /** 后视镜上的灯读不读：听着（亮屏）、两个选项开着至少一个时读，不然放开。 */
+    /** 后视镜上的灯读不读：听着（亮屏）就读（三档都用得到：往有车的一侧打转向灯、开门预警，项目所有者 2026-11-09），不然放开。 */
     private void syncLamps() {
-        boolean want = listening && !destroyed
-                && (appConfig.isSideViewBlindSpotEnabled() || appConfig.isSideViewDoorWarningEnabled());
+        boolean want = listening && !destroyed;
         if (want == lampsHeld) {
             return;
         }
@@ -369,13 +368,13 @@ public class SideViewService extends Service {
         in.parkAssistOn = r.bool(Signal.PARK_ASSIST);
         in.speedKmh = s.speedKmh;
         in.minSpeedKmh = minSpeedKmh;
-        // 设置里关着的那一样不看
-        in.useBlindSpot = lampsHeld && appConfig.isSideViewBlindSpotEnabled();
-        in.useDoorWarning = lampsHeld && appConfig.isSideViewDoorWarningEnabled();
-        in.blindSpotLeft = lamps.blindSpotLeft;
-        in.blindSpotRight = lamps.blindSpotRight;
-        in.doorWarningLeft = lamps.doorWarningLeft;
-        in.doorWarningRight = lamps.doorWarningRight;
+        in.mode = SideViewDecision.Mode.of(appConfig.getSideViewMode());
+        // 灯没登记着时当读不到
+        MirrorLamps held = lampsHeld ? lamps : MirrorLamps.UNKNOWN;
+        in.blindSpotLeft = held.blindSpotLeft;
+        in.blindSpotRight = held.blindSpotRight;
+        in.doorWarningLeft = held.doorWarningLeft;
+        in.doorWarningRight = held.doorWarningRight;
         // 收起前淡出是装饰动效，照同一条规矩放不放
         in.fade = com.kooo.evcam.ui.MotionPolicy.decorative(this);
         return in;
@@ -651,7 +650,8 @@ public class SideViewService extends Service {
                 SideViewTrigger.Cause firstCause = first != SideViewDecision.NONE ? result.side(first).cause : null;
                 BlackBox.note(first != SideViewDecision.NONE
                         ? "盲区画面" + label() + "：显示「" + LaneCycle.labelOf(first) + "」"
-                        + (firstCause == SideViewTrigger.Cause.BLIND_SPOT ? "（盲区指示灯亮）"
+                        + (firstCause == SideViewTrigger.Cause.TURN_TOWARD_CAR ? "（往盲区指示灯亮的一侧打转向灯）"
+                        : firstCause == SideViewTrigger.Cause.BLIND_SPOT ? "（盲区指示灯亮）"
                         : firstCause == SideViewTrigger.Cause.DOOR_WARNING ? "（开门预警亮）" : "")
                         + "（窗口没备着，现在挂）"
                         : heldBack ? "盲区画面" + label() + "：该显示，环视出不了画面，窗口先备着"
@@ -670,7 +670,8 @@ public class SideViewService extends Service {
                 }
                 if (!w.isShowing(lane)) {
                     BlackBox.note("盲区画面" + label() + "：显示「" + LaneCycle.labelOf(lane) + "」"
-                            + (side.cause == SideViewTrigger.Cause.BLIND_SPOT ? "（盲区指示灯亮）"
+                            + (side.cause == SideViewTrigger.Cause.TURN_TOWARD_CAR ? "（往盲区指示灯亮的一侧打转向灯）"
+                            : side.cause == SideViewTrigger.Cause.BLIND_SPOT ? "（盲区指示灯亮）"
                             : side.cause == SideViewTrigger.Cause.DOOR_WARNING ? "（开门预警亮）" : ""));
                     noteShown();
                     w.show(lane);
@@ -695,7 +696,7 @@ public class SideViewService extends Service {
             // 边框（SideViewAlert）：照这一刻后视镜上的灯描；不归它管的那一侧不描。窗口只在那一侧显示着时画
             for (int lane : new int[]{LaneCycle.LEFT, LaneCycle.RIGHT}) {
                 boolean mine = manages(lanes, lane);
-                w.setAlert(lane, mine ? SideViewAlert.level(in, lane) : SideViewAlert.NONE, in.fade);
+                w.setAlert(lane, mine ? SideViewAlert.level(in, lane) : SideViewAlert.NONE);
                 noteEdge(w, lane, mine ? in : null);
             }
         }
@@ -723,8 +724,7 @@ public class SideViewService extends Service {
                         : level == SideViewAlert.WARNING ? "红（开门预警亮）"
                         : level == SideViewAlert.CAUTION_BLINK ? "黄（盲区指示灯亮、往这一侧打着转向灯）"
                         : "黄（盲区指示灯亮）")
-                        + (!SideViewAlert.blinks(level, true) ? ""
-                        : SideViewAlert.blinks(level, in.fade) ? "，闪" : "，不闪（装饰动效放不了）"));
+                        + (SideViewAlert.blinks(level) ? "，闪" : ""));
             }
         }
 

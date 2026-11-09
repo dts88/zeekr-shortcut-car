@@ -20,7 +20,7 @@ import org.junit.Test;
 
 /**
  * {@link SideViewDecision}：左灯只显示左、右灯只显示右、灯灭就不要、原厂画面优先、环视出不了画面不显示；
- * 后视镜上的灯哪一侧亮算哪一侧（两侧怎么一起显示、先后在 {@code SideViewTriggerTest}）。
+ * 后视镜上的灯哪一侧亮算哪一侧（两侧怎么一起显示、先后在 {@code SideViewTriggerTest}）；情境一档包含下一档（2026-11-09）。
  *
  * <p>来源：FerixzTanz 的 PR #4、wysie 的 PR #19（GPL-3.0）。</p>
  */
@@ -164,13 +164,14 @@ public class SideViewDecisionTest {
         assertEquals(LaneCycle.LEFT, SideViewDecision.turnLane(b));
     }
 
-    // ------------------------------------------------------------------ 后视镜上的灯（2026-11-03）
+    // ------------------------------------------------------------------ 后视镜上的灯（2026-11-03）、情境（2026-11-09）
 
     @Test
-    public void blindSpotLightShowsThatSideWithoutATurnSignal() {
+    public void eachSidesLightsAreReadOnTheirOwn() {
         SideViewDecision.Input in = driving(0);
-        in.useBlindSpot = true;
         in.blindSpotRight = true;
+        assertTrue(SideViewDecision.blindSpotLit(in, LaneCycle.RIGHT));
+        assertFalse(SideViewDecision.blindSpotLit(in, LaneCycle.LEFT));
         assertTrue(SideViewDecision.lit(in, LaneCycle.RIGHT));
         assertFalse(SideViewDecision.lit(in, LaneCycle.LEFT));
     }
@@ -181,8 +182,9 @@ public class SideViewDecisionTest {
         in.gear = "P";
         in.speedKmh = 0f;
         in.hazard = true;
-        in.useDoorWarning = true;
         in.doorWarningLeft = true;
+        assertTrue(SideViewDecision.doorWarningLit(in, LaneCycle.LEFT));
+        assertFalse(SideViewDecision.doorWarningLit(in, LaneCycle.RIGHT));
         assertTrue(SideViewDecision.lit(in, LaneCycle.LEFT));
     }
 
@@ -190,29 +192,30 @@ public class SideViewDecisionTest {
     @Test
     public void aTurnSignalAndTheOtherSidesLightAreIndependent() {
         SideViewDecision.Input in = driving(1);
-        in.useBlindSpot = true;
         in.blindSpotRight = true;
         assertEquals(LaneCycle.LEFT, SideViewDecision.turnLane(in));
         assertTrue(SideViewDecision.lit(in, LaneCycle.RIGHT));
+        assertFalse("没往右边打灯", SideViewDecision.signalsToward(in, LaneCycle.RIGHT));
     }
 
+    /** 往哪一侧打灯：双闪、不打灯、读不到都不算；不看车速。 */
     @Test
-    public void aLightWhoseOptionIsOffIsIgnored() {
-        SideViewDecision.Input in = driving(0);
-        in.blindSpotLeft = true;
-        in.doorWarningRight = true;
-        assertFalse(SideViewDecision.lit(in, LaneCycle.LEFT));
-        assertFalse(SideViewDecision.lit(in, LaneCycle.RIGHT));
-        in.useBlindSpot = true;
-        assertTrue("只开了盲区指示灯", SideViewDecision.lit(in, LaneCycle.LEFT));
-        assertFalse(SideViewDecision.lit(in, LaneCycle.RIGHT));
+    public void signalsTowardIgnoresSpeedButNotHazards() {
+        SideViewDecision.Input in = driving(2);
+        in.speedKmh = 5f;
+        assertTrue("不看车速", SideViewDecision.signalsToward(in, LaneCycle.RIGHT));
+        assertFalse(SideViewDecision.signalsToward(in, LaneCycle.LEFT));
+        in.hazard = true;
+        assertFalse("双闪不算", SideViewDecision.signalsToward(in, LaneCycle.RIGHT));
+        SideViewDecision.Input unknown = driving(null);
+        assertFalse(SideViewDecision.signalsToward(unknown, LaneCycle.LEFT));
+        assertFalse(SideViewDecision.signalsToward(unknown, LaneCycle.RIGHT));
     }
 
     @Test
     public void factoryViewsWinOverLights() {
         SideViewDecision.Input in = driving(0);
         in.gear = "R";
-        in.useDoorWarning = true;
         in.doorWarningLeft = true;
         assertTrue("倒挡：原厂画面优先（判定当场全收，SideViewTrigger）", SideViewDecision.factoryViewActive(in));
     }
@@ -220,9 +223,31 @@ public class SideViewDecisionTest {
     @Test
     public void unreadableLightsShowNothing() {
         SideViewDecision.Input in = driving(0);
-        in.useBlindSpot = true;
-        in.useDoorWarning = true;
         assertFalse(SideViewDecision.lit(in, LaneCycle.LEFT));
         assertFalse(SideViewDecision.lit(in, LaneCycle.RIGHT));
+    }
+
+    /** 情境一档包含下一档：简洁，标准再加只打转向灯，丰富再加只是盲区指示灯亮（项目所有者 2026-11-09）。 */
+    @Test
+    public void modesNestOneInsideTheNext() {
+        assertFalse(SideViewDecision.Mode.MINIMAL.showsTurnSignal());
+        assertFalse(SideViewDecision.Mode.MINIMAL.showsBlindSpot());
+        assertTrue(SideViewDecision.Mode.STANDARD.showsTurnSignal());
+        assertFalse(SideViewDecision.Mode.STANDARD.showsBlindSpot());
+        assertTrue(SideViewDecision.Mode.FULL.showsTurnSignal());
+        assertTrue(SideViewDecision.Mode.FULL.showsBlindSpot());
+    }
+
+    /** 存的值认不出来当标准（默认）；以前勾过「盲区提醒」的换成丰富，别的换成标准（项目所有者 2026-11-09）。 */
+    @Test
+    public void storedValuesAndTheOldAddOnsMapToAMode() {
+        for (SideViewDecision.Mode mode : SideViewDecision.Mode.values()) {
+            assertEquals(mode, SideViewDecision.Mode.of(mode.value));
+        }
+        assertEquals(SideViewDecision.Mode.STANDARD, SideViewDecision.Mode.of(null));
+        assertEquals(SideViewDecision.Mode.STANDARD, SideViewDecision.Mode.of("rich"));
+        assertEquals(SideViewDecision.Mode.FULL, SideViewDecision.Mode.fromAddOns(true));
+        assertEquals(SideViewDecision.Mode.STANDARD, SideViewDecision.Mode.fromAddOns(false));
+        assertEquals("没给情境的输入当标准", SideViewDecision.Mode.STANDARD, new SideViewDecision.Input().mode);
     }
 }

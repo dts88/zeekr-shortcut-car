@@ -13,12 +13,14 @@ package com.kooo.evcam.zeekr;
  * <h3>规则（项目所有者 2026-10-16）</h3>
  *
  * <ul>
- *   <li><b>显示</b>：照 {@link SideViewDecision} —— 左灯左侧、右灯右侧，原厂画面优先，低于最低车速不显示；
- *       后视镜上的灯（盲区指示灯、开门预警，设置里开着的，2026-11-03）亮了也显示那一侧，不看车速。
+ *   <li><b>显示</b>：照 {@link SideViewDecision} 和设置里选的情境（{@link SideViewDecision.Mode}，项目所有者 2026-11-09）——
+ *       往盲区指示灯亮的一侧打转向灯、开门预警亮（三档都有，不看车速）；打转向灯（标准、丰富，低于最低车速不显示）；
+ *       盲区指示灯亮（丰富，不看车速）。左灯左侧、右灯右侧，原厂画面优先。
  *       <b>左右各管各的</b>（项目所有者 2026-11-04：后视镜上的灯左右可能同时亮）：两侧可以同时显示，
- *       打着转向灯时另一侧的灯亮着也显示。</li>
+ *       打着转向灯时另一侧该显示的也显示。</li>
  *   <li><b>收</b>：一侧不再要了，再留 {@link #HOLD_AFTER_SIGNAL_MS}，再用 {@link #FADE_MS} 从正常淡到看不见才收
- *       （项目所有者 2026-11-04；装饰动效不放时不淡，留够就收）；这期间那一侧又亮就接着显示（淡着的回到正常）。</li>
+ *       （项目所有者 2026-11-04；装饰动效不放时不淡，留够就收）；这期间那一侧又亮就接着显示（淡着的回到正常）。
+ *       简洁里打着灯、盲区的车过去了（灯灭了）也是这样收，不等转向灯关（项目所有者 2026-11-09）。</li>
  *   <li><b>只能显示一侧时</b>（中控屏第二块画布让出来了，{@link Result#lane}）：先打着转向灯的那一侧，其次灯正亮着的、
  *       先亮起来的那一侧（同时亮先左边），最后才是在保留、淡出的那一侧 —— 灯一灭就换到另一侧亮着的，和以前一样。</li>
  *   <li><b>备着</b>（预备方式 B）：挂 D 挡、原厂画面不在时窗口一直挂着、隐藏，画面留在环视的会话里，打灯只是显示出来；
@@ -45,14 +47,21 @@ final class SideViewTrigger {
     /** 离开 D 挡后再备多久（项目所有者 2026-10-16：离开 D 挡 30 秒后摘掉）。 */
     static final long READY_GRACE_MS = 30_000L;
 
-    /** 为什么显示（黑匣子那一行照它写）。 */
+    /** 为什么显示（黑匣子那一行照它写）：情境里的一种情形（{@link SideViewDecision.Mode}）。 */
     enum Cause {
-        /** 打了转向灯。 */
+        /** 打了转向灯，盲区没车（标准、丰富）。 */
         TURN,
-        /** 后视镜上的盲区指示灯亮了。 */
+        /** 往盲区指示灯亮的一侧打了转向灯（三档都有）。 */
+        TURN_TOWARD_CAR,
+        /** 后视镜上的盲区指示灯亮了，没往这一侧打转向灯（丰富）。 */
         BLIND_SPOT,
-        /** 停车后的开门预警亮了。 */
-        DOOR_WARNING
+        /** 停车后的开门预警亮了（三档都有）。 */
+        DOOR_WARNING;
+
+        /** 打着这一侧的转向灯：只能显示一侧时排在最前。 */
+        boolean signalled() {
+            return this == TURN || this == TURN_TOWARD_CAR;
+        }
     }
 
     /** 一侧此刻的样子。 */
@@ -184,7 +193,7 @@ final class SideViewTrigger {
     private boolean driving;
     /** 离开 D 挡后的备着到什么时候（从离开那一刻起算）；0 = 没在等。 */
     private long readyUntil;
-    /** 上一次判定时两侧后视镜上的灯亮没亮（设置开着的那几样）：点关闭时照它关掉灯亮的那一次。 */
+    /** 上一次判定时两侧后视镜上的灯亮没亮：点关闭时照它关掉灯亮的那一次。 */
     private boolean leftLit;
     private boolean rightLit;
 
@@ -229,15 +238,25 @@ final class SideViewTrigger {
         return result(now, true, drivingNow || readyUntil != 0, graceEnded);
     }
 
-    /** 这一侧此刻为什么要显示：打着这一侧的转向灯，或者这一侧后视镜上的灯亮着（设置开着、没被关掉）；不要是 null。 */
+    /**
+     * 这一侧此刻为什么要显示（情境里有的那几种）；不要是 null。往有车的一侧打转向灯只看灯亮的这一次关没关掉：
+     * 关掉以后灯灭了再亮（又来一辆车）照样显示，同一次打灯也一样。
+     *
+     * @param turn    打转向灯要显示的那一侧（看过车速、打灯的这一次没被关掉）
+     * @param lightOk 这一侧后视镜上的灯亮着、灯亮的这一次没被关掉
+     */
     private static Cause want(SideViewDecision.Input in, int lane, int turn, boolean lightOk) {
-        if (turn == lane) {
+        boolean blindSpot = lightOk && SideViewDecision.blindSpotLit(in, lane);
+        if (blindSpot && SideViewDecision.signalsToward(in, lane)) {
+            return Cause.TURN_TOWARD_CAR;
+        }
+        if (turn == lane && in.mode.showsTurnSignal()) {
             return Cause.TURN;
         }
-        if (!lightOk) {
-            return null;
+        if (lightOk && SideViewDecision.doorWarningLit(in, lane)) {
+            return Cause.DOOR_WARNING;
         }
-        return SideViewDecision.blindSpotLit(in, lane) ? Cause.BLIND_SPOT : Cause.DOOR_WARNING;
+        return blindSpot && in.mode.showsBlindSpot() ? Cause.BLIND_SPOT : null;
     }
 
     /**
@@ -262,10 +281,10 @@ final class SideViewTrigger {
 
     /** 只能显示一侧时显示哪一侧（类注释里的次序）；两侧都不显示是 {@link SideViewDecision#NONE}。 */
     private int first() {
-        if (left.cause == Cause.TURN) {
+        if (left.cause != null && left.cause.signalled()) {
             return LaneCycle.LEFT;
         }
-        if (right.cause == Cause.TURN) {
+        if (right.cause != null && right.cause.signalled()) {
             return LaneCycle.RIGHT;
         }
         int wanted = earlier(left, right, true);

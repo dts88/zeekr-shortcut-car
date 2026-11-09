@@ -15,7 +15,7 @@ import org.junit.Test;
 
 /**
  * {@link SideViewTrigger}：D 挡备着、打灯显示、灯灭后留 1 秒（再淡 1 秒）、离开 D 挡 30 秒后摘掉、原厂画面和熄屏立刻全收；
- * 左右各管各的（2026-11-04），只能显示一侧时的先后。
+ * 左右各管各的（2026-11-04），只能显示一侧时的先后；情境（2026-11-09）。
  */
 public class SideViewTriggerTest {
 
@@ -199,7 +199,7 @@ public class SideViewTriggerTest {
         SideViewTrigger t = new SideViewTrigger();
         SideViewDecision.Input lit = in("P", 0);
         lit.speedKmh = 0f;
-        lit.useDoorWarning = true;
+        lit.mode = SideViewDecision.Mode.MINIMAL;
         lit.doorWarningLeft = true;
         SideViewTrigger.Result r = t.update(0, lit, false);
         assertTrue("停着车也挂、也显示", r.attached);
@@ -209,7 +209,7 @@ public class SideViewTriggerTest {
 
         SideViewDecision.Input out = in("P", 0);
         out.speedKmh = 0f;
-        out.useDoorWarning = true;
+        out.mode = SideViewDecision.Mode.MINIMAL;
         out.doorWarningLeft = false;
         r = t.update(4_000, out, false);
         assertTrue("灭了先留 1 秒", r.shown);
@@ -223,18 +223,20 @@ public class SideViewTriggerTest {
     public void theCauseSaysWhichLightOrTheTurnSignal() {
         SideViewTrigger t = new SideViewTrigger();
         SideViewDecision.Input in = in("D", 0);
-        in.useBlindSpot = true;
+        in.mode = SideViewDecision.Mode.FULL;
         in.blindSpotRight = true;
         assertEquals(SideViewTrigger.Cause.BLIND_SPOT, t.update(0, in, false).cause);
         in.turnSignal = 2;
-        assertEquals("打着转向灯以转向灯为准", SideViewTrigger.Cause.TURN, t.update(100, in, false).cause);
+        assertEquals("往亮着的一侧打灯", SideViewTrigger.Cause.TURN_TOWARD_CAR, t.update(100, in, false).cause);
+        in.blindSpotRight = false;
+        assertEquals("车过去了、还打着灯", SideViewTrigger.Cause.TURN, t.update(200, in, false).cause);
     }
 
     @Test
     public void closeButtonDismissesTheLitSideUntilItGoesOut() {
         SideViewTrigger t = new SideViewTrigger();
         SideViewDecision.Input lit = in("D", 0);
-        lit.useBlindSpot = true;
+        lit.mode = SideViewDecision.Mode.FULL;
         lit.blindSpotRight = true;
         assertTrue(t.update(0, lit, false).shown);
         t.dismiss(LaneCycle.RIGHT);
@@ -243,7 +245,7 @@ public class SideViewTriggerTest {
         assertTrue("D 挡：回到备着", r.attached);
 
         SideViewDecision.Input out = in("D", 0);
-        out.useBlindSpot = true;
+        out.mode = SideViewDecision.Mode.FULL;
         out.blindSpotRight = false;
         assertFalse(t.update(2_000, out, false).shown);
         assertTrue("灭了再亮是新的一次", t.update(3_000, lit, false).shown);
@@ -253,7 +255,7 @@ public class SideViewTriggerTest {
     public void dismissingALightDoesNotHideTheOtherSide() {
         SideViewTrigger t = new SideViewTrigger();
         SideViewDecision.Input lit = in("D", 0);
-        lit.useBlindSpot = true;
+        lit.mode = SideViewDecision.Mode.FULL;
         lit.blindSpotLeft = true;
         assertEquals(LaneCycle.LEFT, t.update(0, lit, false).lane);
         t.dismiss(LaneCycle.LEFT);
@@ -373,7 +375,7 @@ public class SideViewTriggerTest {
 
     private static SideViewDecision.Input lights(String gear, Integer turn, boolean left, boolean right) {
         SideViewDecision.Input in = in(gear, turn);
-        in.useBlindSpot = true;
+        in.mode = SideViewDecision.Mode.FULL;
         in.blindSpotLeft = left;
         in.blindSpotRight = right;
         return in;
@@ -463,5 +465,109 @@ public class SideViewTriggerTest {
         assertFalse(r.side(LaneCycle.LEFT).shown);
         assertTrue(r.side(LaneCycle.RIGHT).shown);
         assertEquals(SideViewTrigger.Cause.BLIND_SPOT, r.side(LaneCycle.RIGHT).cause);
+    }
+
+    // ------------------------------------------------------------------ 情境（项目所有者 2026-11-09）
+
+    private static SideViewDecision.Input mode(SideViewDecision.Mode mode, Integer turn, Boolean left, Boolean right) {
+        SideViewDecision.Input in = in("D", turn);
+        in.mode = mode;
+        in.blindSpotLeft = left;
+        in.blindSpotRight = right;
+        return in;
+    }
+
+    /** 简洁：只打转向灯、只是盲区指示灯亮都不显示；往亮着的一侧打灯才显示，不看车速。 */
+    @Test
+    public void minimalShowsOnlyWhenSignallingTowardALitSide() {
+        SideViewDecision.Mode minimal = SideViewDecision.Mode.MINIMAL;
+        assertFalse("只打转向灯", new SideViewTrigger().update(0, mode(minimal, 2, false, false), false).shown);
+        assertFalse("只是灯亮", new SideViewTrigger().update(0, mode(minimal, 0, false, true), false).shown);
+        assertFalse("往没亮的一侧打灯", new SideViewTrigger().update(0, mode(minimal, 1, false, true), false).shown);
+
+        SideViewDecision.Input slow = mode(minimal, 2, false, true);
+        slow.speedKmh = 10f;
+        SideViewTrigger.Result r = new SideViewTrigger().update(0, slow, false);
+        assertTrue("低于最低车速也显示", r.shown);
+        assertEquals(LaneCycle.RIGHT, r.lane);
+        assertEquals(SideViewTrigger.Cause.TURN_TOWARD_CAR, r.cause);
+    }
+
+    /** 简洁：打着灯、盲区的车过去了（灯灭了）：留 1 秒就收，不等转向灯关。 */
+    @Test
+    public void minimalHidesAfterTheHoldOnceTheCarHasPassed() {
+        SideViewDecision.Mode minimal = SideViewDecision.Mode.MINIMAL;
+        SideViewTrigger t = new SideViewTrigger();
+        assertTrue(t.update(0, mode(minimal, 2, false, true), false).shown);
+        SideViewTrigger.Result r = t.update(1_000, mode(minimal, 2, false, false), false);
+        assertTrue("先留 1 秒", r.shown);
+        assertEquals(null, r.cause);
+        r = t.update(1_000 + SideViewTrigger.HOLD_AFTER_SIGNAL_MS, mode(minimal, 2, false, false), false);
+        assertFalse("还打着灯也收", r.shown);
+    }
+
+    /** 开门预警三档都有。 */
+    @Test
+    public void everyModeShowsTheDoorWarning() {
+        for (SideViewDecision.Mode m : SideViewDecision.Mode.values()) {
+            SideViewDecision.Input in = in("P", 0);
+            in.speedKmh = 0f;
+            in.mode = m;
+            in.doorWarningRight = true;
+            SideViewTrigger.Result r = new SideViewTrigger().update(0, in, false);
+            assertTrue(m.name(), r.shown);
+            assertEquals(m.name(), SideViewTrigger.Cause.DOOR_WARNING, r.cause);
+        }
+    }
+
+    /** 标准：打转向灯显示（看最低车速），只是灯亮不显示；往亮着的一侧打灯不看车速，车过去了还打着灯照样显示。 */
+    @Test
+    public void standardShowsTheTurnSignalButNotASteadyLight() {
+        SideViewDecision.Mode standard = SideViewDecision.Mode.STANDARD;
+        assertFalse("只是灯亮", new SideViewTrigger().update(0, mode(standard, 0, true, false), false).shown);
+        SideViewTrigger.Result r = new SideViewTrigger().update(0, mode(standard, 1, false, false), false);
+        assertTrue(r.shown);
+        assertEquals(SideViewTrigger.Cause.TURN, r.cause);
+
+        SideViewDecision.Input slowTurn = mode(standard, 1, false, false);
+        slowTurn.speedKmh = 10f;
+        assertFalse("只打转向灯看车速", new SideViewTrigger().update(0, slowTurn, false).shown);
+
+        SideViewTrigger t = new SideViewTrigger();
+        SideViewDecision.Input slowToCar = mode(standard, 1, true, false);
+        slowToCar.speedKmh = 10f;
+        r = t.update(0, slowToCar, false);
+        assertTrue("往亮着的一侧打灯不看车速", r.shown);
+        assertEquals(SideViewTrigger.Cause.TURN_TOWARD_CAR, r.cause);
+        SideViewDecision.Input passed = mode(standard, 1, false, false);
+        passed.speedKmh = 10f;
+        r = t.update(1_000, passed, false);
+        assertTrue("车过去了、还打着灯：已经显示着，不再看车速", r.shown);
+        assertEquals(SideViewTrigger.Cause.TURN, r.cause);
+    }
+
+    /** 关掉往有车的一侧打灯的那一次：灯还亮着不再弹；灯灭了又亮（又来一辆车）照样显示，同一次打灯也一样。 */
+    @Test
+    public void closingATurnTowardACarLastsUntilTheLightGoesOut() {
+        SideViewDecision.Mode minimal = SideViewDecision.Mode.MINIMAL;
+        SideViewTrigger t = new SideViewTrigger();
+        assertTrue(t.update(0, mode(minimal, 2, false, true), false).shown);
+        t.dismiss(LaneCycle.RIGHT);
+        assertFalse("灯还亮着", t.update(100, mode(minimal, 2, false, true), false).shown);
+        assertFalse(t.update(1_000, mode(minimal, 2, false, false), false).shown);
+        assertTrue("又来一辆车", t.update(2_000, mode(minimal, 2, false, true), false).shown);
+    }
+
+    /** 标准：关掉只打转向灯的那一次以后，这一侧来了车（灯亮了）照样显示：是新的情形。 */
+    @Test
+    public void aCarArrivingAfterClosingTheTurnSignalShowsAgain() {
+        SideViewDecision.Mode standard = SideViewDecision.Mode.STANDARD;
+        SideViewTrigger t = new SideViewTrigger();
+        assertTrue(t.update(0, mode(standard, 1, false, false), false).shown);
+        t.dismiss(LaneCycle.LEFT);
+        assertFalse("同一次打灯关掉了", t.update(100, mode(standard, 1, false, false), false).shown);
+        SideViewTrigger.Result r = t.update(200, mode(standard, 1, true, false), false);
+        assertTrue(r.shown);
+        assertEquals(SideViewTrigger.Cause.TURN_TOWARD_CAR, r.cause);
     }
 }

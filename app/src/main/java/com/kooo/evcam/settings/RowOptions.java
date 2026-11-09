@@ -24,10 +24,11 @@ import java.util.List;
 /**
  * 设置行下面那一排附加项（ui-spec §三「开关加附加项」，项目所有者 2026-10-23）：行首的开关开着时说明下面多一排 ——
  * 一个小标题加几个按钮（Material 的筛选按钮，按下是开、再按是关），下面可以有一行小字；开关关着时那一排不显示。
- * 还不能用的附加项照样摆出来，置灰、按不动。
+ * 还不能用的附加项照样摆出来，置灰、按不动。那一排也可以是三选一（{@link #setSingleChoice}）。
  *
- * <p>「开关加附加项」（{@link SwitchChipsPreference}）和「开关加下一层」（{@link SwitchNavPreference}：盲区画面的「盲区提醒」
- * 「开门预警」，项目所有者 2026-11-04）两种行共用这一份；那一排也是同一块布局（{@code pref_options}，include 进各自的行布局）。</p>
+ * <p>「开关加附加项」（{@link SwitchChipsPreference}）和「开关加下一层」（{@link SwitchNavPreference}：盲区画面的情境
+ * 「丰富」「标准」「简洁」，三选一，项目所有者 2026-11-09）两种行共用这一份；那一排也是同一块布局（{@code pref_options}，
+ * include 进各自的行布局）。</p>
  */
 final class RowOptions {
 
@@ -47,10 +48,17 @@ final class RowOptions {
     private final List<Option> options = new ArrayList<>();
     private CharSequence label;
     private CharSequence note;
+    /** 三选一（单选）：只能选一个，选中的再点不掉，监听只在选中的那一下叫。 */
+    private boolean singleChoice;
 
     /** 加一个附加项按钮；{@code listener} 是 null 的是还不能用的那种（摆着、置灰、按不动）。 */
     void add(CharSequence text, boolean checked, SwitchChipsPreference.OptionListener listener) {
         options.add(new Option(text, checked, listener));
+    }
+
+    /** 那一排是三选一（单选）：只能选一个，选中的再点不掉；监听只在选中的那一下叫（点掉的那一个不叫）。 */
+    void setSingleChoice(boolean value) {
+        singleChoice = value;
     }
 
     /** 那一排按钮前面的小标题。返回变了没有（变了行要重画）。 */
@@ -105,6 +113,9 @@ final class RowOptions {
             noteView.setVisibility(TextUtils.isEmpty(note) ? View.GONE : View.VISIBLE);
         }
         chips.removeAllViews();
+        // 行的视图会被别的行拿去用：每次都照这一行设（这时还没有按钮，不会动到选中）
+        chips.setSingleSelection(singleChoice);
+        chips.setSelectionRequired(singleChoice);
         if (!show) {
             return;
         }
@@ -117,7 +128,9 @@ final class RowOptions {
             if (option.listener != null) {
                 chip.setOnCheckedChangeListener((button, checked) -> {
                     option.checked = checked;
-                    option.listener.onChanged(checked);
+                    if (checked || !singleChoice) {
+                        option.listener.onChanged(checked);
+                    }
                 });
             }
             chips.addView(chip);
