@@ -223,7 +223,6 @@
     <!-- <string name="set_screen_off_summary">If recording when the screen turns off, keep recording the surround view and keep the head unit awake for up to the set time</string> -->
     <!-- <string name="set_screen_off_wake_title">Keep awake for up to (hours)</string> -->
     <!-- <string name="set_screen_off_wake_value">Up to %1$s h</string> -->
-    <string name="unit_hours">%1$s h</string>
     <string name="set_screen_off_keep_title">Keep recording when the screen goes off</string>
     <string name="set_screen_off_keep_summary">Keeps recording the surround view after you leave the car. Requires Sentry Mode to keep the head unit awake.</string>
     <string name="set_screen_off_fps_title">Screen-off frame rate</string>

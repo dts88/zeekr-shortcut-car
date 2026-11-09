@@ -41,9 +41,6 @@ android {
         versionCode = 343
         // 版本号从 0.1.0 重新起算；代码基座为 EVCam 1.6.6 (0876b97)
         versionName = "3.8.0-alpha"
-
-
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
@@ -51,10 +48,6 @@ android {
             // 使用签名配置
             signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = false
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
         }
     }
     compileOptions {
@@ -102,6 +95,4 @@ dependencies {
     implementation("androidx.slidingpanelayout:slidingpanelayout:1.2.0")
 
     testImplementation(libs.junit)
-    androidTestImplementation(libs.ext.junit)
-    androidTestImplementation(libs.espresso.core)
 }
