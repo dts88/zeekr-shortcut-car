@@ -65,7 +65,7 @@ public class SmartButtonActionTest {
 
     /** 车控动作：写车的有要做的事，媒体、语音的有不碰车的那一样；车门、尾门不在里面。 */
     @Test
-    public void theJiPlusActionsKnowWhatToDo() {
+    public void theCarActionsKnowWhatToDo() {
         String[] car = {"sport_one_touch", "volume_up", "volume_down", "steering_wheel_heat", "seat_vent_driver",
                 "seat_vent_passenger", "seat_heat_driver", "seat_heat_passenger", "seat_heat_rear_left",
                 "seat_heat_rear_right", "seat_heat_rear", "seat_massage_driver", "seat_massage_passenger", "seat_restore",
