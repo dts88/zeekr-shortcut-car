@@ -9,6 +9,7 @@ commit message, not here.
 
 ## [Unreleased]
 
+- Blind spot view: the mode is a slider (Minimal, Standard, Full) instead of three buttons.
 - Other apps can no longer start or stop recording, or make the floating button redraw, through the app's broadcasts.
 - Keep-alive: dropped the broadcast triggers Android never delivers to the app, and an unused network permission.
 

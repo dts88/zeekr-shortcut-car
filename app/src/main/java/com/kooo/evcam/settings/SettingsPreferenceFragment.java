@@ -1189,23 +1189,19 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     }
 
     /**
-     * 盲区画面那一行的情境（项目所有者 2026-11-09）：开关开着时说明下面一排三选一「丰富」「标准」「简洁」，
-     * 下面一行小字说选中的这一档什么时候显示。
+     * 盲区画面那一行的情境（项目所有者 2026-11-09 定三档，2026-11-10 定用滑块）：开关开着时说明下面一条三档的拖动条，
+     * 从左到右「简洁」「标准」「丰富」（{@link SettingsRegistry#SIDE_VIEW_MODE} 的次序），下面一行小字说选中的这一档什么时候显示。
      */
     private void bindSideViewMode(SwitchNavPreference row) {
         SettingSpec spec = SettingsRegistry.SIDE_VIEW_MODE;
         String current = appConfig.getSideViewMode();
-        String[] names = localizedNames(spec);
-        row.setSingleChoice(true);
-        for (int i = 0; i < spec.size(); i++) {
-            String value = spec.valueAt(i);
-            row.addOption(names[i], value.equals(current), on -> {
-                appConfig.setSideViewMode(value);
-                com.kooo.evcam.blackbox.BlackBox.noteImportant("开关变更: pref_side_view_mode → " + value);
-                row.setOptionsNote(getString(sideViewModeNote(value)));
-                SideViewService.applyConfig();
-            });
-        }
+        row.setSteps(localizedNames(spec), spec.indexOf(current), index -> {
+            String value = spec.valueAt(index);
+            appConfig.setSideViewMode(value);
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("开关变更: pref_side_view_mode → " + value);
+            row.setOptionsNote(getString(sideViewModeNote(value)));
+            SideViewService.applyConfig();
+        });
         row.setOptionsNote(getString(sideViewModeNote(current)));
     }
 

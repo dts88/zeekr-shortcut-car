@@ -24,7 +24,7 @@ import com.kooo.evcam.R;
  * 行尾的值下面另有一行哨兵模式此刻的状态，{@link #showSentryStatus}）。
  *
  * <p>开关开着时说明下面也可以多一排附加项（{@link #addOption}，和「开关加附加项」那一排同一种，{@link RowOptions}），
- * 也可以是三选一（{@link #setSingleChoice}）：盲区画面的情境「丰富」「标准」「简洁」（项目所有者 2026-11-09）。
+ * 也可以是一条几档的拖动条（{@link #setSteps}）：盲区画面的情境「简洁」「标准」「丰富」（项目所有者 2026-11-10 定用滑块）。
  * 那一排自己接住点击，没点中按钮时不进下一层。</p>
  *
  * <p>行首的开关只管开关；点这一行其余的地方不切换开关，交给 {@code OnPreferenceClickListener} 进下一层；
@@ -60,9 +60,15 @@ public class SwitchNavPreference extends SwitchPreferenceCompat implements Prefe
         notifyChanged();
     }
 
-    /** 那一排是三选一（{@link RowOptions#setSingleChoice}）：只能选一个，监听只在选中的那一下叫。在加按钮之前叫。 */
-    public void setSingleChoice(boolean single) {
-        options.setSingleChoice(single);
+    /**
+     * 那一排是一条几档的拖动条（{@link RowOptions#setSteps}）：松手停在另一档才叫 {@code listener}，叫完这一行重画
+     * （选中的档位名变亮）。
+     */
+    void setSteps(CharSequence[] labels, int selected, RowOptions.StepListener listener) {
+        options.setSteps(labels, selected, index -> {
+            listener.onStep(index);
+            notifyChanged();
+        });
         notifyChanged();
     }
 
