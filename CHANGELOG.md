@@ -11,6 +11,11 @@ commit message, not here.
 
 Nothing yet.
 
+## [3.8.0-alpha] - 2026-11-09
+
+- Blind spot view: the Blind spot alert and Door open warning options become a choice of Full, Standard or Minimal for when the view shows.
+- Blind spot view: the edge keeps blinking when motion is reduced.
+
 ## [3.7.0-alpha] - 2026-11-08
 
 - Blind spot view: no black window while the surround view can't give a picture (for example the car is using the camera); it says so once and shows again as soon as the picture is back (thanks to lelelolo).
