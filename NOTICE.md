@@ -39,9 +39,9 @@
 平台事实笔记见 [`docs/zeekr-platform-notes.md`](docs/zeekr-platform-notes.md)，
 其中逐条标注了来源与未验证项。
 
-上游原始文档保留在 [`docs/`](docs/) 目录：
-`upstream-EVCam-README.md`、`upstream-EVCam-CLAUDE.md`、`upstream-EVCam-AGENTS.md`、
-`upstream-EVCam-免责声明.md`。
+上游的两份免责声明保留在 [`docs/`](docs/) 目录：`upstream-EVCam-免责声明.md`、`upstream-EVCam-补盲免责声明.md`。
+上游的其他原始文档（README、CLAUDE.md、AGENTS.md 和 README 里的图片）已不适用于本项目，从当前目录删去，
+原文都在第一个 commit 里。
 
 ### 许可影响
 
@@ -103,11 +103,10 @@ dts88 写的部分另有两条 GPL-3.0 第 7 条允许的附加条款（署名�
 | NanoHTTPD | BSD 3-Clause |
 | ZXing Core | Apache License 2.0 |
 
-`docs/evcam-upstream-douyin.jpg`、`docs/evcam-upstream-douyin2.png` 来自 EVCam，
-是其补盲功能作者（抖音 @星星舰见）的反馈群二维码，随上游一同保留以维持署名。
-应用里没有用到它们，2.0 之后从 `assets/` 挪到 `docs/`，不再打进 APK。
-同一位作者的补盲免责声明 `docs/upstream-EVCam-补盲免责声明.md`（原 `res/raw/blind_spot_disclaimer.md`）也来自 EVCam，
-应用里同样没有用到，2026-11-06 挪到 `docs/`。
+EVCam 的补盲功能由抖音 @星星舰见 开发（本项目 1.44 起已不含那部分代码）。这位作者的补盲免责声明
+`docs/upstream-EVCam-补盲免责声明.md`（原 `res/raw/blind_spot_disclaimer.md`）随上游保留；其反馈群二维码图片
+（原 `docs/evcam-upstream-douyin.jpg`、`docs/evcam-upstream-douyin2.png`）应用里从未用到，已从当前目录删去，
+原文件在第一个 commit 里。
 
 ---
 

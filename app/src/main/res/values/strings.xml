@@ -244,7 +244,6 @@
     <!-- <string name="set_screen_off_summary">熄屏时若正在录制，继续录制环视并阻止车机休眠，最长不超过设定的时长</string> -->
     <!-- <string name="set_screen_off_wake_title">阻止休眠时长上限（小时）</string> -->
     <!-- <string name="set_screen_off_wake_value">最长 %1$s 小时</string> -->
-    <string name="unit_hours">%1$s 小时</string>
     <string name="set_screen_off_keep_title">熄屏持续录制</string>
     <string name="set_screen_off_keep_summary">下车后继续录制环视。需开启哨兵模式，使车机保持唤醒状态。</string>
     <!-- 熄屏后的帧率（熄屏持续录制的下一层，2026-11-04）：框的标题、选项下面的说明、跟随那一项 -->
