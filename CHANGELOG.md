@@ -11,6 +11,11 @@ commit message, not here.
 
 Nothing yet.
 
+## [3.10.0-alpha] - 2026-11-11
+
+- Camera: when a session can't take every picture, who gives way and when it tries again are decided in one place (the camera keeper); nothing should look different.
+- Preview, Super mirror and Blind spot view hand their pictures to the camera keeper; nothing should look different.
+
 ## [3.9.1-alpha] - 2026-11-10
 
 - Blind spot view: the mode is picked from a row of segments, like Show on, instead of a slider.
