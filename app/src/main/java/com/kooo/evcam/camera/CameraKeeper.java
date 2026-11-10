@@ -423,6 +423,17 @@ public final class CameraKeeper {
         return context;
     }
 
+    // ================================================================= 录像让了之后什么时候再试（3c 第二步 2b）
+
+    /**
+     * 一份管线的录像让了之后什么时候再试的那一本（{@link RecordRetries}）：管线建的时候开一本；隔够了在这里的主线程上通知那一份管线
+     * （{@code due}）。等相机走了回来、登记表变了、亮屏这几件由那一份管线报来。
+     */
+    RecordRetries recordRetries(RecordRetries.Due due) {
+        return new RecordRetries(due, (delayMs, task) -> main.postDelayed(task, delayMs),
+                android.os.SystemClock::uptimeMillis);
+    }
+
     // ================================================================= 前台服务（3b）
 
     /**

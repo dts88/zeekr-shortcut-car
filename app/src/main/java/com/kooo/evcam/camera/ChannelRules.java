@@ -2378,6 +2378,17 @@ public final class ChannelRules {
         return kind == Kind.MIRROR;
     }
 
+    /**
+     * 会话带不上一路的录像输出（相机层配不上会话、丢了它）之后，隔多久再声明（相机管家 3c 第二步 2b，规矩照旧，
+     * {@link RecordRetries}）：连着不到 {@link CameraLiveness#MAX_ATTEMPTS} 次，隔 {@link CameraLiveness#RETRY_GAP_MS}；
+     * 到了次数不再按时间试（0），等它的相机走了回来、要它的登记方变了、或者亮屏 —— 和救援梯子一个节奏，不会一直重配会话。
+     *
+     * @param refusals 连着第几次（从 1 起）
+     */
+    static long recordRetryAfter(int refusals) {
+        return refusals < CameraLiveness.MAX_ATTEMPTS ? CameraLiveness.RETRY_GAP_MS : 0L;
+    }
+
     /** 要的输出：有人要、已声明、消费者还活着的那几样（预览、后视镜、盲区画面、录像）。 */
     static Set<Out> wantedOutputs(World w, Lane lane) {
         Set<Out> want = new LinkedHashSet<>();
