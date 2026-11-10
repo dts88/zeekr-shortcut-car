@@ -182,12 +182,11 @@ public class MultiCameraManager {
      */
     private final Set<String> unrecordable = new HashSet<>();
     /**
-     * 会话带不上录像输出的那几路（主线程）：相机层配不上会话，把这一路的录像输出丢了（{@link SingleCamera.Drop#CONFIG_FAILED}）。
-     * 这是相机那一侧的事（倒车时原厂 360 刚放开环视、HAL 还在拆它的流，就会这样），不算录不了、不整次停：这一路退出，
-     * 隔 {@link CameraLiveness#RETRY_GAP_MS} 再声明一个；连着 {@link CameraLiveness#MAX_ATTEMPTS} 次都带不上，等它的相机走了
-     * （丢了、关了、在救）回来时再试 —— 和救援梯子一个节奏，不会一直重配会话。加入了（会话带上了）就清。
+     * 会话带不上录像输出的那几路什么时候再试（主线程）：相机层配不上会话、把这一路的录像输出丢了
+     * （{@link SingleCamera.Drop#CONFIG_FAILED}）是相机那一侧的事，这一路退出，记在相机管家开的那一本里（{@link RecordRetries}，
+     * 规矩 {@link ChannelRules#recordRetryAfter}）；隔够了它通知（{@link #retryLane}），等的那几件由这里报给它。
      */
-    private final Map<String, Refusal> refusals = new HashMap<>();
+    private final RecordRetries retries;
     /** 换下来、交给调度等录像输出离开会话再放的录制器（主线程）：调度停不下来时到点直接放（{@link #releaseLeftovers}）。 */
     private final Set<Slot> retiring = new HashSet<>();
     /**
@@ -385,14 +384,6 @@ public class MultiCameraManager {
         }
     }
 
-    /** 一路的录像输出连着被会话带不上的账（主线程，{@link #refusals}）。 */
-    private static final class Refusal {
-        /** 连着几次。 */
-        int count;
-        /** 这个时刻（uptime）之前不再声明。 */
-        long retryAt;
-    }
-
     /** 这个录像意图里一路进出的账（主线程，黑匣子用）。 */
     private static final class LaneTrip {
         int joins;
@@ -501,6 +492,8 @@ public class MultiCameraManager {
 
     public MultiCameraManager(Context context) {
         this.context = context;
+        // 录像让了之后什么时候再试：相机管家给这一份开一本（3c 第二步 2b）
+        retries = CameraKeeper.get(context).recordRetries(this::retryLane);
         // 相机服务眼里每一路空不空：管线一建就听。以前只有前台服务调它，前台服务没起来时相机服务说的话一句都没收，
         // 每次丢失都被判成「没说空闲」。注册那一刻的回放在主线程上收全，排在之后 post 的每一轮之前（重复调用无害）
         CameraAvailabilityWatch.start(context);
@@ -802,7 +795,7 @@ public class MultiCameraManager {
         if (unrecordable.contains(lane.key)) {
             return useCodecRecording ? "录制器建不起来" : "MediaRecorder 备不起来、或者开不了录";
         }
-        if (refusedUntilGone(lane.key)) {
+        if (retries.refusedUntilGone(lane.key)) {
             return "会话连着 " + CameraLiveness.MAX_ATTEMPTS + " 次带不上录像输出，等相机走了回来、登记表变了或者亮屏再试";
         }
         // 这一台那一轮满 60 秒还有开或关没返回（项目所有者 2026-10-28、10-29）：被拿着、在救也是它在先 —— 那一下返回之前谁都不开它
@@ -817,7 +810,7 @@ public class MultiCameraManager {
             case GAVE_UP:
                 return "停手了";
             case STREAMING:
-                return refused(lane.key) ? "在出画面，会话刚带不上录像输出，等一会儿再试" : "在出画面，录制器在备";
+                return retries.refused(lane.key) ? "在出画面，会话刚带不上录像输出，等一会儿再试" : "在出画面，录制器在备";
             default:
                 return lane.cannotOpen ? "现在用不了相机，等主界面回到前台" : "在开";
         }
@@ -839,7 +832,7 @@ public class MultiCameraManager {
 
     /** 这一路的录制器此刻怎样（主线程）。 */
     private RecordingLanes.Recorder recorderOf(String key) {
-        if (unrecordable.contains(key) || refusedUntilGone(key)) {
+        if (unrecordable.contains(key) || retries.refusedUntilGone(key)) {
             return RecordingLanes.Recorder.FAILED;
         }
         if (!useCodecRecording) {
@@ -866,7 +859,7 @@ public class MultiCameraManager {
         if (!isRecording || !recordingPlan.containsKey(key)) {
             return ChannelRules.RecordPrep.NONE;
         }
-        if (unrecordable.contains(key) || refused(key)) {
+        if (unrecordable.contains(key) || retries.refused(key)) {
             return ChannelRules.RecordPrep.FAILED;
         }
         if (!useCodecRecording) {
@@ -898,7 +891,7 @@ public class MultiCameraManager {
                     : why == ChannelScheduler.Gone.RESCUED ? "相机卡住了，调度在救"
                     : closeText(key, closed, "相机关了"));
             // 会话带不上它的录像输出的账随这一路的相机走了就清：回来时是一份新会话，照常声明
-            if (refusals.remove(key) != null) {
+            if (retries.cameraGone(key)) {
                 ensureLane(key);
             }
             publishLanes();
@@ -976,7 +969,7 @@ public class MultiCameraManager {
      */
     private void ensureRecorder(String key) {
         if (!isRecording || !useCodecRecording || !recordingPlan.containsKey(key) || unrecordable.contains(key)
-                || refused(key) || building.containsKey(key) || channel.releasedByDark(key)) {
+                || retries.refused(key) || building.containsKey(key) || channel.releasedByDark(key)) {
             return;
         }
         SingleCamera camera = cameras.get(key);
@@ -1106,7 +1099,7 @@ public class MultiCameraManager {
 
     /**
      * 计划里每一路的录制器都建不起来（MediaRecorder 还有开录没成）：这不是相机的事，整次停（START_FAILED，存储一类，
-     * 照旧自动恢复）。会话带不上录像输出是相机那一侧的事，不算在这里（{@link #refusals}）。
+     * 照旧自动恢复）。会话带不上录像输出是相机那一侧的事，不算在这里（{@link #retries}）。
      */
     private void checkAllUnrecordable() {
         if (!isRecording || interruptReported || !unrecordable.containsAll(recordingPlan.keySet())) {
@@ -1232,7 +1225,7 @@ public class MultiCameraManager {
         }
         slot.phase = SlotPhase.RUNNING;
         // 会话带上了它的录像输出：带不上的账清掉
-        refusals.remove(key);
+        retries.joined(key);
         noteJoined(key, frameAt, "文件按此刻起名", rearmMs >= 0 ? "（含重新备好 " + rearmMs + " ms）" : "");
         publishLanes();
     }
@@ -1413,24 +1406,8 @@ public class MultiCameraManager {
         publishLanes();
     }
 
-    /** 会话带不上这一路的录像输出，眼下不再声明（主线程）：还没到再试的时候，或者连着几次都带不上了（{@link #refusals}）。 */
-    private boolean refused(String key) {
-        Refusal refusal = refusals.get(key);
-        return refusal != null && (refusal.count >= CameraLiveness.MAX_ATTEMPTS
-                || android.os.SystemClock.uptimeMillis() < refusal.retryAt);
-    }
-
     /**
-     * 会话连着 {@link CameraLiveness#MAX_ATTEMPTS} 次都带不上这一路的录像输出：等它的相机走了回来、登记表变了、或者亮屏再试
-     * （主线程，{@link #liftRefusals}）。
-     */
-    private boolean refusedUntilGone(String key) {
-        Refusal refusal = refusals.get(key);
-        return refusal != null && refusal.count >= CameraLiveness.MAX_ATTEMPTS;
-    }
-
-    /**
-     * 会话连着几次都带不上录像输出、等着的那几路（{@link #refusedUntilGone}）重新声明（主线程）：和救援梯子停手之后同样的解锁
+     * 会话连着几次都带不上录像输出、等着的那几路（{@link RecordRetries#refusedUntilGone}）重新声明（主线程）：和救援梯子停手之后同样的解锁
      * （ChannelRules.liftStops，§7.4）—— 要它的登记方变了（只那一路，{@link LaneSide#onLaneWantersChanged}）、亮屏（各路）；
      * 相机服务报它空闲说明它的相机走过了，那时已经清了
      * （{@link LaneSide#onLaneCameraGone}）。以前只等相机走：录像开着时 RECORDING 一直让它开着、在出画面，相机不会走，
@@ -1440,16 +1417,10 @@ public class MultiCameraManager {
      * @param keys 只看这几路；null 是各路
      */
     private void liftRefusals(String why, java.util.Collection<String> keys) {
-        if (!isRecording || refusals.isEmpty()) {
+        if (!isRecording) {
             return;
         }
-        List<String> lifted = new ArrayList<>();
-        for (String key : new ArrayList<>(refusals.keySet())) {
-            if ((keys == null || keys.contains(key)) && refusedUntilGone(key)) {
-                refusals.remove(key);
-                lifted.add(key);
-            }
-        }
+        List<String> lifted = retries.lift(keys);
         if (lifted.isEmpty()) {
             return;
         }
@@ -1463,31 +1434,21 @@ public class MultiCameraManager {
     }
 
     /**
-     * 会话带不上这一路的录像输出（主线程；这一路已经退出、录制器换下来了）：记一次。还没到次数就隔
-     * {@link CameraLiveness#RETRY_GAP_MS} 再声明一个（{@link #ensureLane}）；到了次数就等它的相机走了再来
-     * （{@link LaneSide#onLaneCameraGone}）。
+     * 会话带不上这一路的录像输出（主线程；这一路已经退出、录制器换下来了）：记进相机管家开的那一本（{@link RecordRetries#refuse}）。
+     * 还没到次数，隔够了它通知（{@link #retryLane}）；到了次数就等它的相机走了再来（{@link LaneSide#onLaneCameraGone}）。
      */
     private void sessionRefused(String key, String name) {
-        Refusal refusal = refusals.get(key);
-        if (refusal == null) {
-            refusal = new Refusal();
-            refusals.put(key, refusal);
+        int count = retries.refuse(key);
+        noteSessionRefused(name, count, !retries.refusedUntilGone(key));
+    }
+
+    /** 隔够了（{@link RecordRetries} 到点通知，主线程）：这个录像意图还在录，这一路重新声明一个录像输出。 */
+    private void retryLane(String key) {
+        if (isRecording) {
+            ensureLane(key);
+            channel.wake();
+            publishLanes();
         }
-        refusal.count++;
-        boolean again = refusal.count < CameraLiveness.MAX_ATTEMPTS;
-        noteSessionRefused(name, refusal.count, again);
-        if (!again) {
-            return;
-        }
-        refusal.retryAt = android.os.SystemClock.uptimeMillis() + CameraLiveness.RETRY_GAP_MS;
-        final int gen = recordGeneration;
-        laneHandler.postDelayed(() -> {
-            if (gen == recordGeneration && isRecording) {
-                ensureLane(key);
-                channel.wake();
-                publishLanes();
-            }
-        }, CameraLiveness.RETRY_GAP_MS);
     }
 
     /** 录像输出为什么离开了会话。 */
@@ -4633,7 +4594,7 @@ public class MultiCameraManager {
         recordingPlan.clear();
         recordSources.clear();
         unrecordable.clear();
-        refusals.clear();
+        retries.clear();
         trips.clear();
         startReported = false;
         noneLiveSince = 0;
@@ -4700,7 +4661,7 @@ public class MultiCameraManager {
         recordSources.clear();
         building.clear();
         unrecordable.clear();
-        refusals.clear();
+        retries.clear();
         trips.clear();
         startReported = false;
         noneLiveSince = 0;
@@ -4955,7 +4916,7 @@ public class MultiCameraManager {
      */
     private void ensureMedia(String key) {
         if (!isRecording || useCodecRecording || !recordingPlan.containsKey(key) || unrecordable.contains(key)
-                || refused(key) || mediaSlots.containsKey(key) || lanes.state(key) != RecordingLanes.State.WAITING) {
+                || retries.refused(key) || mediaSlots.containsKey(key) || lanes.state(key) != RecordingLanes.State.WAITING) {
             return;
         }
         SingleCamera camera = cameras.get(key);
@@ -5119,7 +5080,7 @@ public class MultiCameraManager {
         }
         media.phase = MediaPhase.RUNNING;
         // 会话带上了它的录像输出：带不上的账清掉
-        refusals.remove(key);
+        retries.joined(key);
         noteJoined(key, frameAt, "文件 " + new File(media.file).getName() + "（备好时起的名，备好到开录 "
                 + seconds(android.os.SystemClock.uptimeMillis() - media.preparedAt) + "）", "（开录用了 " + ms + " ms）");
         publishLanes();
