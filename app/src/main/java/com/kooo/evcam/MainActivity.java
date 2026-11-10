@@ -33,6 +33,7 @@ import androidx.appcompat.app.AlertDialog;
 
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.kooo.evcam.camera.CameraKeeper;
+import com.kooo.evcam.camera.CanvasSlot;
 import com.kooo.evcam.camera.ChannelRules;
 import com.kooo.evcam.camera.ImageAdjustManager;
 import com.kooo.evcam.camera.MultiCameraManager;
@@ -139,6 +140,11 @@ public class MainActivity extends AppCompatActivity {
      * 这里只向它请求，把它的结果画到屏幕上。
      */
     private CameraKeeper keeper;
+    /**
+     * 三格预览画布交给相机管家的位置（{@link CanvasSlot}，相机管家 3c 第二步）：onCreate 建、onDestroy 关。声明在哪一路上、
+     * 管线换了重新交、留下和接回都经过它。
+     */
+    private final java.util.Map<String, CanvasSlot> previewSlots = new java.util.HashMap<>();
 
     private ImageAdjustManager imageAdjustManager;  // 亮度/降噪调节管理器
     private ImageAdjustFloatingWindow imageAdjustFloatingWindow;  // 亮度/降噪调节悬浮窗
@@ -295,6 +301,9 @@ public class MainActivity extends AppCompatActivity {
         // 录像的唯一入口是进程级的相机管家：相机管线还没建出来时就可以先「要录」，它等管线建好、查过盘就开，不等环视
         keeper = CameraKeeper.get(this);
         keeper.addListener(recordingListener);
+        for (String key : PreviewSlots.KEYS) {
+            previewSlots.put(key, keeper.canvas(ChannelRules.Kind.PREVIEW, key, PREVIEW_CANVAS));
+        }
 
         // 照配置里启用的几路摆布局
         setupLayoutByCarModel();
@@ -621,13 +630,38 @@ public class MainActivity extends AppCompatActivity {
         if (cameraManager == null) {
             initCamera();
         } else {
-            cameraManager.declarePreviews(canvasFor("front"), canvasFor("back"), canvasFor("left"));
+            offerPreviews();
         }
         // 画布都在了，这时才登记「预览要相机」：相机一开，第一份会话就带着预览。
         // 以前在 onResume 登记，而画布要到第一次绘制之后才有 —— 开出来的会话没有预览，
         // 画布一到又重配一遍，三路各多一次进相机服务（2026-10-08，环视那一次重配卡了 12 秒）
         claimPreviewIfReady();
     }
+
+    /**
+     * 各格画布交给相机管家（{@link CanvasSlot#offer}）：同一块画布再交一次什么都不变，所以画布就绪、接上管线时都把各格交一遍。
+     * 这一格没启用、画布还没就绪的跳过。
+     */
+    private void offerPreviews() {
+        for (String key : PreviewSlots.KEYS) {
+            AutoFitTextureView view = canvasFor(key);
+            android.graphics.SurfaceTexture texture = view != null ? view.getSurfaceTexture() : null;
+            if (texture != null) {
+                previewSlots.get(key).offer(texture, view);
+            }
+        }
+    }
+
+    /** 预览画布：主界面预览不让（相机层不会丢它），摆位由相机这一侧跟着视图做 —— 这里没什么要做的。 */
+    private static final CanvasSlot.Listener PREVIEW_CANVAS = new CanvasSlot.Listener() {
+        @Override
+        public void onBound(SingleCamera camera) {
+        }
+
+        @Override
+        public void onRefused() {
+        }
+    };
 
     /**
      * 每一路画面停了就压暗、写「画面已停止」（{@link com.kooo.evcam.zeekr.PreviewStall}，和超级镜子同一套，项目所有者 2026-10-20）：
@@ -664,7 +698,7 @@ public class MainActivity extends AppCompatActivity {
 
     /**
      * 主界面重建（换日夜模式、换语言、从最近任务划掉后再打开）：上一个界面留下的预览画布接回来
-     * （大纲 §7.6，项目所有者 2026-10-11「按建议」；留是 {@link MultiCameraManager#keepPreviewCanvas}）。
+     * （大纲 §7.6，项目所有者 2026-10-11「按建议」；留是 {@link CanvasSlot#keep}）。
      *
      * <p>在 onCreate 里、画布挂上窗口之前做：{@code TextureView.setSurfaceTexture} 之后视图不再自己建画布，
      * 也就不会来 onSurfaceTextureAvailable —— 所以这里当场把预览声明回去（同一块画布就是同一个输出，
@@ -673,19 +707,16 @@ public class MainActivity extends AppCompatActivity {
      * 和系统建的画布一样晚。没留下的那几格照旧等系统建。</p>
      */
     private void reattachKeptCanvases() {
-        // 留着画布的只会是进程里那一份管线（管线属于应用，主界面销毁不放它）。这里不建：没有就没有画布可接。
-        // 它要是随后因为换车型、配置里开关了一路被 Holder 放掉重建，接回的画布归视图，新的那一份照样声明它
-        MultiCameraManager pipeline = com.kooo.evcam.camera.CameraManagerHolder.getInstance().getCameraManager();
-        if (pipeline == null || pipeline.isReleased()) {
-            return;
-        }
+        // 留着画布的只会是进程里那一份管线（管线属于应用，主界面销毁不放它）。这里不建：没有就没有画布可接（CanvasSlot.takeKept）。
+        // 它要是随后因为换车型、配置里开关了一路被 Holder 放掉重建，接回的画布归视图，相机管家把它声明到新的一份上
         List<String> back = new ArrayList<>();
         for (String key : PreviewSlots.KEYS) {
             AutoFitTextureView view = canvasFor(key);
             if (view == null || view.isAvailable()) {
                 continue;
             }
-            android.graphics.SurfaceTexture kept = pipeline.takeKeptPreview(key);
+            CanvasSlot slot = previewSlots.get(key);
+            android.graphics.SurfaceTexture kept = slot.takeKept();
             if (kept == null) {
                 continue;
             }
@@ -696,12 +727,12 @@ public class MainActivity extends AppCompatActivity {
                 // 那一路整条重复请求停到调度摘掉它（审查 2026-10-11，和后视镜接不上时一样）；还不回去（管线里已经没有这一路）
                 // 才放掉，这块画布不在它的会话里。这一格照旧等系统建
                 AppLog.w(TAG, "接回留着的预览画布失败 " + key + ": " + e);
-                if (!MultiCameraManager.keepPreviewCanvas(pipeline, key, kept)) {
+                if (!slot.keep(kept)) {
                     kept.release();
                 }
                 continue;
             }
-            pipeline.declarePreview(key, view);
+            slot.offer(kept, view);
             textureReadyCount++;
             back.add(MultiCameraManager.roleName(key));
         }
@@ -736,9 +767,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public boolean onSurfaceTextureDestroyed(@NonNull android.graphics.SurfaceTexture surface) {
                 textureReadyCount--;
-                MultiCameraManager pipeline = cameraManager != null ? cameraManager
-                        : com.kooo.evcam.camera.CameraManagerHolder.getInstance().getCameraManager();
-                boolean kept = MultiCameraManager.keepPreviewCanvas(pipeline, cameraKey, surface);
+                boolean kept = previewSlots.get(cameraKey).keep(surface);
                 AppLog.d(TAG, "TextureView " + cameraKey + " destroyed, remaining: " + textureReadyCount
                         + (kept ? ", canvas kept by the pipeline" : ""));
                 return !kept;
@@ -1537,7 +1566,7 @@ public class MainActivity extends AppCompatActivity {
         }
         showBuilt(built);
         showBuiltCabins(pipeline);
-        pipeline.declarePreviews(canvasFor("front"), canvasFor("back"), canvasFor("left"));
+        offerPreviews();
         // 各路的画面尺寸可能在挂上回调之前就算出来了（不开设备先算的、上一个界面时开过的）：补一次
         pipeline.firePreviewSizeCallbacks();
         registerCamerasToImageAdjustManager();
@@ -2663,7 +2692,7 @@ public class MainActivity extends AppCompatActivity {
         previewStall.detachAll();
 
         // 相机管线属于应用，不属于主界面（大纲 §2 阶段 6，channel-logic §五）：主界面销毁不放它，相机关不关交给通道调度 ——
-        // 主界面只是登记表里的一个需要方。预览画布在画布销毁那一下交给管线（keepPreviewCanvas；onSurfaceTextureDestroyed 在
+        // 主界面只是登记表里的一个需要方。预览画布在画布销毁那一下交给管线（CanvasSlot.keep；onSurfaceTextureDestroyed 在
         // onDestroy 之后才来），PREVIEW 在 onPause 放过了（重建时留给新界面）：这里都不再做 —— 再放一遍 PREVIEW 的话，
         // 重建时调度会把相机关了再开。以前这里看「还要不要」决定放不放管线：放了的话后视镜当场黑掉、录像断在重建上
         if (cameraManager != null && !cameraManager.isReleased()) {
@@ -2689,6 +2718,10 @@ public class MainActivity extends AppCompatActivity {
 
         // 相机管家是进程级的，录像和它的等待都不随这个界面走；只把画面反馈摘掉
         keeper.removeListener(recordingListener);
+        // 预览画布的位置关掉（管线换了不再替这个界面交）：画布在视图摘下来那一下照样交给管线留着（CanvasSlot.keep）
+        for (CanvasSlot slot : previewSlots.values()) {
+            slot.close();
+        }
 
         // 熄屏退后台的那一步：界面都没了，不用退
         com.kooo.evcam.screen.ScreenState.removeListener(screenListener);

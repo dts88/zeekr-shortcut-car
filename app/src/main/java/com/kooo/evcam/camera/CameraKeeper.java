@@ -213,6 +213,8 @@ public final class CameraKeeper {
         // （应用一起来就装上了，装过了什么都不做）：没装上时挂的会丢
         ChannelFacts.install(this.context);
         ChannelScheduler.setSurroundVerdictListener(() -> main.post(this::onChannelVerdict));
+        // 管线被放掉重建了：新的一份建好，把交着的画布声明到它上面（3c 第二步，见 canvasesOnNewPipeline）。进程里只有一份管家，挂一次
+        CameraManagerHolder.getInstance().addReplacedListener(canvasesOnNewPipeline);
     }
 
     // ================================================================= 请求
@@ -373,6 +375,47 @@ public final class CameraKeeper {
      */
     public void takePhoto(MultiCameraManager.PhotoCallback callback) {
         CameraManagerHolder.getInstance().getOrInit(context).takePhoto(callback);
+    }
+
+    // ================================================================= 画布（3c 第二步）
+
+    /**
+     * 交上来的画布的位置（{@link CanvasSlot}）：主界面三格预览、超级镜子两块、盲区画面三块，各方建一次、走的时候关掉。主线程。
+     */
+    private final List<CanvasSlot> canvases = new ArrayList<>();
+
+    /**
+     * 管线被放掉重建了（换车型、上一次列相机出错、超级镜子要后座舱而管线里没有）：新的一份建好，就把交着的画布声明到它上面
+     * （{@link CanvasSlot#onNewPipeline}），不等各方的看门狗那两秒 —— 新的一份开相机时会话里就带着它们，不用随后再改一次输出。
+     * 以前超级镜子、盲区画面各自挂着做这件事；主界面换管线时还要把界面的回调接到新的一份上，那一半照旧是它自己的。
+     */
+    private final Runnable canvasesOnNewPipeline = () -> {
+        CameraManagerHolder holder = CameraManagerHolder.getInstance();
+        holder.whenBuilt(holder.getCameraManager(), built -> main.post(() -> {
+            MultiCameraManager pipeline = holder.getCameraManager();
+            for (CanvasSlot slot : new ArrayList<>(canvases)) {
+                slot.onNewPipeline(pipeline);
+            }
+        }));
+    };
+
+    /**
+     * 一块画布的位置：哪一种输出（{@link ChannelRules.Kind#PREVIEW}、{@link ChannelRules.Kind#MIRROR}、盲区画面三块）、
+     * 哪一路（{@link CameraSlots} 的键）。交、撤回、留下、接回都经过它（{@link CanvasSlot}）。主线程。
+     */
+    public CanvasSlot canvas(ChannelRules.Kind kind, String lane, CanvasSlot.Listener listener) {
+        CanvasSlot slot = new CanvasSlot(this, kind, lane, listener);
+        canvases.add(slot);
+        return slot;
+    }
+
+    /** 那一方走了（{@link CanvasSlot#close}）。 */
+    void closed(CanvasSlot slot) {
+        canvases.remove(slot);
+    }
+
+    Context appContext() {
+        return context;
     }
 
     // ================================================================= 前台服务（3b）

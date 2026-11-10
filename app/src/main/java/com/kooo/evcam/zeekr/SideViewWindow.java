@@ -226,7 +226,7 @@ public class SideViewWindow extends ViewGroup implements SideViewOutputWindow {
 
     /**
      * 把窗口当场移走（服务退出、离开 D 挡 30 秒、熄屏、原厂画面出现时）：画布在这一下被收走，
-     * 服务在 onSurfaceTextureDestroyed 里把它交给管线留着（同超级镜子，{@link MultiCameraManager#keepSideCanvas}）。
+     * 服务在 onSurfaceTextureDestroyed 里把它交给管线留着（同超级镜子，{@link com.kooo.evcam.camera.CanvasSlot#keep}）。
      * 只从服务调，不在本窗口的绘制、触摸分发途中，当场摘是安全的（理由同 {@link RearViewMirrorView#hide}）。
      */
     @Override

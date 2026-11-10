@@ -30,6 +30,7 @@ import com.kooo.evcam.blackbox.BlackBox;
 import com.kooo.evcam.camera.CameraManagerHolder;
 import com.kooo.evcam.camera.CameraKeeper;
 import com.kooo.evcam.camera.CameraSlots;
+import com.kooo.evcam.camera.CanvasSlot;
 import com.kooo.evcam.camera.ChannelRules;
 import com.kooo.evcam.camera.ChannelScheduler;
 import com.kooo.evcam.camera.MultiCameraManager;
@@ -60,8 +61,8 @@ import com.kooo.evcam.telemetry.VehicleState;
  *
  * <h3>只声明、只登记（同超级镜子，{@link RearViewMirrorService}）</h3>
  *
- * <p>通道调度（{@link ChannelScheduler}）是唯一动相机的地方。这里只做两件事：把窗口的画布声明成环视的盲区画面输出
- * （{@link SingleCamera#declareSide} / {@link SingleCamera#declareHud}），和向相机管家要相机（{@link CameraKeeper#need}，{@link CameraKeeper.Use#SIDE_VIEW}）
+ * <p>通道调度（{@link ChannelScheduler}）是唯一动相机的地方。这里只做两件事：把窗口的画布交给相机管家（{@link CanvasSlot}，
+ * 3c 第二步：它声明成环视的盲区画面输出，中控屏两块、HUD），和向相机管家要相机（{@link CameraKeeper#need}，{@link CameraKeeper.Use#SIDE_VIEW}）
  * —— 它要环视，配置里没开环视也要（项目所有者 2026-10-16，{@code ChannelRules}）。两个出口共用这一个登记方，都放开了才放开。
  * 开不开环视、什么时候把画布加进会话、挂不下时谁让路，都由调度和相机层判；以后调规则也只在登记表这一处。</p>
  *
@@ -71,7 +72,7 @@ import com.kooo.evcam.telemetry.VehicleState;
  * 打灯显示那一侧，灯灭后 1 秒收起；离开 D 挡 30 秒后、熄屏、原厂画面出现时移走窗口、注销、撤回。
  * 超级镜子一点不动：几个窗口各管各的。</p>
  *
- * <p><b>移走窗口时画布由管线留着</b>（同超级镜子 §7.7，{@link MultiCameraManager#keepSideCanvas}、{@link MultiCameraManager#keepHudCanvas}）：
+ * <p><b>移走窗口时画布由管线留着</b>（同超级镜子 §7.7，{@link CanvasSlot#keep}）：
  * 会话里的画布只由通道调度放，不自己放 —— PR #1、#19 就错在这里（窗口一拆就放掉画布，环视会话里多一个死输出，摘到之前整条流停着）。
  * 下一次挂窗口接回同一块（{@link Output#takeBackKeptCanvas}），通道零变动。</p>
  *
@@ -211,22 +212,19 @@ public class SideViewService extends Service {
         BlackBox.attach(this, "Service:SideViewService");
         BlackBox.noteImportant("后台服务 SideViewService onCreate");
         appConfig = new AppConfig(this);
+        // 三块画布交给相机管家的位置（3c 第二步）：声明在哪一路上、管线换了重新交、留下和接回都经过它。
+        // 在 instance 之前建好：监测线程经 instance 读诊断时，位置已经在了
+        center.open();
+        centerSecond.open();
+        hud.open();
         instance = this;
         ScreenState.addListener(screenListener);
-        // 管线被放掉重建了：新的一份建好当场重新声明（同超级镜子，见 pipelineReplaced）
-        CameraManagerHolder.getInstance().addReplacedListener(pipelineReplaced);
     }
 
     /**
-     * 管线被放掉重建了（换车型、上一次列相机出错、超级镜子要后座舱而管线里没有）：新的一份建好就当场重新声明，不等看门狗那两秒 ——
-     * 新的一份开环视时会话里就带着盲区画面的画布，不用随后再改一次输出。和超级镜子、主界面同一个办法。
+     * 窗口挂着、亮着屏、画布在：几个出口各自再声明一次（看门狗到点走这里）。管线换了一份时，相机管家把交着的画布
+     * 声明到新的一份上（{@link CanvasSlot}），不等看门狗那两秒。
      */
-    private final Runnable pipelineReplaced = () -> {
-        CameraManagerHolder holder = CameraManagerHolder.getInstance();
-        holder.whenBuilt(holder.getCameraManager(), built -> handler.post(this::rebindIfAttached));
-    };
-
-    /** 窗口挂着、亮着屏、画布在：两个出口各自再声明一次（看门狗到点、管线换了都走这里）。 */
     private void rebindIfAttached() {
         if (!destroyed) {
             center.rebindIfAttached();
@@ -327,7 +325,7 @@ public class SideViewService extends Service {
 
         String target = appConfig.getSideViewTarget();
         boolean useHud = !AppConfig.SIDE_VIEW_TARGET_CENTER.equals(target) && hudDisplay(now) != null;
-        boolean useCenter = !AppConfig.SIDE_VIEW_TARGET_HUD.equals(target) || !useHud || hud.refused;
+        boolean useCenter = !AppConfig.SIDE_VIEW_TARGET_HUD.equals(target) || !useHud || hud.refused();
 
         MirrorLamps lamps = Telemetry.get().lamps();
         SideViewDecision.Input in = input(s, r, lamps, appConfig.getSideViewMinSpeed());
@@ -337,7 +335,7 @@ public class SideViewService extends Service {
         SideViewTrigger.Result hudResult = hudTrigger.update(now, hudIn, dark);
         ChannelRules.Condition surround = surroundCondition();
         // 中控屏：两块画布左右各管一侧；第二块这一段让出来了，第一块显示优先的那一侧
-        boolean pair = !centerSecond.refused;
+        boolean pair = !centerSecond.refused();
         center.evaluate(useCenter ? centerResult : null, in,
                 pair ? new int[]{LaneCycle.LEFT} : new int[]{centerResult.lane}, surround);
         centerSecond.evaluate(useCenter ? centerResult : null, in, new int[]{LaneCycle.RIGHT}, surround);
@@ -346,8 +344,8 @@ public class SideViewService extends Service {
             ((SideViewHudWindow) hud.window).setNight(night);
         }
         noteRefusal(useCenter && centerResult.shown, useHud && hudResult.shown);
-        noteSurroundUnavailable((useCenter && centerResult.shown && !center.refused)
-                || (useHud && hudResult.shown && !hud.refused), surround);
+        noteSurroundUnavailable((useCenter && centerResult.shown && !center.refused())
+                || (useHud && hudResult.shown && !hud.refused()), surround);
 
         long wakeAt = centerResult.wakeAt;
         if (hudResult.wakeAt > 0 && (wakeAt == 0 || hudResult.wakeAt < wakeAt)) {
@@ -385,11 +383,11 @@ public class SideViewService extends Service {
      * 两个出口这一段都过去了（都不再「不带」）才重新算。
      */
     private void noteRefusal(boolean centerWants, boolean hudWants) {
-        if (!center.refused && !hud.refused) {
+        if (!center.refused() && !hud.refused()) {
             refusalShown = false;
             return;
         }
-        boolean refusedWanted = (centerWants && center.refused) || (hudWants && hud.refused);
+        boolean refusedWanted = (centerWants && center.refused()) || (hudWants && hud.refused());
         if (refusedWanted && !center.showing() && !centerSecond.showing() && !hud.showing() && !refusalShown) {
             refusalShown = true;
             showToast(R.string.msg_side_view_unavailable);
@@ -491,11 +489,14 @@ public class SideViewService extends Service {
         destroyed = true;
         instance = null;
         ScreenState.removeListener(screenListener);
-        CameraManagerHolder.getInstance().removeReplacedListener(pipelineReplaced);
         stopListening();
         center.detach();
         centerSecond.detach();
         hud.detach();
+        // 三块画布的位置关掉：管线换了不再替这个服务交，相机层再报的不再转过来
+        center.close();
+        centerSecond.close();
+        hud.close();
         handler.removeCallbacksAndMessages(null);
         super.onDestroy();
     }
@@ -512,24 +513,16 @@ public class SideViewService extends Service {
      * 各管各的；判定是服务的（中控屏两块共用一份，{@link #centerTrigger}），这里照它显示自己管的那几侧。
      * 登记表、看门狗、提示是服务一份。
      */
-    private final class Output {
+    private final class Output implements CanvasSlot.Listener {
 
         /** 在环视上声明成哪一样输出：{@link ChannelRules.Kind#SIDE}、{@link ChannelRules.Kind#SIDE_SECOND}、{@link ChannelRules.Kind#HUD}。 */
         final ChannelRules.Kind kind;
         final boolean isHud;
         SideViewOutputWindow window;
-        /** 输出声明在哪一路相机上（环视）、属于哪一份管线、声明出去的那块画布。 */
-        SingleCamera boundCamera;
-        MultiCameraManager boundManager;
-        SurfaceTexture boundTexture;
+        /** 交给相机管家的位置（onCreate 建、onDestroy 关）：输出声明在哪一路相机上（环视）、这一段带不带它都在它那里。 */
+        CanvasSlot slot;
         /** 刚接回留着的画布：下一次出帧时把缓冲区尺寸拨回去（同超级镜子的 restoreBufferOnFrame）。 */
         boolean restoreBufferOnFrame;
-        /**
-         * 这一段不带它：相机层这一回丢了它（共享预览流挂不下、会话配不上时它最先让路，JPEG 之后），或者窗口挂不上
-         * （HUD 那块屏没了时系统也会收掉窗口）。到窗口本来就该移走为止（离开 D 挡 30 秒、熄屏、原厂画面出现）不再挂，
-         * 下一次再挂时重试 —— 一段里最多一次，调度不会一直想把它加回去；配不上多半是一时的，不该从此不显示（ultracode 审查 core-1）。
-         */
-        boolean refused;
         /** 登记表上 SIDE_VIEW 算它一份：声明着画布。 */
         boolean claimed;
         int retryCount;
@@ -548,6 +541,24 @@ public class SideViewService extends Service {
             this.isHud = kind == ChannelRules.Kind.HUD;
         }
 
+        void open() {
+            slot = CameraKeeper.get(SideViewService.this).canvas(kind, CameraSlots.KEY_SURROUND, this);
+        }
+
+        void close() {
+            slot.close();
+        }
+
+        /**
+         * 这一段不带它（相机管家记着，{@link CanvasSlot#refused}）：相机层这一回丢了它（共享预览流挂不下、会话配不上时它最先让路，
+         * JPEG 之后），或者窗口挂不上（HUD 那块屏没了时系统也会收掉窗口）。到窗口本来就该移走为止（离开 D 挡 30 秒、熄屏、
+         * 原厂画面出现）不再挂，下一次再挂时重试（{@link CanvasSlot#retry}）—— 一段里最多一次，调度不会一直想把它加回去；
+         * 配不上多半是一时的，不该从此不显示（ultracode 审查 core-1）。
+         */
+        boolean refused() {
+            return slot.refused();
+        }
+
         /** 黑匣子里跟在「盲区画面」后面的标记：中控屏第一块不加，别的加种类名（「（HUD）」「（SIDE_SECOND）」）。 */
         String label() {
             return kind == ChannelRules.Kind.SIDE ? "" : "（" + kind + "）";
@@ -560,8 +571,8 @@ public class SideViewService extends Service {
 
         String describe() {
             SideViewOutputWindow w = window;
-            SingleCamera camera = boundCamera;
-            return "refused=" + refused + " claimed=" + claimed
+            SingleCamera camera = slot.camera();
+            return "refused=" + refused() + " claimed=" + claimed
                     + " window=" + (w == null ? "none" : w.describe())
                     + " boundCamera=" + (camera != null ? camera.getCameraId() : "none")
                     + " inSession=" + inSession();
@@ -577,9 +588,9 @@ public class SideViewService extends Service {
         /** 熄屏、服务退出：这一段结束，窗口移走（判定由服务从头来）。 */
         void stop() {
             heldBack = false;
-            if (refused) {
+            if (refused()) {
                 // 熄屏也是这一段的结束（同离开 D 挡 30 秒、原厂画面）：亮屏后再挂窗口时重试。服务退出也走这里，那就只是结束
-                refused = false;
+                slot.retry();
                 BlackBox.note(destroyed ? "盲区画面" + label() + "：服务停下，不带它的这一段结束"
                         : "盲区画面" + label() + "：熄屏，不带它的这一段结束，亮屏后再挂窗口时重试");
             }
@@ -600,16 +611,16 @@ public class SideViewService extends Service {
                     BlackBox.note("盲区画面" + label() + "：这一刻不用这一处，移走窗口");
                     detach();
                 }
-                refused = false;
+                slot.retry();
                 heldBack = false;
                 return;
             }
-            if (refused && !result.attached) {
+            if (refused() && !result.attached) {
                 // 这一段过去了（离开 D 挡 30 秒、熄屏、原厂画面）：下一次挂窗口时重试
-                refused = false;
+                slot.retry();
                 BlackBox.note("盲区画面" + label() + "：不带它的这一段结束，下一次挂窗口时重试");
             }
-            if (!refused) {
+            if (!refused()) {
                 apply(result, in, lanes, surround);
             }
         }
@@ -835,11 +846,7 @@ public class SideViewService extends Service {
             if (w == null || !w.isAttached()) {
                 return;
             }
-            MultiCameraManager pipeline = CameraManagerHolder.getInstance().getCameraManager();
-            if (pipeline == null || pipeline.isReleased()) {
-                return;
-            }
-            SurfaceTexture kept = pipeline.takeKeptSide(kind);
+            SurfaceTexture kept = slot.takeKept();
             if (kept == null) {
                 return;
             }
@@ -847,7 +854,7 @@ public class SideViewService extends Service {
                 w.getTextureView().setSurfaceTexture(kept);
             } catch (RuntimeException e) {
                 AppLog.w(TAG, "接回留着的盲区画面画布失败" + label() + ": " + e);
-                if (!keepCanvas(pipeline, kept)) {
+                if (!slot.keep(kept)) {
                     kept.release();
                 }
                 return;
@@ -858,11 +865,6 @@ public class SideViewService extends Service {
             w.syncCanvas();
         }
 
-        /** 这块画布交给管线留着（{@link MultiCameraManager#keepSideCanvas}，照这一块的种类）。 */
-        private boolean keepCanvas(MultiCameraManager pipeline, SurfaceTexture st) {
-            return MultiCameraManager.keepSideCanvas(pipeline, kind, st);
-        }
-
         /**
          * 窗口的画布要被系统收走了（窗口移走）：交给管线留着，由调度等它离开会话再放（同超级镜子 {@code handCanvasToPipeline}）。
          *
@@ -871,12 +873,11 @@ public class SideViewService extends Service {
         private boolean handCanvasToPipeline(SurfaceTexture st) {
             cancelRetry();
             restoreBufferOnFrame = false;
-            if (st == boundTexture) {
+            if (st == slot.texture()) {
                 unbindCamera();
-                withdrawOutput();
             }
-            MultiCameraManager pipeline = CameraManagerHolder.getInstance().getCameraManager();
-            boolean kept = keepCanvas(pipeline, st);
+            // 撤回（这块正声明着的话）、交给会话里还带着它的那一份管线留着
+            boolean kept = slot.keep(st);
             if (!kept) {
                 AppLog.i(TAG, "盲区画面" + label() + "画布没了、管线里没有环视：照旧放掉，还在会话里的由通道调度马上摘");
                 ChannelScheduler.wakeAll();
@@ -892,7 +893,7 @@ public class SideViewService extends Service {
             SideViewOutputWindow w = window;
             if (w == null) {
                 unbindCamera();
-                withdrawOutput();
+                slot.withdraw();
                 stopWatchdogIfIdle();
                 return;
             }
@@ -903,7 +904,7 @@ public class SideViewService extends Service {
             // 接回来的画布要自己交给管线，不然它没人管（ultracode 审查 service-1）
             SurfaceTexture orphan = w.getTextureView().isAttachedToWindow() ? null : w.getTextureView().getSurfaceTexture();
             unbindCamera();
-            withdrawOutput();
+            slot.withdraw();
             window = null;
             w.detach();
             if (orphan != null && !orphan.isReleased() && !handCanvasToPipeline(orphan)) {
@@ -934,7 +935,7 @@ public class SideViewService extends Service {
             if (firstFrameSeen || w == null || !w.isShowing()) {
                 return;
             }
-            SingleCamera camera = boundCamera;
+            SingleCamera camera = slot.camera();
             BlackBox.note("盲区画面" + label() + "收起：显示了 " + (SystemClock.uptimeMillis() - shownAtMs)
                     + " ms 一帧都没来；" + (camera == null ? "没接上相机" : "环视" + (camera.isCameraOpened() ? "开着" : "没开")
                     + "、会话里" + (inSession() ? "带着" : "没有") + "盲区画面、最近错误 " + camera.lastErrorName()));
@@ -946,7 +947,7 @@ public class SideViewService extends Service {
             if (w == null) {
                 return;
             }
-            SingleCamera camera = boundCamera;
+            SingleCamera camera = slot.camera();
             if (!w.hasGeometry() && camera != null) {
                 w.setSourceSize(camera.getPreviewSize());
             }
@@ -980,57 +981,54 @@ public class SideViewService extends Service {
                     || surfaceTexture == null || surfaceTexture.isReleased()) {
                 return;
             }
-            MultiCameraManager manager = CameraManagerHolder.getInstance().getCameraManager();
-            if (manager == null) {
-                manager = CameraManagerHolder.getInstance().getOrInit(SideViewService.this);
-            }
-            SingleCamera camera = manager != null ? manager.getCamera(CameraSlots.KEY_SURROUND) : null;
-            if (camera == null) {
+            // 交给相机管家：声明在当下那一份管线的环视上（还没有管线就建；换了一路相机或者一块画布，它先从原来那里撤回）。
+            // 拿不到环视就过一会儿再交
+            CanvasSlot.Offer offer = slot.offer(surfaceTexture, null);
+            if (offer == CanvasSlot.Offer.NO_CAMERA) {
                 scheduleRetry(surfaceTexture);
                 return;
             }
             retryCount = 0;
-            if (camera != boundCamera || surfaceTexture != boundTexture) {
-                // 换了一路相机（换车型，管线重建了）或者换了一块画布：先从原来那里撤回，再在这里声明
-                withdrawOutput();
-                boundCamera = camera;
-                boundManager = manager;
-                boundTexture = surfaceTexture;
-                restoreBufferSize(surfaceTexture);
+            if (offer == CanvasSlot.Offer.REFUSED) {
+                return;   // 这一段不带它：窗口那时已经移走了，走不到这里
             }
+            SingleCamera camera = slot.camera();
             Size previewSize = camera.getPreviewSize();
             if (previewSize != null && !w.hasGeometry()) {
                 w.setSourceSize(previewSize);
             }
-            final SingleCamera declaredOn = camera;
-            SingleCamera.RecordDropped dropped = why -> onDropped(declaredOn, surfaceTexture, why);
-            boolean declared = camera.declareSide(kind, surfaceTexture, dropped);
+            boolean declared = offer == CanvasSlot.Offer.DECLARED;
             CameraKeeper keeper = CameraKeeper.get(SideViewService.this);
             boolean newlyClaimed = !keeper.needs(CameraKeeper.Use.SIDE_VIEW);
             claimed = true;
             keeper.need(CameraKeeper.Use.SIDE_VIEW);
-            if (declared) {
-                manager.channelScheduler().wake();
-            }
             if (declared || newlyClaimed) {
                 AppLog.i(TAG, "盲区画面" + label() + (declared ? "声明了输出" : "的输出早已声明")
                         + (newlyClaimed ? "、登记了 SIDE_VIEW" : "，SIDE_VIEW 早已登记")
                         + "：开环视、把画布加进会话都由通道调度做（环视此刻 "
-                        + manager.channelScheduler().condition(CameraSlots.KEY_SURROUND)
+                        + slot.manager().channelScheduler().condition(CameraSlots.KEY_SURROUND)
                         + "，预览尺寸 " + previewSize + "，缓冲区 " + camera.getPreviewBufferSize() + "）");
             }
         }
 
-        /**
-         * 相机层丢了这一处的画布（调度在主线程上派发）：共享预览流挂不下、或者会话配不上时盲区画面最先让路（JPEG 之后），
-         * 预览、超级镜子、录像不受影响。这一段不再挂（{@link #refused}），不然调度会一直想把它加回去，一次次重建环视会话。
-         */
-        private void onDropped(SingleCamera camera, SurfaceTexture texture, SingleCamera.Drop why) {
-            if (destroyed || camera != boundCamera || texture != boundTexture) {
-                return;
+        /** 声明到了这一路相机上（第一次、换了一块画布、管线换了）：缓冲区尺寸拨回去；窗口还不知道画面尺寸就交给它。 */
+        @Override
+        public void onBound(SingleCamera camera) {
+            restoreBufferSize(slot.texture());
+            SideViewOutputWindow w = window;
+            Size previewSize = camera.getPreviewSize();
+            if (w != null && previewSize != null && !w.hasGeometry()) {
+                w.setSourceSize(previewSize);
             }
-            if (why != SingleCamera.Drop.CONFIG_FAILED) {
-                AppLog.w(TAG, "盲区画面" + label() + "的画布离开了会话（" + why + "）");
+        }
+
+        /**
+         * 相机层这一回不带这一处（共享预览流挂不下、或者会话配不上时盲区画面最先让路，JPEG 之后；预览、超级镜子、录像不受影响）：
+         * 相机管家记下了，这一段不再挂（{@link #refused}）—— 不然调度会一直想把它加回去，一次次重建环视会话。
+         */
+        @Override
+        public void onRefused() {
+            if (destroyed) {
                 return;
             }
             BlackBox.noteImportant("盲区画面" + label() + "：相机层这一回不带它（共享预览流挂不下或会话配不上），这一段不再挂"
@@ -1040,7 +1038,7 @@ public class SideViewService extends Service {
 
         /** 这一段不带这一处（{@link #refused}）：放开登记、撤回、移走窗口；正打着灯、另一处也显示不了的话当场说一句。 */
         private void refuse() {
-            refused = true;
+            slot.refuse();
             refusalShown = false;
             detach();
             // 不在这里直接判：可能正在 apply 里（窗口挂不上）
@@ -1049,10 +1047,11 @@ public class SideViewService extends Service {
 
         /** 把缓冲区尺寸拨回相机会话配置时用的那个（理由见超级镜子的 {@code restoreBufferSize}）。 */
         private void restoreBufferSize(SurfaceTexture surfaceTexture) {
-            if (surfaceTexture == null || boundCamera == null) {
+            SingleCamera camera = slot.camera();
+            if (surfaceTexture == null || camera == null) {
                 return;
             }
-            Size buffer = boundCamera.getPreviewBufferSize();
+            Size buffer = camera.getPreviewBufferSize();
             if (buffer == null || buffer.getWidth() <= 0 || buffer.getHeight() <= 0) {
                 return;
             }
@@ -1061,10 +1060,7 @@ public class SideViewService extends Service {
 
         /** 这一处的输出此刻在环视的会话里（按会话配好时记下的快照）。从监测线程读时是近似值。 */
         boolean inSession() {
-            SingleCamera camera = boundCamera;
-            SurfaceTexture texture = boundTexture;
-            return camera != null && texture != null && camera.sessionOutputs().carries(
-                    new ChannelRules.Out(kind, texture));
+            return slot.inSession();
         }
 
         private void scheduleRetry(SurfaceTexture surfaceTexture) {
@@ -1090,26 +1086,6 @@ public class SideViewService extends Service {
             cancelRetry();
             claimed = false;
             releaseClaimIfUnused();
-        }
-
-        /**
-         * 撤回这一处的输出。撤回不碰会话：画布还活着就是「留着的输出」，等下一次本来要动、或者关相机时一起摘
-         * （移走窗口时画布交给管线留着，见 {@link #handCanvasToPipeline}）。
-         */
-        private void withdrawOutput() {
-            SingleCamera camera = boundCamera;
-            MultiCameraManager manager = boundManager;
-            SurfaceTexture texture = boundTexture;
-            boundCamera = null;
-            boundManager = null;
-            boundTexture = null;
-            if (camera != null && texture != null
-                    && camera.withdrawSide(kind, texture)) {
-                AppLog.i(TAG, "盲区画面" + label() + "撤回了输出（相机 " + camera.getCameraId() + "）：还在会话里的由通道调度摘");
-                if (manager != null) {
-                    manager.channelScheduler().wake();
-                }
-            }
         }
     }
 }

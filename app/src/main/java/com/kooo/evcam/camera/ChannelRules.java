@@ -2369,6 +2369,15 @@ public final class ChannelRules {
         return null;
     }
 
+    /**
+     * 让了之后，管线换了一份时相机管家自己再试哪几样（相机管家 3c 第二步，时机照旧）：超级镜子再试（以前它自己在管线换了时
+     * 清掉、重新声明）；盲区画面不试，等这一段结束（离开 D 挡 30 秒、熄屏、原厂画面，那一方说）。别的再试的时候都由那一方说
+     * （{@link CanvasSlot#retry}）。主界面预览不让，不在这里。
+     */
+    static boolean retryOnNewPipeline(Kind kind) {
+        return kind == Kind.MIRROR;
+    }
+
     /** 要的输出：有人要、已声明、消费者还活着的那几样（预览、后视镜、盲区画面、录像）。 */
     static Set<Out> wantedOutputs(World w, Lane lane) {
         Set<Out> want = new LinkedHashSet<>();
