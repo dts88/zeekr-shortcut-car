@@ -366,8 +366,8 @@ public class SingleCamera {
     private static final long REBUILD_DEBOUNCE_MS = 100L;
     private static final long REBUILD_AFTER_CLOSE_MS = 50L;
     private static final long CLOSE_FALLBACK_MS = 300L;
-    private int configFailRetryCount = 0; // session 配置失败重试计数
-    private static final int MAX_CONFIG_FAIL_RETRIES = 3; // 最大重试次数
+    /** 会话配不上时不丢东西已经再试了几次（照 {@link ChannelRules#onConfigFailed} 给的存）。 */
+    private int configFailRetryCount = 0;
     private final Object sessionLock = new Object(); // 新增：用于同步 Session 操作
 
     // ===================================================================== 2.11 通道调度的接口
@@ -423,8 +423,9 @@ public class SingleCamera {
     private volatile int[] latestAdjust;
 
     /**
-     * 会话里几样输出的次序：预览、后视镜、盲区画面（中控屏、HUD、中控屏第二块）共用一条流（预览打头），出帧口、录像各一条，
-     * JPEG 最后。共享预览流挂不下时排在后面的先让：中控屏第二块，再是 HUD（项目所有者 2026-11-04 定的次序）。
+     * 会话里几样输出的次序：预览、后视镜、盲区画面（中控屏、HUD、中控屏第二块）共用一条流（排在最前的那块建这条流），出帧口、
+     * 录像各一条，JPEG 最后。共享预览流挂不下时谁让照 {@link ChannelRules#sharedOverflow}（只有盲区画面让，中控屏第二块先，
+     * 再是 HUD，项目所有者 2026-11-04）。
      */
     private static final ChannelRules.Kind[] SESSION_ORDER = {
             ChannelRules.Kind.PREVIEW, ChannelRules.Kind.MIRROR, ChannelRules.Kind.SIDE, ChannelRules.Kind.HUD,
@@ -2677,7 +2678,9 @@ public class SingleCamera {
         // 将所有预览性质的 Surface（主预览、后视镜、盲区画面的中控屏两块和 HUD）组合成一个硬件流；
         // 几块的缓冲区尺寸在这之前都拨成了相机的输出尺寸，OutputConfiguration 才对得上
         OutputConfiguration previewSharedConfig = null;
-        int sharedCount = 0;
+        // 共享预览流挂不下时这一份会话不带的那几块（照 ChannelRules.sharedOverflow：建流的那块总是带着，别的只有盲区画面让）
+        Set<ChannelRules.Out> overflow = Collections.emptySet();
+        int sharedLimit = 0;
         final Map<ChannelRules.Out, Surface> built = new LinkedHashMap<>();
         for (Target target : targets) {
             ChannelRules.Kind kind = target.out.kind;
@@ -2687,12 +2690,14 @@ public class SingleCamera {
                     previewSharedConfig = new OutputConfiguration(target.surface);
                     previewSharedConfig.enableSurfaceSharing();
                     outputConfigs.add(previewSharedConfig);
-                    noteSharedSurfaceLimit(previewSharedConfig.getMaxSharedSurfaceCount());
-                } else if (sideView && sharedCount >= previewSharedConfig.getMaxSharedSurfaceCount()) {
-                    // 共享预览流挂满了（框架给的上限）：盲区画面最可有可无，这一份会话不带它（排在最后的先轮到：
-                    // 中控屏第二块，再是 HUD），告诉盲区画面那一侧（它撤回声明，不然调度会一直想把它加回来）
-                    com.kooo.evcam.blackbox.BlackBox.noteImportant("相机 " + cameraId + " 共享预览流已挂 " + sharedCount
-                            + " 块画布（上限 " + previewSharedConfig.getMaxSharedSurfaceCount() + "）：这一份会话不带盲区画面"
+                    sharedLimit = previewSharedConfig.getMaxSharedSurfaceCount();
+                    noteSharedSurfaceLimit(sharedLimit);
+                    overflow = new java.util.HashSet<>(ChannelRules.sharedOverflow(sharedOuts(targets), sharedLimit));
+                } else if (overflow.contains(target.out)) {
+                    // 共享预览流挂满了（框架给的上限）：照让路规则这一份会话不带这块盲区画面，
+                    // 告诉盲区画面那一侧（它撤回声明，不然调度会一直想把它加回来）
+                    com.kooo.evcam.blackbox.BlackBox.noteImportant("相机 " + cameraId + " 共享预览流已挂 " + sharedLimit
+                            + " 块画布（上限 " + sharedLimit + "）：这一份会话不带盲区画面"
                             + (kind == ChannelRules.Kind.HUD ? "（HUD）"
                             : kind == ChannelRules.Kind.SIDE_SECOND ? "（中控屏第二块）" : "（中控屏）"));
                     dropOutput(target.out, Drop.CONFIG_FAILED);
@@ -2700,7 +2705,6 @@ public class SingleCamera {
                 } else {
                     previewSharedConfig.addSurface(target.surface);
                 }
-                sharedCount++;
             } else {
                 // 出帧口、录像各自一条独立的硬件流
                 outputConfigs.add(new OutputConfiguration(target.surface));
@@ -2739,12 +2743,8 @@ public class SingleCamera {
             AppLog.d(TAG, "Camera " + cameraId + " Surface[" + i + "]: " + s + ", isValid=" + s.isValid());
         }
 
-        // 配不上时按这份会话里有什么来丢
-        final ChannelRules.Out sideOut = firstOfKind(built.keySet(), ChannelRules.Kind.SIDE);
-        final ChannelRules.Out hudOut = firstOfKind(built.keySet(), ChannelRules.Kind.HUD);
-        final ChannelRules.Out secondOut = firstOfKind(built.keySet(), ChannelRules.Kind.SIDE_SECOND);
-        final ChannelRules.Out mirrorOut = firstOfKind(targets, ChannelRules.Kind.MIRROR);
-        final ChannelRules.Out recordOut = firstOfKind(targets, ChannelRules.Kind.RECORD);
+        // 配不上时照这份会话带着什么来丢（ChannelRules.onConfigFailed）
+        final List<ChannelRules.Out> sessionOuts = new ArrayList<>(built.keySet());
 
         // 注：旧会话关闭已提前到方法开头处理（确保 SurfaceTexture 断开连接后再创建 EGL Surface）
 
@@ -2832,69 +2832,45 @@ public class SingleCamera {
                     return;
                 }
 
-                // 重试逻辑：按 JPEG → 盲区画面 → 后视镜 → 录像的次序丢输出，一步里的重试都不往外报
-                // 先丢拍照通道：它是这条会话里最可有可无的一条流，
-                // 丢了照片退回抓预览，画面一帧不少；留着它却可能一帧都没有。
-                if (jpegReader != null && !jpegDropped) {
+                // 照让路规则丢（ChannelRules.onConfigFailed，相机管家 3c：拍照 → 盲区画面 → 录像中的后视镜 → 录像），
+                // 一步里的重试都不往外报
+                int sameRetries = configFailRetryCount;
+                ChannelRules.ConfigRetry next = ChannelRules.onConfigFailed(sessionOuts, jpegReader != null && !jpegDropped,
+                        sameRetries);
+                configFailRetryCount = next.sameRetries;
+                if (next.dropJpeg) {
+                    // 拍照通道是这条会话里最可有可无的一条流：丢了照片退回抓预览，画面一帧不少；留着它却可能一帧都没有
                     jpegDropped = true;
                     closeJpegReader();
                     AppLog.w(TAG, "Camera " + cameraId
                             + " 会话配不上，先丢掉拍照通道再试（拍照将回退到抓预览）");
-                    requestSessionRebuild("config-failed-drop-jpeg", 200);
+                    requestSessionRebuild("config-failed-drop-jpeg", next.delayMs);
                     return;
                 }
-
-                // 再丢盲区画面：录不录像都先丢它（预览、超级镜子、录像都比它要紧），中控屏两块、HUD 一起丢，
-                // 告诉盲区画面那一侧撤回
-                if (sideOut != null || hudOut != null || secondOut != null) {
-                    com.kooo.evcam.blackbox.BlackBox.noteImportant("相机 " + cameraId
-                            + " 会话配置失败：先丢掉盲区画面再试（"
-                            + (sideOut != null ? "中控屏" : "") + (secondOut != null ? "、中控屏第二块" : "")
-                            + (hudOut != null ? "、HUD" : "") + "）");
-                    if (sideOut != null) {
-                        dropOutput(sideOut, Drop.CONFIG_FAILED);
-                    }
-                    if (secondOut != null) {
-                        dropOutput(secondOut, Drop.CONFIG_FAILED);
-                    }
-                    if (hudOut != null) {
-                        dropOutput(hudOut, Drop.CONFIG_FAILED);
-                    }
-                    requestSessionRebuild("config-failed-drop-side", 200);
-                    return;
-                }
-
-                if (recordOut != null) {
-                    // 录制中：丢弃可选 Surface 后重试。丢了哪一样都报出去 —— 丢了录像输出，录像那一路当场退出，
+                if (!next.drop.isEmpty()) {
+                    // 丢了哪一样都报出去：盲区画面、后视镜那一侧撤回；丢了录像输出，录像那一路当场退出，
                     // 不再悄悄饿 15 秒、然后被当成写不进整次停
-                    if (mirrorOut != null) {
-                        AppLog.w(TAG, "Retrying without main floating surface...");
-                        com.kooo.evcam.blackbox.BlackBox.noteImportant("相机 " + cameraId
-                                + " 录像中会话配置失败：丢掉后视镜输出重试");
-                        dropOutput(mirrorOut, Drop.CONFIG_FAILED);
-                    } else {
-                        AppLog.w(TAG, "Retrying without recording surface...");
-                        com.kooo.evcam.blackbox.BlackBox.noteImportant("相机 " + who()
-                                + " 录像中会话配置失败：丢掉录像输出重试（已报给录像那一侧，这一路退出录像）");
-                        dropOutput(recordOut, Drop.CONFIG_FAILED);
+                    noteConfigDrop(next.drop);
+                    for (ChannelRules.Out out : next.drop) {
+                        dropOutput(out, Drop.CONFIG_FAILED);
                     }
-                    requestSessionRebuild("config-failed-recording", 500);
-                } else {
-                    configFailRetryCount++;
-                    if (configFailRetryCount <= MAX_CONFIG_FAIL_RETRIES) {
-                        // 可能是 Surface 正在从其他摄像头转移（connect: already connected），
-                        // 短暂延迟后重试，等待旧 session 释放 Surface
-                        AppLog.w(TAG, "Camera " + cameraId + " session config failed, retry " + configFailRetryCount + "/" + MAX_CONFIG_FAIL_RETRIES + " in 200ms...");
-                        requestSessionRebuild("config-failed-retry", 200);
-                    } else {
-                        // 重试耗尽：不再重试，报一次。一步只报一次结果 —— 以前每试一次就报一次，
-                        // 调度会在它还在重试时就判这一步完了
-                        AppLog.e(TAG, "Camera " + cameraId + " config retries exhausted (" + configFailRetryCount + ")");
-                        configFailRetryCount = 0;
-                        if (callback != null) {
-                            callback.onCameraError(cameraId, -3);
-                        }
-                    }
+                    requestSessionRebuild(ChannelRules.sideView(next.drop.get(0).kind)
+                            ? "config-failed-drop-side" : "config-failed-recording", next.delayMs);
+                    return;
+                }
+                if (next.delayMs > 0) {
+                    // 可能是 Surface 正在从其他摄像头转移（connect: already connected），
+                    // 短暂延迟后重试，等待旧 session 释放 Surface
+                    AppLog.w(TAG, "Camera " + cameraId + " session config failed, retry " + configFailRetryCount + "/"
+                            + ChannelRules.CONFIG_FAIL_RETRIES + " in " + next.delayMs + "ms...");
+                    requestSessionRebuild("config-failed-retry", next.delayMs);
+                    return;
+                }
+                // 重试耗尽：不再重试，报一次。一步只报一次结果 —— 以前每试一次就报一次，
+                // 调度会在它还在重试时就判这一步完了
+                AppLog.e(TAG, "Camera " + cameraId + " config retries exhausted (" + (sameRetries + 1) + ")");
+                if (callback != null) {
+                    callback.onCameraError(cameraId, -3);
                 }
             }
             @Override
@@ -2960,6 +2936,40 @@ public class SingleCamera {
         CameraCallback cb = callback;
         if (cb != null) {
             cb.onOutputDropped(cameraId, out, why);
+        }
+    }
+
+    /** 要挂上共享预览流的那几块（预览、后视镜、盲区画面），照会话次序。 */
+    private static List<ChannelRules.Out> sharedOuts(List<Target> targets) {
+        List<ChannelRules.Out> shared = new ArrayList<>();
+        for (Target target : targets) {
+            ChannelRules.Kind kind = target.out.kind;
+            if (kind == ChannelRules.Kind.PREVIEW || kind == ChannelRules.Kind.MIRROR || ChannelRules.sideView(kind)) {
+                shared.add(target.out);
+            }
+        }
+        return shared;
+    }
+
+    /** 会话配不上丢输出时记的那一行（黑匣子；照丢的是什么写，和 2026-11-10 以前同样的话）。 */
+    private void noteConfigDrop(List<ChannelRules.Out> drop) {
+        ChannelRules.Out first = drop.get(0);
+        if (ChannelRules.sideView(first.kind)) {
+            boolean side = firstOfKind(drop, ChannelRules.Kind.SIDE) != null;
+            boolean second = firstOfKind(drop, ChannelRules.Kind.SIDE_SECOND) != null;
+            boolean hud = firstOfKind(drop, ChannelRules.Kind.HUD) != null;
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("相机 " + cameraId
+                    + " 会话配置失败：先丢掉盲区画面再试（"
+                    + (side ? "中控屏" : "") + (second ? "、中控屏第二块" : "")
+                    + (hud ? "、HUD" : "") + "）");
+        } else if (first.kind == ChannelRules.Kind.MIRROR) {
+            AppLog.w(TAG, "Retrying without main floating surface...");
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("相机 " + cameraId
+                    + " 录像中会话配置失败：丢掉后视镜输出重试");
+        } else {
+            AppLog.w(TAG, "Retrying without recording surface...");
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("相机 " + who()
+                    + " 录像中会话配置失败：丢掉录像输出重试（已报给录像那一侧，这一路退出录像）");
         }
     }
 
