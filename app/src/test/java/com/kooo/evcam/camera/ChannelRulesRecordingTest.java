@@ -163,7 +163,7 @@ public class ChannelRulesRecordingTest {
 
     // ------------------------------------------------------------------ 前台服务
 
-    /** 前台服务（规格 §3）：开机自启动开着、在录、或者「这一趟要录」（等接回、等亮屏接）时开着；都不是、或者退出了就停。 */
+    /** 前台服务（规格 §3.5）：开机自启动开着、在录、或者「这一趟要录」（等接回、等亮屏接）时开着；都不是、或者退出了就停。 */
     @Test
     public void theForegroundServiceStaysForBootRecordingOrAWantedRecording() {
         assertTrue("开机自启动开着", ChannelRules.foregroundServiceNeeded(false, true, false, false));

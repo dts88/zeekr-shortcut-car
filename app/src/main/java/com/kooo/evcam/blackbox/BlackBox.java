@@ -177,7 +177,7 @@ public final class BlackBox {
                 + (SystemClock.elapsedRealtime() - startedAtMs) + " ms）");
     }
 
-    /** 这个进程是不是车机重启后第一次运行。用户退出的标记按规格 1.4 在真正开机时清掉，靠它。 */
+    /** 这个进程是不是车机重启后第一次运行。用户退出的标记按规格 §2.5 在真正开机时清掉，靠它。 */
     public static boolean rebootedSinceLastRun() {
         return rebootedSinceLastRun;
     }

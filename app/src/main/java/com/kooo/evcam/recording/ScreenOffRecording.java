@@ -21,7 +21,7 @@ import com.kooo.evcam.camera.ChannelRules;
 import com.kooo.evcam.camera.ChannelScheduler;
 
 /**
- * 熄屏录制（开发者选项，规格 §3.1）：熄屏时正在录像，就拿住唤醒锁不让车机睡（熄屏 v3 起只录环视：座舱屏幕黑满 30 秒放开）。
+ * 熄屏录制（开发者选项，规格 §3.3）：熄屏时正在录像，就拿住唤醒锁不让车机睡（熄屏 v3 起只录环视：座舱屏幕黑满 30 秒放开）。
  *
  * <p><b>2026-11-02 停用</b>（项目所有者：从来没有启用过）：{@link AppConfig#isScreenOffRecordingEnabled} 固定为关，
  * 这里拿锁的入口都走不到，唤醒锁没有人拿。代码留着等恢复（唤醒锁的知识留着，项目所有者 2026-11-02），下面写的是它开着时的样子。

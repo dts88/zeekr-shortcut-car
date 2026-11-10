@@ -396,7 +396,7 @@
   「已选择 U 盘，但当前未检测到，录像会落到内置存储。」（三种语言，以前批过的原文）。status_recording_fallback
   「已改为录制到 %1$s（%2$s 不可用）」除了状态条，也用在改写那一下的提示和设置里「存储位置」那一行；
   选的盘认不出（自动找 U 盘、一次都没找到过）时这三处用 msg_sd_fallback。没有新句子。
-- 2026-10-27 批准（熄屏放开相机：黑满 30 秒时环视看哨兵模式留或放，lifecycle-spec §2.4、§3.5）：set_screen_off_keep_summary
+- 2026-10-27 批准（熄屏放开相机：黑满 30 秒时环视看哨兵模式留或放，lifecycle-spec §3.3）：set_screen_off_keep_summary
   「开启哨兵模式时，熄屏后继续录制环视，后座舱亮屏后恢复录制；未开启时，熄屏后暂停录制，亮屏后恢复。关闭本项，熄屏后停止录制。」
   （项目所有者：还是太复杂，先这样）。英文、马来文 2026-10-27 照草稿批准、换上：
   English「With Sentry Mode on, keeps recording the surround view after the screen turns off; rear cabin recording resumes when

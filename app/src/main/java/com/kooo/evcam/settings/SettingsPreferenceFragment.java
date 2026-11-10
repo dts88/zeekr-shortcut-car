@@ -1580,7 +1580,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 openFragment(new VehicleInfoFragment(), R.string.set_vehicle_info_title));
         bindDriveSound();
 
-        // 开机自启动接手全部保活手段（规格 §3）：关了就把定时任务也取消，别等它下次到点再自己退出
+        // 开机自启动接手全部保活手段（规格 §6）：关了就把定时任务也取消，别等它下次到点再自己退出
         bindSwitch("pref_auto_start", appConfig.isAutoStartOnBoot(),
                 value -> {
                     appConfig.setAutoStartOnBoot(value);
@@ -1632,7 +1632,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
 
         // 熄屏录制 2026-11-02 停用（项目所有者：从来没有启用过），开发者选项里那一行拿掉了（AppConfig.isScreenOffRecordingEnabled
         // 固定为关）。要恢复时连同 preferences.xml 那一行、下面注释掉的 bindScreenOffRecording 和它的几个帮手一起放回：
-        // // 熄屏录制 = 熄屏持续录制 + 唤醒锁（规格 §3.1）。整块只在开发者选项里出现，不用再单独锁
+        // // 熄屏录制 = 熄屏持续录制 + 唤醒锁（规格 §3.3）。整块只在开发者选项里出现，不用再单独锁
         // bindScreenOffRecording();
         bindSwitch("pref_force_h264", appConfig.isForceH264Encoding(),
                 value -> appConfig.setForceH264Encoding(value));

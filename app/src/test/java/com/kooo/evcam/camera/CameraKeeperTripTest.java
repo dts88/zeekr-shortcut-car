@@ -14,7 +14,7 @@ import static org.junit.Assert.assertTrue;
 import org.junit.Test;
 
 /**
- * 「这一趟」（{@link CameraKeeper.Trip}，规格 1.2）：启动自动录制每一趟最多看一次、人停过的不再开；「这一趟要录」进程被结束了还在；
+ * 「这一趟」（{@link CameraKeeper.Trip}，规格 §2.5）：启动自动录制每一趟最多看一次、人停过的不再开；「这一趟要录」进程被结束了还在；
  * 新的一趟清零；写盘只在该写时写。
  */
 public class CameraKeeperTripTest {
@@ -82,7 +82,7 @@ public class CameraKeeperTripTest {
         assertFalse(trip.autoStartUsed());
     }
 
-    /** 规格 1.2：进程被杀又拉回来，「这一趟」的选择还在 —— 新实例从同一份存储里读回来。 */
+    /** 规格 §2.5：进程被杀又拉回来，「这一趟」的选择还在 —— 新实例从同一份存储里读回来。 */
     @Test
     public void choicesSurviveANewInstanceThroughTheStore() {
         MemoryStore store = new MemoryStore();

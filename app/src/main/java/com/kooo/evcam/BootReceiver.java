@@ -19,7 +19,7 @@ import android.os.Looper;
  * 开机启动广播接收器。
  *
  * <p>这个容器不给我们送开机广播（三次重启都没送到，平台笔记 §3.6）。留着它是为了万一哪天送到了：
- * 记黑匣子、清掉用户退出的标记（规格 1.4）、保活开着就起前台服务和定时任务。
+ * 记黑匣子、清掉用户退出的标记（规格 §2.5）、保活开着就起前台服务和定时任务。
  * 「开机后恢复什么」不在这里 —— 前台服务起来时按开机自启动的规矩去做。</p>
  */
 public class BootReceiver extends BroadcastReceiver {
@@ -48,7 +48,7 @@ public class BootReceiver extends BroadcastReceiver {
             // 真正开机：用户上一次的「退出」到此为止
             UserExit.clear(context, "boot");
             
-            // 保活开着才起前台服务（规格 §3）
+            // 保活开着才起前台服务（规格 §6）
             if (new AppConfig(context).isAutoStartOnBoot()) {
                 startForegroundServiceImmediately(context);
             }
