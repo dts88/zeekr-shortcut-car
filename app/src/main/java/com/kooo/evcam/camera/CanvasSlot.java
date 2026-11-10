@@ -23,6 +23,9 @@ import com.kooo.evcam.AppLog;
  * <p>让了之后什么时候再试，时机照旧：那一方到点说（{@link #retry}：超级镜子重新打开、亮屏、放回来、点击恢复；
  * 盲区画面这一段结束）；换了一份管线时管家自己再试哪几样，照 {@link ChannelRules#retryOnNewPipeline}。</p>
  *
+ * <p>换了一份管线（{@link CameraKeeper} 看着）：管家先把交着的画布声明到新的一份上，再告诉每一方（{@link Listener#onRebuilt}），
+ * 要相机的照自己的规矩再登记 —— 两件在同一下做完，新的一份第一轮就都带着（以前超级镜子、盲区画面各自挂着做这一下）。</p>
+ *
  * <p>只在主线程上用。</p>
  */
 public final class CanvasSlot {
@@ -48,6 +51,12 @@ public final class CanvasSlot {
 
         /** 相机层这一回不带它：已经记下了，接着就撤回；照这一方的规矩收拾（盲区画面移走窗口），再试之前不再交。 */
         void onRefused();
+
+        /**
+         * 管线换了一份、建好了，交着的画布已经声明上去（{@link CameraKeeper} 看着）：照这一方的规矩再对一次 —— 看得见、亮着屏就再交、
+         * 再登记（交的时候这一路还没有相机，那时没登记上）。和声明在同一下（主线程），新的一份第一轮就带着它。
+         */
+        void onRebuilt();
     }
 
     final ChannelRules.Kind kind;
@@ -198,11 +207,11 @@ public final class CanvasSlot {
 
     /**
      * 管线换了一份、建好了（{@link CameraKeeper} 看着）：交上来的画布声明到新的一份上 —— 不等那一方的看门狗那两秒，新的一份开相机时
-     * 会话里就带着它。这一回不带它的，照 {@link ChannelRules#retryOnNewPipeline} 定再不再试。新的一份里没有这一路的不动。
+     * 会话里就带着它。这一回不带它的，照 {@link ChannelRules#retryOnNewPipeline} 定再不再试 —— 撤回了的也一样（超级镜子换出
+     * 「后视 + 后座舱」再换回来，后座舱照常再交）。新的一份里没有这一路的不动。之后管家叫 {@link #rebuilt}。
      */
     void onNewPipeline(MultiCameraManager pipeline) {
-        SurfaceTexture texture = offered;
-        if (closed || texture == null || texture.isReleased() || pipeline == null || pipeline.isReleased()) {
+        if (closed) {
             return;
         }
         if (refused) {
@@ -211,9 +220,20 @@ public final class CanvasSlot {
             }
             refused = false;
         }
+        SurfaceTexture texture = offered;
+        if (texture == null || texture.isReleased() || pipeline == null || pipeline.isReleased()) {
+            return;
+        }
         SingleCamera to = pipeline.getCamera(lane);
         if (to != null) {
             declareOn(to, pipeline, texture, offeredView);
+        }
+    }
+
+    /** 管线换好了、各块画布都声明过了（{@link #onNewPipeline}）：告诉那一方（{@link Listener#onRebuilt}）。关掉了的不叫。 */
+    void rebuilt() {
+        if (!closed) {
+            listener.onRebuilt();
         }
     }
 

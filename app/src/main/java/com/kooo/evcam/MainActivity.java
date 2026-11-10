@@ -652,7 +652,10 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    /** 预览画布：主界面预览不让（相机层不会丢它），摆位由相机这一侧跟着视图做 —— 这里没什么要做的。 */
+    /**
+     * 预览画布：主界面预览不让（相机层不会丢它），摆位由相机这一侧跟着视图做；换了管线主界面自己接上新的一份
+     * （{@link #pipelineReplaced}）—— 这里没什么要做的。
+     */
     private static final CanvasSlot.Listener PREVIEW_CANVAS = new CanvasSlot.Listener() {
         @Override
         public void onBound(SingleCamera camera) {
@@ -660,6 +663,10 @@ public class MainActivity extends AppCompatActivity {
 
         @Override
         public void onRefused() {
+        }
+
+        @Override
+        public void onRebuilt() {
         }
     };
 

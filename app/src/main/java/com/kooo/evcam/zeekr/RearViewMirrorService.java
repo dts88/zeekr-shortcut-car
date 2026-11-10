@@ -63,7 +63,7 @@ import com.kooo.evcam.camera.StallWatch;
  * 超级镜子输出（{@link #bindCabin}），登记还是那一项 MIRROR —— 调度照切换范围判后座舱要不要（ChannelRules.World#mirrorCabin）。
  * 看后视时后座舱也带着，切过去不用等；换出这一档撤回。熄屏、贴边只放登记，窗口移走时画布交给管线留着，新窗口接回 ——
  * 两块画布是同一个 {@link MirrorCanvas}，只是声明在不同的一路上。管线里还没有后座舱这一路（刚换到这一档、管线正在重建）时
- * 不声明，新的一份建好时相机管家把交着的画布声明上去（{@link CanvasSlot}）。两块画布总有一块看不见，看不见的 TextureView 不自己建画布，
+ * 不声明，新的一份建好时相机管家把交着的画布声明上去、再叫这里对一次（{@link MirrorCanvas#onRebuilt}）。两块画布总有一块看不见，看不见的 TextureView 不自己建画布，
  * 由这里建（{@link MirrorCanvas#canvas}）。</p>
  */
 public class RearViewMirrorService extends Service {
@@ -399,9 +399,6 @@ public class RearViewMirrorService extends Service {
         CanvasSlot.Offer offer = surround.offer(surfaceTexture);
         if (offer == CanvasSlot.Offer.NO_CAMERA) {
             scheduleRetry(surfaceTexture);
-            // 后座舱那块照样交一次：管线正在重建（换到「后视 + 后座舱」）时两块都交不上，相机管家记着，新的一份建好时
-            // 两块一起声明上去 —— 开环视、后座舱时会话里就带着它们，不用随后再改一次输出
-            syncCabin();
             return;
         }
         retryCount = 0;
@@ -445,8 +442,8 @@ public class RearViewMirrorService extends Service {
      * 声明后座舱的超级镜子输出 —— 和 {@link #bindCamera} 同样的守卫（屏幕黑着、贴边收起不声明），登记还是 MIRROR
      * （bindCamera 登记，它最后会叫到这里；后座舱的画布先准备好时也照样先声明，等登记上了调度才加进会话）。
      *
-     * <p>管线里还没有后座舱这一路（刚换到这一档、管线正在重建）就不声明、不重试：交上去的画布相机管家记着，新的一份建好时
-     * 当场声明上去（{@link CanvasSlot}），看门狗每两秒也会走到。</p>
+     * <p>管线里还没有后座舱这一路（刚换到这一档、管线正在重建）就不声明、不重试：新的一份建好时相机管家叫环视那块再对一次
+     * （{@link MirrorCanvas#onRebuilt}），这里跟着当场声明上去，看门狗每两秒也会走到。</p>
      */
     private void bindCabin(SurfaceTexture surfaceTexture) {
         if (com.kooo.evcam.screen.ScreenState.dark() || mirrorView == null || mirrorView.isDocked()
@@ -715,6 +712,18 @@ public class RearViewMirrorService extends Service {
             com.kooo.evcam.blackbox.BlackBox.noteImportant("超级镜子：相机层这一回不带" + (cabin ? "后座舱" : "环视")
                     + "的画布（会话配不上），撤回；重新打开、亮屏、放回来、点击恢复时再试");
             source = null;
+        }
+
+        /**
+         * 管线换了一份、建好了（相机管家已经把交着的画布声明上去）：环视那块照旧再对一次
+         * （{@link RearViewMirrorService#ensureStillBound}：看得见、没贴边、亮着屏才交、才登记 MIRROR，后座舱跟着对）。
+         * 后座舱那块跟着环视走，这里不动。
+         */
+        @Override
+        public void onRebuilt() {
+            if (!cabin) {
+                ensureStillBound();
+            }
         }
 
         /** 窗口上的那块 TextureView；没有窗口是 null。 */

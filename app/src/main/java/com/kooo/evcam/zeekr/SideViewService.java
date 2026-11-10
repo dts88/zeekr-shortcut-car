@@ -223,7 +223,7 @@ public class SideViewService extends Service {
 
     /**
      * 窗口挂着、亮着屏、画布在：几个出口各自再声明一次（看门狗到点走这里）。管线换了一份时，相机管家把交着的画布
-     * 声明到新的一份上（{@link CanvasSlot}），不等看门狗那两秒。
+     * 声明到新的一份上，再叫各出口自己对一次（{@link Output#onRebuilt}），不等看门狗那两秒。
      */
     private void rebindIfAttached() {
         if (!destroyed) {
@@ -1034,6 +1034,17 @@ public class SideViewService extends Service {
             BlackBox.noteImportant("盲区画面" + label() + "：相机层这一回不带它（共享预览流挂不下或会话配不上），这一段不再挂"
                     + "（离开 D 挡 30 秒、熄屏或原厂画面之后再试）");
             refuse();
+        }
+
+        /**
+         * 管线换了一份、建好了（相机管家已经把交着的画布声明上去）：窗口挂着、亮着屏就再对一次、登记 SIDE_VIEW
+         * （{@link #rebindIfAttached}；画布交的时候这一路还没有相机，那时没登记上）。这一段不带它的照旧不交。
+         */
+        @Override
+        public void onRebuilt() {
+            if (!destroyed) {
+                rebindIfAttached();
+            }
         }
 
         /** 这一段不带这一处（{@link #refused}）：放开登记、撤回、移走窗口；正打着灯、另一处也显示不了的话当场说一句。 */
