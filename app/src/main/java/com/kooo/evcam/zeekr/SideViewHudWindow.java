@@ -294,7 +294,7 @@ public class SideViewHudWindow extends ViewGroup implements SideViewOutputWindow
         return picture(side).fade.isFading();
     }
 
-    /** 当场移走：Presentation 收掉，画布在这一下被收走，服务把它交给管线留着（{@link MultiCameraManager#keepSideCanvas}）。 */
+    /** 当场移走：Presentation 收掉，画布在这一下被收走，服务把它交给管线留着（{@link com.kooo.evcam.camera.CanvasSlot#keep}）。 */
     @Override
     public void detach() {
         handler.removeCallbacks(tick);

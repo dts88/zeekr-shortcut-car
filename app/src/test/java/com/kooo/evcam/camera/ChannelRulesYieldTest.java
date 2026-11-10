@@ -165,6 +165,16 @@ public class ChannelRulesYieldTest {
         assertEquals(Collections.singletonList(PREVIEW), carried);
     }
 
+    /** 让了之后管线换了一份：超级镜子由相机管家再试，盲区画面等这一段结束（那一方说），预览不让。 */
+    @Test
+    public void onlyTheMirrorRetriesOnANewPipeline() {
+        assertTrue(ChannelRules.retryOnNewPipeline(ChannelRules.Kind.MIRROR));
+        assertFalse(ChannelRules.retryOnNewPipeline(ChannelRules.Kind.SIDE));
+        assertFalse(ChannelRules.retryOnNewPipeline(ChannelRules.Kind.SIDE_SECOND));
+        assertFalse(ChannelRules.retryOnNewPipeline(ChannelRules.Kind.HUD));
+        assertFalse(ChannelRules.retryOnNewPipeline(ChannelRules.Kind.PREVIEW));
+    }
+
     /** 两张次序表本身：谁先让（盲区画面第二块、HUD、第一块，再是超级镜子、录像；没有预览）；三块一起丢时报的先后。 */
     @Test
     public void theOrderTables() {
