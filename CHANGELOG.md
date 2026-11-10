@@ -9,6 +9,10 @@ commit message, not here.
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [3.9.1-alpha] - 2026-11-10
+
 - Blind spot view: the mode is picked from a row of segments, like Show on, instead of a slider.
 
 ## [3.9.0-alpha] - 2026-11-10
