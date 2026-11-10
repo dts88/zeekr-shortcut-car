@@ -8,6 +8,7 @@
 package com.kooo.evcam.camera;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.LinkedHashSet;
@@ -2244,6 +2245,121 @@ public final class ChannelRules {
     /** 盲区画面的三块画布（中控屏两块、HUD）：同一个登记方，挂不下、配不上时一起最先让路。 */
     static boolean sideView(Kind kind) {
         return kind == Kind.SIDE || kind == Kind.SIDE_SECOND || kind == Kind.HUD;
+    }
+
+    // ================================================================= 让路（相机管家 3c，项目所有者 2026-11-10）
+
+    /**
+     * 会话装不下时谁先让，从先到后：盲区画面（中控屏第二块、HUD、中控屏第一块）、超级镜子、录像。拍照的 JPEG 通道不在这张表里
+     * （它不是要的输出），比它们都先让；主界面预览不让。共享预览流挂满（{@link #sharedOverflow}）、会话配不上（{@link #onConfigFailed}）
+     * 都照这个次序：先后只在这一处，相机层照做（2026-11-10 起，行为和以前一样）。
+     */
+    static final Kind[] YIELD_ORDER = {Kind.SIDE_SECOND, Kind.HUD, Kind.SIDE, Kind.MIRROR, Kind.RECORD};
+
+    /** 会话配不上、拍照和盲区画面都丢过了、又不在录像：不丢东西再试几次，还不行交给救援。 */
+    static final int CONFIG_FAIL_RETRIES = 3;
+    /** 会话配不上丢了拍照或盲区画面之后、不丢东西再试时，隔多久再建。 */
+    static final long CONFIG_RETRY_MS = 200L;
+    /** 录像中会话配不上、丢了超级镜子或录像之后隔多久再建。 */
+    static final long CONFIG_RETRY_RECORDING_MS = 500L;
+
+    /**
+     * 共享预览流（预览、超级镜子、盲区画面共用一条流）最多挂 {@code limit} 块：哪几块这一份会话不带。只有盲区画面让，
+     * 照 {@link #YIELD_ORDER} 的先后（中控屏第二块，再是 HUD，再是第一块，项目所有者 2026-11-04）；预览、超级镜子挂不下也不让，
+     * 会话真配不上时再照 {@link #onConfigFailed}。
+     *
+     * @param shared 要挂上共享预览流的那几块
+     * @param limit  最多几块（框架给的，AOSP 是 4）
+     * @return 这一份会话不带的那几块，照让的先后；挂得下是空的
+     */
+    static List<Out> sharedOverflow(Collection<Out> shared, int limit) {
+        int excess = shared.size() - Math.max(0, limit);
+        List<Out> drop = new ArrayList<>();
+        for (Kind kind : YIELD_ORDER) {
+            if (excess <= 0 || !sideView(kind)) {
+                break;
+            }
+            for (Out out : shared) {
+                if (out.kind == kind && excess > 0) {
+                    drop.add(out);
+                    excess--;
+                }
+            }
+        }
+        return drop;
+    }
+
+    /** 会话配不上时下一步怎么办（{@link #onConfigFailed}）。 */
+    static final class ConfigRetry {
+        /** 先丢拍照的 JPEG 通道再试（拍照退回抓预览画面，这一路下次正常打开相机时再加回）。 */
+        final boolean dropJpeg;
+        /** 丢掉这几样再试（相机层报给声明它们的那一侧）。 */
+        final List<Out> drop;
+        /** 隔多久再建；0 = 不再试，报一次错交给救援。 */
+        final long delayMs;
+
+        ConfigRetry(boolean dropJpeg, List<Out> drop, long delayMs) {
+            this.dropJpeg = dropJpeg;
+            this.drop = Collections.unmodifiableList(new ArrayList<>(drop));
+            this.delayMs = delayMs;
+        }
+
+        /** 日志用的记号，不是给人读的句子。 */
+        @Override
+        public String toString() {
+            return (dropJpeg ? "drop JPEG" : drop.isEmpty() ? (delayMs > 0 ? "same set" : "give up") : "drop " + drop)
+                    + (delayMs > 0 ? " in " + delayMs + " ms" : "");
+        }
+    }
+
+    /**
+     * 会话配不上时下一步（相机层问；照 {@link #YIELD_ORDER}，2026-11-10 起规则在这里，行为和以前一样）：
+     * <ol>
+     *   <li>带着拍照的 JPEG 通道：先丢它；</li>
+     *   <li>带着盲区画面：三块一起丢；</li>
+     *   <li>在录像（会话里有录像输出）：带着超级镜子先丢超级镜子，不然丢录像（那一路退出录像，别的路照录）；</li>
+     *   <li>不在录像：不丢东西再试 {@link #CONFIG_FAIL_RETRIES} 次，还不行交给救援，不丢超级镜子
+     *       （待办：要不要和录像中统一，项目所有者 2026-11-10 定这次不改）。</li>
+     * </ol>
+     *
+     * @param carried     这一份会话带的输出（不含 JPEG）
+     * @param jpeg        会话里带着拍照的 JPEG 通道
+     * @param sameRetries 不丢东西已经再试了几次
+     */
+    static ConfigRetry onConfigFailed(Collection<Out> carried, boolean jpeg, int sameRetries) {
+        if (jpeg) {
+            return new ConfigRetry(true, Collections.emptyList(), CONFIG_RETRY_MS);
+        }
+        List<Out> sides = new ArrayList<>();
+        for (Kind kind : YIELD_ORDER) {
+            if (sideView(kind)) {
+                for (Out out : carried) {
+                    if (out.kind == kind) {
+                        sides.add(out);
+                    }
+                }
+            }
+        }
+        if (!sides.isEmpty()) {
+            return new ConfigRetry(false, sides, CONFIG_RETRY_MS);
+        }
+        Out record = firstOf(carried, Kind.RECORD);
+        if (record != null) {
+            Out mirror = firstOf(carried, Kind.MIRROR);
+            return new ConfigRetry(false, Collections.singletonList(mirror != null ? mirror : record),
+                    CONFIG_RETRY_RECORDING_MS);
+        }
+        return new ConfigRetry(false, Collections.emptyList(),
+                sameRetries < CONFIG_FAIL_RETRIES ? CONFIG_RETRY_MS : 0L);
+    }
+
+    private static Out firstOf(Collection<Out> outs, Kind kind) {
+        for (Out out : outs) {
+            if (out.kind == kind) {
+                return out;
+            }
+        }
+        return null;
     }
 
     /** 要的输出：有人要、已声明、消费者还活着的那几样（预览、后视镜、盲区画面、录像）。 */
