@@ -366,7 +366,7 @@ public class SingleCamera {
     private static final long REBUILD_DEBOUNCE_MS = 100L;
     private static final long REBUILD_AFTER_CLOSE_MS = 50L;
     private static final long CLOSE_FALLBACK_MS = 300L;
-    /** 会话配不上时不丢东西已经再试了几次（{@link ChannelRules#onConfigFailed}）。 */
+    /** 会话配不上时不丢东西已经再试了几次（照 {@link ChannelRules#onConfigFailed} 给的存）。 */
     private int configFailRetryCount = 0;
     private final Object sessionLock = new Object(); // 新增：用于同步 Session 操作
 
@@ -423,8 +423,9 @@ public class SingleCamera {
     private volatile int[] latestAdjust;
 
     /**
-     * 会话里几样输出的次序：预览、后视镜、盲区画面（中控屏、HUD、中控屏第二块）共用一条流（预览打头），出帧口、录像各一条，
-     * JPEG 最后。共享预览流挂不下时排在后面的先让：中控屏第二块，再是 HUD（项目所有者 2026-11-04 定的次序）。
+     * 会话里几样输出的次序：预览、后视镜、盲区画面（中控屏、HUD、中控屏第二块）共用一条流（排在最前的那块建这条流），出帧口、
+     * 录像各一条，JPEG 最后。共享预览流挂不下时谁让照 {@link ChannelRules#sharedOverflow}（只有盲区画面让，中控屏第二块先，
+     * 再是 HUD，项目所有者 2026-11-04）。
      */
     private static final ChannelRules.Kind[] SESSION_ORDER = {
             ChannelRules.Kind.PREVIEW, ChannelRules.Kind.MIRROR, ChannelRules.Kind.SIDE, ChannelRules.Kind.HUD,
@@ -2677,7 +2678,7 @@ public class SingleCamera {
         // 将所有预览性质的 Surface（主预览、后视镜、盲区画面的中控屏两块和 HUD）组合成一个硬件流；
         // 几块的缓冲区尺寸在这之前都拨成了相机的输出尺寸，OutputConfiguration 才对得上
         OutputConfiguration previewSharedConfig = null;
-        // 共享预览流挂不下时这一份会话不带的那几块（照 ChannelRules.sharedOverflow：只有盲区画面让，排在后面的先让）
+        // 共享预览流挂不下时这一份会话不带的那几块（照 ChannelRules.sharedOverflow：建流的那块总是带着，别的只有盲区画面让）
         Set<ChannelRules.Out> overflow = Collections.emptySet();
         int sharedLimit = 0;
         final Map<ChannelRules.Out, Surface> built = new LinkedHashMap<>();
@@ -2693,8 +2694,8 @@ public class SingleCamera {
                     noteSharedSurfaceLimit(sharedLimit);
                     overflow = new java.util.HashSet<>(ChannelRules.sharedOverflow(sharedOuts(targets), sharedLimit));
                 } else if (overflow.contains(target.out)) {
-                    // 共享预览流挂满了（框架给的上限）：盲区画面最可有可无，这一份会话不带它（排在最后的先轮到：
-                    // 中控屏第二块，再是 HUD），告诉盲区画面那一侧（它撤回声明，不然调度会一直想把它加回来）
+                    // 共享预览流挂满了（框架给的上限）：照让路规则这一份会话不带这块盲区画面，
+                    // 告诉盲区画面那一侧（它撤回声明，不然调度会一直想把它加回来）
                     com.kooo.evcam.blackbox.BlackBox.noteImportant("相机 " + cameraId + " 共享预览流已挂 " + sharedLimit
                             + " 块画布（上限 " + sharedLimit + "）：这一份会话不带盲区画面"
                             + (kind == ChannelRules.Kind.HUD ? "（HUD）"
@@ -2833,8 +2834,10 @@ public class SingleCamera {
 
                 // 照让路规则丢（ChannelRules.onConfigFailed，相机管家 3c：拍照 → 盲区画面 → 录像中的后视镜 → 录像），
                 // 一步里的重试都不往外报
+                int sameRetries = configFailRetryCount;
                 ChannelRules.ConfigRetry next = ChannelRules.onConfigFailed(sessionOuts, jpegReader != null && !jpegDropped,
-                        configFailRetryCount);
+                        sameRetries);
+                configFailRetryCount = next.sameRetries;
                 if (next.dropJpeg) {
                     // 拍照通道是这条会话里最可有可无的一条流：丢了照片退回抓预览，画面一帧不少；留着它却可能一帧都没有
                     jpegDropped = true;
@@ -2858,7 +2861,6 @@ public class SingleCamera {
                 if (next.delayMs > 0) {
                     // 可能是 Surface 正在从其他摄像头转移（connect: already connected），
                     // 短暂延迟后重试，等待旧 session 释放 Surface
-                    configFailRetryCount++;
                     AppLog.w(TAG, "Camera " + cameraId + " session config failed, retry " + configFailRetryCount + "/"
                             + ChannelRules.CONFIG_FAIL_RETRIES + " in " + next.delayMs + "ms...");
                     requestSessionRebuild("config-failed-retry", next.delayMs);
@@ -2866,8 +2868,7 @@ public class SingleCamera {
                 }
                 // 重试耗尽：不再重试，报一次。一步只报一次结果 —— 以前每试一次就报一次，
                 // 调度会在它还在重试时就判这一步完了
-                AppLog.e(TAG, "Camera " + cameraId + " config retries exhausted (" + (configFailRetryCount + 1) + ")");
-                configFailRetryCount = 0;
+                AppLog.e(TAG, "Camera " + cameraId + " config retries exhausted (" + (sameRetries + 1) + ")");
                 if (callback != null) {
                     callback.onCameraError(cameraId, -3);
                 }
