@@ -33,6 +33,4 @@
     <dimen name="pref_switch_width">60dp</dimen>
     <dimen name="pref_switch_gap">18dp</dimen>
     <dimen name="pref_text_start">98dp</dimen>
-    <!-- 设置行下面那条几档的拖动条有多宽（RowOptions.setSteps，盲区画面的情境） -->
-    <dimen name="pref_option_steps_width">440dp</dimen>
 </resources>

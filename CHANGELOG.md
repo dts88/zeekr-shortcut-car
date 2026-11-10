@@ -9,7 +9,7 @@ commit message, not here.
 
 ## [Unreleased]
 
-Nothing yet.
+- Blind spot view: the mode is back to three buttons; the 3.9.0-alpha slider is withdrawn.
 
 ## [3.9.0-alpha] - 2026-11-10
 

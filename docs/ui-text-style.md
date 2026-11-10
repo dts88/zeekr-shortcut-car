@@ -635,7 +635,7 @@
 | 盲区画面 | 盲区画面（按情境在中控屏或 HUD 上该侧显示侧方摄像头画面的窗口，设置在「超级镜子」分区里；显示位置：中控屏 / HUD / 中控屏和 HUD） | Blind spot view（句中也大写 B） | Paparan titik buta | 2026-10-17 项目所有者批准；不用「盲区辅助」（原厂功能的名字）、「侧视弹窗」 |
 | 转向灯 | 转向灯；打转向灯 | turn signal | lampu isyarat | 双闪见「闪远光 / 双闪」 |
 | 盲区指示灯 / 开门预警 | 盲区指示灯（后视镜上那盏灯，开车时旁边有车亮）；开门预警（停车后亮，后视镜上同一盏灯） | blind spot light；door open warning | lampu titik buta；amaran buka pintu | 2026-11-03 加，项目所有者批准；2026-11-04 加的附加项名「盲区提醒」2026-11-09 随附加项去掉；「后视镜」指车外两侧的，英文 side mirror / 马来文 cermin sisi |
-| 情境（盲区画面） | 情境：丰富、标准、简洁（盲区画面那一行的三档拖动条，从左到右简洁、标准、丰富：什么情形显示画面，一档包含下一档） | mode：Full、Standard、Minimal | mod：Penuh、Piawai、Minimum | 2026-11-09 加，中文名字是项目所有者定的，2026-11-09 项目所有者批准 |
+| 情境（盲区画面） | 情境：丰富、标准、简洁（盲区画面那一行的三选一：什么情形显示画面，一档包含下一档） | mode：Full、Standard、Minimal | mod：Penuh、Piawai、Minimum | 2026-11-09 加，中文名字是项目所有者定的，2026-11-09 项目所有者批准 |
 | 方向标签 | 方向标签（超级镜子窗口左上角那块写着前、后、左、右的标签） | Direction label | Label arah | 2.12 加；标签上的字用「前 / 后 / 左 / 右」（zeekr_lane_*），后座舱写「后座舱」（slot_cabin_rear） |
 | 切换范围 | 切换范围（超级镜子在哪几路之间切）：四向、前后、后视 + 后座舱 | Views：All four、Front and rear、Rear + rear cabin | Paparan：Empat arah、Depan dan belakang、Belakang + kabin belakang | 2026-10-19 加，取代「只显示前后视」 |
 | 悬浮按钮 | 悬浮按钮；按钮大小、按钮透明度、时长文字大小 | floating button；Button opacity | butang terapung；Kelegapan butang | 「悬浮窗」只用于系统权限名「悬浮窗权限」（Overlay / Paparan di atas apl lain） |

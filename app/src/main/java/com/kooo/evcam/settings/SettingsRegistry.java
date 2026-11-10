@@ -112,13 +112,13 @@ public final class SettingsRegistry {
 
     /**
      * 盲区画面的情境（项目所有者 2026-11-09）：哪几种情形显示画面，一档包含下一档（{@code zeekr.SideViewDecision.Mode}）；默认标准。
-     * 界面上是「盲区画面」那一行的三档拖动条，照这里的次序从左到右（从少到多，项目所有者 2026-11-10）。
+     * 界面上是「盲区画面」那一行的三选一。
      */
     public static final SettingSpec SIDE_VIEW_MODE = SettingSpec.of(
             "side_view_mode", "盲区画面情境", com.kooo.evcam.AppConfig.SIDE_VIEW_MODE_STANDARD,
-            entry(com.kooo.evcam.AppConfig.SIDE_VIEW_MODE_MINIMAL, "简洁", R.string.opt_side_view_mode_minimal),
+            entry(com.kooo.evcam.AppConfig.SIDE_VIEW_MODE_FULL, "丰富", R.string.opt_side_view_mode_full),
             entry(com.kooo.evcam.AppConfig.SIDE_VIEW_MODE_STANDARD, "标准", R.string.opt_side_view_mode_standard),
-            entry(com.kooo.evcam.AppConfig.SIDE_VIEW_MODE_FULL, "丰富", R.string.opt_side_view_mode_full));
+            entry(com.kooo.evcam.AppConfig.SIDE_VIEW_MODE_MINIMAL, "简洁", R.string.opt_side_view_mode_minimal));
 
     /**
      * 录制声音用哪个来源（设置 → 录制「录制声音」的下一层；{@code camera.FootageAudio}）。项目所有者 2026-10-20：两种都做出来、上车比。
