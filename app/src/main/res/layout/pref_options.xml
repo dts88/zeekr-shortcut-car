@@ -36,33 +36,6 @@
             app:singleLine="true" />
     </LinearLayout>
 
-    <!-- 几档的拖动条（RowOptions.setSteps；盲区画面的情境，项目所有者 2026-11-10 定用滑块）：
-         原生拖动条的分档样式，档位名写在下面、对着各档（第一个靠左、最后一个靠右、中间的居中） -->
-    <LinearLayout
-        android:id="@+id/pref_option_steps"
-        android:layout_width="@dimen/pref_option_steps_width"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:visibility="gone">
-
-        <SeekBar
-            android:id="@+id/pref_option_step_bar"
-            style="@android:style/Widget.Material.SeekBar.Discrete"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:background="@null"
-            android:paddingTop="12dp"
-            android:paddingBottom="12dp" />
-
-        <LinearLayout
-            android:id="@+id/pref_option_step_labels"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:paddingStart="4dp"
-            android:paddingEnd="4dp" />
-    </LinearLayout>
-
     <!-- 那一排按钮下面的一行小字（锁定影像：紧急制动会自动打开双闪警示灯） -->
     <TextView
         android:id="@+id/pref_options_note"

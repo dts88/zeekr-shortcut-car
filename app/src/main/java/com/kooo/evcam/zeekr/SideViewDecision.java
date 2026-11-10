@@ -114,7 +114,7 @@ public final class SideViewDecision {
         /** 停车后的开门预警（亮的是后视镜上同一盏灯）：左、右亮着没有；null 读不到。 */
         public Boolean doorWarningLeft;
         public Boolean doorWarningRight;
-        /** 设置里选的情境（「盲区画面」那一行的三档拖动条）。 */
+        /** 设置里选的情境（「盲区画面」那一行的三选一）。 */
         public Mode mode = Mode.STANDARD;
         /**
          * 收起前淡出（项目所有者 2026-11-04，{@link SideViewTrigger#FADE_MS}）：装饰动效此刻放不放（{@code ui.MotionPolicy}：
