@@ -9,7 +9,7 @@ commit message, not here.
 
 ## [Unreleased]
 
-- Blind spot view: the mode is back to three buttons; the 3.9.0-alpha slider is withdrawn.
+- Blind spot view: the mode is picked from a row of segments, like Show on, instead of a slider.
 
 ## [3.9.0-alpha] - 2026-11-10
 

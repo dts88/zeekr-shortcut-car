@@ -1189,7 +1189,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     }
 
     /**
-     * 盲区画面那一行的情境（项目所有者 2026-11-09）：开关开着时说明下面一排三选一「丰富」「标准」「简洁」，
+     * 盲区画面那一行的情境（项目所有者 2026-11-09）：开关开着时说明下面一排分段选择「丰富」「标准」「简洁」（三选一），
      * 下面一行小字说选中的这一档什么时候显示。
      */
     private void bindSideViewMode(SwitchNavPreference row) {

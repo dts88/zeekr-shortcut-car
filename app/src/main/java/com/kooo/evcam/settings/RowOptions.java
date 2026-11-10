@@ -10,6 +10,7 @@ package com.kooo.evcam.settings;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.TextView;
 
 import androidx.preference.PreferenceViewHolder;
@@ -24,7 +25,10 @@ import java.util.List;
 /**
  * 设置行下面那一排附加项（ui-spec §三「开关加附加项」，项目所有者 2026-10-23）：行首的开关开着时说明下面多一排 ——
  * 一个小标题加几个按钮（Material 的筛选按钮，按下是开、再按是关），下面可以有一行小字；开关关着时那一排不显示。
- * 还不能用的附加项照样摆出来，置灰、按不动。那一排也可以是三选一（{@link #setSingleChoice}）。
+ * 还不能用的附加项照样摆出来，置灰、按不动。
+ *
+ * <p>那一排也可以是三选一（{@link #setSingleChoice}）：不摆按钮，摆一条分段选择，和「显示位置」同一种、段由同一份代码摆
+ * （{@link Segments}，项目所有者 2026-11-10；之前是三个筛选按钮）。</p>
  *
  * <p>「开关加附加项」（{@link SwitchChipsPreference}）和「开关加下一层」（{@link SwitchNavPreference}：盲区画面的情境
  * 「丰富」「标准」「简洁」，三选一，项目所有者 2026-11-09）两种行共用这一份；那一排也是同一块布局（{@code pref_options}，
@@ -48,15 +52,21 @@ final class RowOptions {
     private final List<Option> options = new ArrayList<>();
     private CharSequence label;
     private CharSequence note;
-    /** 三选一（单选）：只能选一个，选中的再点不掉，监听只在选中的那一下叫。 */
+    /** 三选一（单选）：画成分段选择，只能选一个，点选中的那一段不动，监听只在选中的那一下叫。 */
     private boolean singleChoice;
 
-    /** 加一个附加项按钮；{@code listener} 是 null 的是还不能用的那种（摆着、置灰、按不动）。 */
+    /**
+     * 加一个附加项按钮；{@code listener} 是 null 的是还不能用的那种（摆着、置灰、按不动）。
+     * 三选一的每一项都要能选（分段选择里没有单独置灰的一段）。
+     */
     void add(CharSequence text, boolean checked, SwitchChipsPreference.OptionListener listener) {
+        if (singleChoice && listener == null) {
+            throw new IllegalArgumentException("single choice: every option needs a listener");
+        }
         options.add(new Option(text, checked, listener));
     }
 
-    /** 那一排是三选一（单选）：只能选一个，选中的再点不掉；监听只在选中的那一下叫（点掉的那一个不叫）。 */
+    /** 那一排是三选一（单选），画成分段选择：只能选一个，点选中的那一段不动；监听只在选中的那一下叫。在加选项之前叫。 */
     void setSingleChoice(boolean value) {
         singleChoice = value;
     }
@@ -97,7 +107,8 @@ final class RowOptions {
     void bind(PreferenceViewHolder holder, boolean switchOn, boolean enabled) {
         View row = holder.findViewById(R.id.pref_options);
         ChipGroup chips = (ChipGroup) holder.findViewById(R.id.pref_option_chips);
-        if (row == null || chips == null) {
+        ViewGroup segments = (ViewGroup) holder.findViewById(R.id.pref_option_segments);
+        if (row == null || chips == null || segments == null) {
             return;
         }
         boolean show = switchOn && !options.isEmpty();
@@ -112,13 +123,42 @@ final class RowOptions {
             noteView.setText(note);
             noteView.setVisibility(TextUtils.isEmpty(note) ? View.GONE : View.VISIBLE);
         }
+        // 行的视图会被别的行拿去用：每次都照这一行摆（按钮还是分段、摆哪几个）
         chips.removeAllViews();
-        // 行的视图会被别的行拿去用：每次都照这一行设（这时还没有按钮，不会动到选中）
-        chips.setSingleSelection(singleChoice);
-        chips.setSelectionRequired(singleChoice);
+        segments.removeAllViews();
+        chips.setVisibility(singleChoice ? View.GONE : View.VISIBLE);
+        segments.setVisibility(singleChoice ? View.VISIBLE : View.GONE);
         if (!show) {
             return;
         }
+        if (singleChoice) {
+            bindSegments(segments, enabled);
+        } else {
+            bindChips(chips, enabled);
+        }
+    }
+
+    /** 三选一：分段选择（{@link Segments}）。点了另一段，先当场换成它选中的样子，再叫它的监听。 */
+    private void bindSegments(ViewGroup track, boolean enabled) {
+        CharSequence[] labels = new CharSequence[options.size()];
+        int chosen = -1;
+        for (int i = 0; i < options.size(); i++) {
+            labels[i] = options.get(i).label;
+            if (chosen < 0 && options.get(i).checked) {
+                chosen = i;
+            }
+        }
+        Segments.fill(track, labels, chosen, enabled, index -> {
+            for (int i = 0; i < options.size(); i++) {
+                options.get(i).checked = i == index;
+            }
+            bindSegments(track, enabled);
+            options.get(index).listener.onChanged(true);
+        });
+    }
+
+    /** 附加项：筛选按钮，按下是开、再按是关。 */
+    private void bindChips(ChipGroup chips, boolean enabled) {
         LayoutInflater inflater = LayoutInflater.from(chips.getContext());
         for (Option option : options) {
             Chip chip = (Chip) inflater.inflate(R.layout.pref_option_chip, chips, false);
@@ -128,9 +168,7 @@ final class RowOptions {
             if (option.listener != null) {
                 chip.setOnCheckedChangeListener((button, checked) -> {
                     option.checked = checked;
-                    if (checked || !singleChoice) {
-                        option.listener.onChanged(checked);
-                    }
+                    option.listener.onChanged(checked);
                 });
             }
             chips.addView(chip);
