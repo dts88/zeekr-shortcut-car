@@ -42,12 +42,11 @@
     <string name="set_storage_location_title">Lokasi storan</string>
     <string name="set_storage_port_note">Pemacu pada port USB-A disyorkan. Ujian menunjukkan port Type-C terputus kuasa selepas anda keluar dari kereta; sebarang rakaman selepas itu disimpan ke pemacu pada port USB-A.</string>
     <string name="set_storage_usage_no_drive">Tiada pemacu USB ditemui</string>
-    <string name="set_rearview_summary">Menunjukkan mana-mana kamera sekeliling atau kabin belakang dalam tetingkap terapung; paparan belakang dan kabin belakang dicerminkan kiri-kanan, seperti cermin pandang belakang dalaman</string>
     <string name="set_rearview_switch_mode_title">Tukar paparan dengan</string>
     <string name="opt_rearview_switch_swipe">Leret</string>
     <string name="opt_rearview_switch_tap">Ketik</string>
-    <string name="set_rearview_button_mode_summary">Bertukar ke paparan depan, belakang, kiri atau kanan apabila kawasan atas, bawah, kiri atau kanan diketik; jika Paparan ialah Depan dan belakang atau Belakang + kabin belakang, hanya separuh atas dan bawah digunakan, dengan paparan belakang di bawah</string>
-    <string name="set_rearview_views_title">Paparan</string>
+    <string name="set_rearview_button_mode_summary">Bertukar ke paparan depan, belakang, kiri atau kanan apabila kawasan atas, bawah, kiri atau kanan diketik; jika Cermin super ialah Depan dan belakang atau Belakang + kabin belakang, hanya separuh atas dan bawah digunakan, dengan paparan belakang di bawah</string>
+    <string name="opt_off">Mati</string>
     <string name="opt_views_four">Empat arah</string>
     <string name="opt_views_front_rear">Depan dan belakang</string>
     <string name="opt_views_rear_cabin">Belakang + kabin belakang</string>
@@ -55,7 +54,7 @@
     <string name="set_rearview_fisheye_summary">Membetulkan herotan tong mata ikan dalam Cermin super sahaja; rakaman tidak berubah.</string>
     <string name="set_rearview_fov_title">Medan pandangan</string>
     <string name="set_rearview_fov_summary">Lebih luas menunjukkan lebih banyak dan nampak lebih tajam, tetapi tepinya lebih herot</string>
-    <string name="set_rearview_reset_summary">Memulihkan kedudukan dan saiz tetingkap, bingkai, medan pandangan, pembetulan mata ikan, Paparan dan Label arah kepada lalai, serta kembali ke pandangan belakang</string>
+    <string name="set_rearview_reset_summary">Memulihkan kedudukan dan saiz tetingkap, bingkai, medan pandangan, pembetulan mata ikan dan Label arah kepada lalai, serta kembali ke pandangan belakang</string>
     <string name="set_rearview_fisheye_value">Medan pandangan %1$d°</string>
     <string name="set_rearview_window_summary">Nisbah gambar kekal; bentuk tetingkap hanya menentukan berapa banyak yang kelihatan</string>
     <string name="set_rearview_window_value">Lebar %1$d px · Tinggi %2$d px</string>
@@ -64,7 +63,7 @@
     <string name="set_rearview_guide_title">Cara guna</string>
     <string name="set_rearview_guide_summary">Zon gerak isyarat, tukar kamera, bingkai, lekap tepi dan ubah saiz</string>
     <string name="set_side_view_title">Paparan titik buta</string>
-    <string name="set_side_view_summary">Memaparkan kamera sisi di sebelah skrin itu mengikut mod yang dipilih; 1 saat selepas lampu isyarat atau lampu cermin sisi padam ia mula pudar dan hilang sepenuhnya 1 saat kemudian; tidak dipaparkan dalam gear undur atau semasa paparan kilang dipaparkan. Paparan sekeliling kekal hidup dalam gear D.</string>
+    <string name="set_side_view_summary">Memaparkan kamera sisi di sebelah skrin itu mengikut mod yang dipilih</string>
     <string name="set_side_view_min_speed_title">Kelajuan minimum</string>
     <string name="set_side_view_min_speed_summary">Apabila lampu isyarat menyala, tidak dipaparkan pada skrin tengah di bawah kelajuan ini (tidak terpakai apabila lampu titik buta sebelah itu menyala, atau pada HUD); 0 bermaksud tiada had</string>
     <string name="side_view_close">Tutup Paparan titik buta</string>
@@ -1144,4 +1143,5 @@
     <string name="dev_tool_file_result">%1$s: %2$s</string>
     <string name="dev_note">Ketik Safety notice dalam Tetapan → Perihal &amp; penghargaan untuk mematikan pilihan pembangun dan menyembunyikan bahagian ini</string>
     <string name="set_rearview_camera_label_title">Label arah</string>
+    <string name="set_rearview_camera_label_summary">Menunjukkan arah paparan semasa di penjuru kiri atas tetingkap</string>
 </resources>

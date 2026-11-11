@@ -1,9 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   设置行下面那一排附加项（RowOptions，ui-spec §三）：一个小标题加几个按钮（pref_option_chip），下面可以有一行小字。
-  三选一的那一排（盲区画面的情境）不摆按钮，摆一条分段选择（pref_segment_track，和「显示位置」同一种）。
-  开关加附加项（pref_row_switch_chips）、开关加下一层（pref_row_switch_nav、pref_row_switch_nav_sentry）都 include 它，
-  放在说明下面；开关开着、加了附加项才显示。这一排自己接住点击（clickable）：没点中按钮或分段时不会顺带切换开关、也不会进下一层。
+  开关加附加项（pref_row_switch_chips）include 它，放在说明下面；开关开着、加了附加项才显示。
+  这一排自己接住点击（clickable）：没点中按钮时不会顺带切换开关。
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -35,14 +34,6 @@
             android:layout_height="wrap_content"
             app:chipSpacingHorizontal="12dp"
             app:singleLine="true" />
-
-        <!-- 三选一：分段选择，段由 Segments 摆；按钮和分段只显示一样（RowOptions 按这一排是不是三选一） -->
-        <include
-            android:id="@+id/pref_option_segments"
-            layout="@layout/pref_segment_track"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:visibility="gone" />
     </LinearLayout>
 
     <!-- 那一排按钮下面的一行小字（锁定影像：紧急制动会自动打开双闪警示灯） -->

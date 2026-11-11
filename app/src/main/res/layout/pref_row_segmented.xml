@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  设置行：两三个选项直接摆在行里。
+  设置行：两三个选项直接摆在行里（开关合进分段的那一行是「关闭」加三档，四段；SegmentedPreference）。
 
   下拉框要点两次（开框、选中），而这种行一次就够。选项少的时候，
   还能同时看见「另一个是什么」—— 下拉框收起来之后是看不见的。
@@ -41,12 +41,22 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
-            android:maxLines="3"
+            android:maxLines="6"
             android:textAppearance="@style/TextAppearance.Cam.Micro"
             android:textColor="@color/pref_summary" />
+
+        <!-- 说明下面一行小字（SegmentedPreference.setNote：盲区画面选中的这一档什么时候显示）；空就不显示 -->
+        <TextView
+            android:id="@+id/pref_segment_note"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:textAppearance="@style/TextAppearance.Cam.Micro"
+            android:textColor="@color/pref_summary"
+            android:visibility="gone" />
     </LinearLayout>
 
-    <!-- 分段选择的底槽，段由 Segments 摆（设置行下面那一排的三选一也是这一条） -->
+    <!-- 分段选择的底槽，段由 Segments 摆 -->
     <include
         android:id="@+id/segments"
         layout="@layout/pref_segment_track"

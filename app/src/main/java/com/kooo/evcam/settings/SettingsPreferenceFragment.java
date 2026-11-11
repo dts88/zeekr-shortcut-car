@@ -100,6 +100,11 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     /** 超级镜子「切换方式」两个选项的值（{@link #bindSwitchMode}）。 */
     private static final String SWITCH_SWIPE = "swipe";
     private static final String SWITCH_TAP = "tap";
+    /**
+     * 「超级镜子」「盲区画面」那一行第一段「关闭」的值（开关合进分段，{@link #setOffOptions}）。其余几段是切换范围、情境的值
+     * （{@link SettingsRegistry}），不会撞上。
+     */
+    private static final String ROW_OFF = "off";
 
     private static final String ARG_SECTION = "section";
 
@@ -195,6 +200,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         // 权限、存储用量这些可能在别处被改过，回到这个界面时重新读一次
         updateSavedIn();
         refreshRearViewWindow();
+        refreshOverlayRows();
         refreshDriveSoundValue();
     }
 
@@ -834,45 +840,71 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     // ------------------------------------------------------------------ 超级镜子
 
     /**
-     * 超级镜子（2026-10-23 整理，ui-spec §十一）：总开关一行带两个附加项（方向标签、点按切换）；鱼眼校正和视野角度合成一行
-     * （开关加下一层，{@link #bindFisheye}）；窗口的宽、高和重置合成一行（值加一个按钮，{@link #bindRearViewWindow}）。
+     * 超级镜子（2026-10-23 整理，ui-spec §十一；2026-11-11 起这一页分组）：「超级镜子」那一行是开关和切换范围合成的分段选择
+     * （{@link #bindRearViewRow}）；方向标签单独一行开关；鱼眼校正和视野角度合成一行（开关加下一层，{@link #bindFisheye}）；
+     * 窗口的宽、高和重置合成一行（值加一个按钮，{@link #bindRearViewWindow}）。
      */
     private void bindRearView() {
-        // 这个开关原先没查悬浮窗权限：没授权时它会拨上去、提示语还讲了手势怎么用，
-        // 而服务在 onStartCommand 里就 stopSelf() 走了，屏幕上什么都没有。
-        bindOverlaySwitch("pref_rearview", appConfig.isRearViewEnabled(),
-                OverlayCoordinator::setRearViewEnabled, on -> {
-                    if (on) {
-                        toast(getString(R.string.msg_rearview_on));
-                        com.kooo.evcam.ui.RearViewGuide.showOnce(getActivity());
-                    }
-                });
-        SwitchChipsPreference mirror = findPreference("pref_rearview");
-        if (mirror != null) {
-            // 第 0 项（也是唯一一项）方向标签：重置之后照这个下标改回来，见 resetRearView
-            mirror.addOption(getString(R.string.set_rearview_camera_label_title),
-                    appConfig.isRearViewCameraLabelEnabled(), on -> {
-                        appConfig.setRearViewCameraLabelEnabled(on);
-                        com.kooo.evcam.blackbox.BlackBox.noteImportant(
-                                "开关变更: pref_rearview_camera_label → " + (on ? "开" : "关"));
-                        RearViewMirrorService.refreshCameraLabel();
-                    });
-        }
+        bindRearViewRow();
+        bindSwitch("pref_rearview_camera_label", appConfig.isRearViewCameraLabelEnabled(), on -> {
+            appConfig.setRearViewCameraLabelEnabled(on);
+            RearViewMirrorService.refreshCameraLabel();
+        });
         bindSwitchMode();
 
         // 不跟着开关走：还没打开后视镜之前，也该能先看看它怎么用
         onClick("pref_rearview_guide",
                 pref -> com.kooo.evcam.ui.RearViewGuide.show(getActivity()));
 
-        // 切换范围（项目所有者 2026-10-19，取代「只显示前后视」开关）
-        bindSegmented("pref_rearview_views", SettingsRegistry.REARVIEW_VIEWS,
-                appConfig.getRearViewViews().key, value -> {
-                    appConfig.setRearViewViews(com.kooo.evcam.zeekr.MirrorViews.fromKey(value));
-                    applyRearViewViews();
-                });
-
         bindFisheye();
         bindRearViewWindow();
+    }
+
+    /**
+     * 「超级镜子」那一行（项目所有者 2026-11-11，ui-spec §三「开关合进分段」）：行尾分段「关闭」「四向」「前后」「后视 + 后座舱」。
+     * 存的还是原来两样：开没开（{@link OverlayCoordinator#setRearViewEnabled}，悬浮按钮、菜单里也开关它）和切换范围
+     * （{@link SettingsRegistry#REARVIEW_VIEWS}）。选「关闭」只关，切换范围留着；关着时选一档 = 换到这一档再打开 ——
+     * 和原来的开关一样先查悬浮窗权限（原来没查时开关拨上去了、服务却当场 stopSelf，屏幕上什么都没有），没有就去要、停在「关闭」。
+     */
+    private void bindRearViewRow() {
+        SegmentedPreference pref = findPreference("pref_rearview");
+        if (pref == null) {
+            return;
+        }
+        setOffOptions(pref, SettingsRegistry.REARVIEW_VIEWS);
+        pref.setValue(rearViewRowValue());
+        pref.setOnPreferenceChangeListener((preference, newValue) -> {
+            Context context = getContext();
+            if (context == null) {
+                return false;
+            }
+            String value = String.valueOf(newValue);
+            boolean wasOn = appConfig.isRearViewEnabled();
+            if (ROW_OFF.equals(value)) {
+                OverlayCoordinator.setRearViewEnabled(context, false);
+            } else if (!wasOn && !OverlayCoordinator.canShowOverlay(context)) {
+                askForOverlay(context);
+                return false;
+            } else {
+                com.kooo.evcam.zeekr.MirrorViews views = com.kooo.evcam.zeekr.MirrorViews.fromKey(value);
+                if (views != appConfig.getRearViewViews()) {
+                    appConfig.setRearViewViews(views);
+                    applyRearViewViews();
+                }
+                if (!wasOn) {
+                    OverlayCoordinator.setRearViewEnabled(context, true);
+                    toast(getString(R.string.msg_rearview_on));
+                    com.kooo.evcam.ui.RearViewGuide.showOnce(getActivity());
+                }
+            }
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("设置变更: pref_rearview → " + value);
+            return true;
+        });
+    }
+
+    /** 「超级镜子」那一行此刻该选中哪一段：关着是「关闭」，开着是切换范围那一档。 */
+    private String rearViewRowValue() {
+        return appConfig.isRearViewEnabled() ? appConfig.getRearViewViews().key : ROW_OFF;
     }
 
     /**
@@ -995,16 +1027,15 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 .setNegativeButton(R.string.action_cancel, null));
     }
 
-    /** 恢复默认之后，这一页上被它改到的几行都照新的值显示（以前鱼眼校正、视野角度两行不跟着变）。 */
+    /**
+     * 恢复默认之后，这一页上被它改到的几行都照新的值显示（以前鱼眼校正、视野角度两行不跟着变）。
+     * 「超级镜子」那一行不动：开没开、哪一档都不归重置管（2026-11-11 切换范围并进那一行起，{@link AppConfig#resetRearViewLayout}）。
+     */
     private void resetRearView() {
         appConfig.resetRearViewLayout();
-        SwitchChipsPreference mirror = findPreference("pref_rearview");
-        if (mirror != null) {
-            mirror.setOptionChecked(0, appConfig.isRearViewCameraLabelEnabled());
-        }
-        SegmentedPreference views = findPreference("pref_rearview_views");
-        if (views != null) {
-            views.setValue(appConfig.getRearViewViews().key);
+        SwitchPreferenceCompat label = findPreference("pref_rearview_camera_label");
+        if (label != null) {
+            label.setChecked(appConfig.isRearViewCameraLabelEnabled());
         }
         SwitchNavPreference fisheye = findPreference("pref_rearview_fisheye");
         if (fisheye != null) {
@@ -1012,7 +1043,6 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             showFov(fisheye);
         }
         refreshRearViewWindow();
-        applyRearViewViews();
         if (getContext() != null && appConfig.isRearViewEnabled()) {
             // 重开一次让新的默认值生效
             RearViewMirrorService.stop(getContext());
@@ -1033,7 +1063,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     }
 
     /**
-     * 切换范围变了（选了、或者重置了）。「后视 + 后座舱」要管线里有后座舱这一路：已经有管线时问一次
+     * 切换范围变了（「超级镜子」那一行换了一档）。「后视 + 后座舱」要管线里有后座舱这一路：已经有管线时问一次
      * （{@link com.kooo.evcam.camera.CameraManagerHolder#getOrInit}）—— 换到这一档而管线里还没有后座舱时，管线当场放掉重建，
      * 主界面、超级镜子照「放掉重建了」接上新的那一份（在录的话那一段到头、自动接回）；换出这一档不重建。再叫醒调度（超级镜子要不要
      * 后座舱是它每一轮读的事实），正在显示的窗口换环、接上或撤回后座舱的画布。
@@ -1065,17 +1095,12 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     // ------------------------------------------------------------------ 盲区画面
 
     /**
-     * 超级镜子分区里的一行：单独的窗口、单独的开关，不挂在超级镜子的开关下面（项目所有者 2026-10-16）。
-     * 2026-11-11 起只是开关（开关加附加项，项目所有者）：开着时说明下面一排情境三选一；显示位置、最低车速、中控屏上的位置和大小、
-     * HUD 画面一组（原来「盲区画面」那一页的）照原来的次序排在这一行下面、同一页，关着时变灰（dependency）。
+     * 超级镜子分区里的「盲区画面」一组：单独的窗口，不挂在超级镜子下面（项目所有者 2026-10-16）。「盲区画面」那一行是开关和情境
+     * 合成的分段选择（{@link #bindSideViewRow}，项目所有者 2026-11-11）；显示位置、最低车速、中控屏上的位置和大小、HUD 画面一组
+     * （原来「盲区画面」那一页的）照原来的次序排在下面、同一页，「关闭」时变灰（dependency）。
      */
     private void bindSideView() {
-        bindOverlaySwitch("pref_side_view", appConfig.isSideViewEnabled(),
-                OverlayCoordinator::setSideViewEnabled, null);
-        SwitchChipsPreference row = findPreference("pref_side_view");
-        if (row != null) {
-            bindSideViewMode(row);
-        }
+        bindSideViewRow();
         bindSegmented("pref_side_view_target", SettingsRegistry.SIDE_VIEW_TARGET,
                 appConfig.getSideViewTarget(), value -> {
                     appConfig.setSideViewTarget(value);
@@ -1174,25 +1199,55 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     }
 
     /**
-     * 盲区画面那一行的情境（项目所有者 2026-11-09）：开关开着时说明下面一排分段选择「丰富」「标准」「简洁」（三选一），
-     * 下面一行小字说选中的这一档什么时候显示。
+     * 「盲区画面」那一行（项目所有者 2026-11-11，ui-spec §三「开关合进分段」）：行尾分段「关闭」「丰富」「标准」「简洁」，
+     * 说明下面一行小字说选中的这一档什么时候显示（{@link #showSideViewRow}）。存的还是开没开和情境
+     * （{@link SettingsRegistry#SIDE_VIEW_MODE}，2026-11-09）两样，规矩同「超级镜子」那一行（{@link #bindRearViewRow}）：
+     * 选「关闭」只关、情境留着；关着时选一档 = 换到这一档再打开，先查悬浮窗权限。
      */
-    private void bindSideViewMode(SwitchChipsPreference row) {
-        SettingSpec spec = SettingsRegistry.SIDE_VIEW_MODE;
-        String current = appConfig.getSideViewMode();
-        String[] names = localizedNames(spec);
-        row.setSingleChoice(true);
-        for (int i = 0; i < spec.size(); i++) {
-            String value = spec.valueAt(i);
-            row.addOption(names[i], value.equals(current), on -> {
-                appConfig.setSideViewMode(value);
-                com.kooo.evcam.blackbox.BlackBox.noteImportant("开关变更: pref_side_view_mode → " + value);
-                row.setOptionsNote(getString(sideViewModeNote(value)));
-                syncSideViewRows();
-                SideViewService.applyConfig();
-            });
+    private void bindSideViewRow() {
+        SegmentedPreference pref = findPreference("pref_side_view");
+        if (pref == null) {
+            return;
         }
-        row.setOptionsNote(getString(sideViewModeNote(current)));
+        setOffOptions(pref, SettingsRegistry.SIDE_VIEW_MODE);
+        showSideViewRow(pref);
+        pref.setOnPreferenceChangeListener((preference, newValue) -> {
+            Context context = getContext();
+            if (context == null) {
+                return false;
+            }
+            String value = String.valueOf(newValue);
+            boolean wasOn = appConfig.isSideViewEnabled();
+            if (ROW_OFF.equals(value)) {
+                OverlayCoordinator.setSideViewEnabled(context, false);
+            } else if (!wasOn && !OverlayCoordinator.canShowOverlay(context)) {
+                askForOverlay(context);
+                return false;
+            } else {
+                if (!value.equals(appConfig.getSideViewMode())) {
+                    appConfig.setSideViewMode(value);
+                    syncSideViewRows();
+                    SideViewService.applyConfig();
+                }
+                if (!wasOn) {
+                    OverlayCoordinator.setSideViewEnabled(context, true);
+                }
+            }
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("设置变更: pref_side_view → " + value);
+            pref.setNote(sideViewNote(value));
+            return true;
+        });
+    }
+
+    /** 「盲区画面」那一行照实际状态显示：关着是「关闭」、不写小字；开着是情境那一档，小字说这一档什么时候显示。 */
+    private void showSideViewRow(SegmentedPreference pref) {
+        String value = appConfig.isSideViewEnabled() ? appConfig.getSideViewMode() : ROW_OFF;
+        pref.setValue(value);
+        pref.setNote(sideViewNote(value));
+    }
+
+    private CharSequence sideViewNote(String value) {
+        return ROW_OFF.equals(value) ? null : getString(sideViewModeNote(value));
     }
 
     /** 情境下面那一行小字：这一档什么时候显示。 */
@@ -1213,7 +1268,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     /**
      * 显示位置决定哪些可用：只有中控屏时 HUD 画面那一组不可用，只有 HUD 时最低车速、中控屏上的位置和大小不可用（只管中控屏）。
      * 情境是简洁时最低车速也不可用：简洁里没有只打转向灯的那一种（项目所有者 2026-11-09）。
-     * 盲区画面关着时这些都变灰（preferences.xml 里的 dependency，和这里的不可用叠在一起）；情境换了这里跟着再对一次。
+     * 「盲区画面」是「关闭」时这些都变灰（preferences.xml 里的 dependency，和这里的不可用叠在一起）；情境换了这里跟着再对一次。
      */
     private void syncSideViewRows() {
         String target = appConfig.getSideViewTarget();
@@ -1997,8 +2052,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             }
             boolean on = Boolean.TRUE.equals(newValue);
             if (!toggle.apply(getContext(), on)) {
-                toast(getString(R.string.msg_need_overlay));
-                WakeUpHelper.requestOverlayPermission(getContext());
+                askForOverlay(getContext());
                 return false;
             }
             if (afterChange != null) {
@@ -2011,6 +2065,30 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     /** 开 / 关一个悬浮窗；返回是否真的按要求生效。 */
     private interface OverlayToggle {
         boolean apply(Context context, boolean enabled);
+    }
+
+    /** 要打开悬浮窗却没有权限：提示一句、去系统设置要（开关停在原位，分段停在「关闭」）。 */
+    private void askForOverlay(Context context) {
+        toast(getString(R.string.msg_need_overlay));
+        WakeUpHelper.requestOverlayPermission(context);
+    }
+
+    /**
+     * 「超级镜子」「盲区画面」那一行照实际状态重画（回到设置页时）：超级镜子在悬浮按钮、菜单里也开关 —— 那边关了而这里还停在
+     * 「四向」的话，点「四向」不会再打开它。
+     */
+    private void refreshOverlayRows() {
+        if (appConfig == null) {
+            return;
+        }
+        SegmentedPreference mirror = findPreference("pref_rearview");
+        if (mirror != null) {
+            mirror.setValue(rearViewRowValue());
+        }
+        SegmentedPreference side = findPreference("pref_side_view");
+        if (side != null) {
+            showSideViewRow(side);
+        }
     }
 
     /**
@@ -2240,6 +2318,24 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             setter.set(String.valueOf(newValue));
             return true;
         });
+    }
+
+    /**
+     * 开关合进分段的那一行（ui-spec §三，项目所有者 2026-11-11：超级镜子、盲区画面）：第一段「关闭」，后面是这个设置的几档
+     * （只给开发者的不列，同 {@link #bindSegmented}）；选中「关闭」时写着 dependency 指向这一行的几行变灰。
+     */
+    private void setOffOptions(SegmentedPreference pref, SettingSpec spec) {
+        spec = spec.offeredTo(DeveloperMode.isUnlocked());
+        String[] names = localizedNames(spec);
+        String[] values = spec.values();
+        CharSequence[] entries = new CharSequence[names.length + 1];
+        String[] all = new String[values.length + 1];
+        entries[0] = getString(R.string.opt_off);
+        all[0] = ROW_OFF;
+        System.arraycopy(names, 0, entries, 1, names.length);
+        System.arraycopy(values, 0, all, 1, values.length);
+        pref.setOptions(entries, all);
+        pref.setOffValue(ROW_OFF);
     }
 
     private void bindEnum(String key, SettingSpec spec, String current, StringSetter setter) {

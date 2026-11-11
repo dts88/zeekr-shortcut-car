@@ -56,12 +56,12 @@
     <string name="set_storage_location_title">存储位置</string>
     <string name="set_storage_port_note">推荐选择 USB-A 口的 U 盘。经实测，下车后 Type-C 口会断电，之后如仍在录制，将录制到 USB-A 口的 U 盘。</string>
     <string name="set_storage_usage_no_drive">未检测到 U 盘</string>
-    <string name="set_rearview_summary">悬浮显示环视中的任一路画面或后座舱画面；后视和后座舱画面左右镜像，与车内后视镜一致</string>
     <string name="set_rearview_switch_mode_title">切换方式</string>
     <string name="opt_rearview_switch_swipe">滑动切换</string>
     <string name="opt_rearview_switch_tap">点按切换</string>
-    <string name="set_rearview_button_mode_summary">点击上、下、左、右区域分别切换到前、后、左、右画面；「切换范围」为「前后」或「后视 + 后座舱」时只分上下两半，下半为后视</string>
-    <string name="set_rearview_views_title">切换范围</string>
+    <string name="set_rearview_button_mode_summary">点击上、下、左、右区域分别切换到前、后、左、右画面；「超级镜子」为「前后」或「后视 + 后座舱」时只分上下两半，下半为后视</string>
+    <!-- 超级镜子、盲区画面那一行的第一段（开关合进分段，2026-11-11）：名字是项目所有者定的 -->
+    <string name="opt_off">关闭</string>
     <string name="opt_views_four">四向</string>
     <string name="opt_views_front_rear">前后</string>
     <string name="opt_views_rear_cabin">后视 + 后座舱</string>
@@ -69,7 +69,7 @@
     <string name="set_rearview_fisheye_summary">校正鱼眼镜头的桶形畸变，仅作用于超级镜子，不影响录像。</string>
     <string name="set_rearview_fov_title">视野角度</string>
     <string name="set_rearview_fov_summary">角度越大，视野越宽、画面越清晰，但边缘变形越明显</string>
-    <string name="set_rearview_reset_summary">恢复窗口位置、大小、取景、视野角度、鱼眼校正、「切换范围」和「方向标签」的默认值，并切回后视</string>
+    <string name="set_rearview_reset_summary">恢复窗口位置、大小、取景、视野角度、鱼眼校正和「方向标签」的默认值，并切回后视</string>
     <string name="set_rearview_fisheye_value">视野 %1$d°</string>
     <string name="set_rearview_window_summary">画面比例不变，窗口形状只决定可见范围</string>
     <string name="set_rearview_window_value">宽度 %1$d 像素 · 高度 %2$d 像素</string>
@@ -79,7 +79,7 @@
     <string name="set_rearview_guide_summary">手势区域、切换画面、调整取景、贴边隐藏、调整窗口大小</string>
     <!-- 盲区画面（超级镜子分区里的一组，和超级镜子各管各的）：文字 2026-10-17 项目所有者批准 -->
     <string name="set_side_view_title">盲区画面</string>
-    <string name="set_side_view_summary">按所选情境在屏幕该侧显示侧方摄像头画面，转向灯或后视镜上的灯熄灭 1 秒后开始淡出，再过 1 秒完全消失；倒挡或原厂画面显示时不显示。挂 D 挡时环视保持开启。</string>
+    <string name="set_side_view_summary">按所选情境在屏幕该侧显示侧方摄像头画面</string>
     <string name="set_side_view_min_speed_title">最低车速</string>
     <string name="set_side_view_min_speed_summary">打转向灯时，低于此车速中控屏上不显示，该侧盲区指示灯亮时和 HUD 不受此限；0 为不限</string>
     <string name="side_view_close">关闭盲区画面</string>
@@ -88,7 +88,7 @@
     <string name="opt_side_view_target_hud">HUD</string>
     <string name="opt_side_view_target_both">中控屏和 HUD</string>
     <string name="set_group_side_view_hud">HUD 画面</string>
-    <!-- 盲区画面那一行的附加项（2026-11-04，原来是下一层的两个开关）：名字是项目所有者定的 -->
+    <!-- 盲区画面那一行除「关闭」外的三段（情境，2026-11-09）：名字是项目所有者定的 -->
     <string name="opt_side_view_mode_full">丰富</string>
     <string name="opt_side_view_mode_standard">标准</string>
     <string name="opt_side_view_mode_minimal">简洁</string>
@@ -1159,4 +1159,5 @@
     <string name="dev_tool_file_result">%1$s：%2$s</string>
     <string name="dev_note">在「设置 → 关于与致谢」中点击「安全须知」可关闭开发者选项，关闭后此分区隐藏</string>
     <string name="set_rearview_camera_label_title">方向标签</string>
+    <string name="set_rearview_camera_label_summary">在窗口左上角显示当前画面的方向</string>
 </resources>

@@ -8,8 +8,11 @@
 package com.kooo.evcam.settings;
 
 import android.content.Context;
+import android.text.TextUtils;
 import android.util.AttributeSet;
+import android.view.View;
 import android.view.ViewGroup;
+import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.preference.Preference;
@@ -28,15 +31,25 @@ import com.kooo.evcam.R;
  *
  * <h3>选项多了就别用它</h3>
  *
- * <p>三段是舒服的上限。再多，每一段就窄到看不清字，那时候下拉框反而是对的。</p>
+ * <p>三段是舒服的上限。再多，每一段就窄到看不清字，那时候下拉框反而是对的。
+ * 例外是开关合进分段的那一行（{@link #setOffValue}）：「关闭」加三档，四段。</p>
  *
- * <p>段怎么摆在 {@link Segments}：设置行下面那一排的三选一（盲区画面的情境）也用它，两处一个样子。</p>
+ * <h3>开关合进分段</h3>
+ *
+ * <p>一个功能开着时只能从几档里选一档的，开关和那几档合成一行，第一段是「关闭」（ui-spec §三，项目所有者 2026-11-11：
+ * 超级镜子、盲区画面）。选中「关闭」时，写着 dependency 指向这一行的那几行变灰，和开关关着一样。
+ * 选中的那一档要交代一句的，写在说明下面一行小字（{@link #setNote}）。</p>
+ *
+ * <p>段怎么摆在 {@link Segments}。</p>
  */
 public class SegmentedPreference extends Preference implements PreferenceRows.OwnLayout {
 
     private CharSequence[] entries = new CharSequence[0];
     private String[] values = new String[0];
     private String value;
+    /** 选中它就是关着（{@link #setOffValue}）；null：这一行没有「关闭」。 */
+    private String offValue;
+    private CharSequence note;
 
     public SegmentedPreference(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -56,17 +69,52 @@ public class SegmentedPreference extends Preference implements PreferenceRows.Ow
     }
 
     void setValue(String value) {
+        boolean wasOff = shouldDisableDependents();
         this.value = value;
+        dependentsFollow(wasOff);
         notifyChanged();
+    }
+
+    /** 开关合进分段：选中这个值就是关着，依赖这一行的几行跟着变灰（{@link #shouldDisableDependents}）。 */
+    void setOffValue(String offValue) {
+        boolean wasOff = shouldDisableDependents();
+        this.offValue = offValue;
+        dependentsFollow(wasOff);
+    }
+
+    /** 说明下面一行小字（盲区画面：选中的这一档什么时候显示）；空就不写。 */
+    void setNote(CharSequence note) {
+        if (!TextUtils.equals(this.note, note)) {
+            this.note = note;
+            notifyChanged();
+        }
+    }
+
+    /** 选中「关闭」时和开关关着一样：写着 dependency 指向这一行的那几行不可用。 */
+    @Override
+    public boolean shouldDisableDependents() {
+        return (offValue != null && offValue.equals(value)) || super.shouldDisableDependents();
+    }
+
+    private void dependentsFollow(boolean wasOff) {
+        boolean off = shouldDisableDependents();
+        if (off != wasOff) {
+            notifyDependencyChange(off);
+        }
     }
 
     @Override
     public void onBindViewHolder(@NonNull PreferenceViewHolder holder) {
         super.onBindViewHolder(holder);
+        if (holder.findViewById(R.id.pref_segment_note) instanceof TextView) {
+            TextView noteView = (TextView) holder.findViewById(R.id.pref_segment_note);
+            noteView.setText(note);
+            noteView.setVisibility(TextUtils.isEmpty(note) ? View.GONE : View.VISIBLE);
+        }
         if (!(holder.findViewById(R.id.segments) instanceof ViewGroup)) {
             return;
         }
-        // 依赖的开关关着（android:dependency）时整行置灰：段也跟着灰、点了不动（超级镜子的切换范围）
+        // 依赖的那一行关着（android:dependency）时整行置灰：段也跟着灰、点了不动（超级镜子「关闭」时的切换方式）
         Segments.fill((ViewGroup) holder.findViewById(R.id.segments), entries, indexOf(value), isEnabled(),
                 index -> pick(values[index]));
     }
