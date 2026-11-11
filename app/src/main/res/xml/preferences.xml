@@ -205,111 +205,106 @@
 
         <!--
           盲区画面：单独的窗口，不挂在超级镜子的开关下面 —— 两个窗口各管各的（项目所有者 2026-10-16）。
-          2026-10-23 起开关加下一层：行尾写显示位置，点这一行进下面的「盲区画面」页。
-          2026-11-04 起开着时说明下面一排附加项「盲区提醒」「开门预警」（项目所有者；原来是那一页的两个开关）
+          2026-11-11 起只是开关（开关加附加项，项目所有者）：开着时说明下面一排情境三选一（丰富 / 标准 / 简洁）；
+          原来「盲区画面」页的选项照原来的次序排在下面、同一页，关着时变灰（dependency）；哪些可用另看显示位置、情境
+          （SettingsPreferenceFragment.syncSideViewRows）。
         -->
-        <com.kooo.evcam.settings.SwitchNavPreference
+        <com.kooo.evcam.settings.SwitchChipsPreference
             android:key="pref_side_view"
             android:title="@string/set_side_view_title"
             android:summary="@string/set_side_view_summary" />
 
+        <!-- 显示位置：中控屏 / HUD / 中控屏和 HUD，摆在行里点一次（2026-10-21，默认两处） -->
+        <com.kooo.evcam.settings.SegmentedPreference
+            android:key="pref_side_view_target"
+            android:dependency="pref_side_view"
+            android:title="@string/set_side_view_target_title" />
+
+        <!-- 只管中控屏：显示位置是「HUD」时不可用 -->
+        <SeekBarPreference
+            android:key="pref_side_view_min_speed"
+            android:dependency="pref_side_view"
+            android:title="@string/set_side_view_min_speed_title"
+            android:summary="@string/set_side_view_min_speed_summary"
+            app:showSeekBarValue="true" />
+
         <!--
-          盲区画面的下一层（2026-10-23）：嵌在分区里的 PreferenceScreen 不在上一层列成一行，只从它那一行进
-          （SettingsPreferenceFragment.hideSubPages）。和上一层的开关不在同一页，所以这里不写 dependency（找不到会崩）；
-          哪些可用看显示位置（SettingsPreferenceFragment.syncSideViewRows）。
+          中控屏上的位置和大小（2026-11-03，值加一个按钮）：行尾写左侧那个的宽和高、「重置」；点这一行在整个屏幕上调
+          左右两个框（zeekr.SideViewPlacementEditor）。调盲区画面位置和大小只有这里。显示位置是「HUD」时不可用。
         -->
-        <PreferenceScreen
-            android:key="screen_side_view"
-            android:title="@string/set_side_view_title">
+        <com.kooo.evcam.settings.ValueActionPreference
+            android:key="pref_side_view_place"
+            android:dependency="pref_side_view"
+            android:title="@string/set_side_view_place_title"
+            android:summary="@string/set_side_view_place_summary" />
 
-            <!-- 显示位置：中控屏 / HUD / 中控屏和 HUD，摆在行里点一次（2026-10-21，默认两处） -->
-            <com.kooo.evcam.settings.SegmentedPreference
-                android:key="pref_side_view_target"
-                android:title="@string/set_side_view_target_title" />
+        <!--
+          HUD 上的盲区画面（2026-10-21）：大小、位置和样子；拉直、视野、朝向和中控屏共用。默认值照 FerixzTanz 在他 7X 上调的。
+          显示位置是「中控屏」时整组不可用。
+        -->
+        <PreferenceCategory
+            android:key="cat_side_view_hud"
+            android:dependency="pref_side_view"
+            android:title="@string/set_group_side_view_hud">
 
-            <!-- 只管中控屏：显示位置是「HUD」时不可用 -->
+            <SwitchPreferenceCompat
+                android:key="pref_hud_mirror"
+                android:title="@string/set_hud_mirror_title"
+                android:summary="@string/set_hud_mirror_summary" />
+
             <SeekBarPreference
-                android:key="pref_side_view_min_speed"
-                android:title="@string/set_side_view_min_speed_title"
-                android:summary="@string/set_side_view_min_speed_summary"
+                android:key="pref_hud_height"
+                android:title="@string/set_hud_height_title"
+                android:summary="@string/set_hud_height_summary"
                 app:showSeekBarValue="true" />
 
-            <!--
-              中控屏上的位置和大小（2026-11-03，值加一个按钮）：行尾写左侧那个的宽和高、「重置」；点这一行在整个屏幕上调
-              左右两个框（zeekr.SideViewPlacementEditor）。调盲区画面位置和大小只有这里。显示位置是「HUD」时不可用。
-            -->
-            <com.kooo.evcam.settings.ValueActionPreference
-                android:key="pref_side_view_place"
-                android:title="@string/set_side_view_place_title"
-                android:summary="@string/set_side_view_place_summary" />
+            <SeekBarPreference
+                android:key="pref_hud_shape"
+                android:title="@string/set_hud_shape_title"
+                android:summary="@string/set_hud_shape_summary"
+                app:showSeekBarValue="true" />
 
-            <!--
-              HUD 上的盲区画面（2026-10-21）：大小、位置和样子；拉直、视野、朝向和中控屏共用。默认值照 FerixzTanz 在他 7X 上调的。
-              显示位置是「中控屏」时整组不可用。
-            -->
-            <PreferenceCategory
-                android:key="cat_side_view_hud"
-                android:title="@string/set_group_side_view_hud">
+            <SeekBarPreference
+                android:key="pref_hud_edge"
+                android:title="@string/set_hud_edge_title"
+                android:summary="@string/set_hud_edge_summary"
+                app:showSeekBarValue="true" />
 
-                <SwitchPreferenceCompat
-                    android:key="pref_hud_mirror"
-                    android:title="@string/set_hud_mirror_title"
-                    android:summary="@string/set_hud_mirror_summary" />
+            <SeekBarPreference
+                android:key="pref_hud_vertical"
+                android:title="@string/set_hud_vertical_title"
+                android:summary="@string/set_hud_vertical_summary"
+                app:showSeekBarValue="true" />
 
-                <SeekBarPreference
-                    android:key="pref_hud_height"
-                    android:title="@string/set_hud_height_title"
-                    android:summary="@string/set_hud_height_summary"
-                    app:showSeekBarValue="true" />
+            <SeekBarPreference
+                android:key="pref_hud_opacity"
+                android:title="@string/set_hud_opacity_title"
+                app:showSeekBarValue="true" />
 
-                <SeekBarPreference
-                    android:key="pref_hud_shape"
-                    android:title="@string/set_hud_shape_title"
-                    android:summary="@string/set_hud_shape_summary"
-                    app:showSeekBarValue="true" />
+            <SeekBarPreference
+                android:key="pref_hud_contrast"
+                android:title="@string/set_hud_contrast_title"
+                android:summary="@string/set_hud_contrast_summary"
+                app:showSeekBarValue="true" />
 
-                <SeekBarPreference
-                    android:key="pref_hud_edge"
-                    android:title="@string/set_hud_edge_title"
-                    android:summary="@string/set_hud_edge_summary"
-                    app:showSeekBarValue="true" />
+            <SeekBarPreference
+                android:key="pref_hud_contrast_night"
+                android:title="@string/set_hud_contrast_night_title"
+                android:summary="@string/set_hud_contrast_night_summary"
+                app:showSeekBarValue="true" />
 
-                <SeekBarPreference
-                    android:key="pref_hud_vertical"
-                    android:title="@string/set_hud_vertical_title"
-                    android:summary="@string/set_hud_vertical_summary"
-                    app:showSeekBarValue="true" />
+            <SeekBarPreference
+                android:key="pref_hud_night"
+                android:title="@string/set_hud_night_title"
+                android:summary="@string/set_hud_night_summary"
+                app:showSeekBarValue="true" />
 
-                <SeekBarPreference
-                    android:key="pref_hud_opacity"
-                    android:title="@string/set_hud_opacity_title"
-                    app:showSeekBarValue="true" />
-
-                <SeekBarPreference
-                    android:key="pref_hud_contrast"
-                    android:title="@string/set_hud_contrast_title"
-                    android:summary="@string/set_hud_contrast_summary"
-                    app:showSeekBarValue="true" />
-
-                <SeekBarPreference
-                    android:key="pref_hud_contrast_night"
-                    android:title="@string/set_hud_contrast_night_title"
-                    android:summary="@string/set_hud_contrast_night_summary"
-                    app:showSeekBarValue="true" />
-
-                <SeekBarPreference
-                    android:key="pref_hud_night"
-                    android:title="@string/set_hud_night_title"
-                    android:summary="@string/set_hud_night_summary"
-                    app:showSeekBarValue="true" />
-
-                <SeekBarPreference
-                    android:key="pref_hud_fade"
-                    android:title="@string/set_hud_fade_title"
-                    android:summary="@string/set_hud_fade_summary"
-                    app:showSeekBarValue="true" />
-            </PreferenceCategory>
-        </PreferenceScreen>
+            <SeekBarPreference
+                android:key="pref_hud_fade"
+                android:title="@string/set_hud_fade_title"
+                android:summary="@string/set_hud_fade_summary"
+                app:showSeekBarValue="true" />
+        </PreferenceCategory>
     </PreferenceScreen>
 
     <!-- ==================== 悬浮键与灵动贴 ==================== -->

@@ -23,10 +23,6 @@ import com.kooo.evcam.R;
  * 车牌号水印（下一层是输入车牌号）、行驶信息条（下一层是「车辆信号」里选显示哪些信号）、熄屏持续录制（下一层是熄屏后的帧率，
  * 行尾的值下面另有一行哨兵模式此刻的状态，{@link #showSentryStatus}）。
  *
- * <p>开关开着时说明下面也可以多一排附加项（{@link #addOption}，和「开关加附加项」那一排同一种，{@link RowOptions}），
- * 也可以是三选一（{@link #setSingleChoice}，画成分段选择，和「显示位置」同一种）：盲区画面的情境「丰富」「标准」「简洁」
- * （项目所有者 2026-11-09；2026-11-10 定画成分段选择）。那一排自己接住点击，没点中按钮或分段时不进下一层。</p>
- *
  * <p>行首的开关只管开关；点这一行其余的地方不切换开关，交给 {@code OnPreferenceClickListener} 进下一层；
  * 行尾写当前值（{@link #setValue}）再加 ›。和安卓系统设置里 Wi-Fi、蓝牙那一行是同一种，开关照车机放在行首。</p>
  *
@@ -37,8 +33,6 @@ public class SwitchNavPreference extends SwitchPreferenceCompat implements Prefe
 
     /** 行尾的当前值；空 = 不写，只有 ›。 */
     private CharSequence value;
-    /** 开关开着时说明下面那一排附加项；没加就没有。 */
-    private final RowOptions options = new RowOptions();
 
     public SwitchNavPreference(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -52,25 +46,6 @@ public class SwitchNavPreference extends SwitchPreferenceCompat implements Prefe
      */
     public void showSentryStatus() {
         setLayoutResource(R.layout.pref_row_switch_nav_sentry);
-    }
-
-    /** 加一个附加项按钮（开关开着时才显示），和 {@link SwitchChipsPreference#addOption} 一样。 */
-    public void addOption(CharSequence label, boolean checked, SwitchChipsPreference.OptionListener listener) {
-        options.add(label, checked, listener);
-        notifyChanged();
-    }
-
-    /** 那一排是三选一（{@link RowOptions#setSingleChoice}），画成分段选择：只能选一个，监听只在选中的那一下叫。在加选项之前叫。 */
-    public void setSingleChoice(boolean single) {
-        options.setSingleChoice(single);
-        notifyChanged();
-    }
-
-    /** 那一排按钮下面的一行小字，和 {@link SwitchChipsPreference#setOptionsNote} 一样；空就不写。 */
-    public void setOptionsNote(CharSequence note) {
-        if (options.setNote(note)) {
-            notifyChanged();
-        }
     }
 
     /** 行尾的当前值（车牌号、选了几项）；空就只有 ›。 */
@@ -89,7 +64,6 @@ public class SwitchNavPreference extends SwitchPreferenceCompat implements Prefe
             valueView.setText(value);
             valueView.setVisibility(TextUtils.isEmpty(value) ? View.GONE : View.VISIBLE);
         }
-        options.bind(holder, isChecked(), isEnabled());
         View toggle = holder.findViewById(android.R.id.widget_frame);
         if (toggle != null) {
             toggle.setEnabled(isEnabled());
