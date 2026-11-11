@@ -176,8 +176,7 @@
             -->
             <com.kooo.evcam.settings.SegmentedPreference
                 android:key="pref_rearview"
-                android:title="@string/set_section_rearview"
-                android:summary="@string/set_rearview_summary" />
+                android:title="@string/set_section_rearview" />
 
             <!-- 方向标签：2026-10-23 起是超级镜子那一行的附加项，那一行改成分段以后单独一行（2026-11-11） -->
             <SwitchPreferenceCompat

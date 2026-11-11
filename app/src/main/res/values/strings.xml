@@ -56,7 +56,6 @@
     <string name="set_storage_location_title">存储位置</string>
     <string name="set_storage_port_note">推荐选择 USB-A 口的 U 盘。经实测，下车后 Type-C 口会断电，之后如仍在录制，将录制到 USB-A 口的 U 盘。</string>
     <string name="set_storage_usage_no_drive">未检测到 U 盘</string>
-    <string name="set_rearview_summary">悬浮显示环视中的任一路画面或后座舱画面；后视和后座舱画面左右镜像，与车内后视镜一致</string>
     <string name="set_rearview_switch_mode_title">切换方式</string>
     <string name="opt_rearview_switch_swipe">滑动切换</string>
     <string name="opt_rearview_switch_tap">点按切换</string>
@@ -80,7 +79,7 @@
     <string name="set_rearview_guide_summary">手势区域、切换画面、调整取景、贴边隐藏、调整窗口大小</string>
     <!-- 盲区画面（超级镜子分区里的一组，和超级镜子各管各的）：文字 2026-10-17 项目所有者批准 -->
     <string name="set_side_view_title">盲区画面</string>
-    <string name="set_side_view_summary">按所选情境在屏幕该侧显示侧方摄像头画面，转向灯或后视镜上的灯熄灭 1 秒后开始淡出，再过 1 秒完全消失；倒挡或原厂画面显示时不显示。挂 D 挡时环视保持开启。</string>
+    <string name="set_side_view_summary">按所选情境在屏幕该侧显示侧方摄像头画面</string>
     <string name="set_side_view_min_speed_title">最低车速</string>
     <string name="set_side_view_min_speed_summary">打转向灯时，低于此车速中控屏上不显示，该侧盲区指示灯亮时和 HUD 不受此限；0 为不限</string>
     <string name="side_view_close">关闭盲区画面</string>

@@ -42,7 +42,6 @@
     <string name="set_storage_location_title">Storage location</string>
     <string name="set_storage_port_note">A drive on the USB-A port is recommended. Testing shows the Type-C port loses power after you leave the car; any recording after that goes to the drive on the USB-A port.</string>
     <string name="set_storage_usage_no_drive">No USB drive found</string>
-    <string name="set_rearview_summary">Shows any surround camera or the rear cabin in a floating window; the rear view and the rear cabin are mirrored left to right, like the interior mirror</string>
     <string name="set_rearview_switch_mode_title">Switch views by</string>
     <string name="opt_rearview_switch_swipe">Swipe</string>
     <string name="opt_rearview_switch_tap">Tap</string>
@@ -64,7 +63,7 @@
     <string name="set_rearview_guide_title">How to use</string>
     <string name="set_rearview_guide_summary">Gesture zones, switching cameras, framing, docking and resizing</string>
     <string name="set_side_view_title">Blind spot view</string>
-    <string name="set_side_view_summary">Shows the side camera on that side of the screen, depending on the chosen mode; 1 second after the turn signal or side mirror light goes off it starts to fade out and is gone 1 second later; not shown in reverse or while a factory view is on screen. Surround view stays on in D.</string>
+    <string name="set_side_view_summary">Shows the side camera on that side of the screen, depending on the chosen mode</string>
     <string name="set_side_view_min_speed_title">Minimum speed</string>
     <string name="set_side_view_min_speed_summary">When the turn signal is on, not shown on the center screen below this speed (doesn\'t apply when that side\'s blind spot light is on, or on the HUD); 0 means no limit</string>
     <string name="side_view_close">Close Blind spot view</string>

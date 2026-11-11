@@ -598,21 +598,11 @@
     tidak dipaparkan pada skrin tengah di bawah kelajuan ini (tidak terpakai apabila lampu titik buta sebelah itu menyala, atau
     pada HUD); 0 bermaksud tiada had」。
   - 不用了、已删：set_side_view_blind_spot_chip「盲区提醒」、set_side_view_door_warning_chip「开门预警」、set_side_view_lamps_note。
-- 2026-11-11（超级镜子、盲区画面的开关合进分段选择，ui-spec §三「开关合进分段」；第一段的名字是项目所有者定的）：
+- 2026-11-11 批准（超级镜子、盲区画面的开关合进分段选择，ui-spec §三「开关合进分段」；第一段的名字、两处说明的删减是项目所有者定的）：
   - opt_off「关闭」/ Off / Mati（英文、马来文照术语表「开关与窗口」的紧凑值标签）。
   - 「方向标签」不再是附加项、单独一行，用回 2026-10-16 批准的 set_rearview_camera_label_summary「在窗口左上角显示当前画面的方向」/
     「Shows the direction of the current view in the top-left corner of the window」/
     「Menunjukkan arah paparan semasa di penjuru kiri atas tetingkap」。
-  - 不用了、已删：set_rearview_views_title「切换范围」（并进「超级镜子」那一行）。
-- vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
-- 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
-
-### 待项目所有者确认
-
-下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
-可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
-
-- 2026-11-11（「切换范围」并进「超级镜子」那一行，引用它的两句跟着改）：
   - set_rearview_button_mode_summary 里「切换范围」换成「超级镜子」：「点击上、下、左、右区域分别切换到前、后、左、右画面；
     「超级镜子」为「前后」或「后视 + 后座舱」时只分上下两半，下半为后视」/「…; with Super mirror set to Front and rear or
     Rear + rear cabin, only the top and bottom halves are used, with the rear view at the bottom」/「…; jika Cermin super ialah
@@ -621,6 +611,20 @@
     「方向标签」的默认值，并切回后视」/「Restores the default window position and size, framing, field of view, fisheye correction
     and Direction label, and switches back to the rear view」/「Memulihkan kedudukan dan saiz tetingkap, bingkai, medan pandangan,
     pembetulan mata ikan dan Label arah kepada lalai, serta kembali ke pandangan belakang」。
+  - set_side_view_summary 只留前半句（项目所有者删掉淡出、倒挡和原厂画面、D 挡那几句）：「按所选情境在屏幕该侧显示侧方摄像头画面」/
+    「Shows the side camera on that side of the screen, depending on the chosen mode」/
+    「Memaparkan kamera sisi di sebelah skrin itu mengikut mod yang dipilih」（一句话，按 §3 不带句号）。
+  - 不用了、已删：set_rearview_views_title「切换范围」（并进「超级镜子」那一行）、set_rearview_summary（项目所有者删掉「超级镜子」
+    那一行的说明）。
+- vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
+- 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
+
+### 待项目所有者确认
+
+下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
+可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
+
+- （现在没有。）
 
 ---
 
