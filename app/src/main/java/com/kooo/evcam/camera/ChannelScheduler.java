@@ -1734,12 +1734,12 @@ public final class ChannelScheduler {
     }
 
     /** 进程里唯一的那一个调度；还没装上是 null（单元测试里不装，各自建）。哪个线程都能读。 */
-    public static ChannelScheduler app() {
+    static ChannelScheduler app() {
         return app;
     }
 
     /** 叫醒那一个调度：前台服务就绪 / 没了、主界面进出前台、一轮结束了（这几件事是进程级的，不归哪一份管线）。哪个线程都能调。 */
-    public static void wakeAll() {
+    static void wakeAll() {
         ChannelScheduler s = app;
         if (s != null) {
             s.wake();
@@ -1797,7 +1797,7 @@ public final class ChannelScheduler {
      * 屏幕黑着时录像能不能开（相机管家的判断，{@link ChannelRules#startsInDark}；相机管家黑着来的「要录」、接回照它）。
      * 没装上调度时判不了，按车机要睡算（不开）。主线程。
      */
-    public static ChannelRules.DarkStart startsInDark(boolean surroundPlanned, boolean bySentryRise,
+    static ChannelRules.DarkStart startsInDark(boolean surroundPlanned, boolean bySentryRise,
                                                       boolean cameraUsable) {
         ChannelScheduler s = app;
         return s == null ? ChannelRules.DarkStart.SLEEPS : s.darkStart(surroundPlanned, bySentryRise, cameraUsable);
@@ -1807,7 +1807,7 @@ public final class ChannelScheduler {
      * 录制键下那行小字（相机管家的判断，{@link ChannelRules#darkOutlook}）：哨兵模式、在不在开车读进程这一层的事实
      * （车辆接口没连着时读不到、算没在开车）。主线程。
      */
-    public static ChannelRules.DarkOutlook darkOutlook(boolean keepWhenDark, boolean surroundPlanned, boolean autoStart) {
+    static ChannelRules.DarkOutlook darkOutlook(boolean keepWhenDark, boolean surroundPlanned, boolean autoStart) {
         ChannelScheduler s = app;
         return ChannelRules.darkOutlook(keepWhenDark, surroundPlanned, s != null && s.facts.driving(),
                 s == null ? null : s.facts.sentry(), autoStart);

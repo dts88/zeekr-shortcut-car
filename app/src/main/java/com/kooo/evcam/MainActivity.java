@@ -2583,7 +2583,7 @@ public class MainActivity extends AppCompatActivity {
         // 熄屏带来的暂停：那一刻系统已经不交互了（人切走、重建、关掉时还交互着）。熄屏广播后到时据此照样记「因熄屏退下去」
         android.os.PowerManager power = (android.os.PowerManager) getSystemService(Context.POWER_SERVICE);
         pausedByScreenOff = !isFinishing() && !isChangingConfigurations() && power != null && !power.isInteractive();
-        com.kooo.evcam.camera.StallWatch.setForeground(false);
+        keeper.mainScreenForeground(false);
         previewStall.stop();
         AppLog.d(TAG, "onPause called, isRecording=" + isRecording());
 
@@ -2650,7 +2650,7 @@ public class MainActivity extends AppCompatActivity {
         boolean wasInBackground = isInBackground;
         isInBackground = false;
         pausedByScreenOff = false;
-        com.kooo.evcam.camera.StallWatch.setForeground(true);
+        keeper.mainScreenForeground(true);
         previewStall.start();
         AppLog.i(TAG, "onResume " + instanceTag() + " surround: " + describeComposite());
         

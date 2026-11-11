@@ -374,7 +374,7 @@ public final class CameraKeeper {
      * 主界面在不在前台都一样。主线程。
      */
     public void takePhoto(MultiCameraManager.PhotoCallback callback) {
-        CameraManagerHolder.getInstance().getOrInit(context).takePhoto(callback);
+        pipeline().takePhoto(callback);
     }
 
     // ================================================================= 画布（3c 第二步）
@@ -461,6 +461,14 @@ public final class CameraKeeper {
         if (holder.getCameraManager() != null) {
             holder.getOrInit(context);
         }
+    }
+
+    /**
+     * 主界面进出前台（onResume / onPause）：能不能用相机看它（规格 §4.7）—— 记下，叫醒调度（回到前台，开失败判出的
+     * 「现在用不了相机」作废、照常开）。主线程。
+     */
+    public void mainScreenForeground(boolean foreground) {
+        StallWatch.setForeground(foreground);
     }
 
     /**
@@ -1021,7 +1029,7 @@ public final class CameraKeeper {
         boolean keep = appConfig.isScreenOffKeepRecording();
         boolean auto = appConfig.isAutoStartRecording();
         boolean surround = surroundPlanned();
-        ChannelRules.DarkOutlook outlook = ChannelScheduler.darkOutlook(keep, surround, auto);
+        ChannelRules.DarkOutlook outlook = darkOutlook();
         BlackBox.noteImportant("熄屏时" + (isRecording() ? "在录像"
                 : pending == null ? "没在录像" : resuming() ? "在等自动接回" : "在等开录（" + pending + "）")
                 + "：录像停不停由相机管家在通道算黑时定（黑满 " + (ChannelRules.HOLD_MS / 1000) + " 秒、或者车机要睡），照现在的车和设置是「"
@@ -1143,8 +1151,7 @@ public final class CameraKeeper {
      * （不等 {@link #POLL_MS} 的下一轮）。换了一份就接上。
      */
     private MultiCameraManager currentManager() {
-        CameraManagerHolder holder = CameraManagerHolder.getInstance();
-        MultiCameraManager held = holder.getOrInit(context);
+        MultiCameraManager held = pipeline();
         if (held != cameraManager) {
             setCameraManager(held);
         }
@@ -1153,7 +1160,7 @@ public final class CameraKeeper {
         }
         if (awaitedBuild != held) {
             awaitedBuild = held;
-            holder.whenBuilt(held, built -> {
+            CameraManagerHolder.getInstance().whenBuilt(held, built -> {
                 awaitedBuild = null;
                 if (pending != null) {
                     main.removeCallbacks(poll);

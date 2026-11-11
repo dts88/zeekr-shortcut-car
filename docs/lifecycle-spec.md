@@ -48,8 +48,9 @@
   在录 / 等待摄像头）、每一路的样子（`summary`）、录制键小字（§3.3）、前台通知的字（`notificationTitle`、`notificationContent`）。
   主界面、悬浮按钮、前台通知、自动锁定都照它。
 - **事实也只有一份**：屏幕黑没黑只问 `ScreenState`（§3.3）；相机服务说的话只经 `CameraAvailabilityWatch`；叫醒调度的进程层监听
-  （亮熄屏、登记表、相机服务、车辆信号）在 `ChannelFacts`，挂一次；别的事实（前台服务起来了、没了，车机要睡，车机醒着屏幕黑着，
-  设置变了）经相机管家叫醒调度（`CameraKeeper.factsChanged`）。管线也向相机管家要（`pipeline`、`commitConfigForMainScreen`、
+  （亮熄屏、登记表、相机服务、车辆信号）在 `ChannelFacts`，挂一次；别的事实也经相机管家：主界面进出前台（`mainScreenForeground`），
+  前台服务起来了、没了，车机要睡，车机醒着屏幕黑着，超级镜子切换范围变了，超级镜子、盲区画面的画布留不住
+  （`CameraKeeper.factsChanged`）。管线也向相机管家要（`pipeline`、`commitConfigForMainScreen`、
   `checkPipeline`），谁都不直接去建、去换。
 
 **代码地图**（在 `camera` 包里，另注的除外）：
@@ -84,7 +85,8 @@
 - **拍照**：`takePhoto`（§3.5）。
 - **退出**：`beginExit`，次序由相机管家定，主界面只做界面那几件（§3.5）。
 - **报的事实**：人自己点开主界面是新的一趟（`newTrip`，§2.5）；界面打开、回到前台（`mainScreenOpened`、`mainScreenShown`：相机管家看
-  「这一趟要录」、看一次「启动自动录制」，§3.2）；界面没了（`mainScreenGone`）。
+  「这一趟要录」、看一次「启动自动录制」，§3.2）；界面没了（`mainScreenGone`）；进出前台（`mainScreenForeground`：能不能用相机
+  看它，§4.7）。
 - **管线**：向相机管家要（`CameraKeeper.pipeline`）；摆好录制界面时请它让存下的配置生效（`commitConfigForMainScreen`，§2.6）。
   管线换了，主界面自己把界面的回调接到新的一份上（`pipelineReplaced`）；预览画布由相机管家重新交（§5.3）。
 - 相机管线不属于主界面（§4.9），录像不经过它。它只在一种时候非出来不可：后台起的前台服务用不了相机（安卓 12），这时要录，
@@ -158,7 +160,7 @@
 
 - 改了设置回到主界面时生效，不用重启：要建的几路、各路参数、摄像头映射变了，管线在主界面下一次接上时照此刻的设置重建
   （主界面请相机管家，`CameraKeeper.commitConfigForMainScreen`，§4.9）。超级镜子切到「后视 + 后座舱」而管线里没有后座舱，
-  设置页请相机管家对一次管线（`checkPipeline`），当场重建；调度现读的那几样变了，请它叫醒调度（`factsChanged`）。
+  设置页请相机管家对一次管线（`checkPipeline`），当场重建；切换范围变了，请它叫醒调度（`factsChanged`）。
 - 「开机自启动」变了：请相机管家把前台服务对一次（`refreshForegroundService`，§3.5）。
 
 ---
