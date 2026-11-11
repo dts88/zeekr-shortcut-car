@@ -296,9 +296,7 @@ public class RearViewMirrorService extends Service {
         }
         // 「后视 + 后座舱」而管线里还没有后座舱（超级镜子关着时管线不为它建）：已经有管线就问一次，缺这一路当场重建
         // （CameraManagerHolder.rebuildFor）。设置页、主界面、悬浮按钮、恢复，哪条路打开的超级镜子都经过这里
-        if (CameraManagerHolder.getInstance().getCameraManager() != null) {
-            CameraManagerHolder.getInstance().getOrInit(this);
-        }
+        CameraKeeper.get(this).checkPipeline();
         mirrorView = new RearViewMirrorView(this, appConfig);
         // 新窗口还不知道画面尺寸：下一次声明时交给它（MirrorCanvas.attach）
         surround.attach(mirrorView);
@@ -972,7 +970,7 @@ public class RearViewMirrorService extends Service {
                         + "画布交给管线留着，那一路不动（没人接回的等它离开会话再放）");
             } else {
                 AppLog.i(TAG, "后视镜" + (cabin ? "后座舱" : "环视") + "画布没了、管线里没有这一路：照旧放掉，还在会话里的由通道调度马上摘");
-                ChannelScheduler.wakeAll();
+                CameraKeeper.factsChanged();
             }
             return kept;
         }

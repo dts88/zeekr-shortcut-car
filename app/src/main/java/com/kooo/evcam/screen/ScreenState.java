@@ -687,7 +687,7 @@ public final class ScreenState {
         // 车机要睡由相机管家自己判（ChannelRules.headUnitSleeps：安卓熄屏、没在开车），录像停不停也是它定
         // （2026-11-02「熄屏判断收归通道调度」，以前这里先叫录像那一侧照它那张表判）。
         // 相机：通道眼里的熄屏也看安卓熄没熄屏（车机要睡不等黑满 30 秒，ChannelRules.darkForChannel）—— 叫醒调度，不等下一个两秒
-        com.kooo.evcam.camera.ChannelScheduler.wakeAll();
+        com.kooo.evcam.camera.CameraKeeper.factsChanged();
         startWakePoll();
     }
 
@@ -699,7 +699,7 @@ public final class ScreenState {
                 + VehicleScreen.eventText(after.event) + "、点火=" + VehicleScreen.ignitionText(after.ignition)
                 + "）：车机醒着、屏幕黑着" + (darkMs < 0 ? "" : "，熄屏后 +" + darkMs / 1000 + " 秒"));
         // 相机：安卓又亮了，通道眼里的熄屏照黑了多久算（ChannelRules.darkForChannel）—— 叫醒调度
-        com.kooo.evcam.camera.ChannelScheduler.wakeAll();
+        com.kooo.evcam.camera.CameraKeeper.factsChanged();
         // 车机醒着：按开机自启动的规矩恢复服务；黑着不拉界面，录像接不接照相机管家的决定
         Recovery.restore(app, "wake");
     }

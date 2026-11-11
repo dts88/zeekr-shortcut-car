@@ -157,7 +157,7 @@ public class CameraForegroundService extends Service {
         isForegroundReady = true;
         // 服务就绪：叫醒通道调度 —— 没人要的相机可以保持 30 秒（isRunning），是主界面在前时起的、刷新的，后台也能用相机了
         // （startedWhileVisible）。以前这里还执行排着的「就绪后」回调（whenReady，开相机用的）：相机只由调度开，2.11 阶段 6 删了
-        com.kooo.evcam.camera.ChannelScheduler.wakeAll();
+        com.kooo.evcam.camera.CameraKeeper.factsChanged();
 
         return stickiness(this);
     }
@@ -261,7 +261,7 @@ public class CameraForegroundService extends Service {
         isForegroundReady = false;
         startedWhileVisible = false;
         // 前台服务没了：不再保持，后台用不了相机 —— 叫醒通道调度
-        com.kooo.evcam.camera.ChannelScheduler.wakeAll();
+        com.kooo.evcam.camera.CameraKeeper.factsChanged();
 
         // 服务被杀时自己拉自己：这是保活的手段之一，保活开着才做（规格 §6）；
         // 用户主动退出时不做 —— 这正是以前「退不掉」的一条路

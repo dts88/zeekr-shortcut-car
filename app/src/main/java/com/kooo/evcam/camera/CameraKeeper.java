@@ -434,6 +434,61 @@ public final class CameraKeeper {
                 android.os.SystemClock::uptimeMillis);
     }
 
+    // ================================================================= 管线、事实（3e）
+
+    /**
+     * 要一份相机管线（主界面接上它、挂界面的回调）：有就给当下那一份，没有就建 —— 建不建、什么时候放掉重建由
+     * {@link CameraManagerHolder} 照生效的配置判（规格 §4.9）。主线程。
+     */
+    public MultiCameraManager pipeline() {
+        return CameraManagerHolder.getInstance().getOrInit(context);
+    }
+
+    /**
+     * 主界面照存下的配置摆好了录制界面（{@code laidOut}：它摆的那份配置的键）：存下的配置这一刻生效，建管线、录像用到的变了
+     * 就换管线（{@link CameraManagerHolder#commitForMainScreen}，规格 §4.9）。主线程。
+     */
+    public void commitConfigForMainScreen(String laidOut) {
+        CameraManagerHolder.getInstance().commitForMainScreen(context, laidOut);
+    }
+
+    /**
+     * 超级镜子可能要后座舱了（打开超级镜子、设置里切换范围换到「后视 + 后座舱」）：已经有管线就照此刻的设置问一次 —— 这一份里没有
+     * 后座舱就当场放掉重建（{@link CameraManagerHolder.Rebuild#MIRROR_CABIN}）；还没有管线不为它建。主线程。
+     */
+    public void checkPipeline() {
+        CameraManagerHolder holder = CameraManagerHolder.getInstance();
+        if (holder.getCameraManager() != null) {
+            holder.getOrInit(context);
+        }
+    }
+
+    /**
+     * 调度每一轮现读的事实变了，叫醒它（只排一轮，不当场做什么）：前台服务起来了、没了（保持、能不能用相机）；安卓熄屏了、或者又亮了
+     * 而屏幕还黑着（车机要睡、车机醒着屏幕黑着：通道眼里的熄屏也看安卓）；设置里调度现读的那几样变了（超级镜子切换范围）；
+     * 超级镜子、盲区画面的画布没了而管线留不住（还在会话里的那一个死了，调度马上摘）。哪里都能调，不建管家。
+     */
+    public static void factsChanged() {
+        ChannelScheduler.wakeAll();
+    }
+
+    /** 录制键下那行小字：现在熄屏的话录像会怎样（{@link ChannelRules#darkOutlook}，规格 §3.3）。主线程。 */
+    public ChannelRules.DarkOutlook darkOutlook() {
+        return ChannelScheduler.darkOutlook(appConfig.isScreenOffKeepRecording(), surroundPlanned(),
+                appConfig.isAutoStartRecording());
+    }
+
+    /**
+     * 退出的记号清掉了（人点开了主界面、车机真正开机，{@link UserExit#clear}）：调度照常开 —— 退出以后它只关、不开。
+     * 调度还没装上就不用叫。哪里都能调，不建管家。
+     */
+    public static void exitCleared() {
+        ChannelScheduler scheduler = ChannelScheduler.app();
+        if (scheduler != null) {
+            scheduler.resumeAfterExit();
+        }
+    }
+
     // ================================================================= 前台服务（3b）
 
     /**
