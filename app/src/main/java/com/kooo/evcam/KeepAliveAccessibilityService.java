@@ -17,7 +17,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 /**
- * 保活手段之一：无障碍服务（规格 §3）。
+ * 保活手段之一：无障碍服务（规格 §6）。
  *
  * <p>系统管理的服务，进程优先级高；它跑着时每分钟看一眼前台服务在不在。
  * 要用户去系统设置里打开它。<b>这个容器肯不肯让它跑，还没在车上试过</b>（项目所有者 2026-09-27：留着，试）——

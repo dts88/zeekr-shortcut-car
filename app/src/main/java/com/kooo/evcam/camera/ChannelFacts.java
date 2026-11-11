@@ -261,7 +261,7 @@ public final class ChannelFacts implements ChannelScheduler.Facts {
         return t.carLinkConnected() ? t.latest().sentry : null;
     }
 
-    /** 「熄屏持续录制」（开发者「熄屏录制（阻止休眠）」不算，lifecycle-spec §3.1）。每一轮现读：黑着时没人改得了它。 */
+    /** 「熄屏持续录制」（开发者「熄屏录制（阻止休眠）」不算，lifecycle-spec §3.3）。每一轮现读：黑着时没人改得了它。 */
     @Override
     public boolean keepRecordingWhenDark() {
         return config().isScreenOffKeepRecording();

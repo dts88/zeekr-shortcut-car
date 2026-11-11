@@ -60,7 +60,7 @@
         <PreferenceCategory
             android:title="@string/set_group_auto_record">
 
-            <!-- 「我要它一直在录」是设定状态的一部分，不是规则，所以在录制分区（规格 §2） -->
+            <!-- 「我要它一直在录」是设定状态的一部分，不是规则，所以在录制分区（规格 §3.2） -->
             <SwitchPreferenceCompat
                 android:key="pref_auto_record"
                 android:title="@string/set_auto_record_title"
@@ -547,7 +547,7 @@
                 android:summary="@string/set_force_h264_summary" />
 
             <!--
-              熄屏录制 = 熄屏持续录制 + 防止休眠（规格 §3.1）。2026-11-02 停用（项目所有者：从来没有启用过），这一行从开发者选项里拿掉；
+              熄屏录制 = 熄屏持续录制 + 防止休眠（规格 §3.3）。2026-11-02 停用（项目所有者：从来没有启用过），这一行从开发者选项里拿掉；
               要恢复时放回下面这一行（2026-10-23 和时长上限合成一行，开关加下一层：行尾写最长多久，点这一行填小时数）：
             <com.kooo.evcam.settings.SwitchNavPreference
                 android:key="pref_screen_off_recording"

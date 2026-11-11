@@ -279,7 +279,7 @@ public class MainActivity extends AppCompatActivity {
         // 用户退出之后，所有会自己拉起主界面的路都被拦住了 —— 这时主界面被创建，只能是人点开的。清掉退出的记号也是通道调度退出的门
         // （UserExit.clear，第 2 步「只有一个调度」）：退出以后通道只关、不开，这之前后台来要管线建出来的那一份什么都不开
         UserExit.clear(this, "manual open");
-        // 人点开的主界面 = 新的一趟（规格 1.2）：手动停录、自动开过的记录清零。
+        // 人点开的主界面 = 新的一趟（规格 §2.5）：手动停录、自动开过的记录清零。
         // 我们自己静默拉起来的（恢复录像、亮屏接回）不算，界面重建（savedState 非空）也不算
         if (savedInstanceState == null
                 && !getIntent().getBooleanExtra(com.kooo.evcam.recovery.Recovery.EXTRA_SILENT, false)
@@ -334,7 +334,7 @@ public class MainActivity extends AppCompatActivity {
         KeepAliveManager.startKeepAliveWork(this);
         AppLog.d(TAG, "定时保活任务已启动");
         
-        // 唤醒锁只属于「熄屏录制（阻止休眠）」（规格 §3.1）：熄屏时在录像才拿，见 ScreenOffRecording；2026-11-02 熄屏录制停用，没有人拿
+        // 唤醒锁只属于「熄屏录制（阻止休眠）」（规格 §3.3）：熄屏时在录像才拿，见 ScreenOffRecording；2026-11-02 熄屏录制停用，没有人拿
                 
         // 启动存储清理任务（如果用户设置了限制）
         storageCleanupManager = new StorageCleanupManager(this);
@@ -346,7 +346,7 @@ public class MainActivity extends AppCompatActivity {
             // 清除标志，避免后续重复检测
             getIntent().removeExtra("auto_start_from_boot");
 
-            // 静默拉起来的主界面闪一下就退后台（规格 1.6）：录像不靠主界面显示，退到后台照常录
+            // 静默拉起来的主界面闪一下就退后台（规格 §2.5）：录像不靠主界面显示，退到后台照常录
             AppLog.d(TAG, "开机自启动模式：等待窗口准备好后移到后台");
             shouldMoveToBackgroundOnReady = true;
         }
@@ -371,7 +371,7 @@ public class MainActivity extends AppCompatActivity {
         AppLog.d(TAG, "onNewIntent called");
         navigateIfAsked(intent);
 
-        // 还活着的主界面被静默拉到前面（Recovery：要接录像、而那时用不了相机）：接上之后照样退回后台（规格 1.6）
+        // 还活着的主界面被静默拉到前面（Recovery：要接录像、而那时用不了相机）：接上之后照样退回后台（规格 §2.5）
         if (intent.getBooleanExtra("auto_start_from_boot", false)) {
             intent.removeExtra("auto_start_from_boot");
             shouldMoveToBackgroundOnReady = true;

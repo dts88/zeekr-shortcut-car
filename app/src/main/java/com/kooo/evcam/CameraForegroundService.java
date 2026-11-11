@@ -84,7 +84,7 @@ public class CameraForegroundService extends Service {
     /**
      * 这个前台服务能用相机：它是在主界面在前时起的，或者主界面在前时刷新过（{@code onStartCommand} 那一刻主界面在前）。
      *
-     * <p>安卓 12 起，后台才起的前台服务用不了相机（lifecycle-spec §3）：通道调度据此判「能用相机」 ——
+     * <p>安卓 12 起，后台才起的前台服务用不了相机（lifecycle-spec §4.7）：通道调度据此判「能用相机」 ——
      * 主界面在前，或者这一项为真（项目所有者 2026-10-10 确认，大纲 §0）。不能用时它不开、不重开、不计次数。</p>
      *
      * <p>只升不降，服务停了才清：AOSP 12 的 {@code ActiveServices.setFgsRestrictionLocked} 对已经放行的服务不再收回
@@ -95,13 +95,13 @@ public class CameraForegroundService extends Service {
         return isForegroundReady && startedWhileVisible;
     }
 
-    /** 被系统杀了要不要重启：保活开着才要（规格 §3：关 = 被杀了不回来）。几个服务共用这一条。 */
+    /** 被系统杀了要不要重启：保活开着才要（规格 §6：关 = 被杀了不回来）。几个服务共用这一条。 */
     public static int stickiness(Context context) {
         return new AppConfig(context).isAutoStartOnBoot() ? START_STICKY : START_NOT_STICKY;
     }
     
     /**
-     * 唤醒锁不在这里管了：它只属于「熄屏录制（阻止休眠）」（规格 §3.1，{@code ScreenOffRecording}），
+     * 唤醒锁不在这里管了：它只属于「熄屏录制（阻止休眠）」（规格 §3.3，{@code ScreenOffRecording}），
      * 熄屏时在录像才拿、录像停了就放、到了用户设的时长就放。
      */
 
@@ -263,7 +263,7 @@ public class CameraForegroundService extends Service {
         // 前台服务没了：不再保持，后台用不了相机 —— 叫醒通道调度
         com.kooo.evcam.camera.ChannelScheduler.wakeAll();
 
-        // 服务被杀时自己拉自己：这是保活的手段之一，保活开着才做（规格 §3）；
+        // 服务被杀时自己拉自己：这是保活的手段之一，保活开着才做（规格 §6）；
         // 用户主动退出时不做 —— 这正是以前「退不掉」的一条路
         if (!UserExit.isExited(this) && new AppConfig(this).isAutoStartOnBoot()) {
             scheduleServiceRestart();
@@ -408,7 +408,7 @@ public class CameraForegroundService extends Service {
     /**
      * 停掉前台服务。只由相机管家叫（{@code CameraKeeper}）：停不停它判（{@code CameraKeeper#foregroundServiceNeeded}）。
      *
-     * <p>前台服务的寿命 = 「开机自启动」开着、在录、或者等着接回（规格 §3）。保活开着时它本来就该一直在：
+     * <p>前台服务的寿命 = 「开机自启动」开着、在录、或者等着接回（规格 §3.5）。保活开着时它本来就该一直在：
      * 这里只把通知照录像此刻的样子换回「在后台运行」（{@link #showText}，不再 start 一次），不停。等着接回的也一样
      * （「这一趟要录」立着：存储一类被打断等自动接回、因熄屏停下等亮屏，2026-10-10）—— 接回时相机是从后台开的，
      * 后台拿着相机安卓要求有前台服务。都不是、或用户退出了，才真的停。

@@ -42,7 +42,7 @@ public class ZeekrShortcutApp extends Application {
         // U 盘挂上、卸下、异常掉线进黑匣子（2026-09-26 录像盘掉线，系统那边发生了什么一行都没记下）
         com.kooo.evcam.blackbox.VolumeEvents.register(this);
         // 熄屏判断活在进程上：熄屏 / 亮屏广播在这里注册、车辆信号的核心在这里登记（屏幕真黑了看车辆信号，熄屏 v3），
-        // 主界面在不在都一样（规格 §3.1）。这里不会当场判出熄屏：车辆信号在自己的线程上连、读到了才排到主线程，下面的相机管家先起来
+        // 主界面在不在都一样（规格 §3.3）。这里不会当场判出熄屏：车辆信号在自己的线程上连、读到了才排到主线程，下面的相机管家先起来
         com.kooo.evcam.screen.ScreenState.install(this);
         // 通道调度（唯一动相机的地方）进程里只有一个：在这里最先装上，不换、不停（第 2 步；建管线、相机管家也各自先装一次，装过了什么都不做）。
         // 登记表、相机服务、亮熄屏、车辆信号叫醒它的监听跟着它挂一次 —— 车辆信号的核心上面刚登记好。这里不进相机服务（开始听相机服务的可用性
@@ -52,12 +52,12 @@ public class ZeekrShortcutApp extends Application {
         com.kooo.evcam.sound.DriveSound.install(this);
         // 灵动贴（试验性）：开着、有绑定的就开始听它们的广播，按下去照选的动作做；关着、没绑定的、用户退出了的不扫（上一个进程留下的扫描也停掉）
         com.kooo.evcam.button.SmartButtons.install(this);
-        // 相机管家（要相机做什么都向它请求）在这里起来：「这一趟」的录像选择从盘上读回来（规格 1.2：进程被杀又拉回来时还在）；
+        // 相机管家（要相机做什么都向它请求）在这里起来：「这一趟」的录像选择从盘上读回来（规格 §2.5：进程被杀又拉回来时还在）；
         // 车机真正开机是新的一趟
         com.kooo.evcam.camera.CameraKeeper keeper = com.kooo.evcam.camera.CameraKeeper.get(this);
         if (com.kooo.evcam.blackbox.BlackBox.rebootedSinceLastRun()) {
             keeper.newTrip("reboot");
-            com.kooo.evcam.blackbox.BlackBox.noteImportant("车机重启过：这一趟的录像选择清零（规格 1.2）");
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("车机重启过：这一趟的录像选择清零（规格 §2.5）");
         }
         // 每一台相机的来历（车机重新初始化以来开过几台、最后一次关完；2.11.5 诊断）：读回存下的那一份，在写盘的那条线程上读。
         // 车机重启过没有看上面黑匣子的开机记录，所以排在它后面

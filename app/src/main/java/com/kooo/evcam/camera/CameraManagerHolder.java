@@ -77,7 +77,7 @@ import java.util.function.Consumer;
  *
  * <ul>
  *   <li>对象当场建好交出去（登记表的监听、调度、录像宿主都在它的构造里接上）；相机列表、合成流探测、照配置定尺寸
- *       都要进相机服务，在 {@link #setup} 这条线程上做 —— 主线程不进相机服务（lifecycle-spec §3.5：相机服务忙的时候一问要等
+ *       都要进相机服务，在 {@link #setup} 这条线程上做 —— 主线程不进相机服务（lifecycle-spec §4.9：相机服务忙的时候一问要等
  *       几秒到十几秒）。做完回主线程 {@link MultiCameraManager#initCameras}，各路的画面尺寸由 SingleCamera 在它自己的相机线程上
  *       不开设备先算（{@code resolveSize}）。</li>
  *   <li>槽位照存下的映射建（{@link ZeekrMultiPlan#choose}）：相机列表完整时照列表分，值得存才存下来（{@code worthStoring}：

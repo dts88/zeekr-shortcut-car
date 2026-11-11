@@ -48,7 +48,7 @@ public class KeepAliveProvider extends ContentProvider {
             return true;
         }
         if (!new AppConfig(context).isAutoStartOnBoot()) {
-            // 保活关着（规格 §3）：被拉起来也不起前台服务，让系统把空进程收掉
+            // 保活关着（规格 §6）：被拉起来也不起前台服务，让系统把空进程收掉
             return true;
         }
 

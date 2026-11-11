@@ -253,7 +253,7 @@ public class SideViewService extends Service {
                 startListening();
             }
         });
-        // 被杀了要不要重启：跟着「开机自启动」开关（规格 §3），同超级镜子
+        // 被杀了要不要重启：跟着「开机自启动」开关（规格 §6），同超级镜子
         return com.kooo.evcam.CameraForegroundService.stickiness(this);
     }
 
