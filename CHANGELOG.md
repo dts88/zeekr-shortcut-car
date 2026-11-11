@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [3.12.0-alpha] - 2026-11-11
+
+- Super mirror: the switch and Views are one row of segments: Off, All four, Front and rear, Rear + rear cabin; Direction label is a row of its own; Reset window and view leaves that row alone.
+- Blind spot view: the switch and mode are one row of segments at the end of the row: Off, Full, Standard, Minimal.
+- Settings: the Super mirror page has three groups (Super mirror, Blind spot view, HUD picture); the Super mirror row has no description and the Blind spot view one is shorter.
+
 ## [3.11.0-alpha] - 2026-11-11
 
 - Blind spot view: its settings sit under its switch on the Super mirror page instead of on a page of their own; they are greyed out while it is off.
