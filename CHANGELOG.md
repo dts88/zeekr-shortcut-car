@@ -11,6 +11,10 @@ commit message, not here.
 
 Nothing yet.
 
+## [3.10.1-alpha] - 2026-11-11
+
+- Camera: the last requests that went around the camera keeper (getting the camera pipeline, screen and service changes, the screen-off hint) now go through it; nothing should look different.
+
 ## [3.10.0-alpha] - 2026-11-11
 
 - Camera: when a session can't take every picture, who gives way and when it tries again are decided in one place (the camera keeper); nothing should look different.
