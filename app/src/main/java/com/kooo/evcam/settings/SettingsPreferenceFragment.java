@@ -119,7 +119,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     }
 
     /**
-     * 嵌在分区里的 PreferenceScreen 是下一层页面（盲区画面），只从它那一行（开关加下一层）进：
+     * 嵌在分区里的 PreferenceScreen 是下一层页面（模拟声浪），只从它那一行（开关加下一层）进：
      * 在上一层不列成一行 —— androidx 本来会把它画成一行，点了却没处接。
      */
     private static void hideSubPages(androidx.preference.PreferenceGroup group) {
@@ -195,7 +195,6 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         // 权限、存储用量这些可能在别处被改过，回到这个界面时重新读一次
         updateSavedIn();
         refreshRearViewWindow();
-        refreshSideViewTarget();
         refreshDriveSoundValue();
     }
 
@@ -1067,20 +1066,14 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
 
     /**
      * 超级镜子分区里的一行：单独的窗口、单独的开关，不挂在超级镜子的开关下面（项目所有者 2026-10-16）。
-     * 2026-10-23 起是开关加下一层：行尾写显示位置，点这一行进「盲区画面」页（preferences.xml 里嵌着的 screen_side_view），
-     * 显示位置、最低车速和 HUD 画面一组（2026-10-21）都在那一页。2026-11-04 起开着时说明下面一排附加项（项目所有者）：
-     * 「盲区提醒」「开门预警」—— 后视镜上的灯亮了也显示那一侧，各自开关、默认关（2026-11-03 加的时候是那一页的两个开关）。
+     * 2026-11-11 起只是开关（开关加附加项，项目所有者）：开着时说明下面一排情境三选一；显示位置、最低车速、中控屏上的位置和大小、
+     * HUD 画面一组（原来「盲区画面」那一页的）照原来的次序排在这一行下面、同一页，关着时变灰（dependency）。
      */
     private void bindSideView() {
         bindOverlaySwitch("pref_side_view", appConfig.isSideViewEnabled(),
                 OverlayCoordinator::setSideViewEnabled, null);
-        SwitchNavPreference row = findPreference("pref_side_view");
+        SwitchChipsPreference row = findPreference("pref_side_view");
         if (row != null) {
-            showSideViewTarget(row);
-            row.setOnPreferenceClickListener(preference -> {
-                openFragment(SettingsPreferenceFragment.forSection("screen_side_view"), R.string.set_side_view_title);
-                return true;
-            });
             bindSideViewMode(row);
         }
         bindSegmented("pref_side_view_target", SettingsRegistry.SIDE_VIEW_TARGET,
@@ -1180,16 +1173,11 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         pref.setValue(getString(R.string.set_side_view_place_value, rect.width, rect.height));
     }
 
-    /** 盲区画面那一行的行尾：显示位置。 */
-    private void showSideViewTarget(SwitchNavPreference row) {
-        row.setValue(nameOf(SettingsRegistry.SIDE_VIEW_TARGET, appConfig.getSideViewTarget()));
-    }
-
     /**
      * 盲区画面那一行的情境（项目所有者 2026-11-09）：开关开着时说明下面一排分段选择「丰富」「标准」「简洁」（三选一），
      * 下面一行小字说选中的这一档什么时候显示。
      */
-    private void bindSideViewMode(SwitchNavPreference row) {
+    private void bindSideViewMode(SwitchChipsPreference row) {
         SettingSpec spec = SettingsRegistry.SIDE_VIEW_MODE;
         String current = appConfig.getSideViewMode();
         String[] names = localizedNames(spec);
@@ -1200,6 +1188,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 appConfig.setSideViewMode(value);
                 com.kooo.evcam.blackbox.BlackBox.noteImportant("开关变更: pref_side_view_mode → " + value);
                 row.setOptionsNote(getString(sideViewModeNote(value)));
+                syncSideViewRows();
                 SideViewService.applyConfig();
             });
         }
@@ -1221,18 +1210,10 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         return index >= 0 ? localizedNames(spec)[index] : "";
     }
 
-    /** 从「盲区画面」页回来时显示位置可能改过。 */
-    private void refreshSideViewTarget() {
-        SwitchNavPreference row = findPreference("pref_side_view");
-        if (row != null && getContext() != null) {
-            showSideViewTarget(row);
-        }
-    }
-
     /**
      * 显示位置决定哪些可用：只有中控屏时 HUD 画面那一组不可用，只有 HUD 时最低车速、中控屏上的位置和大小不可用（只管中控屏）。
      * 情境是简洁时最低车速也不可用：简洁里没有只打转向灯的那一种（项目所有者 2026-11-09）。
-     * 这一页和盲区画面的开关、情境不在同一页，开关关着时这些照样能先调好。
+     * 盲区画面关着时这些都变灰（preferences.xml 里的 dependency，和这里的不可用叠在一起）；情境换了这里跟着再对一次。
      */
     private void syncSideViewRows() {
         String target = appConfig.getSideViewTarget();

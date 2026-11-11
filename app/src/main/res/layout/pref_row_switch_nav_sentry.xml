@@ -51,9 +51,6 @@
             android:maxLines="6"
             android:textColor="@color/pref_summary"
             android:textAppearance="@style/TextAppearance.Cam.Micro" />
-
-        <!-- 开关开着时的附加项（SwitchNavPreference.addOption；没加就不显示） -->
-        <include layout="@layout/pref_options" />
     </LinearLayout>
 
     <LinearLayout

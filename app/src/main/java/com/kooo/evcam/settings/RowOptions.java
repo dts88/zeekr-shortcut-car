@@ -30,9 +30,8 @@ import java.util.List;
  * <p>那一排也可以是三选一（{@link #setSingleChoice}）：不摆按钮，摆一条分段选择，和「显示位置」同一种、段由同一份代码摆
  * （{@link Segments}，项目所有者 2026-11-10；之前是三个筛选按钮）。</p>
  *
- * <p>「开关加附加项」（{@link SwitchChipsPreference}）和「开关加下一层」（{@link SwitchNavPreference}：盲区画面的情境
- * 「丰富」「标准」「简洁」，三选一，项目所有者 2026-11-09）两种行共用这一份；那一排也是同一块布局（{@code pref_options}，
- * include 进各自的行布局）。</p>
+ * <p>用它的是「开关加附加项」（{@link SwitchChipsPreference}：锁定影像、超级镜子、悬浮按钮的附加项；盲区画面的情境
+ * 「丰富」「标准」「简洁」，三选一，项目所有者 2026-11-09）；那一排是 {@code pref_options}，include 进 {@code pref_row_switch_chips}。</p>
  */
 final class RowOptions {
 
