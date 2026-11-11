@@ -46,8 +46,8 @@
     <string name="set_rearview_switch_mode_title">Tukar paparan dengan</string>
     <string name="opt_rearview_switch_swipe">Leret</string>
     <string name="opt_rearview_switch_tap">Ketik</string>
-    <string name="set_rearview_button_mode_summary">Bertukar ke paparan depan, belakang, kiri atau kanan apabila kawasan atas, bawah, kiri atau kanan diketik; jika Paparan ialah Depan dan belakang atau Belakang + kabin belakang, hanya separuh atas dan bawah digunakan, dengan paparan belakang di bawah</string>
-    <string name="set_rearview_views_title">Paparan</string>
+    <string name="set_rearview_button_mode_summary">Bertukar ke paparan depan, belakang, kiri atau kanan apabila kawasan atas, bawah, kiri atau kanan diketik; jika Cermin super ialah Depan dan belakang atau Belakang + kabin belakang, hanya separuh atas dan bawah digunakan, dengan paparan belakang di bawah</string>
+    <string name="opt_off">Mati</string>
     <string name="opt_views_four">Empat arah</string>
     <string name="opt_views_front_rear">Depan dan belakang</string>
     <string name="opt_views_rear_cabin">Belakang + kabin belakang</string>
@@ -55,7 +55,7 @@
     <string name="set_rearview_fisheye_summary">Membetulkan herotan tong mata ikan dalam Cermin super sahaja; rakaman tidak berubah.</string>
     <string name="set_rearview_fov_title">Medan pandangan</string>
     <string name="set_rearview_fov_summary">Lebih luas menunjukkan lebih banyak dan nampak lebih tajam, tetapi tepinya lebih herot</string>
-    <string name="set_rearview_reset_summary">Memulihkan kedudukan dan saiz tetingkap, bingkai, medan pandangan, pembetulan mata ikan, Paparan dan Label arah kepada lalai, serta kembali ke pandangan belakang</string>
+    <string name="set_rearview_reset_summary">Memulihkan kedudukan dan saiz tetingkap, bingkai, medan pandangan, pembetulan mata ikan dan Label arah kepada lalai, serta kembali ke pandangan belakang</string>
     <string name="set_rearview_fisheye_value">Medan pandangan %1$d°</string>
     <string name="set_rearview_window_summary">Nisbah gambar kekal; bentuk tetingkap hanya menentukan berapa banyak yang kelihatan</string>
     <string name="set_rearview_window_value">Lebar %1$d px · Tinggi %2$d px</string>
@@ -1144,4 +1144,5 @@
     <string name="dev_tool_file_result">%1$s: %2$s</string>
     <string name="dev_note">Ketik Safety notice dalam Tetapan → Perihal &amp; penghargaan untuk mematikan pilihan pembangun dan menyembunyikan bahagian ini</string>
     <string name="set_rearview_camera_label_title">Label arah</string>
+    <string name="set_rearview_camera_label_summary">Menunjukkan arah paparan semasa di penjuru kiri atas tetingkap</string>
 </resources>

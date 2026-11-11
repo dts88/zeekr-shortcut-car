@@ -598,6 +598,12 @@
     tidak dipaparkan pada skrin tengah di bawah kelajuan ini (tidak terpakai apabila lampu titik buta sebelah itu menyala, atau
     pada HUD); 0 bermaksud tiada had」。
   - 不用了、已删：set_side_view_blind_spot_chip「盲区提醒」、set_side_view_door_warning_chip「开门预警」、set_side_view_lamps_note。
+- 2026-11-11（超级镜子、盲区画面的开关合进分段选择，ui-spec §三「开关合进分段」；第一段的名字是项目所有者定的）：
+  - opt_off「关闭」/ Off / Mati（英文、马来文照术语表「开关与窗口」的紧凑值标签）。
+  - 「方向标签」不再是附加项、单独一行，用回 2026-10-16 批准的 set_rearview_camera_label_summary「在窗口左上角显示当前画面的方向」/
+    「Shows the direction of the current view in the top-left corner of the window」/
+    「Menunjukkan arah paparan semasa di penjuru kiri atas tetingkap」。
+  - 不用了、已删：set_rearview_views_title「切换范围」（并进「超级镜子」那一行）。
 - vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
 - 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
 
@@ -606,7 +612,15 @@
 下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
 可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
 
-- （现在没有。）
+- 2026-11-11（「切换范围」并进「超级镜子」那一行，引用它的两句跟着改）：
+  - set_rearview_button_mode_summary 里「切换范围」换成「超级镜子」：「点击上、下、左、右区域分别切换到前、后、左、右画面；
+    「超级镜子」为「前后」或「后视 + 后座舱」时只分上下两半，下半为后视」/「…; with Super mirror set to Front and rear or
+    Rear + rear cabin, only the top and bottom halves are used, with the rear view at the bottom」/「…; jika Cermin super ialah
+    Depan dan belakang atau Belakang + kabin belakang, hanya separuh atas dan bawah digunakan, dengan paparan belakang di bawah」。
+  - set_rearview_reset_summary 去掉「切换范围」（重置不再动「超级镜子」那一行）：「恢复窗口位置、大小、取景、视野角度、鱼眼校正和
+    「方向标签」的默认值，并切回后视」/「Restores the default window position and size, framing, field of view, fisheye correction
+    and Direction label, and switches back to the rear view」/「Memulihkan kedudukan dan saiz tetingkap, bingkai, medan pandangan,
+    pembetulan mata ikan dan Label arah kepada lalai, serta kembali ke pandangan belakang」。
 
 ---
 
@@ -635,9 +649,9 @@
 | 盲区画面 | 盲区画面（按情境在中控屏或 HUD 上该侧显示侧方摄像头画面的窗口，设置在「超级镜子」分区里；显示位置：中控屏 / HUD / 中控屏和 HUD） | Blind spot view（句中也大写 B） | Paparan titik buta | 2026-10-17 项目所有者批准；不用「盲区辅助」（原厂功能的名字）、「侧视弹窗」 |
 | 转向灯 | 转向灯；打转向灯 | turn signal | lampu isyarat | 双闪见「闪远光 / 双闪」 |
 | 盲区指示灯 / 开门预警 | 盲区指示灯（后视镜上那盏灯，开车时旁边有车亮）；开门预警（停车后亮，后视镜上同一盏灯） | blind spot light；door open warning | lampu titik buta；amaran buka pintu | 2026-11-03 加，项目所有者批准；2026-11-04 加的附加项名「盲区提醒」2026-11-09 随附加项去掉；「后视镜」指车外两侧的，英文 side mirror / 马来文 cermin sisi |
-| 情境（盲区画面） | 情境：丰富、标准、简洁（盲区画面那一行的三选一：什么情形显示画面，一档包含下一档） | mode：Full、Standard、Minimal | mod：Penuh、Piawai、Minimum | 2026-11-09 加，中文名字是项目所有者定的，2026-11-09 项目所有者批准 |
+| 情境（盲区画面） | 情境：丰富、标准、简洁（盲区画面那一行除「关闭」外的三档：什么情形显示画面，一档包含下一档） | mode：Full、Standard、Minimal | mod：Penuh、Piawai、Minimum | 2026-11-09 加，中文名字是项目所有者定的，2026-11-09 项目所有者批准 |
 | 方向标签 | 方向标签（超级镜子窗口左上角那块写着前、后、左、右的标签） | Direction label | Label arah | 2.12 加；标签上的字用「前 / 后 / 左 / 右」（zeekr_lane_*），后座舱写「后座舱」（slot_cabin_rear） |
-| 切换范围 | 切换范围（超级镜子在哪几路之间切）：四向、前后、后视 + 后座舱 | Views：All four、Front and rear、Rear + rear cabin | Paparan：Empat arah、Depan dan belakang、Belakang + kabin belakang | 2026-10-19 加，取代「只显示前后视」 |
+| 切换范围 | 切换范围（超级镜子在哪几路之间切）：四向、前后、后视 + 后座舱；设置里是「超级镜子」那一行除「关闭」外的三档，不单独成行（2026-11-11） | Views：All four、Front and rear、Rear + rear cabin | Paparan：Empat arah、Depan dan belakang、Belakang + kabin belakang | 2026-10-19 加，取代「只显示前后视」 |
 | 悬浮按钮 | 悬浮按钮；按钮大小、按钮透明度、时长文字大小 | floating button；Button opacity | butang terapung；Kelegapan butang | 「悬浮窗」只用于系统权限名「悬浮窗权限」（Overlay / Paparan di atas apl lain） |
 | 行驶信息条 | 行驶信息条；仅车辆信号页每行下方的小字可简称「信息条」 | Driving info bar（行下小字 Info bar） | Bar maklumat pemanduan | — |
 | 车辆信号（那一页） | 车辆信号（试验性） | Vehicle signals (experimental) | Isyarat kenderaan (percubaan) | 2026-10-23 前叫「系统信息」；说的是车机读得到的那些信号 |

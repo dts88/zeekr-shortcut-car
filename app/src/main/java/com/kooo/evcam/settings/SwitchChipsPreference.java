@@ -20,15 +20,13 @@ import com.kooo.evcam.R;
 
 /**
  * 开关加几个附加项（ui-spec §三，项目所有者 2026-10-23）：一个功能开着时还有几样可以单独开、关的附加项，合成一行 ——
- * 锁定影像（附加项：「自动锁定」的「闪远光」「双闪」「鸣笛」）、超级镜子（附加项：「方向标签」）、悬浮按钮（「录制时长」「锁定位置」）。
+ * 锁定影像（附加项：「自动锁定」的「闪远光」「双闪」「鸣笛」）、悬浮按钮（「录制时长」「锁定位置」）。
  *
  * <p>行首的开关管整个功能，点这一行其余的地方也是这个开关（没有下一层；那一排按钮所在的地方除外）；
  * 行尾写当前值（{@link #setValue}）。
  * 开着时说明下面多一排：一个小标题（{@link #setOptionsLabel}）加几个按钮（{@link #addOption}，Material 的筛选按钮，
  * 按下是开、再按是关）；关着时那一排不显示。还不能用的附加项照样摆出来，置灰、按不动（{@link #addUnavailableOption}）。
- * 那一排也可以是三选一（{@link #setSingleChoice}，画成分段选择，和「显示位置」同一种）：盲区画面的情境「丰富」「标准」「简洁」
- * （项目所有者 2026-11-09、2026-11-10；2026-11-11 起那一行是这一种，之前是「开关加下一层」）。
- * 那一排的画法在 {@link RowOptions}。</p>
+ * 那一排的画法在 {@link RowOptions}。只能选一样的不是附加项，是分段选择（{@link SegmentedPreference}）。</p>
  */
 public class SwitchChipsPreference extends SwitchPreferenceCompat implements PreferenceRows.OwnLayout {
 
@@ -59,12 +57,6 @@ public class SwitchChipsPreference extends SwitchPreferenceCompat implements Pre
         if (options.setLabel(label)) {
             notifyChanged();
         }
-    }
-
-    /** 那一排是三选一（{@link RowOptions#setSingleChoice}），画成分段选择：只能选一个，监听只在选中的那一下叫。在加选项之前叫。 */
-    public void setSingleChoice(boolean single) {
-        options.setSingleChoice(single);
-        notifyChanged();
     }
 
     /** 那一排按钮下面的一行小字（附加项的说明是次要的，写在下面，ui-spec §三）；空就不写。 */

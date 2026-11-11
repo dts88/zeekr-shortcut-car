@@ -1,8 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  分段选择的底槽（ui-spec §三「分段选择」）：比设置行浅一档的面，段由 Segments 往里摆。
-  自己占一行的分段选择（pref_row_segmented）和设置行下面那一排的三选一（pref_options，盲区画面的情境）都 include 它，
-  两处一个样子。
+  分段选择的底槽（ui-spec §三「分段选择」）：比设置行浅一档的面，段由 Segments 往里摆；pref_row_segmented 把它摆在行尾。
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="wrap_content"

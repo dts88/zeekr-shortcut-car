@@ -18,11 +18,10 @@ import androidx.core.content.ContextCompat;
 import com.kooo.evcam.R;
 
 /**
- * 分段选择的段（ui-spec §三「分段选择」）：底槽（{@code pref_segment_track}）里摆两三段，选中的那一段实心能量色、白字，
- * 其余透明、次要文字色；点一下就切，不能拖。
+ * 分段选择的段（ui-spec §三「分段选择」）：底槽（{@code pref_segment_track}）里摆两三段（开关合进分段的那一行四段），
+ * 选中的那一段实心能量色、白字，其余透明、次要文字色；点一下就切，不能拖。
  *
- * <p>自己占一行的（显示位置、切换范围、切换方式、操作按钮位置，{@link SegmentedPreference}）和设置行下面那一排的三选一
- * （盲区画面的情境，{@link RowOptions}，项目所有者 2026-11-10：和「显示位置」同一种）都由这里摆，两处一个样子。</p>
+ * <p>摆在 {@link SegmentedPreference} 的行尾：显示位置、超级镜子、切换方式、盲区画面、操作按钮位置。</p>
  */
 final class Segments {
 

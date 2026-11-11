@@ -1404,7 +1404,10 @@ public class AppConfig {
         prefs.edit().putInt(KEY_REARVIEW_X, x).putInt(KEY_REARVIEW_Y, y).apply();
     }
 
-    /** 恢复出厂：位置、大小、取景范围一并复位。 */
+    /**
+     * 恢复出厂：位置、大小、取景、视野角度、鱼眼校正、方向标签一并复位，切回后视。开没开、切换范围不动 —— 2026-11-11 切换范围
+     * 和开关合成「超级镜子」那一行（关闭 / 四向 / 前后 / 后视 + 后座舱）起，那一行不归重置管（之前切换范围也回到四向）。
+     */
     public void resetRearViewLayout() {
         prefs.edit()
                 .remove(KEY_REARVIEW_X)
@@ -1415,8 +1418,6 @@ public class AppConfig {
                 .remove(KEY_REARVIEW_HEIGHT)
                 .remove(KEY_REARVIEW_PAN)
                 .remove(KEY_REARVIEW_LANE)
-                .remove(SettingsRegistry.REARVIEW_VIEWS.key)
-                .remove(KEY_REARVIEW_FRONT_REAR_LEGACY)
                 .remove(KEY_REARVIEW_CAMERA_LABEL)
                 .apply();
         AppLog.i(TAG, "超级镜子布局已恢复默认");
