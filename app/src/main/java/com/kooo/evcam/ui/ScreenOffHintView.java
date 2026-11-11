@@ -17,7 +17,6 @@ import androidx.appcompat.widget.AppCompatTextView;
 
 import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.camera.ChannelRules;
-import com.kooo.evcam.camera.ChannelScheduler;
 import com.kooo.evcam.camera.CameraKeeper;
 import com.kooo.evcam.recording.ScreenOffPlan;
 import com.kooo.evcam.screen.ScreenState;
@@ -30,7 +29,7 @@ import java.util.Objects;
  * 录制键上的小字：现在熄屏的话，这段录像会怎样（「熄屏后继续录制环视 /
  * 熄屏暂停，亮屏后恢复 / 熄屏后停止录制」）。
  *
- * <p>说什么由相机管家定（{@link ChannelScheduler#darkOutlook}，规矩在 {@link ChannelRules#darkOutlook}，2026-11-02 起）——
+ * <p>说什么由相机管家定（{@link CameraKeeper#darkOutlook}，规矩在 {@link ChannelRules#darkOutlook}，2026-11-02 起）——
  * 和熄屏时实际怎么录同一套规矩，所以写的就是实际会发生的：熄屏持续录制、启动自动录制、这一次录像的计划里有没有环视
  * （{@link CameraKeeper#surroundPlanned}）、哨兵模式和在不在开车（相机管家读的那一份：车辆接口没连着时读不到、算没在开车，
  * 也就是判不出屏幕、熄屏就是车机下电的那种）。</p>
@@ -142,8 +141,7 @@ public class ScreenOffHintView extends AppCompatTextView {
         judgedDriving = ChannelRules.driving(vehicle.gear, vehicle.speedKmh);
         judgedVehicleJudges = vehicleJudges;
         // 相机管家说（ChannelRules.darkOutlook）：熄屏持续录制、启动自动录制、计划里有没有环视，哨兵模式、在不在开车
-        ScreenOffPlan plan = ScreenOffPlan.of(ChannelScheduler.darkOutlook(config.isScreenOffKeepRecording(),
-                CameraKeeper.get(context).surroundPlanned(), config.isAutoStartRecording()));
+        ScreenOffPlan plan = ScreenOffPlan.of(CameraKeeper.get(context).darkOutlook());
         if (plan != shown) {
             shown = plan;
             setText(plan.text);

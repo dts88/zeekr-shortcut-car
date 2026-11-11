@@ -880,7 +880,7 @@ public class SideViewService extends Service {
             boolean kept = slot.keep(st);
             if (!kept) {
                 AppLog.i(TAG, "盲区画面" + label() + "画布没了、管线里没有环视：照旧放掉，还在会话里的由通道调度马上摘");
-                ChannelScheduler.wakeAll();
+                CameraKeeper.factsChanged();
             }
             return kept;
         }

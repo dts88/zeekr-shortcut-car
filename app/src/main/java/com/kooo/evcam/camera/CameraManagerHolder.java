@@ -313,7 +313,7 @@ public class CameraManagerHolder {
      * {@link #whenBuilt}）。超级镜子要后座舱而这一份里没有、或者上一次列相机出错（隔够 {@link #FAILED_REBUILD_GAP_MS}），
      * 照生效的配置放掉重建；配置变了不在这里换（{@link #commitForMainScreen}，见类说明）。没有管线时照存下的配置建。主线程调。</p>
      */
-    public synchronized MultiCameraManager getOrInit(Context context) {
+    synchronized MultiCameraManager getOrInit(Context context) {
         return obtain(context, null);
     }
 
@@ -326,7 +326,7 @@ public class CameraManagerHolder {
      *
      * @param laidOut 主界面照着摆的那份配置的键（{@link #configKeyOf}，它摆布局时记下的）
      */
-    public synchronized void commitForMainScreen(Context context, String laidOut) {
+    synchronized void commitForMainScreen(Context context, String laidOut) {
         if (cameraManager != null && !cameraManager.isReleased() && laidOut != null) {
             obtain(context, laidOut);
         }

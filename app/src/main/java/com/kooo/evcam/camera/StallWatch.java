@@ -265,7 +265,8 @@ public final class StallWatch {
         }
     }
 
-    public static void setForeground(boolean value) {
+    /** 主界面进出前台：只由相机管家记（{@link CameraKeeper#mainScreenForeground}）。 */
+    static void setForeground(boolean value) {
         if (foreground != value) {
             foreground = value;
             AppLog.d(TAG, "main window " + (value ? "foreground" : "background"));

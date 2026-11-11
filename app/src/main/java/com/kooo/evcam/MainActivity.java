@@ -463,7 +463,7 @@ public class MainActivity extends AppCompatActivity {
             // 摆的是录制界面：照着摆的这份（存下的配置）这一刻生效（项目所有者 2026-10-30「回到主界面时生效」，
             // CameraManagerHolder 类说明）—— 赶在下面接回留着的画布、读录制键和状态条之前，它们读到的生效的配置就是这一份。
             // 摆着设置页的（深浅色、语言重建时还回来的）不生效，等回到录制界面（relayoutIfConfigChanged）
-            com.kooo.evcam.camera.CameraManagerHolder.getInstance().commitForMainScreen(this, laidOutConfig);
+            keeper.commitConfigForMainScreen(laidOutConfig);
         }
 
         // 根据布局获取TextureView（不同布局有不同数量的TextureView）
@@ -1476,7 +1476,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
         com.kooo.evcam.camera.CameraManagerHolder holder = com.kooo.evcam.camera.CameraManagerHolder.getInstance();
-        final MultiCameraManager pipeline = holder.getOrInit(this);
+        final MultiCameraManager pipeline = keeper.pipeline();
         cameraManager = pipeline;
         // 管线比界面活得久：回调在 onDestroy 一律摘掉（detachUiCallbacks），这里每个界面重新挂一遍
         wireCameraCallbacks();
@@ -2583,7 +2583,7 @@ public class MainActivity extends AppCompatActivity {
         // 熄屏带来的暂停：那一刻系统已经不交互了（人切走、重建、关掉时还交互着）。熄屏广播后到时据此照样记「因熄屏退下去」
         android.os.PowerManager power = (android.os.PowerManager) getSystemService(Context.POWER_SERVICE);
         pausedByScreenOff = !isFinishing() && !isChangingConfigurations() && power != null && !power.isInteractive();
-        com.kooo.evcam.camera.StallWatch.setForeground(false);
+        keeper.mainScreenForeground(false);
         previewStall.stop();
         AppLog.d(TAG, "onPause called, isRecording=" + isRecording());
 
@@ -2650,7 +2650,7 @@ public class MainActivity extends AppCompatActivity {
         boolean wasInBackground = isInBackground;
         isInBackground = false;
         pausedByScreenOff = false;
-        com.kooo.evcam.camera.StallWatch.setForeground(true);
+        keeper.mainScreenForeground(true);
         previewStall.start();
         AppLog.i(TAG, "onResume " + instanceTag() + " surround: " + describeComposite());
         

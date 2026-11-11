@@ -1044,11 +1044,8 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         if (context == null) {
             return;
         }
-        com.kooo.evcam.camera.CameraManagerHolder holder = com.kooo.evcam.camera.CameraManagerHolder.getInstance();
-        if (holder.getCameraManager() != null) {
-            holder.getOrInit(context);
-        }
-        com.kooo.evcam.camera.ChannelScheduler.wakeAll();
+        com.kooo.evcam.camera.CameraKeeper.get(context).checkPipeline();
+        com.kooo.evcam.camera.CameraKeeper.factsChanged();
         if (appConfig.isRearViewEnabled()) {
             RearViewMirrorService.applyLaneMode(context);
         }

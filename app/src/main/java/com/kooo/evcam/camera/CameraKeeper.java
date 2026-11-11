@@ -374,7 +374,7 @@ public final class CameraKeeper {
      * 主界面在不在前台都一样。主线程。
      */
     public void takePhoto(MultiCameraManager.PhotoCallback callback) {
-        CameraManagerHolder.getInstance().getOrInit(context).takePhoto(callback);
+        pipeline().takePhoto(callback);
     }
 
     // ================================================================= 画布（3c 第二步）
@@ -432,6 +432,69 @@ public final class CameraKeeper {
     RecordRetries recordRetries(RecordRetries.Due due) {
         return new RecordRetries(due, (delayMs, task) -> main.postDelayed(task, delayMs),
                 android.os.SystemClock::uptimeMillis);
+    }
+
+    // ================================================================= 管线、事实（3e）
+
+    /**
+     * 要一份相机管线（主界面接上它、挂界面的回调）：有就给当下那一份，没有就建 —— 建不建、什么时候放掉重建由
+     * {@link CameraManagerHolder} 照生效的配置判（规格 §4.9）。主线程。
+     */
+    public MultiCameraManager pipeline() {
+        return CameraManagerHolder.getInstance().getOrInit(context);
+    }
+
+    /**
+     * 主界面照存下的配置摆好了录制界面（{@code laidOut}：它摆的那份配置的键）：存下的配置这一刻生效，建管线、录像用到的变了
+     * 就换管线（{@link CameraManagerHolder#commitForMainScreen}，规格 §4.9）。主线程。
+     */
+    public void commitConfigForMainScreen(String laidOut) {
+        CameraManagerHolder.getInstance().commitForMainScreen(context, laidOut);
+    }
+
+    /**
+     * 超级镜子可能要后座舱了（打开超级镜子、设置里切换范围换到「后视 + 后座舱」）：已经有管线就照此刻的设置问一次 —— 这一份里没有
+     * 后座舱就当场放掉重建（{@link CameraManagerHolder.Rebuild#MIRROR_CABIN}）；还没有管线不为它建。主线程。
+     */
+    public void checkPipeline() {
+        CameraManagerHolder holder = CameraManagerHolder.getInstance();
+        if (holder.getCameraManager() != null) {
+            holder.getOrInit(context);
+        }
+    }
+
+    /**
+     * 主界面进出前台（onResume / onPause）：能不能用相机看它（规格 §4.7）—— 记下，叫醒调度（回到前台，开失败判出的
+     * 「现在用不了相机」作废、照常开）。主线程。
+     */
+    public void mainScreenForeground(boolean foreground) {
+        StallWatch.setForeground(foreground);
+    }
+
+    /**
+     * 调度每一轮现读的事实变了，叫醒它（只排一轮，不当场做什么）：前台服务起来了、没了（保持、能不能用相机）；安卓熄屏了、或者又亮了
+     * 而屏幕还黑着（车机要睡、车机醒着屏幕黑着：通道眼里的熄屏也看安卓）；设置里调度现读的那几样变了（超级镜子切换范围）；
+     * 超级镜子、盲区画面的画布没了而管线留不住（还在会话里的那一个死了，调度马上摘）。哪里都能调，不建管家。
+     */
+    public static void factsChanged() {
+        ChannelScheduler.wakeAll();
+    }
+
+    /** 录制键下那行小字：现在熄屏的话录像会怎样（{@link ChannelRules#darkOutlook}，规格 §3.3）。主线程。 */
+    public ChannelRules.DarkOutlook darkOutlook() {
+        return ChannelScheduler.darkOutlook(appConfig.isScreenOffKeepRecording(), surroundPlanned(),
+                appConfig.isAutoStartRecording());
+    }
+
+    /**
+     * 退出的记号清掉了（人点开了主界面、车机真正开机，{@link UserExit#clear}）：调度照常开 —— 退出以后它只关、不开。
+     * 调度还没装上就不用叫。哪里都能调，不建管家。
+     */
+    public static void exitCleared() {
+        ChannelScheduler scheduler = ChannelScheduler.app();
+        if (scheduler != null) {
+            scheduler.resumeAfterExit();
+        }
     }
 
     // ================================================================= 前台服务（3b）
@@ -966,7 +1029,7 @@ public final class CameraKeeper {
         boolean keep = appConfig.isScreenOffKeepRecording();
         boolean auto = appConfig.isAutoStartRecording();
         boolean surround = surroundPlanned();
-        ChannelRules.DarkOutlook outlook = ChannelScheduler.darkOutlook(keep, surround, auto);
+        ChannelRules.DarkOutlook outlook = darkOutlook();
         BlackBox.noteImportant("熄屏时" + (isRecording() ? "在录像"
                 : pending == null ? "没在录像" : resuming() ? "在等自动接回" : "在等开录（" + pending + "）")
                 + "：录像停不停由相机管家在通道算黑时定（黑满 " + (ChannelRules.HOLD_MS / 1000) + " 秒、或者车机要睡），照现在的车和设置是「"
@@ -1088,8 +1151,7 @@ public final class CameraKeeper {
      * （不等 {@link #POLL_MS} 的下一轮）。换了一份就接上。
      */
     private MultiCameraManager currentManager() {
-        CameraManagerHolder holder = CameraManagerHolder.getInstance();
-        MultiCameraManager held = holder.getOrInit(context);
+        MultiCameraManager held = pipeline();
         if (held != cameraManager) {
             setCameraManager(held);
         }
@@ -1098,7 +1160,7 @@ public final class CameraKeeper {
         }
         if (awaitedBuild != held) {
             awaitedBuild = held;
-            holder.whenBuilt(held, built -> {
+            CameraManagerHolder.getInstance().whenBuilt(held, built -> {
                 awaitedBuild = null;
                 if (pending != null) {
                     main.removeCallbacks(poll);
