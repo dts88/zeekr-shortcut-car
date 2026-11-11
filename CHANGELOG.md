@@ -11,6 +11,10 @@ commit message, not here.
 
 Nothing yet.
 
+## [3.11.0-alpha] - 2026-11-11
+
+- Blind spot view: its settings sit under its switch on the Super mirror page instead of on a page of their own; they are greyed out while it is off.
+
 ## [3.10.1-alpha] - 2026-11-11
 
 - Camera: the last requests that went around the camera keeper (getting the camera pipeline, screen and service changes, the screen-off hint) now go through it; nothing should look different.
