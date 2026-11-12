@@ -11,6 +11,18 @@ commit message, not here.
 
 Nothing yet.
 
+## [4.0.0-alpha] - 2026-11-12
+
+- Settings: seven sections (Recording, Storage, Super mirror, Blind spot view, Buttons, General, Updates & about), two columns each; a feature that is off takes one row and its rows appear when it is turned on; greyed rows say why; the left column shows each section's state and no longer has Back to main screen and Exit rows. Settings from 3.x are kept.
+- Recording: Cameras (Surround, Surround + rear cabin) and Recording quality are segments on the page; the per-camera editor is Detailed settings; Use JPEG output for photos moved to developer options.
+- Blind spot view: its own section; the HUD picture rows are Position and size (with a sketch), Brightness, Contrast and Mirror left to right.
+- General: Simulated drive sound and Exterior speaker are groups on this page. Microphone source, Listening position, Engine speed pattern, Gearbox and Exterior route are fixed for everyone, with the other choice in developer options; Listening position now defaults to In the cabin.
+- Updates & about: Versions to receive is one row (Stable, Beta, Alpha).
+- Main screen: six switches on the action rail (Super mirror, Blind spot view, Floating button, Smart buttons, Simulated drive sound, Fisheye correction); the screen-off hint is a row of its own below the record key; the status bar and, without a USB drive, the record and photo keys open the matching setting. The drawer only navigates.
+- First run: a seven-step Initial setup replaces the language, driver-side and guide dialogs; Settings → General → Initial setup runs it again. Upgrading shows a one-time note on what moved.
+- Motion: the selected segment slides; dialogs float in; settings sub-pages slide sideways; the floating button and the full-screen editors fade.
+- Experimental features carry a tag next to the name. The Horn option of Lock footage is hidden until the horn signal can be read.
+
 ## [3.12.0-alpha] - 2026-11-11
 
 - Super mirror: the switch and Views are one row of segments: Off, All four, Front and rear, Rear + rear cabin; Direction label is a row of its own; Reset window and view leaves that row alone.
