@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  初始设置（setup/SetupFragment，ui-spec §十五）：统一骨架的 ① 标题区 · ② 列表栏 · ③ 内容区。
+
+  ① 写「初始设置」，右边「跳过设置」；② 是七步的名字（item_setup_step，代码里摆）；
+  ③ 是这一步的标题、一句说明和要选的东西，右下角「上一步」「下一步」。
+  ③ 里要选的东西有两种放法：自己摆的（setup_body，语言、驾驶座位置这些）和设置里的行（setup_rows，第五、六步），一次只有一种看得见。
+  换步时左右推的是 setup_block 这一整块，按钮那一排不动。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg"
+    android:clickable="true"
+    android:focusable="true"
+    android:orientation="vertical">
+
+    <!-- ① 标题区 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/title_bar_height"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="28dp"
+        android:paddingEnd="16dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="@string/set_first_run_title"
+            android:textAppearance="@style/TextAppearance.Cam.Title"
+            android:textColor="@color/text_primary"
+            android:textStyle="bold" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/setup_skip"
+            style="@style/Widget.Cam.RailSmall"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:paddingLeft="20dp"
+            android:paddingRight="20dp"
+            android:text="@string/setup_skip"
+            android:textColor="@color/text_secondary"
+            app:backgroundTint="@android:color/transparent" />
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/line" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:baselineAligned="false"
+        android:orientation="horizontal">
+
+        <!-- ② 七步 -->
+        <LinearLayout
+            android:id="@+id/setup_steps"
+            android:layout_width="@dimen/list_width"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:paddingTop="12dp" />
+
+        <!-- ③ 这一步 -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:id="@+id/setup_block"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:paddingStart="28dp"
+                android:paddingTop="28dp"
+                android:paddingEnd="28dp">
+
+                <TextView
+                    android:id="@+id/setup_step_title"
+                    android:layout_width="@dimen/setup_content_width"
+                    android:layout_height="wrap_content"
+                    android:textAppearance="@style/TextAppearance.Cam.Title"
+                    android:textColor="@color/text_primary"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/setup_step_note"
+                    android:layout_width="@dimen/setup_content_width"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:textAppearance="@style/TextAppearance.Cam.Body"
+                    android:textColor="@color/text_secondary" />
+
+                <ScrollView
+                    android:id="@+id/setup_scroll"
+                    android:layout_width="@dimen/setup_content_width"
+                    android:layout_height="0dp"
+                    android:layout_marginTop="24dp"
+                    android:layout_weight="1"
+                    android:scrollbars="none">
+
+                    <FrameLayout
+                        android:id="@+id/setup_body"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content" />
+                </ScrollView>
+
+                <androidx.fragment.app.FragmentContainerView
+                    android:id="@+id/setup_rows"
+                    android:layout_width="@dimen/setup_content_width"
+                    android:layout_height="0dp"
+                    android:layout_marginTop="8dp"
+                    android:layout_weight="1"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="end"
+                android:orientation="horizontal"
+                android:paddingStart="28dp"
+                android:paddingTop="12dp"
+                android:paddingEnd="28dp"
+                android:paddingBottom="24dp">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/setup_back"
+                    style="@style/Widget.Cam.RailSmall"
+                    android:layout_width="200dp"
+                    android:layout_height="@dimen/rail_small_height"
+                    android:text="@string/setup_back" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/setup_next"
+                    style="@style/Widget.Cam.RailSmall"
+                    android:layout_width="260dp"
+                    android:layout_height="@dimen/rail_small_height"
+                    android:layout_marginStart="@dimen/gutter"
+                    android:text="@string/setup_next"
+                    android:textColor="@color/on_energy"
+                    app:backgroundTint="@color/energy" />
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>

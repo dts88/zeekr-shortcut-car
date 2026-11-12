@@ -19,6 +19,8 @@
     <dimen name="rail_tile_height">104dp</dimen>
     <dimen name="rail_small_height">72dp</dimen>
     <dimen name="rail_switch_height">84dp</dimen>
+    <!-- 初始设置（fragment_setup）右边内容那一列的宽度：和设置页的一列差不多宽，字不会拉成一长行 -->
+    <dimen name="setup_content_width">920dp</dimen>
     <dimen name="icon_button_size">48dp</dimen>
     <!-- 车辆信号页每一行旁边的信息条图标（ui.InfoBarCellView）：高固定，宽按那一格的比例 -->
     <dimen name="info_cell_icon_height">44dp</dimen>

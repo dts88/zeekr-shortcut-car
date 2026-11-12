@@ -26,7 +26,6 @@ import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.R;
 import com.kooo.evcam.WakeUpHelper;
 import com.kooo.evcam.overlay.OverlayCoordinator;
-import com.kooo.evcam.settings.SettingSpec;
 import com.kooo.evcam.settings.SettingsRegistry;
 
 /**
@@ -177,10 +176,10 @@ public class QuickSwitches extends LinearLayout {
     /** 每块照实际状态写：下面那一行字、右上角的点。 */
     private void refresh() {
         boolean mirror = config.isRearViewEnabled();
-        show(MIRROR, mirror, mirror ? name(SettingsRegistry.REARVIEW_VIEWS, config.getRearViewViews().key)
+        show(MIRROR, mirror, mirror ? SettingsRegistry.REARVIEW_VIEWS.label(getContext(), config.getRearViewViews().key)
                 : getContext().getString(R.string.opt_off));
         boolean side = config.isSideViewEnabled();
-        show(SIDE_VIEW, side, side ? name(SettingsRegistry.SIDE_VIEW_MODE, config.getSideViewMode())
+        show(SIDE_VIEW, side, side ? SettingsRegistry.SIDE_VIEW_MODE.label(getContext(), config.getSideViewMode())
                 : getContext().getString(R.string.opt_off));
         show(FLOATING, config.isRecordingFloatingEnabled(), null);
         boolean smart = config.isSmartButtonsEnabled();
@@ -197,16 +196,6 @@ public class QuickSwitches extends LinearLayout {
         leds[which].setBackgroundTintList(ColorStateList.valueOf(
                 ContextCompat.getColor(getContext(), on ? R.color.energy : R.color.text_tertiary)));
         tiles[which].setSelected(on);
-    }
-
-    /** 某个选项在界面上叫什么（和设置里那一行的分段同一个名字）。 */
-    private String name(SettingSpec spec, String value) {
-        int index = spec.indexOf(spec.sanitize(value));
-        if (index < 0) {
-            return "";
-        }
-        int res = spec.nameResIds()[index];
-        return res != 0 ? getContext().getString(res) : spec.displayNames()[index];
     }
 
     private Activity activity() {

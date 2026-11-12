@@ -111,6 +111,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     private static final String CHANNEL_ALPHA = "alpha";
 
     private static final String ARG_SECTION = "section";
+    private static final String ARG_ROWS = "rows";
 
     /**
      * 只显示某一个分区。
@@ -125,6 +126,36 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         args.putString(ARG_SECTION, screenKey);
         fragment.setArguments(args);
         return fragment;
+    }
+
+    /**
+     * 只摆这几行，照给的先后（初始设置第五、六步，{@code setup.SetupFragment}，ui-spec §十五）：行、值、接线都是设置页的同一份，
+     * 那里选了什么，设置里就是什么。
+     */
+    public static SettingsPreferenceFragment forRows(String... keys) {
+        SettingsPreferenceFragment fragment = new SettingsPreferenceFragment();
+        Bundle args = new Bundle();
+        args.putStringArray(ARG_ROWS, keys);
+        fragment.setArguments(args);
+        return fragment;
+    }
+
+    /** 整份设置读进来以后，只留下要的那几行：从各自的组里摘下来，照给的先后放进一个新的屏。接线在这之后做，和平时一样。 */
+    private void keepOnly(String[] keys) {
+        androidx.preference.PreferenceScreen all = getPreferenceScreen();
+        androidx.preference.PreferenceScreen picked =
+                getPreferenceManager().createPreferenceScreen(requireContext());
+        int order = 0;
+        for (String key : keys) {
+            Preference pref = all.findPreference(key);
+            if (pref == null || pref.getParent() == null) {
+                continue;
+            }
+            pref.getParent().removePreference(pref);
+            pref.setOrder(order++);
+            picked.addPreference(pref);
+        }
+        setPreferenceScreen(picked);
     }
 
     /**
@@ -151,7 +182,11 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         if (section == null && getArguments() != null) {
             section = getArguments().getString(ARG_SECTION);
         }
-        setPreferencesFromResource(R.xml.preferences, section);
+        String[] only = getArguments() != null ? getArguments().getStringArray(ARG_ROWS) : null;
+        setPreferencesFromResource(R.xml.preferences, only != null ? null : section);
+        if (only != null && getContext() != null) {
+            keepOnly(only);
+        }
         hideSubPages(getPreferenceScreen());
         if (getContext() == null) {
             return;
@@ -188,7 +223,9 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                               @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
         // 这份列表是右边内容区的一列（SettingsSectionFragment）：两列之间、和两边的留白由列自己的内边距加外面那一层凑成
-        PreferenceRows.styleList(this, 14, 16);
+        // 摆在初始设置里的那几行（forRows）贴着那一步的标题排，自己不再留左右的白
+        boolean inSetup = getArguments() != null && getArguments().getStringArray(ARG_ROWS) != null;
+        PreferenceRows.styleList(this, inSetup ? 0 : 14, inSetup ? 8 : 16);
         PreferenceRows.animateChanges(this);
     }
 
@@ -1715,10 +1752,15 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             backup.setAction(getString(R.string.action_export), () -> SettingsBackupFlow.export(requireActivity()));
         }
         // 「车辆信号」那一页 4.0 起只从「录制 → 行驶信息条」进（以前这里还有一个入口，两个入口进同一页）。
-        // 初始设置（再走一遍首次启动的七步，ui-spec §十五）：那七步做出来之前这一行先不摆
+        // 初始设置：再走一遍首次启动的七步，值从现在的设置起（ui-spec §十五）
         Preference firstRun = findPreference("pref_first_run");
         if (firstRun != null) {
-            firstRun.setVisible(false);
+            firstRun.setOnPreferenceClickListener(preference -> {
+                if (getActivity() instanceof com.kooo.evcam.MainActivity) {
+                    ((com.kooo.evcam.MainActivity) getActivity()).showSetup();
+                }
+                return true;
+            });
         }
         bindDriveSound();
 

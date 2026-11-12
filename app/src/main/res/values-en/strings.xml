@@ -433,7 +433,7 @@
     <string name="opt_internal_storage">Internal storage</string>
     <string name="opt_internal_storage_locked">Internal storage (requires developer options)</string>
     <string name="dlg_internal_locked_title">Internal storage requires developer options</string>
-    <string name="dlg_internal_locked_msg">Recording writes data continuously. Internal storage has limited write endurance and usually can\'t be replaced, so without developer options, recordings go to a USB drive only.\n\nTo use it anyway, go to Settings → About &amp; credits and tap Safety notice to turn on developer options.</string>
+    <string name="dlg_internal_locked_msg">Recording writes data continuously. Internal storage has limited write endurance and usually can\'t be replaced, so without developer options, recordings go to a USB drive only.\n\nTo use it anyway, go to Settings → Updates &amp; about → About &amp; credits and tap Safety notice to turn on developer options.</string>
     <string name="msg_storage_changed">Storage location set to “%1$s”. Takes effect from the next recording.</string>
     <string name="msg_enter_number">Enter a number</string>
     <!-- Only the screen-off recording hours box used this (switched off on 2026-11-02); restore it with it -->
@@ -467,7 +467,6 @@
     <string name="action_all_auto">All automatic</string>
     <string name="msg_mapping_saved">Camera mapping saved.</string>
     <string name="msg_mapping_cleared">Automatic assignment restored.</string>
-    <string name="msg_language_hint">You can change this later in Settings → Interface → Language</string>
 
     <!-- Main interface -->
     <string name="about_title">About &amp; credits</string>
@@ -483,9 +482,7 @@
     <string name="guide_title">Before you start</string>
     <string name="guide_1">Experimental, unofficial software with no vehicle safety certification. It does not replace the factory dashcam, reversing camera or blind-spot monitor. Do not use it while driving, and do not rely on its picture to judge the road.</string>
     <string name="guide_2">Videos and photos go to a USB drive only; without one, recording doesn\'t start and no photos can be taken. Continuous writing would wear out the head unit\'s internal storage, which usually can\'t be replaced. Videos and photos aren\'t encrypted: anyone with the drive can read them.</string>
-    <string name="guide_3">The menu button is always at the top left. The Super mirror is off by default; turn it on from the menu or Settings → Super mirror. Drag its sides to move it, pinch to resize, and in the middle swipe up or down to adjust the framing, or left or right to change camera.</string>
-    <string name="guide_4">If something goes wrong, restart the app. If it continues, export a report from Settings → System → Diagnostics and attach it to an issue.</string>
-    <string name="action_got_it_guide">Got it</string>
+    <string name="guide_4">If something goes wrong, restart the app. If it continues, export a report from Settings → General → Diagnostics and attach it to an issue.</string>
 
     <!-- Main screen, notifications, playback -->
     <string name="msg_need_camera_storage">Camera and storage permissions are required</string>
@@ -772,9 +769,6 @@
     <string name="set_fisheye_value">%1$s · %2$d°</string>
     <string name="opt_projection_stereographic">Full circle (lines slightly curved)</string>
     <string name="dlg_rail_side_title">Which side is the driver\'s seat on?</string>
-    <string name="dlg_rail_side_lhd">Left (left-hand drive) · action buttons on the left</string>
-    <string name="dlg_rail_side_rhd">Right (right-hand drive) · action buttons on the right</string>
-    <string name="msg_rail_side_hint">Action buttons are on the driver\'s side. Change this in Settings → Interface → Action button side.</string>
     <string name="record_unavailable">Insert a USB drive to record</string>
     <string name="record_unavailable_detail">No USB drive</string>
     <string name="record_waiting_cameras">Waiting for cameras</string>
@@ -1164,7 +1158,7 @@
     <string name="dev_tool_recording_title">Recording in progress</string>
     <string name="dev_tool_progress">(%1$d/%2$d) %3$s</string>
     <string name="dev_tool_file_result">%1$s: %2$s</string>
-    <string name="dev_note">Tap Safety notice in Settings → About &amp; credits to turn off developer options and hide this section</string>
+    <string name="dev_note">Tap Safety notice in Settings → Updates &amp; about → About &amp; credits to turn off developer options and hide this section</string>
     <string name="set_rearview_camera_label_title">Direction label</string>
     <string name="set_rearview_camera_label_summary">Shows the direction of the current view in the top-left corner of the window</string>
 
@@ -1215,4 +1209,28 @@
     <string name="quick_off">Off</string>
     <string name="quick_smart_bound">%1$d paired</string>
     <string name="quick_smart_none">None paired</string>
+    <!-- 4.0 初始设置（ui-spec §十五）、升级后「设置已重新整理」那个框 -->
+    <string name="setup_skip">Skip setup</string>
+    <string name="setup_back">Back</string>
+    <string name="setup_next">Next</string>
+    <string name="setup_continue">Continue</string>
+    <string name="setup_enter">Go to Main screen</string>
+    <string name="setup_step_language">Language</string>
+    <string name="setup_step_side">Driver\'s seat</string>
+    <string name="setup_step_drive">USB drive</string>
+    <string name="setup_step_features">Common features</string>
+    <string name="setup_step_done">Done</string>
+    <string name="setup_language_note">You can change this in Settings → General → Language</string>
+    <string name="setup_side_note">The action buttons go on the driver\'s side. You can change this in Settings → General → Action button side</string>
+    <string name="setup_side_lhd">Left-hand drive</string>
+    <string name="setup_side_rhd">Right-hand drive</string>
+    <string name="setup_drive_found">USB drive detected</string>
+    <string name="setup_drive_space">%1$s free of %2$s</string>
+    <string name="setup_drive_missing">No USB drive detected</string>
+    <string name="setup_drive_later">You can insert one later</string>
+    <string name="setup_record_note">You can change these in Settings → Recording</string>
+    <string name="setup_features_note">Turn on what you need. You can change these in Settings → Super mirror, Settings → Blind spot view and Settings → Buttons</string>
+    <string name="setup_done_title">Setup complete</string>
+    <string name="regroup_title">Settings have been rearranged</string>
+    <string name="regroup_body">Settings have moved; the ones you already chose stay as they are.\n\nInterface and System are now General; Simulated drive sound is in General too.\nBlind spot view has moved out of Super mirror into its own section.\nFloating button and smart buttons is now Buttons.\nCheck for updates and About &amp; credits are now Updates &amp; about.\nSwitches for Super mirror, Floating button and more are next to the action buttons on the main screen.</string>
 </resources>

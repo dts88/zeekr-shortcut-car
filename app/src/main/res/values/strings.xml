@@ -458,7 +458,7 @@
     <string name="opt_internal_storage">内置存储</string>
     <string name="opt_internal_storage_locked">内置存储（需开启开发者选项）</string>
     <string name="dlg_internal_locked_title">内置存储需开启开发者选项</string>
-    <string name="dlg_internal_locked_msg">录制时会持续写入数据。内置存储的写入寿命有限，且通常无法更换，因此未开启开发者选项时仅录制到 U 盘。\n\n如确需使用，请在「设置 → 关于与致谢」中点击「安全须知」，开启开发者选项。</string>
+    <string name="dlg_internal_locked_msg">录制时会持续写入数据。内置存储的写入寿命有限，且通常无法更换，因此未开启开发者选项时仅录制到 U 盘。\n\n如确需使用，请在「设置 → 更新与关于 → 关于与致谢」中点击「安全须知」，开启开发者选项。</string>
     <string name="msg_storage_changed">存储位置已切换为「%1$s」，下次开始录制时生效</string>
     <string name="msg_enter_number">请输入数字</string>
     <!-- 只有熄屏录制的时长框用它（2026-11-02 停用）；要恢复时一起放回 -->
@@ -492,15 +492,12 @@
     <string name="action_all_auto">全部自动</string>
     <string name="msg_mapping_saved">已保存摄像头映射</string>
     <string name="msg_mapping_cleared">已恢复自动分配</string>
-    <string name="msg_language_hint">可随时在「设置 → 界面 → 语言」中更改</string>
 
     <!-- 首次启动引导 -->
     <string name="guide_title">开始之前</string>
     <string name="guide_1">试验性非官方应用，未经任何车辆功能安全认证，不能替代原厂行车记录仪、倒车影像或盲区监测。行驶中请勿操作本应用，也不要依据其画面判断路况。</string>
     <string name="guide_2">录像和照片仅保存到 U 盘，未插入 U 盘时不会开始录制，也无法拍照。行车记录需要持续写入，而内置存储的写入寿命有限，且通常无法更换。U 盘上的录像和照片未加密，取下后可在其他设备上直接读取。</string>
-    <string name="guide_3">菜单键固定在左上角。超级镜子默认关闭，可在菜单或「设置 → 超级镜子」中开启；开启后拖动窗口两侧可移动，双指可缩放，在窗口中间上下滑动调整取景、左右滑动切换摄像头。</string>
-    <string name="guide_4">遇到问题请先重启应用。如仍未恢复，请在「设置 → 系统 → 诊断信息」中导出诊断报告，并附在 issue 中提交。</string>
-    <string name="action_got_it_guide">知道了</string>
+    <string name="guide_4">遇到问题请先重启应用。如仍未恢复，请在「设置 → 通用 → 诊断信息」中导出诊断报告，并附在 issue 中提交。</string>
 
     <!-- 主界面 / 通知 / 回放 -->
     <string name="msg_need_camera_storage">需要相机和存储权限</string>
@@ -776,9 +773,6 @@
     <string name="set_fisheye_value">%1$s · %2$d°</string>
     <string name="opt_projection_stereographic">全圆（直线略弯）</string>
     <string name="dlg_rail_side_title">驾驶座在哪一侧？</string>
-    <string name="dlg_rail_side_lhd">左侧（左舵车）· 操作按钮在左侧</string>
-    <string name="dlg_rail_side_rhd">右侧（右舵车）· 操作按钮在右侧</string>
-    <string name="msg_rail_side_hint">操作按钮已放在驾驶座一侧，可在「设置 → 界面 → 操作按钮位置」中更改</string>
     <string name="record_unavailable">插入 U 盘后可录制</string>
     <string name="record_unavailable_detail">未检测到 U 盘</string>
     <string name="record_waiting_cameras">等待摄像头</string>
@@ -1157,7 +1151,7 @@
     <string name="dev_tool_recording_title">正在录制</string>
     <string name="dev_tool_progress">（%1$d/%2$d）%3$s</string>
     <string name="dev_tool_file_result">%1$s：%2$s</string>
-    <string name="dev_note">在「设置 → 关于与致谢」中点击「安全须知」可关闭开发者选项，关闭后此分区隐藏</string>
+    <string name="dev_note">在「设置 → 更新与关于 → 关于与致谢」中点击「安全须知」可关闭开发者选项，关闭后此分区隐藏</string>
     <string name="set_rearview_camera_label_title">方向标签</string>
     <string name="set_rearview_camera_label_summary">在窗口左上角显示当前画面的方向</string>
 
@@ -1207,4 +1201,28 @@
     <string name="quick_off">关</string>
     <string name="quick_smart_bound">已绑定 %1$d 个</string>
     <string name="quick_smart_none">未绑定</string>
+    <!-- 4.0 初始设置（ui-spec §十五）、升级后「设置已重新整理」那个框 -->
+    <string name="setup_skip">跳过设置</string>
+    <string name="setup_back">上一步</string>
+    <string name="setup_next">下一步</string>
+    <string name="setup_continue">继续</string>
+    <string name="setup_enter">进入主界面</string>
+    <string name="setup_step_language">语言</string>
+    <string name="setup_step_side">驾驶座位置</string>
+    <string name="setup_step_drive">U 盘</string>
+    <string name="setup_step_features">常用功能</string>
+    <string name="setup_step_done">完成</string>
+    <string name="setup_language_note">可在「设置 → 通用 → 语言」中修改</string>
+    <string name="setup_side_note">操作按钮放在驾驶座一侧。可在「设置 → 通用 → 操作按钮位置」中修改</string>
+    <string name="setup_side_lhd">左舵车</string>
+    <string name="setup_side_rhd">右舵车</string>
+    <string name="setup_drive_found">已检测到 U 盘</string>
+    <string name="setup_drive_space">剩余 %1$s / 共 %2$s</string>
+    <string name="setup_drive_missing">未检测到 U 盘</string>
+    <string name="setup_drive_later">可稍后插入</string>
+    <string name="setup_record_note">以下各项可在「设置 → 录制」中修改</string>
+    <string name="setup_features_note">按需开启，可在「设置 → 超级镜子」「设置 → 盲区画面」「设置 → 按键」中修改</string>
+    <string name="setup_done_title">设置完成</string>
+    <string name="regroup_title">设置已重新整理</string>
+    <string name="regroup_body">设置项的位置有调整，已有的设置保持不变。\n\n「界面」和「系统」合并为「通用」，「模拟声浪」也在「通用」。\n「盲区画面」从「超级镜子」中分出，单独一个分区。\n「悬浮键与灵动贴」改名为「按键」。\n「检查更新」和「关于与致谢」合并为「更新与关于」。\n超级镜子、悬浮按钮等开关在主界面的操作按钮一侧。</string>
 </resources>

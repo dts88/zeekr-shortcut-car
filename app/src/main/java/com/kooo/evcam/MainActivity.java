@@ -42,9 +42,6 @@ import com.kooo.evcam.profile.CameraProfile;
 import com.kooo.evcam.profile.Profile;
 import com.kooo.evcam.profile.ProfileStore;
 import com.kooo.evcam.overlay.OverlayCoordinator;
-import com.kooo.evcam.settings.Languages;
-import com.kooo.evcam.settings.SettingSpec;
-import com.kooo.evcam.settings.SettingsRegistry;
 import com.kooo.evcam.ui.NavDrawer;
 import com.kooo.evcam.camera.SingleCamera;
 import com.kooo.evcam.StorageHelper;
@@ -52,7 +49,7 @@ import com.kooo.evcam.StorageHelper;
 import java.util.ArrayList;
 import java.util.List;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements com.kooo.evcam.setup.SetupFragment.Host {
 
     /**
      * 回放界面的抽屉里点了主界面上才办得了的一项（主界面、设置、退出应用；值是菜单项的 id）：
@@ -1134,152 +1131,60 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-     * 检查并处理首次启动
-     * 首次启动时自动进入设置界面并显示引导弹窗
+     * 首次启动（ui-spec §十五）：该走初始设置的走初始设置（新装的；或者很早的版本升上来、语言或驾驶座位置还没问过的）；
+     * 不用走的、从 4.0 以前升上来的，第一次打开时看一个框「设置已重新整理」。4.0 以前这里是两个框加一个说明框。
      */
     private void checkFirstLaunch() {
         if (appConfig == null) {
             return;
         }
-
-        // 语言先问。它和「首次启动」分开记：选完语言可能触发界面重建，
-        // 重建之后引导弹窗还得照常出现，共用一个标记就会把引导吞掉。
-        if (!appConfig.isLanguageChosen()) {
-            new android.os.Handler(android.os.Looper.getMainLooper())
-                    .postDelayed(this::showLanguageChoiceDialog, 300);
+        // 延迟一下，等界面摆好
+        android.os.Handler main = new android.os.Handler(android.os.Looper.getMainLooper());
+        if (appConfig.needsSetup()) {
+            main.postDelayed(() -> {
+                // 选了别的语言、界面重建以后，初始设置是系统照原样恢复的：已经在了就不再放一份
+                if (!isFinishing() && !isDestroyed() && appConfig.needsSetup() && !(getSupportFragmentManager()
+                        .findFragmentById(R.id.fragment_container) instanceof com.kooo.evcam.setup.SetupFragment)) {
+                    showSetup();
+                }
+            }, 300);
             return;
         }
-
-        // 再问方向盘在哪边：它决定操作按钮放哪一侧。老用户升级上来也问这一次
-        if (!appConfig.isRailSideChosen()) {
-            new android.os.Handler(android.os.Looper.getMainLooper())
-                    .postDelayed(this::showRailSideChoiceDialog, 300);
-            return;
+        if (!appConfig.isRegroupNoteSeen()) {
+            main.postDelayed(this::showRegroupNote, 300);
         }
-
-        if (!appConfig.isFirstLaunch()) {
-            return;
-        }
-
-        AppLog.d(TAG, "检测到首次启动，进入设置界面");
-
-        // 标记首次启动已完成（在显示弹窗前标记，避免重复触发）
-        appConfig.setFirstLaunchCompleted();
-
-        // 延迟执行，确保 UI 完全初始化
-        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
-            // 进入设置界面
-            showSettingsInterface();
-            drawer.select(R.id.nav_settings);
-
-            // 显示引导弹窗
-            showFirstLaunchGuideDialog();
-        }, 300);
     }
 
-    /**
-     * 首次启动时选界面语言。
-     *
-     * <p>默认「跟随系统」并且预先选中 —— 车机是什么语言，应用就该是什么语言，
-     * 这是不需要任何人做决定的默认。直接关掉弹窗也停在这一档。</p>
-     *
-     * <p>选完如果语言真的变了，系统会重建界面；那时 {@code isLanguageChosen()}
-     * 已经是 true，于是接着走引导弹窗，而引导已经是新语言的了。</p>
-     */
-    private void showLanguageChoiceDialog() {
-        if (isFinishing() || isDestroyed()) {
-            return;
-        }
-        SettingSpec spec = SettingsRegistry.LANGUAGE;
-        String[] values = spec.values();
-        String[] labels = new String[values.length];
-        int[] res = spec.nameResIds();
-        for (int i = 0; i < labels.length; i++) {
-            labels[i] = res[i] != 0 ? getString(res[i]) : spec.displayNames()[i];
-        }
-        final int[] picked = {Math.max(0, spec.indexOf(appConfig.getLanguageMode()))};
-
-        com.kooo.evcam.ui.CamDialogs.show(new MaterialAlertDialogBuilder(this, R.style.Theme_Cam_MaterialAlertDialog)
-                .setTitle(R.string.dlg_language_title)
-                .setSingleChoiceItems(labels, picked[0], (d, which) -> picked[0] = which)
-                .setPositiveButton(R.string.action_ok, (d, w) -> applyLanguageChoice(
-                        spec.valueAt(picked[0])))
-                .setOnCancelListener(d -> applyLanguageChoice(spec.valueAt(picked[0])))
-                // 注意：AlertDialog 一旦设了选项列表就不再显示 message，
-                // 所以「以后能在哪里改」这句放到选完之后提示
-                .setCancelable(true));
+    /** 初始设置：首次启动，或者「设置 → 通用 → 初始设置」再走一遍。 */
+    public void showSetup() {
+        AppLog.d(TAG, "进入初始设置");
+        showFragment(new com.kooo.evcam.setup.SetupFragment());
     }
 
-    private void applyLanguageChoice(String mode) {
-        appConfig.setLanguageMode(mode);
-        appConfig.setLanguageChosen();
-        Languages.apply(mode);
-        Toast.makeText(this, R.string.msg_language_hint, Toast.LENGTH_LONG).show();
-        // 语言没变的话不会重建，这里接着往下走
+    @Override
+    public void onSetupFinished() {
+        goToRecordingInterface();
+        // 升级上来、刚补问完的：接着看「设置已重新整理」
         checkFirstLaunch();
     }
 
-    /**
-     * 首次启动问方向盘在哪边，决定操作按钮放哪一侧。
-     *
-     * <p>规则是<b>离驾驶位近的那一侧</b>：左舵车人坐在左边，中控屏在右手边，
-     * 屏幕离人最近的是它的左边缘；右舵车反过来。选项上把这条规则直接写出来，
-     * 不合心意选另一个就是。预先选中的是现在的设置，直接关掉弹窗也停在这一档。</p>
-     */
-    private void showRailSideChoiceDialog() {
-        if (isFinishing() || isDestroyed()) {
+    @Override
+    public void onSetupShowing(boolean showing) {
+        if (drawer != null) {
+            drawer.setLocked(showing);
+        }
+    }
+
+    /** 升级到 4.0 的人第一次打开时：设置挪了地方，说一声哪几页合并了、改名了。只出一次。 */
+    private void showRegroupNote() {
+        if (isFinishing() || isDestroyed() || appConfig.isRegroupNoteSeen()) {
             return;
         }
-        String[] sides = {"left", "right"};
-        String[] labels = {
-                getString(R.string.dlg_rail_side_lhd),
-                getString(R.string.dlg_rail_side_rhd),
-        };
-        final int[] picked = {"left".equals(appConfig.getActionRailSide()) ? 0 : 1};
+        appConfig.setRegroupNoteSeen();
         com.kooo.evcam.ui.CamDialogs.show(new MaterialAlertDialogBuilder(this, R.style.Theme_Cam_MaterialAlertDialog)
-                .setTitle(R.string.dlg_rail_side_title)
-                .setSingleChoiceItems(labels, picked[0], (d, which) -> picked[0] = which)
-                .setPositiveButton(R.string.action_ok,
-                        (d, w) -> applyRailSideChoice(sides[picked[0]]))
-                .setOnCancelListener(d -> applyRailSideChoice(sides[picked[0]]))
-                .setCancelable(true));
-    }
-
-    private void applyRailSideChoice(String side) {
-        appConfig.setActionRailSide(side);
-        appConfig.setRailSideChosen();
-        applyActionRailSide();
-        Toast.makeText(this, R.string.msg_rail_side_hint, Toast.LENGTH_LONG).show();
-        checkFirstLaunch();
-    }
-
-    /**
-     * 显示首次启动引导弹窗（美化版）
-     */
-    private void showFirstLaunchGuideDialog() {
-        // 创建自定义对话框
-        android.app.Dialog dialog = new android.app.Dialog(this);
-        dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE);
-        dialog.setContentView(R.layout.dialog_first_launch_guide);
-        dialog.setCancelable(false);
-
-        // 设置对话框窗口属性
-        android.view.Window window = dialog.getWindow();
-        if (window != null) {
-            // 设置背景透明（让圆角生效）
-            window.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
-            // 设置对话框宽度
-            android.view.WindowManager.LayoutParams params = window.getAttributes();
-            params.width = (int) (getResources().getDisplayMetrics().widthPixels * 0.85);
-            window.setAttributes(params);
-        }
-
-        // 加载二维码图片
-
-        // 设置确认按钮点击事件
-        dialog.findViewById(R.id.btn_confirm).setOnClickListener(v -> dialog.dismiss());
-
-        dialog.show();
+                .setTitle(R.string.regroup_title)
+                .setMessage(R.string.regroup_body)
+                .setPositiveButton(R.string.action_got_it, null));
     }
 
     /**
@@ -2837,6 +2742,15 @@ public class MainActivity extends AppCompatActivity {
         // 先问当前这一层自己能不能退一步。设置页的二级界面（权限、相机映射）
         // 进的是设置外壳自己的子返回栈，活动这一层的返回栈是空的 ——
         // 不问它，从二级界面按返回会一路跳回录制界面，而不是回到刚才那个分区。
+        // 初始设置里返回键是「上一步」；已经在第一步，照主界面那样退到后台
+        Fragment setup = fragmentManager.findFragmentById(R.id.fragment_container);
+        if (setup instanceof com.kooo.evcam.setup.SetupFragment && setup.isAdded()) {
+            if (!((com.kooo.evcam.setup.SetupFragment) setup).back()) {
+                moveTaskToBack(true);
+            }
+            return;
+        }
+
         // isAdded() 一定要查：这个指针在 Fragment 被 replace 掉之后不一定跟着清空，
         // 对着一个已经移走的 Fragment 取子 FragmentManager 会炸
         Fragment current = fragmentManager.getPrimaryNavigationFragment();

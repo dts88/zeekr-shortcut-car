@@ -120,6 +120,11 @@ public final class NavDrawer {
         layout.openDrawer(GravityCompat.START);
     }
 
+    /** 锁住：从屏幕边上拉不开（初始设置在屏幕上时，那几步还没走完）；开着的先收起。 */
+    public void setLocked(boolean locked) {
+        layout.setDrawerLockMode(locked ? DrawerLayout.LOCK_MODE_LOCKED_CLOSED : DrawerLayout.LOCK_MODE_UNLOCKED);
+    }
+
     /** 开着就收起来，返回 true —— 返回键先收抽屉。 */
     public boolean closeIfOpen() {
         if (!layout.isDrawerOpen(GravityCompat.START)) {

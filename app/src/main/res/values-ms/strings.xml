@@ -433,7 +433,7 @@
     <string name="opt_internal_storage">Storan dalaman</string>
     <string name="opt_internal_storage_locked">Storan dalaman (memerlukan pilihan pembangun)</string>
     <string name="dlg_internal_locked_title">Storan dalaman memerlukan pilihan pembangun</string>
-    <string name="dlg_internal_locked_msg">Rakaman menulis data secara berterusan. Storan dalaman mempunyai hayat tulis yang terhad dan biasanya tidak boleh diganti, jadi tanpa pilihan pembangun, rakaman disimpan ke pemacu USB sahaja.\n\nUntuk menggunakannya juga, pergi ke Tetapan → Perihal &amp; penghargaan dan ketik Safety notice untuk menghidupkan pilihan pembangun.</string>
+    <string name="dlg_internal_locked_msg">Rakaman menulis data secara berterusan. Storan dalaman mempunyai hayat tulis yang terhad dan biasanya tidak boleh diganti, jadi tanpa pilihan pembangun, rakaman disimpan ke pemacu USB sahaja.\n\nUntuk menggunakannya juga, pergi ke Tetapan → Kemas kini &amp; perihal → Perihal &amp; penghargaan dan ketik Safety notice untuk menghidupkan pilihan pembangun.</string>
     <string name="msg_storage_changed">Lokasi storan ditetapkan kepada “%1$s”. Berkuat kuasa pada rakaman seterusnya.</string>
     <string name="msg_enter_number">Masukkan nombor</string>
     <!-- Only the screen-off recording hours box used this (switched off on 2026-11-02); restore it with it -->
@@ -467,7 +467,6 @@
     <string name="action_all_auto">Semua automatik</string>
     <string name="msg_mapping_saved">Pemetaan kamera disimpan.</string>
     <string name="msg_mapping_cleared">Penetapan automatik dipulihkan.</string>
-    <string name="msg_language_hint">Anda boleh menukarnya kemudian di Tetapan → Antara muka → Bahasa</string>
 
     <!-- Antara muka utama -->
     <string name="about_title">Perihal &amp; penghargaan</string>
@@ -483,9 +482,7 @@
     <string name="guide_title">Sebelum anda mula</string>
     <string name="guide_1">Perisian percubaan tidak rasmi tanpa pensijilan keselamatan kenderaan. Ia tidak menggantikan kamera papan pemuka kilang, kamera undur atau pemantau titik buta. Jangan mengendalikannya semasa memandu, dan jangan bergantung pada paparannya untuk menilai keadaan jalan.</string>
     <string name="guide_2">Video dan foto disimpan ke pemacu USB sahaja; tanpanya, rakaman tidak bermula dan foto tidak dapat diambil. Penulisan berterusan akan menghauskan storan dalaman unit kepala, yang biasanya tidak boleh diganti. Video dan foto tidak disulitkan: sesiapa yang memegang pemacu boleh membacanya.</string>
-    <string name="guide_3">Butang menu sentiasa di kiri atas. Cermin super dimatikan secara lalai; hidupkannya dari menu atau Tetapan → Cermin super. Seret sisinya untuk mengalihkannya, cubit untuk mengubah saiz, dan di bahagian tengah leret ke atas atau ke bawah untuk melaraskan bingkai, atau ke kiri atau ke kanan untuk menukar kamera.</string>
-    <string name="guide_4">Jika ada yang tidak kena, mulakan semula apl. Jika berterusan, eksport laporan dari Tetapan → Sistem → Maklumat diagnostik dan lampirkannya pada isu.</string>
-    <string name="action_got_it_guide">Faham</string>
+    <string name="guide_4">Jika ada yang tidak kena, mulakan semula apl. Jika berterusan, eksport laporan dari Tetapan → Umum → Maklumat diagnostik dan lampirkannya pada isu.</string>
 
     <!-- Skrin utama, pemberitahuan, main balik -->
     <string name="msg_need_camera_storage">Kebenaran kamera dan storan diperlukan</string>
@@ -761,9 +758,6 @@
     <string name="set_fisheye_value">%1$s · %2$d°</string>
     <string name="opt_projection_stereographic">Bulatan penuh (garisan sedikit melengkung)</string>
     <string name="dlg_rail_side_title">Tempat duduk pemandu di sebelah mana?</string>
-    <string name="dlg_rail_side_lhd">Kiri (pandu kiri) · butang tindakan di kiri</string>
-    <string name="dlg_rail_side_rhd">Kanan (pandu kanan) · butang tindakan di kanan</string>
-    <string name="msg_rail_side_hint">Butang tindakan di sebelah pemandu. Tukar di Tetapan → Antara muka → Sebelah butang tindakan.</string>
     <string name="record_unavailable">Masukkan pemacu USB untuk merakam</string>
     <string name="record_unavailable_detail">Tiada pemacu USB</string>
     <string name="record_waiting_cameras">Menunggu kamera</string>
@@ -1141,7 +1135,7 @@
     <string name="dev_tool_recording_title">Rakaman sedang berjalan</string>
     <string name="dev_tool_progress">(%1$d/%2$d) %3$s</string>
     <string name="dev_tool_file_result">%1$s: %2$s</string>
-    <string name="dev_note">Ketik Safety notice dalam Tetapan → Perihal &amp; penghargaan untuk mematikan pilihan pembangun dan menyembunyikan bahagian ini</string>
+    <string name="dev_note">Ketik Safety notice dalam Tetapan → Kemas kini &amp; perihal → Perihal &amp; penghargaan untuk mematikan pilihan pembangun dan menyembunyikan bahagian ini</string>
     <string name="set_rearview_camera_label_title">Label arah</string>
     <string name="set_rearview_camera_label_summary">Menunjukkan arah paparan semasa di penjuru kiri atas tetingkap</string>
 
@@ -1191,4 +1185,28 @@
     <string name="quick_off">Mati</string>
     <string name="quick_smart_bound">%1$d dipasangkan</string>
     <string name="quick_smart_none">Tiada dipasangkan</string>
+    <!-- 4.0 初始设置（ui-spec §十五）、升级后「设置已重新整理」那个框 -->
+    <string name="setup_skip">Langkau persediaan</string>
+    <string name="setup_back">Kembali</string>
+    <string name="setup_next">Seterusnya</string>
+    <string name="setup_continue">Teruskan</string>
+    <string name="setup_enter">Pergi ke Skrin utama</string>
+    <string name="setup_step_language">Bahasa</string>
+    <string name="setup_step_side">Tempat duduk pemandu</string>
+    <string name="setup_step_drive">Pemacu USB</string>
+    <string name="setup_step_features">Ciri biasa</string>
+    <string name="setup_step_done">Selesai</string>
+    <string name="setup_language_note">Anda boleh menukarnya dalam Tetapan → Umum → Bahasa</string>
+    <string name="setup_side_note">Butang tindakan diletakkan di sebelah pemandu. Anda boleh menukarnya dalam Tetapan → Umum → Sebelah butang tindakan</string>
+    <string name="setup_side_lhd">Pemanduan kiri</string>
+    <string name="setup_side_rhd">Pemanduan kanan</string>
+    <string name="setup_drive_found">Pemacu USB dikesan</string>
+    <string name="setup_drive_space">%1$s kosong daripada %2$s</string>
+    <string name="setup_drive_missing">Tiada pemacu USB dikesan</string>
+    <string name="setup_drive_later">Anda boleh memasukkannya kemudian</string>
+    <string name="setup_record_note">Anda boleh menukarnya dalam Tetapan → Rakaman</string>
+    <string name="setup_features_note">Hidupkan apa yang anda perlukan. Anda boleh menukarnya dalam Tetapan → Cermin super, Tetapan → Paparan titik buta dan Tetapan → Butang</string>
+    <string name="setup_done_title">Persediaan selesai</string>
+    <string name="regroup_title">Tetapan telah disusun semula</string>
+    <string name="regroup_body">Tetapan telah berpindah; pilihan anda yang sedia ada kekal.\n\nAntara muka dan Sistem kini Umum; Bunyi pemanduan simulasi juga dalam Umum.\nPaparan titik buta telah dipindahkan keluar daripada Cermin super ke bahagiannya sendiri.\nButang terapung dan butang pintar kini Butang.\nSemak kemas kini dan Perihal &amp; penghargaan kini Kemas kini &amp; perihal.\nSuis untuk Cermin super, Butang terapung dan lain-lain berada di sebelah butang tindakan pada skrin utama.</string>
 </resources>

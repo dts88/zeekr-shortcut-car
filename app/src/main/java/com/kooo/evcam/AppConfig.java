@@ -31,6 +31,7 @@ public class AppConfig {
     private static final String KEY_FIRST_LAUNCH = "first_launch";  // 首次启动标记
     private static final String KEY_LANGUAGE_CHOSEN = "language_chosen";  // 首次启动的语言选择是否已完成
     private static final String KEY_RAIL_SIDE_CHOSEN = "rail_side_chosen";  // 「方向盘在哪边」是否问过
+    private static final String KEY_REGROUP_NOTE_SEEN = "regroup_note_seen";  // 升级到 4.0：「设置已重新整理」那个框看过没有
     private static final String KEY_REDUCE_MOTION_RECORDING = "reduce_motion_recording";  // 录制时减少动效
     private static final String KEY_SCREEN_OFF_WAKE_MINUTES = "screen_off_wake_min";  // 熄屏录制：最多不让车机睡多久（分钟）
     // 开机自启动（2.10.4 起含保活）。键名沿用合并前「保持后台运行」的，老用户的选择才接得上
@@ -234,11 +235,26 @@ public class AppConfig {
     }
     
     /**
-     * 标记首次启动已完成
+     * 要不要走初始设置（{@code setup.SetupFragment}，ui-spec §十五）：新装的；或者从很早的版本升上来、语言或驾驶座位置
+     * 还没问过的。一个规矩，不分两种问法。
      */
-    public void setFirstLaunchCompleted() {
-        prefs.edit().putBoolean(KEY_FIRST_LAUNCH, false).apply();
-        AppLog.d(TAG, "首次启动标记已设置为完成");
+    public boolean needsSetup() {
+        return isFirstLaunch() || !isLanguageChosen() || !isRailSideChosen();
+    }
+
+    /** 初始设置走完或者跳过了：三个「问过没有」一起记下，以后不再走。 */
+    public void setSetupDone() {
+        prefs.edit().putBoolean(KEY_FIRST_LAUNCH, false).putBoolean(KEY_LANGUAGE_CHOSEN, true)
+                .putBoolean(KEY_RAIL_SIDE_CHOSEN, true).apply();
+    }
+
+    /** 升级到 4.0 的人第一次打开时看的那个框（「设置已重新整理」）看过没有。新装的走完初始设置就算看过。 */
+    public boolean isRegroupNoteSeen() {
+        return prefs.getBoolean(KEY_REGROUP_NOTE_SEEN, false);
+    }
+
+    public void setRegroupNoteSeen() {
+        prefs.edit().putBoolean(KEY_REGROUP_NOTE_SEEN, true).apply();
     }
 
 
@@ -756,6 +772,7 @@ public class AppConfig {
                 KEY_FIRST_LAUNCH,
                 KEY_LANGUAGE_CHOSEN,
                 KEY_RAIL_SIDE_CHOSEN,
+                KEY_REGROUP_NOTE_SEEN,
                 KEY_UI_LEFT_FOR_SCREEN_OFF,
                 KEY_FRONT_CABIN_IN_USE,
                 KEY_LAST_DETECTED_SD_PATH,

@@ -187,10 +187,10 @@ public class SettingsHeadersFragment extends PreferenceFragmentCompat {
             }
             case "screen_rearview":
                 return config.isRearViewEnabled()
-                        ? nameOf(SettingsRegistry.REARVIEW_VIEWS, config.getRearViewViews().key) : getString(R.string.opt_off);
+                        ? SettingsRegistry.REARVIEW_VIEWS.label(context, config.getRearViewViews().key) : getString(R.string.opt_off);
             case "screen_side_view":
                 return config.isSideViewEnabled()
-                        ? nameOf(SettingsRegistry.SIDE_VIEW_MODE, config.getSideViewMode()) : getString(R.string.opt_off);
+                        ? SettingsRegistry.SIDE_VIEW_MODE.label(context, config.getSideViewMode()) : getString(R.string.opt_off);
             case "screen_floating": {
                 int on = (config.isRecordingFloatingEnabled() ? 1 : 0) + (config.isSmartButtonsEnabled() ? 1 : 0);
                 return on == 0 ? getString(R.string.header_none_enabled) : getString(R.string.header_enabled_count, on);
@@ -222,16 +222,6 @@ public class SettingsHeadersFragment extends PreferenceFragmentCompat {
         return getString(profile.quality == QualityPreset.SAVE_SPACE ? R.string.editor_quality_space
                 : profile.quality == QualityPreset.SHARPEST ? R.string.editor_quality_sharp
                 : R.string.editor_quality_balanced);
-    }
-
-    /** 某个选项在界面上叫什么（和右边那一行的分段同一个名字）。 */
-    private String nameOf(SettingSpec spec, String value) {
-        int index = spec.indexOf(spec.sanitize(value));
-        if (index < 0) {
-            return "";
-        }
-        int res = spec.nameResIds()[index];
-        return res != 0 ? getString(res) : spec.displayNames()[index];
     }
 
     private static int iconFor(String key) {

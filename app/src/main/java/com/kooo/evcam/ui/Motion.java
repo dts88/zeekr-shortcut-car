@@ -25,6 +25,8 @@ public final class Motion {
     /** 换界面、网格和单格之间。再长，在车机上就从顺变成卡。 */
     public static final long SLOW = 300;
 
+    /** 往前一步、往回一步时旧的那一面退出去：比进来的短，让新的一面早点到。 */
+    public static final long LEAVE = 100;
     /** 收起比展开快一点：要走的东西不用人等。 */
     public static final long COLLAPSE = 200;
     /** 一行一行长出来时，后一行比前一行晚这么多。 */

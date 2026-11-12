@@ -26,7 +26,6 @@
     <!-- 昼夜各自取值的 -->
     <color name="preview_frame_background">#FFE2E2E4</color>
     <color name="nav_ripple_color">#1F2A2B2E</color>
-    <color name="dialog_guide_button_ripple">#30000000</color>
 
     <!-- 旧名字 → 语义色 -->
     <color name="text_hint">@color/text_tertiary</color>
@@ -43,12 +42,6 @@
     <color name="preview_background">@color/bg</color>
     <color name="preview_placeholder_text">@color/text_secondary</color>
     <color name="preview_controls_background">@color/bg</color>
-    <color name="dialog_guide_background">@color/surface</color>
-    <color name="dialog_guide_title">@color/text_primary</color>
-    <color name="dialog_guide_content">@color/text_primary</color>
-    <color name="dialog_guide_accent">@color/energy_text</color>
-    <color name="dialog_guide_button_bg">@color/energy</color>
-    <color name="dialog_guide_button_text">@color/on_energy</color>
 
     <!-- 常量 -->
     <color name="white">#FFFFFFFF</color>
