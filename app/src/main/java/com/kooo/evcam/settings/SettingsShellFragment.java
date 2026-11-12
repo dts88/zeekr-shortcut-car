@@ -147,8 +147,8 @@ public class SettingsShellFragment extends Fragment {
         if (order >= 0) {
             currentOrder = order;
         }
-        // 右边是这个分区的左右两列（SettingsSectionFragment，ui-spec §三「双列」）
-        Fragment next = SettingsSectionFragment.forSection(screenKey);
+        // 右边是这个分区，一列排到底（ui-spec §三「单列」）
+        Fragment next = SettingsPreferenceFragment.forSection(screenKey);
         Fragment shown = getChildFragmentManager().findFragmentById(R.id.settings_detail);
         if (shown != null && MotionPolicy.decorative(requireContext())) {
             // 换分区沿纵轴走：左栏是竖着排的，点下面一行内容就从下面上来，
@@ -283,7 +283,7 @@ public class SettingsShellFragment extends Fragment {
                     androidx.fragment.app.FragmentManager.POP_BACK_STACK_INCLUSIVE);
         }
         Fragment shown = getChildFragmentManager().findFragmentById(R.id.settings_detail);
-        if (!sectionKey.equals(currentSection) || !(shown instanceof SettingsSectionFragment)) {
+        if (!sectionKey.equals(currentSection) || !(shown instanceof SettingsPreferenceFragment)) {
             Fragment headers = getChildFragmentManager().findFragmentById(R.id.settings_headers);
             int order = headers instanceof SettingsHeadersFragment
                     ? ((SettingsHeadersFragment) headers).orderOf(sectionKey) : -1;
@@ -295,8 +295,8 @@ public class SettingsShellFragment extends Fragment {
                 return;
             }
             Fragment now = getChildFragmentManager().findFragmentById(R.id.settings_detail);
-            if (now instanceof SettingsSectionFragment) {
-                SettingsSectionFragment section = (SettingsSectionFragment) now;
+            if (now instanceof SettingsPreferenceFragment) {
+                SettingsPreferenceFragment section = (SettingsPreferenceFragment) now;
                 if (!section.flash(prefKey) && fallbackKey != null) {
                     section.flash(fallbackKey);
                 }

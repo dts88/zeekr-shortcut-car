@@ -47,10 +47,10 @@ public class RailSideSketch extends View {
 
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        // 中控屏应用区域的比例（2133 : 1197），宽 240dp
+        // 中控屏应用区域的比例（1600 : 848），宽 240dp
         int width = Math.round(240 * density);
         setMeasuredDimension(resolveSize(width, widthMeasureSpec),
-                resolveSize(Math.round(width * 1197f / 2133f), heightMeasureSpec));
+                resolveSize(Math.round(width * 848f / 1600f), heightMeasureSpec));
     }
 
     @Override

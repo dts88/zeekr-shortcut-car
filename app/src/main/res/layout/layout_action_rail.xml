@@ -32,6 +32,24 @@
         android:textAppearance="@style/TextAppearance.Cam.Title"
         android:textStyle="bold" />
 
+    <!--
+      中间这一段（录制键到车辆状态）放在一个能滚的容器里，底下「设置」那一行固定：实车的应用区域只有 848 dp 高
+      （4.0.0 照 1197 dp 排，把「设置」「隐藏到后台」顶出了屏幕）。各块的高度是照 848 dp 排的，平时刚好排下、不用滚；
+      字放大了、或者车辆状态面板开着排不下时，滚的是这一段，「设置」那一行不会再被顶出去。
+    -->
+    <ScrollView
+        android:id="@+id/rail_scroll"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:overScrollMode="never"
+        android:scrollbars="none">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/btn_start_record"
         android:layout_width="match_parent"
@@ -110,7 +128,7 @@
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
-    <!-- 拍照独占一行：四宫格键撤了，放大一格改成直接点画面 -->
+    <!-- 拍照独占一行：四宫格键撤了，放大一格改成直接点画面。4.0.1 起矮一档（图标在字左边），给下面的开关让地方 -->
     <!--
       熄屏提示（「熄屏后继续录制环视」那三句）：4.0 起从录制键里拿出来，在它下面单独一行，录着、等待摄像头时才有。
       拿出来是为了它能单独点：点了去「设置 → 录制 → 熄屏持续录制」（ui-spec §十三「状态能点」）。显隐照旧由 RecordButtonUi 管
@@ -134,9 +152,9 @@
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btn_take_photo"
-        style="@style/Widget.Cam.RailTile"
+        style="@style/Widget.Cam.RailSmall"
         android:layout_width="match_parent"
-        android:layout_height="@dimen/rail_tile_height"
+        android:layout_height="@dimen/rail_small_height"
         android:layout_marginTop="@dimen/gutter"
         android:text="@string/rail_photo"
         app:icon="@drawable/ic_camera" />
@@ -178,8 +196,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginStart="6dp"
-        android:layout_marginTop="@dimen/gutter"
-        android:layout_marginBottom="6dp"
+        android:layout_marginTop="10dp"
+        android:layout_marginBottom="4dp"
         android:text="@string/nav_group_switches"
         android:textAppearance="@style/TextAppearance.Cam.Micro"
         android:textColor="@color/text_secondary" />
@@ -193,25 +211,20 @@
       车辆状态（试验性，设置 → 界面）：用信息条的图标显示哨兵模式、刹车 / 油门、驾驶辅助、喇叭。
       控件自己管开关和收信号（VehicleStatusPanel），关着就不占地方，MainActivity 不用接线。
     -->
-    <!-- 鱼眼校正和设置之间剩下的那块：面板放在里面，放不下就按比例缩小，不会把设置那一行挤出去 -->
-    <FrameLayout
+    <com.kooo.evcam.ui.VehicleStatusPanel
+        android:id="@+id/vehicle_status_panel"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1">
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/gutter"
+        android:visibility="gone" />
 
-        <com.kooo.evcam.ui.VehicleStatusPanel
-            android:id="@+id/vehicle_status_panel"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_gravity="top|center_horizontal"
-            android:layout_marginTop="@dimen/gutter"
-            android:layout_marginBottom="@dimen/gutter"
-            android:visibility="gone" />
-    </FrameLayout>
+    </LinearLayout>
+    </ScrollView>
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/gutter"
         android:orientation="horizontal">
 
         <com.google.android.material.button.MaterialButton

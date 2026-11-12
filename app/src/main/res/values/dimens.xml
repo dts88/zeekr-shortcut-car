@@ -16,9 +16,13 @@
 
     <dimen name="record_button_height">132dp</dimen>
     <dimen name="record_ring_size">68dp</dimen>
-    <dimen name="rail_tile_height">104dp</dimen>
+    <!--
+      动作栏各块的高度照实车的应用区域排（1600 × 848 dp，动作栏里能用的高 800 dp）：标题 56、录制键 132、熄屏提示 48、
+      拍照 84、回放 92、「开关」36、六块开关 208、设置 84，合起来 740，录着的时候也排得下（MainScreenShotsTest 看着）
+    -->
+    <dimen name="rail_tile_height">80dp</dimen>
     <dimen name="rail_small_height">72dp</dimen>
-    <dimen name="rail_switch_height">84dp</dimen>
+    <dimen name="rail_switch_height">64dp</dimen>
     <!-- 初始设置（fragment_setup）右边内容那一列的宽度：和设置页的一列差不多宽，字不会拉成一长行 -->
     <dimen name="setup_content_width">920dp</dimen>
     <dimen name="icon_button_size">48dp</dimen>

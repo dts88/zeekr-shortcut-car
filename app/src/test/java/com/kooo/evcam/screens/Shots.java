@@ -24,7 +24,10 @@ import java.io.IOException;
 /**
  * 把界面画成图片（项目所有者 2026-11-12 同意引入截图测试）：不上车也能逐页看，改界面时拿它对照设计。
  *
- * <p>用 Robolectric 的原生绘图在电脑上画，尺寸照车机的应用区域：2133 × 1197 dp、密度 1.5（3200 × 1796 像素）。
+ * <p>用 Robolectric 的原生绘图在电脑上画，尺寸照车机的应用区域：1600 × 848 dp、密度 2.0（3200 × 1696 像素）。
+ * 这是 2026-11-13 从实车量出来的（诊断信息里环视画面那一块 1403 × 1601 像素，加上四周的留白；照片上各块的比例也对得上）；
+ * 4.0.0 照 2133 × 1197 dp、密度 1.5 画，比实车「小一号」，于是动作栏在车上排不下、设置的两列挤成一团。
+ * 诊断信息「3. 显示屏」现在写着应用看到的尺寸和密度，再有出入以它为准。
  * 图片写到 {@code app/build/outputs/screenshots/}，CI 把这个文件夹传上去。</p>
  *
  * <p>画出来的和车上不是每个像素都一样（字体不同、没有相机画面），它管的是排布、文字、颜色、有没有截断。</p>
@@ -32,9 +35,9 @@ import java.io.IOException;
 public final class Shots {
 
     /** 车机应用区域，中文，白天。 */
-    public static final String DAY = "zh-rCN-w2133dp-h1197dp-land-notnight-hdpi";
+    public static final String DAY = "zh-rCN-w1600dp-h848dp-land-notnight-xhdpi";
     /** 车机应用区域，中文，夜间。 */
-    public static final String NIGHT = "zh-rCN-w2133dp-h1197dp-land-night-hdpi";
+    public static final String NIGHT = "zh-rCN-w1600dp-h848dp-land-night-xhdpi";
 
     private static final File FOLDER = new File("build/outputs/screenshots");
 

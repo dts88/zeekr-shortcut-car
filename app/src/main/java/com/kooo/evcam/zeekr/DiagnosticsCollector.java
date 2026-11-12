@@ -921,6 +921,15 @@ public final class DiagnosticsCollector {
      * <p>这台 7X 上安卓的显示屏状态、可交互只在车机下电时才变（2026-10-12）：车主走开、中控屏真黑了，这里还写 ON、可交互。
      * 屏幕真黑没黑看下一节「3.1 熄屏」。</p>
      */
+    /** 系统的一项动画缩放；没设过是 1，读不到写 ?。 */
+    private static String scale(android.content.ContentResolver resolver, String name) {
+        try {
+            return String.valueOf(android.provider.Settings.Global.getFloat(resolver, name, 1f));
+        } catch (Exception e) {
+            return "?";
+        }
+    }
+
     private static void appendDisplays(StringBuilder sb, Context context) {
         sb.append("## 3. 显示屏").append('\n');
         DisplayManager dm = (DisplayManager) context.getSystemService(Context.DISPLAY_SERVICE);
@@ -943,6 +952,20 @@ public final class DiagnosticsCollector {
                     .append("  state=").append(DisplayWatch.stateName(d.getState()))
                     .append('\n');
         }
+        // 应用看到的尺寸（界面是照它排的）和系统的动画缩放（缩放是 0 时应用里的装饰动效不放，ui/MotionPolicy）
+        android.util.DisplayMetrics metrics = context.getResources().getDisplayMetrics();
+        android.content.res.Configuration config = context.getResources().getConfiguration();
+        sb.append("应用看到的屏幕: ").append(metrics.widthPixels).append('x').append(metrics.heightPixels)
+                .append(" 像素，密度 ").append(metrics.density).append("（").append(metrics.densityDpi).append(" dpi）")
+                .append("，可用 ").append(config.screenWidthDp).append('x').append(config.screenHeightDp).append(" dp")
+                .append("，字体缩放 ").append(config.fontScale).append('\n');
+        android.content.ContentResolver resolver = context.getContentResolver();
+        sb.append("系统动画缩放: 动画 ")
+                .append(scale(resolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE))
+                .append("，转场 ").append(scale(resolver, android.provider.Settings.Global.TRANSITION_ANIMATION_SCALE))
+                .append("，窗口 ").append(scale(resolver, android.provider.Settings.Global.WINDOW_ANIMATION_SCALE))
+                .append("；应用里的装饰动效此刻: ")
+                .append(com.kooo.evcam.ui.MotionPolicy.decorative(context) ? "放" : "不放").append('\n');
         sb.append("可交互（isInteractive）: ").append(DisplayWatch.interactiveNow() ? "是" : "否").append('\n');
         // 盲区画面投 HUD 用哪一块（HudScreen 的规则：1440x480、不是主屏；没有就退到 id 3，但不能是仪表盘）
         java.util.List<HudScreen.Candidate> candidates = HudScreen.candidatesNow(context);

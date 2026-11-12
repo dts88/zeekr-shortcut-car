@@ -73,7 +73,8 @@ public class MainScreenShotsTest {
         assertNotNull("动作栏上没有六块开关", rail.findViewById(R.id.quick_switches));
         View hint = rail.findViewById(R.id.record_hint);
         assertNotNull("动作栏上没有熄屏提示那一行", hint);
-        assertEquals("熄屏提示应该在录制键外面、动作栏里", rail, hint.getParent());
+        assertEquals("熄屏提示应该在录制键外面、和它并排在同一列里",
+                rail.findViewById(R.id.btn_start_record).getParent(), hint.getParent());
 
         RecordButtonUi record = new RecordButtonUi(rail.findViewById(R.id.btn_start_record));
         record.setState(recording ? RecordButtonUi.State.RECORDING : RecordButtonUi.State.IDLE);
@@ -88,5 +89,13 @@ public class MainScreenShotsTest {
         if (recording) {
             assertEquals("录着的时候熄屏提示那一行要在", View.VISIBLE, hint.getVisibility());
         }
+        // 4.0.0 在实车上把「设置」那一行顶出了屏幕：照实车的尺寸，这一行要整个在屏幕里，中间那一段也不用滚
+        View settings = rail.findViewById(R.id.btn_settings);
+        android.graphics.Rect seen = new android.graphics.Rect();
+        assertTrue("「设置」不在屏幕里", settings.getGlobalVisibleRect(seen));
+        assertEquals("「设置」被裁掉了一截", settings.getHeight(), seen.height());
+        android.widget.ScrollView scroll = rail.findViewById(R.id.rail_scroll);
+        assertTrue("动作栏中间那一段排不下、要滚了（高 " + scroll.getChildAt(0).getHeight() + "，能用 "
+                + scroll.getHeight() + "）", scroll.getChildAt(0).getHeight() <= scroll.getHeight());
     }
 }
