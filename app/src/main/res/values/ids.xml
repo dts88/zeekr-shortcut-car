@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 分段选择的底槽上记着它的选中块（ui/SegmentThumb） -->
+    <item name="segment_thumb" type="id" />
+</resources>

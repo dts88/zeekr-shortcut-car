@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  窗口动效（anim/window_*）用的时长。XML 里引用不到 ui/Motion，在这里各抄一份；MotionTest 看住两边一样，改的时候两边一起改。
+-->
+<resources>
+    <integer name="motion_fast">150</integer>
+    <integer name="motion_medium">250</integer>
+    <integer name="motion_collapse">200</integer>
+</resources>

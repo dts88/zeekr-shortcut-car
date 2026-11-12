@@ -106,6 +106,12 @@ public class SegmentedPreference extends Preference implements PreferenceRows.Ow
     @Override
     public void onBindViewHolder(@NonNull PreferenceViewHolder holder) {
         super.onBindViewHolder(holder);
+        // androidx 会把「点不动、又带说明」的行的名字染成说明的颜色（它当这种行是一段只读的字）。这一行点不动只是因为要点的是
+        // 那几段；名字得和别的行一个颜色 —— 不然带说明的（盲区画面、接收的版本）名字是灰的，不带的（超级镜子）是黑的
+        if (holder.findViewById(android.R.id.title) instanceof TextView) {
+            ((TextView) holder.findViewById(android.R.id.title)).setTextColor(
+                    androidx.core.content.ContextCompat.getColorStateList(getContext(), R.color.pref_title));
+        }
         if (holder.findViewById(R.id.pref_segment_note) instanceof TextView) {
             TextView noteView = (TextView) holder.findViewById(R.id.pref_segment_note);
             noteView.setText(note);

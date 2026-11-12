@@ -174,7 +174,7 @@ public class FourLaneContainer extends ViewGroup {
      * 相机没有重新取流 —— 动的只是同一个子视图被画进去的那个矩形，不额外占资源。
      * 模式本身（{@link #getDisplayMode}）立刻就是新的，过渡只管画。</p>
      */
-    private static final long GROW_MS = 280;
+    private static final long GROW_MS = com.kooo.evcam.ui.Motion.SLOW;
     private ValueAnimator growAnimator;
     private boolean transitioning;
     private int transitionLane;
@@ -408,7 +408,7 @@ public class FourLaneContainer extends ViewGroup {
         transitioning = true;
         growAnimator = ValueAnimator.ofFloat(from, to);
         growAnimator.setDuration(GROW_MS);
-        growAnimator.setInterpolator(new PathInterpolator(0.4f, 0f, 0.2f, 1f));
+        growAnimator.setInterpolator(com.kooo.evcam.ui.Motion.standard());
         growAnimator.addUpdateListener(animation -> {
             growProgress = (float) animation.getAnimatedValue();
             invalidate();

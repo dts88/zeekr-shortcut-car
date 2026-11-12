@@ -81,6 +81,10 @@ final class PreferenceRows {
             Preference preference = group.getPreference(i);
             preference.setIconSpaceReserved(false);
             if (preference instanceof OwnLayout) {
+                // 自己带布局的组（LinkCategory）：组不换，组里的行照样要套
+                if (preference instanceof PreferenceGroup) {
+                    apply((PreferenceGroup) preference);
+                }
                 continue;
             }
             String row = preference.peekExtras() != null
@@ -124,12 +128,27 @@ final class PreferenceRows {
         int vertical = Math.round(verticalDp * density);
         list.setPadding(horizontal, vertical, horizontal, vertical);
         list.setClipToPadding(false);
+    }
 
-        // 进这一屏时，行一条条排出来。装饰性的，录制中和关了动画时不放
-        if (fragment.getContext() != null
-                && com.kooo.evcam.ui.MotionPolicy.decorative(fragment.getContext())) {
-            list.setLayoutAnimation(android.view.animation.AnimationUtils
-                    .loadLayoutAnimation(fragment.getContext(), R.anim.layout_list_enter));
+    /**
+     * 行出现、消失时的动效（ui-spec §十四「展开、收起」）：要走的行先淡出，剩下的行挪到位，新来的行再淡入。
+     * 时长照 {@link com.kooo.evcam.ui.Motion}。行自己变了内容（开关、值）不放交叉淡入：那是控件自己的事，整行淡一下反而像闪。
+     * 装饰动效不放时（{@code MotionPolicy}）直接到位。
+     */
+    static void animateChanges(PreferenceFragmentCompat fragment) {
+        RecyclerView list = fragment.getListView();
+        if (list == null || fragment.getContext() == null) {
+            return;
         }
+        if (!com.kooo.evcam.ui.MotionPolicy.decorative(fragment.getContext())) {
+            list.setItemAnimator(null);
+            return;
+        }
+        androidx.recyclerview.widget.DefaultItemAnimator animator = new androidx.recyclerview.widget.DefaultItemAnimator();
+        animator.setSupportsChangeAnimations(false);
+        animator.setRemoveDuration(com.kooo.evcam.ui.Motion.LEAVE);
+        animator.setMoveDuration(com.kooo.evcam.ui.Motion.FAST);
+        animator.setAddDuration(com.kooo.evcam.ui.Motion.FAST);
+        list.setItemAnimator(animator);
     }
 }

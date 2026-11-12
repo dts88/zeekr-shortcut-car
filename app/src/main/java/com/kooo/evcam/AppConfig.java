@@ -31,6 +31,7 @@ public class AppConfig {
     private static final String KEY_FIRST_LAUNCH = "first_launch";  // 首次启动标记
     private static final String KEY_LANGUAGE_CHOSEN = "language_chosen";  // 首次启动的语言选择是否已完成
     private static final String KEY_RAIL_SIDE_CHOSEN = "rail_side_chosen";  // 「方向盘在哪边」是否问过
+    private static final String KEY_REGROUP_NOTE_SEEN = "regroup_note_seen";  // 升级到 4.0：「设置已重新整理」那个框看过没有
     private static final String KEY_REDUCE_MOTION_RECORDING = "reduce_motion_recording";  // 录制时减少动效
     private static final String KEY_SCREEN_OFF_WAKE_MINUTES = "screen_off_wake_min";  // 熄屏录制：最多不让车机睡多久（分钟）
     // 开机自启动（2.10.4 起含保活）。键名沿用合并前「保持后台运行」的，老用户的选择才接得上
@@ -234,11 +235,26 @@ public class AppConfig {
     }
     
     /**
-     * 标记首次启动已完成
+     * 要不要走初始设置（{@code setup.SetupFragment}，ui-spec §十五）：新装的；或者从很早的版本升上来、语言或驾驶座位置
+     * 还没问过的。一个规矩，不分两种问法。
      */
-    public void setFirstLaunchCompleted() {
-        prefs.edit().putBoolean(KEY_FIRST_LAUNCH, false).apply();
-        AppLog.d(TAG, "首次启动标记已设置为完成");
+    public boolean needsSetup() {
+        return isFirstLaunch() || !isLanguageChosen() || !isRailSideChosen();
+    }
+
+    /** 初始设置走完或者跳过了：三个「问过没有」一起记下，以后不再走。 */
+    public void setSetupDone() {
+        prefs.edit().putBoolean(KEY_FIRST_LAUNCH, false).putBoolean(KEY_LANGUAGE_CHOSEN, true)
+                .putBoolean(KEY_RAIL_SIDE_CHOSEN, true).apply();
+    }
+
+    /** 升级到 4.0 的人第一次打开时看的那个框（「设置已重新整理」）看过没有。新装的走完初始设置就算看过。 */
+    public boolean isRegroupNoteSeen() {
+        return prefs.getBoolean(KEY_REGROUP_NOTE_SEEN, false);
+    }
+
+    public void setRegroupNoteSeen() {
+        prefs.edit().putBoolean(KEY_REGROUP_NOTE_SEEN, true).apply();
     }
 
 
@@ -719,7 +735,14 @@ public class AppConfig {
                 KEY_SIDE_VIEW_BACK,                   // 盲区画面的三个标定角度 → 默认
                 KEY_SIDE_VIEW_UP,
                 KEY_SIDE_VIEW_FOV,
-                KEY_VEHICLE_STATUS));                 // 主界面的车辆状态面板 → 关（2026-10-23 挪进开发者选项）
+                KEY_VEHICLE_STATUS,                   // 主界面的车辆状态面板 → 关（2026-10-23 挪进开发者选项）
+                // 4.0（项目所有者 2026-11-12）：当初两种做法都做出来、上车比了再定的五项，对所有人固定为默认的那一种，
+                // 另一种只在开发者选项「声音」一组里选得到
+                SettingsRegistry.FOOTAGE_AUDIO_SOURCE.key,       // 麦克风来源 → 原始
+                SettingsRegistry.DRIVE_SOUND_VIEW.key,           // 听感 → 车内
+                SettingsRegistry.DRIVE_SOUND_RPM.key,            // 转速变化方式 → 连续
+                SettingsRegistry.DRIVE_SOUND_GEARBOX.key,        // 变速箱 → 8 速自动
+                SettingsRegistry.DRIVE_SOUND_EXTERIOR_ROUTE.key));  // 车外线路 → BUS12（外部通知）
         for (String slot : CAMERA_OVERRIDE_SLOTS) {
             keys.add(KEY_CAMERA_OVERRIDE_PREFIX + slot);  // 相机映射 → 自动分配
         }
@@ -749,6 +772,7 @@ public class AppConfig {
                 KEY_FIRST_LAUNCH,
                 KEY_LANGUAGE_CHOSEN,
                 KEY_RAIL_SIDE_CHOSEN,
+                KEY_REGROUP_NOTE_SEEN,
                 KEY_UI_LEFT_FOR_SCREEN_OFF,
                 KEY_FRONT_CABIN_IN_USE,
                 KEY_LAST_DETECTED_SD_PATH,
@@ -989,7 +1013,8 @@ public class AppConfig {
     /**
      * 环视画面在屏幕上是否做鱼眼校正：主界面预览、图片回看、视频回看共用这一个开关。
      *
-     * <p>三处各有一个按钮（{@code FisheyeToggleButton}），拨的都是它。和后视镜那一档各管各的。
+     * <p>主界面动作栏上是六块开关里的一块（{@code ui.QuickSwitches}），两处回看各有一个按钮
+     * （{@code FisheyeToggleButton}），拨的都是它。和后视镜那一档各管各的。
      * 只改屏幕上看到的样子：录像和照片落盘的都是原始画面，一个字节都不动。
      * 默认关 —— 回看首先要能看到「拍下来的就是这样」。</p>
      *
@@ -1029,6 +1054,13 @@ public class AppConfig {
     /** 熄屏后录像会怎样（{@code ScreenOffPlan}）看的这几项，一变就叫 {@code action}（主线程）。拿住返回值，同上。 */
     public SharedPreferences.OnSharedPreferenceChangeListener onScreenOffPlanChanged(Runnable action) {
         return onChanged(action, KEY_SCREEN_OFF_RECORDING, KEY_SCREEN_OFF_KEEP_RECORDING, KEY_AUTO_START_RECORDING);
+    }
+
+    /** 主界面动作栏的六块开关（{@code ui.QuickSwitches}）看的这几项，一变就叫 {@code action}（主线程）。拿住返回值，同上。 */
+    public SharedPreferences.OnSharedPreferenceChangeListener onQuickSwitchesChanged(Runnable action) {
+        return onChanged(action, KEY_REARVIEW_ENABLED, SettingsRegistry.REARVIEW_VIEWS.key, KEY_SIDE_VIEW_ENABLED,
+                SettingsRegistry.SIDE_VIEW_MODE.key, KEY_RECORDING_FLOATING_ENABLED, KEY_SMART_BUTTONS_ENABLED,
+                KEY_SMART_BUTTONS, KEY_DRIVE_SOUND, KEY_PHOTO_FISHEYE);
     }
 
     /** 这几项里有一项变了就叫 {@code action}。返回的监听器调用方要拿住，用完交给 {@link #removeChangeListener}。 */

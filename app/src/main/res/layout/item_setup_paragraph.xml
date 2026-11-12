@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 初始设置里的一段正文（setup/SetupFragment：开始之前、U 盘、完成） -->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="16dp"
+    android:textAppearance="@style/TextAppearance.Cam.Body"
+    android:textColor="@color/text_primary" />

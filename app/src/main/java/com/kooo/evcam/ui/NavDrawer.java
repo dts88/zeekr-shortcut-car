@@ -32,12 +32,13 @@ import com.kooo.evcam.overlay.OverlayCoordinator;
  * 抽屉就地滑出，不先退回主界面）。
  *
  * <p>菜单、头、样式各只有一份（{@code navigation_menu}、{@code nav_header}、{@code layout_nav_drawer}），
- * 这里管行为：两个开关就地拨、抽屉不收；去别处的几项交给所在的界面（{@link Host}）。
+ * 这里管行为：去别处的几项交给所在的界面（{@link Host}）。抽屉只管去哪 —— 原来的两行开关 4.0 起在主界面动作栏上
+ * （{@link QuickSwitches}，项目所有者 2026-11-12）。
  * 亮着的一项是当前这个界面，由所在的界面定（{@link #select}）。</p>
  */
 public final class NavDrawer {
 
-    /** 所在的界面：点了去别处的那一项（两个开关不经过这里）。 */
+    /** 所在的界面：点了去别处的那一项。 */
     public interface Host {
         void onNavigate(int itemId);
     }
@@ -99,25 +100,8 @@ public final class NavDrawer {
 
     private void wire(Host host) {
         showVersion();
-        layout.addDrawerListener(new DrawerLayout.SimpleDrawerListener() {
-            @Override
-            public void onDrawerOpened(View drawerView) {
-                // 超级镜子也可能在设置里、或者悬浮窗自己关掉过
-                syncSwitches();
-            }
-        });
-        syncSwitches();
         menu.setNavigationItemSelectedListener(item -> {
             int itemId = item.getItemId();
-            // 开关行：点一下就拨，不跳界面、不收抽屉 —— 拨完还看得见它变了没有
-            if (itemId == R.id.nav_rearview) {
-                toggleRearView();
-                return false;
-            }
-            if (itemId == R.id.nav_floating_button) {
-                toggleFloatingButton();
-                return false;
-            }
             host.onNavigate(itemId);
             layout.closeDrawer(GravityCompat.START);
             return false;   // 亮哪一项由所在的界面定（select）
@@ -134,6 +118,11 @@ public final class NavDrawer {
 
     public void open() {
         layout.openDrawer(GravityCompat.START);
+    }
+
+    /** 锁住：从屏幕边上拉不开（初始设置在屏幕上时，那几步还没走完）；开着的先收起。 */
+    public void setLocked(boolean locked) {
+        layout.setDrawerLockMode(locked ? DrawerLayout.LOCK_MODE_LOCKED_CLOSED : DrawerLayout.LOCK_MODE_UNLOCKED);
     }
 
     /** 开着就收起来，返回 true —— 返回键先收抽屉。 */
@@ -180,48 +169,4 @@ public final class NavDrawer {
         }
     }
 
-    /**
-     * 「超级镜子」那一行。
-     *
-     * <p>和设置里那个开关走同一条路（{@code OverlayCoordinator.setRearViewEnabled}）：
-     * 悬浮窗权限不够时它会返回 false，这时去申请权限，开关停在原位 ——
-     * 开关显示的必须是后视镜真实的状态，不是「刚才按了一下」。</p>
-     */
-    private void toggleRearView() {
-        boolean on = !new AppConfig(activity).isRearViewEnabled();
-        if (!OverlayCoordinator.setRearViewEnabled(activity, on)) {
-            Toast.makeText(activity, R.string.msg_need_overlay, Toast.LENGTH_SHORT).show();
-            WakeUpHelper.requestOverlayPermission(activity);
-        } else if (on) {
-            Toast.makeText(activity, R.string.msg_rearview_on, Toast.LENGTH_SHORT).show();
-            RearViewGuide.showOnce(activity);
-        }
-        syncSwitches();
-    }
-
-    /** 「悬浮按钮」那一行，和超级镜子那一行表现一致。 */
-    private void toggleFloatingButton() {
-        boolean on = !new AppConfig(activity).isRecordingFloatingEnabled();
-        if (!OverlayCoordinator.setRecordButtonEnabled(activity, on)) {
-            Toast.makeText(activity, R.string.msg_need_overlay, Toast.LENGTH_SHORT).show();
-            WakeUpHelper.requestOverlayPermission(activity);
-        }
-        syncSwitches();
-    }
-
-    /** 行尾那两个开关照各自的真实状态摆。 */
-    private void syncSwitches() {
-        AppConfig config = new AppConfig(activity);
-        syncSwitch(R.id.nav_rearview, config.isRearViewEnabled());
-        syncSwitch(R.id.nav_floating_button, config.isRecordingFloatingEnabled());
-    }
-
-    private void syncSwitch(int itemId, boolean on) {
-        MenuItem item = menu.getMenu().findItem(itemId);
-        View action = item != null ? item.getActionView() : null;
-        View toggle = action != null ? action.findViewById(R.id.nav_switch) : null;
-        if (toggle instanceof CompoundButton) {
-            ((CompoundButton) toggle).setChecked(on);
-        }
-    }
 }

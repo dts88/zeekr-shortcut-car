@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  初始设置里一块能选的（setup/SetupFragment：语言、驾驶座位置）：上面可以有一张图，下面是名字，再下面可以有一行小字。
+  选中的那一块描一圈能量色（setActivated，bg_pref_row_choice）。U 盘那一步的状态也用这一块，换成不可点的底。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_pref_row_choice"
+    android:clickable="true"
+    android:focusable="true"
+    android:gravity="center_vertical"
+    android:minHeight="72dp"
+    android:orientation="vertical"
+    android:paddingStart="20dp"
+    android:paddingTop="14dp"
+    android:paddingEnd="20dp"
+    android:paddingBottom="14dp">
+
+    <FrameLayout
+        android:id="@+id/setup_choice_art"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="6dp"
+        android:layout_marginBottom="14dp"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/setup_choice_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textAppearance="@style/TextAppearance.Cam.Row"
+        android:textColor="@color/text_primary" />
+
+    <TextView
+        android:id="@+id/setup_choice_note"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textAppearance="@style/TextAppearance.Cam.Caption"
+        android:textColor="@color/text_secondary"
+        android:visibility="gone" />
+</LinearLayout>

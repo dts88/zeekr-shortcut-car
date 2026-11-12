@@ -147,7 +147,7 @@ public class RearViewMirrorView extends ViewGroup {
     private static final long IDLE_TICK_MS = 1000L;
 
     /** 按键模式点中一块之后，那块三角闪多久（从半透明橙淡到没有）。 */
-    private static final long TAP_FLASH_MS = 350L;
+    private static final long TAP_FLASH_MS = com.kooo.evcam.ui.Motion.SLOW;
     /** 闪光最亮时的不透明度：极氪橙的一半，压在画面上还看得见底下的路。 */
     private static final float TAP_FLASH_ALPHA = 0.5f;
 

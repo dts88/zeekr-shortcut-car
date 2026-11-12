@@ -163,4 +163,27 @@ public final class StatusLine {
             }
         }
     }
+
+    /** 状态条上的一格点了去设置里的哪一行。 */
+    public interface RowLink {
+        void open(String section, String key, String fallbackKey);
+    }
+
+    /**
+     * 状态能点（ui-spec §十三）：「按什么录」那一格去「设置 → 录制 → 录制画质」，「剩多少空间」那一格去「设置 → 存储 → 存储位置」。
+     * 主界面和设置页各有一条状态条，各接各的。
+     */
+    public static void link(View root, RowLink link) {
+        if (root == null || link == null) {
+            return;
+        }
+        View stream = root.findViewById(R.id.tv_status_stream);
+        if (stream != null) {
+            stream.setOnClickListener(v -> link.open("screen_recording", "pref_record_quality", null));
+        }
+        View storage = root.findViewById(R.id.tv_status_storage);
+        if (storage != null) {
+            storage.setOnClickListener(v -> link.open("screen_storage", "pref_storage_location", null));
+        }
+    }
 }

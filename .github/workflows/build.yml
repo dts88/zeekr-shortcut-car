@@ -51,6 +51,16 @@ jobs:
           path: app/build/reports/tests/
           if-no-files-found: ignore
 
+      # 单元测试画出来的界面图（Robolectric 原生绘图）：不上车也能逐页看界面改动
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: app/build/outputs/screenshots/*.png
+          if-no-files-found: ignore
+          retention-days: 14
+
       - name: Build release APK
         run: ./gradlew assembleRelease --stacktrace
 

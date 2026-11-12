@@ -16,10 +16,12 @@ import android.widget.TextView;
 import androidx.core.content.ContextCompat;
 
 import com.kooo.evcam.R;
+import com.kooo.evcam.ui.SegmentThumb;
 
 /**
  * 分段选择的段（ui-spec §三「分段选择」）：底槽（{@code pref_segment_track}）里摆两三段（开关合进分段的那一行四段），
- * 选中的那一段实心能量色、白字，其余透明、次要文字色；点一下就切，不能拖。
+ * 选中的那一段实心能量色、白字，其余透明、次要文字色；点一下就切，不能拖。选中的那一块是底槽上单独的一层
+ * （{@link SegmentThumb}）：换了一段，它滑过去，不跳（ui-spec §十四「值变了」）。
  *
  * <p>摆在 {@link SegmentedPreference} 的行尾：显示位置、超级镜子、切换方式、盲区画面、操作按钮位置。</p>
  */
@@ -46,6 +48,7 @@ final class Segments {
      * @param enabled 可用；不可用时段置灰、点了不动
      */
     static void fill(ViewGroup track, CharSequence[] labels, int chosen, boolean enabled, OnPick onPick) {
+        SegmentThumb.on(track).show(track, labels, chosen, enabled);
         track.removeAllViews();
         Context context = track.getContext();
         float density = context.getResources().getDisplayMetrics().density;
@@ -70,8 +73,6 @@ final class Segments {
         view.setTextAppearance(R.style.TextAppearance_Cam_Caption);
         view.setTextColor(ContextCompat.getColor(context,
                 chosen ? R.color.on_energy : R.color.text_secondary));
-        view.setBackgroundResource(R.drawable.bg_segment);
-        view.setActivated(chosen);
         int padding = Math.round(SEGMENT_PADDING_DP * density);
         view.setPadding(padding, 0, padding, 0);
         view.setMinWidth(Math.round(SEGMENT_MIN_WIDTH_DP * density));

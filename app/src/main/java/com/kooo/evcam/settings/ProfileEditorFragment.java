@@ -416,19 +416,8 @@ public class ProfileEditorFragment extends Fragment {
         return landing.width + "×" + landing.height;
     }
 
-    /**
-     * 这一路的这个尺寸，真正会编码成多大。
-     *
-     * <h3>相机 id 必须是这一路自己的</h3>
-     *
-     * <p>拆不拆只看相机 id（{@code StreamLayoutTable.stackingFor}）。
-     * 以前这里不管哪一路都传环视的 id，于是座舱的 1280×800
-     * 被当成四格竖条拆了：每格 1280×200，2×2 拼回去就是那个
-     * 凭空出现的 2560×400（1280×720 则是 2560×360）。</p>
-     */
     private EncodeSize landingFor(CameraProfile camera, int[] source) {
-        boolean grid = splitsFor(camera.role) && camera.record != null && camera.record.grid;
-        return EncodeSize.forSource(cameraIdFor(camera.role), source[0], source[1], grid);
+        return budget().landingFor(camera, source);
     }
 
     // ------------------------------------------------------------------ 细调
@@ -533,6 +522,11 @@ public class ProfileEditorFragment extends Fragment {
 
     // ------------------------------------------------------------------ 代价
 
+    /** 尺寸、码率、每小时用量怎么算在 {@link RecordingBudget}：设置页「录制画质」那一行也用它，两边是同一个数。 */
+    private RecordingBudget budget() {
+        return new RecordingBudget(requireContext(), cameraManager, profile);
+    }
+
     private void renderBudget() {
         int[] rates = enabledRates(null);
         if (rates.length == 0) {
@@ -579,72 +573,20 @@ public class ProfileEditorFragment extends Fragment {
         issueLine.setVisibility(sb.length() == 0 ? View.GONE : View.VISIBLE);
     }
 
-    /**
-     * 现在开着的这几路各配多少码率（bps）。
-     *
-     * @param preset 不为 null 时按这一档算（三张卡上那两个数），null 表示按现在的设置算
-     */
     private int[] enabledRates(@Nullable QualityPreset preset) {
-        List<Integer> rates = new ArrayList<>();
-        for (CameraProfile camera : profile.cameras) {
-            if (!camera.enabled) {
-                continue;
-            }
-            String fps = preset == null ? camera.record.fps : preset.fps;
-            String bitrate = preset == null ? camera.record.bitrate : preset.bitrate;
-            rates.add(estimatedBitrate(camera, fps, bitrate) + soundBitrate(camera));
-        }
-        int[] bits = new int[rates.size()];
-        for (int i = 0; i < bits.length; i++) {
-            bits[i] = rates.get(i);
-        }
-        return bits;
+        return budget().enabledRates(preset);
     }
 
-    /**
-     * 环视那一路录着声音时多出来的码率（开发者选项「录制声音」）：开着、有权限、走 MediaCodec 录制时才真录 ——
-     * 和定录法问的是同一处（{@code FootageAudio.sourceFor}）。界面写的码率、每小时用量都要把它算进去。
-     */
-    private int soundBitrate(CameraProfile camera) {
-        if (!CameraProfile.ROLE_COMPOSITE.equals(camera.role)) {
-            return 0;
-        }
-        AppConfig config = new AppConfig(requireContext());
-        return com.kooo.evcam.camera.FootageAudio.sourceFor(requireContext(), config) != null
-                && config.shouldUseCodecRecording() ? com.kooo.evcam.camera.FootageAudio.BIT_RATE : 0;
-    }
-
-    /** 这份配置一小时落盘多少字节。 */
     private long bytesPerHourFor(@Nullable QualityPreset preset) {
-        return StorageBudget.bytesPerHour(enabledRates(preset));
+        return budget().bytesPerHourFor(preset);
     }
 
-    /**
-     * 这一路按这组参数会配多少码率。
-     *
-     * <p>走的是录制那边同一个 {@link TargetBitrate} —— 界面写的数和实际配下去的
-     * 必须是同一个，不能在这里另算一遍。</p>
-     */
     private int estimatedBitrate(CameraProfile camera, String fps, String bitrate) {
-        int[] source = resolvedSource(camera.role, camera.record);
-        if (source == null) {
-            return 0;
-        }
-        EncodeSize size = landingFor(camera, source);
-        int max = com.kooo.evcam.camera.CameraCapabilities.declaredMaxFps();
-        int nominal = com.kooo.evcam.profile.RecordSpecs.nominal(fps,
-                max > 0 ? max : AppConfig.RECORDER_MAX_FPS);
-        boolean h264 = com.kooo.evcam.profile.RecordSpecs.forceH264(camera.record.codec)
-                || new AppConfig(requireContext()).isForceH264Encoding();
-        return TargetBitrate.compute(
-                com.kooo.evcam.profile.RecordSpecs.qualityLevel(bitrate),
-                size.width, size.height, nominal, !h264);
+        return budget().estimatedBitrate(camera, fps, bitrate);
     }
 
     private long freeBytes() {
-        java.io.File sdCard =
-                com.kooo.evcam.StorageHelper.getExternalSdCardRoot(requireContext());
-        return sdCard == null ? 0 : com.kooo.evcam.StorageHelper.getAvailableSpace(sdCard);
+        return budget().freeBytes();
     }
 
     private int dp(int value) {
@@ -773,90 +715,12 @@ public class ProfileEditorFragment extends Fragment {
         return resolved[0] + "x" + resolved[1];
     }
 
-    /**
-     * 这条流最后会向相机要多大；解不出来返回 null。
-     *
-     * <p>{@code auto} 在会拆的那一路是「每格最清楚的那个声明尺寸」，其他路跟随预览
-     * ——和 {@link ProfileSizes} 是同一条规则，两边不能各说各的。</p>
-     */
     private int[] resolvedSource(String role, StreamSpec spec) {
-        int[] parsed = ProfileResolution.parse(spec.resolution);
-        if (parsed != null) {
-            return parsed;
-        }
-        int[] max = ProfileSizes.declaredMax(requireContext(), role);
-        if (StreamSpec.RESOLUTION_MAX.equals(spec.resolution)) {
-            return max;
-        }
-        if (CameraProfile.ROLE_COMPOSITE.equals(role)) {
-            return max;
-        }
-        // 座舱那两路的 auto：拍照用声明的最大值，预览按「最接近 1280×800」
-        // 挑，录制跟着预览走。这三条以前在这里一律返回 null，于是卡上的码率
-        // 写成 0 kbps，「还能录多久」也完全不受这两路开关的影响 ——
-        // 而这个数是算得出来的，算得出来就不能写 0。
-        CameraProfile camera = profile.camera(role);
-        if (camera == null) {
-            return previewDefaultSize(role);
-        }
-        if (spec == camera.photo) {
-            return max;
-        }
-        if (spec != camera.preview && camera.preview != null) {
-            return resolvedSource(role, camera.preview);
-        }
-        return previewDefaultSize(role);
+        return budget().resolvedSource(role, spec);
     }
 
-    /**
-     * 配置里写 auto 时，预览会挑中的那个尺寸。
-     *
-     * <p>和 {@code SingleCamera.chooseOptimalSize} 同一条规则：先找 1280×800，
-     * 找不到就找最接近的。两边必须一致 —— 界面上写的数就是实际配下去的数。</p>
-     */
-    private int[] previewDefaultSize(String role) {
-        int[] best = null;
-        int bestDiff = Integer.MAX_VALUE;
-        for (int[] size : declaredPreviewSizes(role)) {
-            if (size[0] == 1280 && size[1] == 800) {
-                return size;
-            }
-            int diff = Math.abs(1280 - size[0]) + Math.abs(800 - size[1]);
-            if (diff < bestDiff) {
-                bestDiff = diff;
-                best = size;
-            }
-        }
-        return best;
-    }
-
-    /** 预览走的是 PRIVATE / SurfaceTexture 那一份声明，不是 JPEG 那一份。 */
     private List<int[]> declaredPreviewSizes(String role) {
-        List<int[]> out = new ArrayList<>();
-        String cameraId = cameraIdFor(role);
-        if (cameraId == null || cameraManager == null) {
-            return out;
-        }
-        try {
-            StreamConfigurationMap map = cameraManager.getCameraCharacteristics(cameraId)
-                    .get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
-            if (map == null) {
-                return out;
-            }
-            Size[] sizes = map.getOutputSizes(ImageFormat.PRIVATE);
-            if (sizes == null || sizes.length == 0) {
-                sizes = map.getOutputSizes(android.graphics.SurfaceTexture.class);
-            }
-            if (sizes == null) {
-                return out;
-            }
-            for (Size size : sizes) {
-                out.add(new int[]{size.getWidth(), size.getHeight()});
-            }
-        } catch (Exception e) {
-            AppLog.w(TAG, "读不到 " + role + " 的预览尺寸列表: " + e);
-        }
-        return out;
+        return budget().declaredPreviewSizes(role);
     }
 
     String fpsLabel(String fps) {
@@ -1026,15 +890,8 @@ public class ProfileEditorFragment extends Fragment {
 
     // ------------------------------------------------------------------ 相机信息
 
-    /**
-     * 这一路拆不拆。
-     *
-     * <p>环视那一路在 {@link StreamLayoutTable} 里，也就是<b>一定</b>拆 —— 和分辨率无关，
-     * 也和「这次相机开没开起来」无关。以前这里还要求表里已经登记了相机 id，
-     * 于是相机还没起来时进设置，编辑器会把环视说成不拆的，连每一格都不给编。</p>
-     */
     boolean splitsFor(String role) {
-        return CameraProfile.ROLE_COMPOSITE.equals(role);
+        return budget().splitsFor(role);
     }
 
     private List<int[]> declaredSizes(String role) {
@@ -1065,27 +922,7 @@ public class ProfileEditorFragment extends Fragment {
     }
 
     private String cameraIdFor(String role) {
-        String composite = StreamLayoutTable.compositeCameraId();
-        try {
-            if (cameraManager == null) {
-                return null;
-            }
-            String[] ids = cameraManager.getCameraIdList();
-            if (CameraProfile.ROLE_COMPOSITE.equals(role)) {
-                return composite != null ? composite : (ids.length > 0 ? ids[0] : null);
-            }
-            List<String> others = new ArrayList<>();
-            for (String id : ids) {
-                if (!id.equals(composite)) {
-                    others.add(id);
-                }
-            }
-            int index = CameraProfile.ROLE_CABIN_1.equals(role) ? 0 : 1;
-            return index < others.size() ? others.get(index) : null;
-        } catch (Exception e) {
-            AppLog.w(TAG, "读不到相机列表: " + e);
-            return null;
-        }
+        return budget().cameraIdFor(role);
     }
 
     String cameraSummary(String role) {

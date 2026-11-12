@@ -167,6 +167,16 @@ public final class SettingSpec {
         return out;
     }
 
+    /** 某个值在界面上叫什么（当前语言）；值不认识的照默认值。设置页以外要写这个名字的地方用它（主界面的开关、初始设置）。 */
+    public String label(android.content.Context context, String value) {
+        int index = indexOf(sanitize(value));
+        if (index < 0) {
+            return "";
+        }
+        Entry entry = entries.get(index);
+        return entry.nameRes != 0 ? context.getString(entry.nameRes) : entry.displayName;
+    }
+
     /** 全部显示名对应的字符串资源 id，与 {@link #values()} 一一对应；没有的位置是 0。 */
     public int[] nameResIds() {
         int[] out = new int[entries.size()];

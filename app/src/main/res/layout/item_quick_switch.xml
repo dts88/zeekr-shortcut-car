@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  主界面动作栏上的一块开关（ui/QuickSwitches，ui-spec §十三）：上面名字，下面一行现在的状态，右上角一个点
+  （开着是能量色，关着是最弱一级文字色，代码里染）。整块能点，按下有涟漪。
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="@dimen/rail_switch_height"
+    android:background="@drawable/bg_pref_row"
+    android:clickable="true"
+    android:focusable="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center_vertical"
+        android:orientation="vertical"
+        android:paddingStart="16dp"
+        android:paddingEnd="30dp">
+
+        <TextView
+            android:id="@+id/quick_name"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textAppearance="@style/TextAppearance.Cam.Caption"
+            android:textColor="@color/text_primary" />
+
+        <TextView
+            android:id="@+id/quick_state"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textAppearance="@style/TextAppearance.Cam.Micro"
+            android:textColor="@color/text_secondary" />
+    </LinearLayout>
+
+    <View
+        android:id="@+id/quick_led"
+        android:layout_width="12dp"
+        android:layout_height="12dp"
+        android:layout_gravity="top|end"
+        android:layout_marginTop="14dp"
+        android:layout_marginEnd="14dp"
+        android:background="@drawable/bg_quick_led" />
+</FrameLayout>

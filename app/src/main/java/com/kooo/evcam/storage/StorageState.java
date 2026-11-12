@@ -56,18 +56,22 @@ public final class StorageState {
         public final File videoDir;
         /** 录像目录所在盘的剩余空间；-1 = 不知道。 */
         public final long freeBytes;
+        /** U 盘一共多大；-1 = 没有 U 盘或者不知道。和剩余空间一样在存储线程上读好。 */
+        public final long totalBytes;
         /** 此刻能不能开录、拍照（和拒录、拒拍用的是同一个判断）。 */
         public final boolean available;
         /** 此刻挂着的盘，黑匣子那种写法。 */
         public final String mounts;
 
-        static final Snapshot EMPTY = new Snapshot(false, null, null, -1L, false, "?");
+        static final Snapshot EMPTY = new Snapshot(false, null, null, -1L, -1L, false, "?");
 
-        Snapshot(boolean known, File root, File videoDir, long freeBytes, boolean available, String mounts) {
+        Snapshot(boolean known, File root, File videoDir, long freeBytes, long totalBytes, boolean available,
+                 String mounts) {
             this.known = known;
             this.root = root;
             this.videoDir = videoDir;
             this.freeBytes = freeBytes;
+            this.totalBytes = totalBytes;
             this.available = available;
             this.mounts = mounts;
         }
@@ -180,8 +184,16 @@ public final class StorageState {
                 AppLog.w(TAG, "读不到剩余空间: " + e);
             }
         }
+        long total = -1L;
+        if (root != null) {
+            try {
+                total = root.getTotalSpace();
+            } catch (Exception e) {
+                AppLog.w(TAG, "读不到 U 盘大小: " + e);
+            }
+        }
         boolean available = StorageHelper.isRecordingStorageAvailable(context);
-        return new Snapshot(true, root, videoDir, free, available, StorageHelper.describeMounts());
+        return new Snapshot(true, root, videoDir, free, total, available, StorageHelper.describeMounts());
     }
 
     /** 主线程调。第一个监听者到了就开始定时刷新。 */

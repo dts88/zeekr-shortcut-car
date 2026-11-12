@@ -40,7 +40,7 @@
 |---|---|---|
 | 分区 / 页面标题 | 名词，2–6 字；页面标题与入口同名 | 存储、录像回放 |
 | 设置项标题 | 功能名（名词短语），动作行用动宾短语；开关标题写功能，不写「开启 X」；尽量 ≤ 10 字；不带标点 | 锁定影像、重置窗口与画面、编辑视频流配置 |
-| 试验性功能 | 标题后加「（试验性）」 | 车辆状态（试验性） |
+| 试验性功能 | 名称旁边一个标签「试验性」（4.0 起，项目所有者 2026-11-12）；名称里不再写「（试验性）」 | 车辆状态 + 标签「试验性」 |
 | 设置项说明 | 写开启时的效果，动词开头；依赖写「需开启『X』」；关闭的后果写「关闭后，……」；需重启写在句末「重启应用后生效」；最多两句 | 在环视录像画面下方附加一栏车辆信号 |
 | 状态 / 值 | 「名称：值」；值用「已开启 / 未开启 / 读取中… / 无法读取」 | 哨兵模式：已开启 |
 | 值标签 | 1–3 字的状态词，不用「着」 | 开 / 关、有人 / 无人 |
@@ -90,7 +90,7 @@
 
 - 路径从「设置」写起，整条放进一对「」，→ 两侧各一个半角空格：「设置 → 存储 → 存储位置」。
 - 单个元素：点击「开始录制」。
-- 名称与界面标题逐字一致；可以省略的只有三种：「（试验性）」后缀、双语标题的另一半（「语言 / Language」引用为「语言」）、选项名后面括号里的解释（「宽视野（地平线弯曲）」引用为「宽视野」）。
+- 名称与界面标题逐字一致；可以省略的只有两种：双语标题的另一半（「语言 / Language」引用为「语言」）、选项名后面括号里的解释（「宽视野（地平线弯曲）」引用为「宽视野」）。名称旁的「试验性」标签不是名称的一部分，引用时不带。
 - 不写「在设置里」而不给路径。
 - 改名时必须搜一遍引用它的文字，包括其他字符串、代码注释和文档，一起改。
 - 英文、马来文不加引号，名称与界面一致：Settings → Storage → Storage location；Tap Start recording；Tetapan → Storan → Lokasi storan。
@@ -616,6 +616,35 @@
     「Memaparkan kamera sisi di sebelah skrin itu mengikut mod yang dipilih」（一句话，按 §3 不带句号）。
   - 不用了、已删：set_rearview_views_title「切换范围」（并进「超级镜子」那一行）、set_rearview_summary（项目所有者删掉「超级镜子」
     那一行的说明）。
+- 2026-11-12 批准（4.0 界面重做；项目所有者「文字方面全部同意」，同一天另定：「行车画面」不用、分成「超级镜子」「盲区画面」两个分区，
+  声音两组收在「通用」，「（试验性）」改成名称旁的标签，五项声音选择对所有人固定、另一种进开发者选项；并确认下面带 * 的两处改写。
+  英文、马来文先照草稿上，全部做完后统一整理、再给项目所有者看）。新字符串按名字找：
+  - 分区与左栏：set_section_keys「按键」、set_section_general「通用」、set_section_update_about「更新与关于」；左栏每个分区名下面一行状态
+    header_recording_on / _off「录制中 · %1$s」「未录制 · %1$s」、header_storage_free「剩余 %1$s」、header_enabled_count「已开启 %1$d 项」、
+    header_none_enabled「未开启」。
+  - 录制：set_car_model_title「摄像头」（选项「环视」「环视 + 后座舱」，状态条同名）、「录制画质」提到这一页（set_record_quality_per_hour、
+    plurals set_record_quality_hours、set_record_quality_custom「自定义 · %1$s」*：各路单独调过时选的那一档照旧亮着，不是「三档都不选中」）、
+    set_profile_editor_title「详细参数」、组名 set_group_picture_sound、set_group_stamps_info；opt_screen_off_fps_follow「跟随录制画质」。
+  - 存储：set_storage_limits_keep。
+  - 盲区画面的 HUD：set_hud_place_title / _value、dlg_hud_place_note、hud_sketch_label、set_hud_brightness_title / _value、
+    set_hud_contrast_pair_title / _value。
+  - 通用：组名 set_group_display、set_group_maintenance、set_group_exterior_speaker（+ _note）；set_first_run_title「初始设置」/ _summary；
+    开发者选项组名 dev_group_sound。变灰的原因 reason_when「「%1$s」为「%2$s」时不可用」。
+  - 更新与关于：set_update_channel_title「接收的版本」、opt_channel_stable / _beta / _alpha、set_update_channel_stable / _beta、action_check。
+  - 标签 tag_experimental「试验性」：行驶信息条、灵动贴、模拟声浪、车辆状态的名称里去掉「（试验性）」，set_info_bar_summary 末尾的
+    「试验性功能。」跟着去掉。
+  - 主界面六块开关：小标题用已有的 nav_group_switches「开关」；quick_on「开」、quick_off「关」、quick_smart_bound「已绑定 %1$d 个」、
+    quick_smart_none「未绑定」。
+  - 初始设置：setup_skip「跳过设置」、setup_back「上一步」、setup_next「下一步」、setup_continue「继续」、setup_enter「进入主界面」；
+    七步的名字 setup_step_language「语言」、guide_title「开始之前」（已有）、setup_step_side「驾驶座位置」、setup_step_drive「U 盘」、
+    set_section_recording「录制」（已有）、setup_step_features「常用功能」*（原来写的「行车画面与按键」）、setup_step_done「完成」；
+    setup_language_note、setup_side_note、setup_side_lhd「左舵车」/ _rhd「右舵车」、setup_drive_found / _space / _missing / _later、
+    setup_record_note、setup_features_note*、setup_done_title「设置完成」。正文用已有的 guide_1、guide_2、set_storage_port_note、guide_4。
+  - 升级后的一个框：regroup_title「设置已重新整理」、regroup_body*（照新的分区重写的六句），按钮用已有的「知道了」。
+  - 连带修改（引用了旧路径的句子，意思不动）：guide_4「设置 → 通用 → 诊断信息」；dlg_internal_locked_msg、dev_note
+    「设置 → 更新与关于 → 关于与致谢」；set_vehicle_status_summary「在主界面的开关下方…」。
+  - 不用了、已删：msg_language_hint、msg_rail_side_hint、dlg_rail_side_lhd / _rhd、guide_3（菜单键、超级镜子手势那一段：手势在超级镜子的
+    使用指南里）、action_got_it_guide；设置左栏的「返回主界面」「退出应用」；锁定影像的「鸣笛」附加项不摆（读得到喇叭信号再放出来）。
 - vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
 - 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
 
@@ -671,10 +700,10 @@
 | 开关与窗口 | 开关：开启 / 关闭（已开启、未开启、需开启「X」）；窗口、页面、文件、应用：打开 / 关闭；紧凑值标签：开 / 关 | turn on / off、On / Off；open / close | hidupkan / matikan、Hidup / Mati；buka / tutup | 马来文开关不用 buka / tutup |
 | 手势 | 点击、长按、拖动、滑动（上下滑动 / 左右滑动） | tap、long press、drag、swipe | ketik、tekan lama、seret、leret | 不用「点一下」「划」「单击」 |
 | 诊断信息 / 诊断报告 | 诊断信息（设置项与页面）；诊断报告（导出的文件） | Diagnostics；Diagnostics report | Maklumat diagnostik；Laporan diagnostik | — |
-| 引用写法 | 「设置 → 系统 → 诊断信息」 | Settings → System → Diagnostics | Tetapan → Sistem → Maklumat diagnostik | 见 §5 |
+| 引用写法 | 「设置 → 通用 → 诊断信息」 | Settings → General → Diagnostics | Tetapan → Umum → Maklumat diagnostik | 见 §5 |
 | 开机自启动 | 开机自启动（2.10.4 起含保活，不再有「保持后台运行」） | Start on boot | Mula semasa but | 不用「保活」 |
 | 水印 | 时间水印、应用水印、车牌号水印、水印显示录制规格 | stamp：Timestamp、App stamp、Plate number stamp、Include recording specs | tera：Tera masa、Tera nama apl、Tera nombor plat、Sertakan spesifikasi rakaman | 不用「角标」；英文不用 overlay、badge |
-| 试验性 | 功能名后缀「（试验性）」 | (experimental) | (percubaan) | 不用「实验性」「试验功能」 |
+| 试验性 | 名称旁的标签「试验性」（4.0 起；以前是功能名后缀「（试验性）」） | Experimental | Percubaan | 不用「实验性」「试验功能」 |
 | 鱼眼校正 | 鱼眼校正（按钮与设置项同名）；鱼眼校正方式：直线、宽视野（地平线弯曲）、全圆（直线略弯）；视野角度（超级镜子）、校正视野（界面） | 按钮 Straighten；Fisheye correction、Fisheye projection；Straight lines、Wide (curved horizon)、Full circle (lines slightly curved) | 按钮 Luruskan；Pembetulan mata ikan、Unjuran mata ikan | 英文引用按钮时写 Straighten |
 | 闪远光 / 双闪 | 闪远光；双闪（说明文字里可写全称「双闪警示灯」，项目所有者 2026-10-23） | flash-to-pass；hazard lights（值标签 Hazard；设置里的按钮 Hazard lights） | kelip lampu tinggi；lampu kecemasan | — |
 | 原厂 | 原厂（原厂 360、原厂界面、原厂行车记录仪） | factory | kilang | 英文不用 stock |
@@ -685,6 +714,6 @@
 | 需重启生效 | 重启应用后生效（放在句末） | Takes effect after restarting the app | Berkuat kuasa selepas apl dimulakan semula | — |
 | 确认按钮 | 知道了 | Got it | Faham | 不用「我知道了」 |
 | 画面调节 | 画面调节；画面调节窗口 | Image adjustment | Pelarasan imej | 不用「亮度 / 降噪调节」 |
-| 设置分区与页面 | 录制、存储、超级镜子、悬浮键与灵动贴、界面、系统、开发者选项、检查更新、关于与致谢 | Recording、Storage、Super mirror、Floating button and smart buttons、Interface、System、Developer options、Check for updates、About & credits | Rakaman、Storan、Cermin super、Butang terapung dan butang pintar、Antara muka、Sistem、Pilihan pembangun、Semak kemas kini、Perihal & penghargaan | 关于页没有马来文，见 §5 |
+| 设置分区与页面 | 4.0 起：录制、存储、超级镜子、盲区画面、按键、通用、更新与关于、开发者选项；页：详细参数、车辆信号、关于与致谢、初始设置（4.0 以前的「悬浮键与灵动贴」「界面」「系统」「检查更新」不再是页名） | Recording、Storage、Super mirror、Blind spot view、Buttons、General、Updates & about、Developer options（草稿） | Rakaman、Storan、Cermin super、Paparan titik buta、Butang、Umum、Kemas kini & perihal、Pilihan pembangun（草稿） | 英文、马来文 4.0 全部做完后统一整理 |
 | 灵动贴 | 灵动贴（只有页名里和「悬浮键」连着写，别处的悬浮按钮照旧） | smart button | butang pintar | — |
 | 绑定（灵动贴） | 绑定：绑定灵动贴、已绑定 | pair：Pair smart button、paired | pasangkan：Pasangkan butang pintar、dipasangkan | 「连接」只指连上蓝牙的那一下（长按时）；不用「搜索」「登记」「配对」（2026-11-04 加，2026-11-05 项目所有者批准） |

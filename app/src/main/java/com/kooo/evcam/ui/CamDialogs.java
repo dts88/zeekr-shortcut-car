@@ -132,6 +132,11 @@ public final class CamDialogs {
     private static <T extends Dialog> T style(T dialog, boolean destructive) {
         if (dialog != null) {
             dialog.setOnShowListener(d -> paintButtons(dialog, destructive));
+            // 浮起来的（ui-spec §十四）：框从 94% 放大到原大并淡入，写在对话框的主题里；不放装饰动效时直接出现
+            android.view.Window window = dialog.getWindow();
+            if (window != null && !MotionPolicy.decorative(dialog.getContext())) {
+                window.setWindowAnimations(R.style.Animation_Cam_None);
+            }
         }
         return dialog;
     }

@@ -43,6 +43,9 @@ import com.kooo.evcam.ui.MotionPolicy;
 public class SettingsShellFragment extends Fragment {
 
     private static final String STATE_SECTION = "section";
+    private static final String ARG_SECTION = "section";
+    private static final String ARG_ROW = "row";
+    private static final String ARG_FALLBACK = "fallback";
 
     /** 打开设置时默认停在哪一段。 */
     static final String DEFAULT_SECTION = "screen_recording";
@@ -55,6 +58,17 @@ public class SettingsShellFragment extends Fragment {
     private String currentSection = DEFAULT_SECTION;
     /** 当前分区在左栏的行号，决定下一次切换往上还是往下走。 */
     private int currentOrder = -1;
+
+    /** 打开设置就停在某个分区、指着某一行（从主界面的状态点过来，{@link #showRow}）。 */
+    public static SettingsShellFragment at(String sectionKey, String prefKey, @Nullable String fallbackKey) {
+        SettingsShellFragment fragment = new SettingsShellFragment();
+        Bundle args = new Bundle();
+        args.putString(ARG_SECTION, sectionKey);
+        args.putString(ARG_ROW, prefKey);
+        args.putString(ARG_FALLBACK, fallbackKey);
+        fragment.setArguments(args);
+        return fragment;
+    }
 
     @Nullable
     @Override
@@ -75,6 +89,7 @@ public class SettingsShellFragment extends Fragment {
         // 进出二级界面时标题区要跟着变
         getChildFragmentManager().addOnBackStackChangedListener(this::refreshTitle);
         com.kooo.evcam.ui.StatusLine.fill(view);
+        com.kooo.evcam.ui.StatusLine.link(view, this::showRow);
 
         if (savedInstanceState != null) {
             String saved = savedInstanceState.getString(STATE_SECTION);
@@ -83,11 +98,20 @@ public class SettingsShellFragment extends Fragment {
             }
         }
 
+        Bundle args = getArguments();
+        if (savedInstanceState == null && args != null && args.getString(ARG_SECTION) != null) {
+            currentSection = args.getString(ARG_SECTION);
+        }
         if (savedInstanceState == null) {
             getChildFragmentManager().beginTransaction()
                     .replace(R.id.settings_headers, new SettingsHeadersFragment())
                     .commit();
             showSection(currentSection);
+            if (args != null && args.getString(ARG_ROW) != null) {
+                String row = args.getString(ARG_ROW);
+                String fallback = args.getString(ARG_FALLBACK);
+                view.post(() -> showRow(currentSection, row, fallback));
+            }
         }
         refreshTitle();
     }
@@ -123,14 +147,15 @@ public class SettingsShellFragment extends Fragment {
         if (order >= 0) {
             currentOrder = order;
         }
-        Fragment next = SettingsPreferenceFragment.forSection(screenKey);
+        // 右边是这个分区的左右两列（SettingsSectionFragment，ui-spec §三「双列」）
+        Fragment next = SettingsSectionFragment.forSection(screenKey);
         Fragment shown = getChildFragmentManager().findFragmentById(R.id.settings_detail);
         if (shown != null && MotionPolicy.decorative(requireContext())) {
             // 换分区沿纵轴走：左栏是竖着排的，点下面一行内容就从下面上来，
             // 点上面一行就从上面下来 —— 动作的方向和手指在列表里移动的方向一致。
-            // 平级切换不用横向（那读起来像「进了下一级」），也不用 Z 轴（那是进二级界面）
-            shown.setExitTransition(new MaterialSharedAxis(MaterialSharedAxis.Y, down));
-            next.setEnterTransition(new MaterialSharedAxis(MaterialSharedAxis.Y, down));
+            // 平级切换不用横向（那是往前一步、往回一步），也不用放大缩小（那是换界面）
+            shown.setExitTransition(axis(MaterialSharedAxis.Y, down));
+            next.setEnterTransition(axis(MaterialSharedAxis.Y, down));
         }
         getChildFragmentManager().beginTransaction()
                 .setReorderingAllowed(true)
@@ -188,6 +213,13 @@ public class SettingsShellFragment extends Fragment {
         navButton.setContentDescription(getString(R.string.cd_menu));
     }
 
+    /** 设置里的过渡都是这一种做法、一个时长（ui-spec §十四：最长的一档）。 */
+    private static MaterialSharedAxis axis(int axis, boolean forward) {
+        MaterialSharedAxis transition = new MaterialSharedAxis(axis, forward);
+        transition.setDuration(com.kooo.evcam.ui.Motion.SLOW);
+        return transition;
+    }
+
     /**
      * 分区内部再往下走（权限、相机映射这些自带界面的）。
      *
@@ -195,17 +227,17 @@ public class SettingsShellFragment extends Fragment {
      * 进了二级界面还看得见自己在设置的哪一块。进返回栈，返回键回到分区。</p>
      */
     void openDetail(Fragment fragment, CharSequence title) {
-        // 进二级界面沿 Z 轴：新的一层从稍小放大到位，旧的一层稍放大并淡出；
-        // 返回时两者各自倒放 —— 深了一层还是退回一层，看动作就知道
+        // 往前一步、往回一步（ui-spec §十四）：进下一层，新的从右边进来、旧的向左退；返回时倒放 ——
+        // 深了一层还是退回一层，看动作就知道。和初始设置里换步是同一个动作
         Fragment shown = getChildFragmentManager().findFragmentById(R.id.settings_detail);
         boolean animate = MotionPolicy.decorative(requireContext());
         if (shown != null) {
-            shown.setExitTransition(animate ? new MaterialSharedAxis(MaterialSharedAxis.Z, true) : null);
-            shown.setReenterTransition(animate ? new MaterialSharedAxis(MaterialSharedAxis.Z, false) : null);
+            shown.setExitTransition(animate ? axis(MaterialSharedAxis.X, true) : null);
+            shown.setReenterTransition(animate ? axis(MaterialSharedAxis.X, false) : null);
         }
         if (animate) {
-            fragment.setEnterTransition(new MaterialSharedAxis(MaterialSharedAxis.Z, true));
-            fragment.setReturnTransition(new MaterialSharedAxis(MaterialSharedAxis.Z, false));
+            fragment.setEnterTransition(axis(MaterialSharedAxis.X, true));
+            fragment.setReturnTransition(axis(MaterialSharedAxis.X, false));
         }
         // 打上类名当 tag：被换下去的那一层还在返回栈里活着，
         // 有 tag 才找得回来。摆位那一页要改的正是被它换下去的配置编辑里
@@ -223,5 +255,52 @@ public class SettingsShellFragment extends Fragment {
         if (slidingPane != null) {
             slidingPane.openPane();
         }
+    }
+
+    /** 左栏每个分区名下面那一行状态照现在的设置重写（右边改了一项之后，ui-spec §十三「左栏的状态」）。 */
+    void refreshHeaders() {
+        if (!isAdded()) {
+            return;
+        }
+        Fragment headers = getChildFragmentManager().findFragmentById(R.id.settings_headers);
+        if (headers instanceof SettingsHeadersFragment) {
+            ((SettingsHeadersFragment) headers).refreshStatus();
+        }
+    }
+
+    /**
+     * 状态能点（ui-spec §十三）：换到某个分区，滚到某一行、闪两下。
+     *
+     * @param fallbackKey 那一行此刻收着（它的功能关着）时改闪这一行，一般是那个功能的第一行；可以是 null
+     */
+    public void showRow(String sectionKey, String prefKey, @Nullable String fallbackKey) {
+        View root = getView();
+        if (root == null || !isAdded()) {
+            return;
+        }
+        if (getChildFragmentManager().getBackStackEntryCount() > 0) {
+            getChildFragmentManager().popBackStackImmediate(null,
+                    androidx.fragment.app.FragmentManager.POP_BACK_STACK_INCLUSIVE);
+        }
+        Fragment shown = getChildFragmentManager().findFragmentById(R.id.settings_detail);
+        if (!sectionKey.equals(currentSection) || !(shown instanceof SettingsSectionFragment)) {
+            Fragment headers = getChildFragmentManager().findFragmentById(R.id.settings_headers);
+            int order = headers instanceof SettingsHeadersFragment
+                    ? ((SettingsHeadersFragment) headers).orderOf(sectionKey) : -1;
+            showSection(sectionKey, order);
+        }
+        // 等这一页换好、列表排好再找那一行
+        root.postDelayed(() -> {
+            if (!isAdded()) {
+                return;
+            }
+            Fragment now = getChildFragmentManager().findFragmentById(R.id.settings_detail);
+            if (now instanceof SettingsSectionFragment) {
+                SettingsSectionFragment section = (SettingsSectionFragment) now;
+                if (!section.flash(prefKey) && fallbackKey != null) {
+                    section.flash(fallbackKey);
+                }
+            }
+        }, com.kooo.evcam.ui.Motion.SLOW);
     }
 }

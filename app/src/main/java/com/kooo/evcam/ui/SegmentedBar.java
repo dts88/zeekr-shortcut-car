@@ -29,10 +29,9 @@ import com.kooo.evcam.R;
  * <p>这也是把「界面显示的值 = 实际生效的值」做到底：没有中间态，
  * 不存在「弹框里选了、外面还没变」这半秒。</p>
  *
- * <h3>为什么是 activated 不是 selected</h3>
+ * <h3>选中的那一块</h3>
  *
- * <p>{@code selected} 在列表里另有含义（整行被选中）。档位用
- * {@code activated}，和 {@code bg_segment} 里写的一致。</p>
+ * <p>是底槽上单独的一层（{@link SegmentThumb}），和设置行尾的分段是同一个：换了一档，它滑过去，不跳。</p>
  */
 public class SegmentedBar extends LinearLayout {
 
@@ -69,6 +68,13 @@ public class SegmentedBar extends LinearLayout {
         }
         this.values = values;
         this.onPick = onPick;
+        int chosen = -1;
+        for (int i = 0; i < values.length; i++) {
+            if (values[i].equals(current)) {
+                chosen = i;
+            }
+        }
+        SegmentThumb.on(this).show(this, labels, chosen, true);
         removeAllViews();
         for (int i = 0; i < labels.length; i++) {
             addView(segment(labels[i], values[i], values[i].equals(current)));
@@ -86,8 +92,6 @@ public class SegmentedBar extends LinearLayout {
         view.setText(label);
         view.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX,
                 getResources().getDimension(R.dimen.text_body));
-        view.setBackgroundResource(R.drawable.bg_segment);
-        view.setActivated(active);
         view.setTextColor(ContextCompat.getColor(getContext(),
                 active ? R.color.on_energy : R.color.text_primary));
         view.setOnClickListener(v -> {

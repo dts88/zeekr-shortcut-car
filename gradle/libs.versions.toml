@@ -1,6 +1,7 @@
 [versions]
 agp = "9.0.0"
 junit = "4.13.2"
+robolectric = "4.16"
 appcompat = "1.7.1"
 material = "1.13.0"
 activity = "1.12.2"
@@ -11,6 +12,7 @@ media3 = "1.8.0"
 
 [libraries]
 junit = { group = "junit", name = "junit", version.ref = "junit" }
+robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
 appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
 activity = { group = "androidx.activity", name = "activity", version.ref = "activity" }

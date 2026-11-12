@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 浮起来的（ui-spec §十四）：对话框从 94% 放大到原大并淡入 -->
+<set xmlns:android="http://schemas.android.com/apk/res/android"
+    android:duration="@integer/motion_medium"
+    android:interpolator="@android:interpolator/decelerate_cubic">
+    <alpha
+        android:fromAlpha="0"
+        android:toAlpha="1" />
+    <scale
+        android:fromXScale="0.94"
+        android:fromYScale="0.94"
+        android:pivotX="50%"
+        android:pivotY="50%"
+        android:toXScale="1"
+        android:toYScale="1" />
+</set>

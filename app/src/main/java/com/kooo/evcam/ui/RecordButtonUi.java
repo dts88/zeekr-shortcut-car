@@ -56,11 +56,11 @@ public final class RecordButtonUi {
 
     public enum State { IDLE, UNAVAILABLE, PREPARING, RECORDING, WAITING }
 
-    private static final long MORPH_MS = 220;
+    private static final long MORPH_MS = Motion.MEDIUM;
     private static final long PULSE_MS = 600;
     /** 等待摄像头时的呼吸：比准备中慢得多 —— 不是马上就好，是在等。 */
     private static final long WAITING_PULSE_MS = 1_600;
-    private static final long FLASH_MS = 300;
+    private static final long FLASH_MS = Motion.SLOW;
 
     private final View root;
     private final Context context;
@@ -92,7 +92,10 @@ public final class RecordButtonUi {
         this.dot = root.findViewById(R.id.record_dot);
         this.title = root.findViewById(R.id.record_title);
         this.detail = root.findViewById(R.id.record_detail);
-        this.hint = root.findViewById(R.id.record_hint);
+        // 熄屏提示 4.0 起在录制键下面单独一行（它要能单独点，ui-spec §十三「状态能点」），不在这张卡片里：到动作栏里找
+        View rail = root.getParent() instanceof View ? (View) root.getParent() : null;
+        View outside = rail != null ? rail.findViewById(R.id.record_hint) : null;
+        this.hint = outside != null ? outside : root.findViewById(R.id.record_hint);
         if (dot != null) {
             dotShape = new GradientDrawable();
             dotShape.setColor(color(R.color.recording));

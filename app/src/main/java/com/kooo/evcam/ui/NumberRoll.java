@@ -25,8 +25,9 @@ import android.widget.TextView;
  */
 public final class NumberRoll {
 
-    private static final int OUT_MS = 90;
-    private static final int IN_MS = 130;
+    /** 值变了：一出一进合起来是最短的一档（{@link Motion#FAST}），出去的占小头。 */
+    private static final long OUT_MS = Motion.FAST * 2 / 5;
+    private static final long IN_MS = Motion.FAST - OUT_MS;
     /** 滚动距离按字号取，字大就滚得远一点，看起来才是同一个动作。 */
     private static final float DISTANCE_RATIO = 0.6f;
 
@@ -58,6 +59,7 @@ public final class NumberRoll {
                 .alpha(0f)
                 .translationY(-distance)
                 .setDuration(OUT_MS)
+                .setInterpolator(Motion.exit())
                 .withEndAction(() -> {
                     view.setText(target);
                     view.setTranslationY(distance);
@@ -65,6 +67,7 @@ public final class NumberRoll {
                             .alpha(1f)
                             .translationY(0f)
                             .setDuration(IN_MS)
+                            .setInterpolator(Motion.enter())
                             .start();
                 })
                 .start();

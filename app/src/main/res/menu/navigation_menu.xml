@@ -1,10 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  抽屉菜单。三组：看（界面之间跳）、开关（直接在这里拨）、系统。
+  抽屉菜单：只管去哪。两组：看（界面之间跳）、系统。
 
-  「超级镜子」是一个开关而不是一个界面：以前要进设置 → 超级镜子 → 拨开关，
-  三步才能做一件「开 / 关」的事。现在行尾就是开关，点这一行就拨，抽屉不收起 ——
-  拨完还看得见它变了没有。
+  「超级镜子」「悬浮按钮」两行开关 4.0 起挪到主界面动作栏的六块开关里（ui/QuickSwitches，项目所有者 2026-11-12）：
+  右舵时抽屉在离驾驶座最远的一侧，动作栏在手边；抽屉里有的入口别处也都有。
 
   图标全部是统一图标集里的矢量图（24dp 网格、线宽 1.7），随抽屉的着色走。
 -->
@@ -25,23 +24,6 @@
             android:icon="@drawable/ic_photo"
             android:title="@string/nav_photo_playback" />
     </group>
-
-    <item android:title="@string/nav_group_switches">
-        <menu>
-            <item
-                android:id="@+id/nav_rearview"
-                android:checkable="false"
-                android:icon="@drawable/ic_rearview"
-                android:title="@string/set_section_rearview"
-                app:actionLayout="@layout/nav_switch" />
-            <item
-                android:id="@+id/nav_floating_button"
-                android:checkable="false"
-                android:icon="@drawable/ic_floating"
-                android:title="@string/set_section_floating"
-                app:actionLayout="@layout/nav_switch" />
-        </menu>
-    </item>
 
     <item android:title="@string/nav_group_system">
         <menu>

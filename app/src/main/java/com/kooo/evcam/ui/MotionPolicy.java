@@ -42,6 +42,15 @@ public final class MotionPolicy {
     }
 
     /** 现在能不能放装饰性动效。 */
+    /**
+     * 不带相机画面的悬浮窗（悬浮按钮、全屏编辑框）出现和收起用哪一套窗口动效：淡入淡出；不放装饰动效时不放。
+     * 给 {@code WindowManager.LayoutParams.windowAnimations}。
+     */
+    public static int overlayWindowAnimations(Context context) {
+        return decorative(context) ? com.kooo.evcam.R.style.Animation_Cam_Fade
+                : com.kooo.evcam.R.style.Animation_Cam_None;
+    }
+
     public static boolean decorative(Context context) {
         if (context == null) {
             return true;

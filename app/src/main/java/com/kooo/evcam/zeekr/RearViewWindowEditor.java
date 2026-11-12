@@ -114,6 +114,8 @@ public final class RearViewWindowEditor {
                         | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
                 PixelFormat.TRANSLUCENT);
         params.gravity = Gravity.TOP | Gravity.START;
+        // 出现和收起：淡入淡出（ui-spec §十四），不放装饰动效时不放
+        params.windowAnimations = com.kooo.evcam.ui.MotionPolicy.overlayWindowAnimations(root.getContext());
         try {
             windowManager.addView(root, params);
             root.requestFocus();

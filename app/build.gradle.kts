@@ -57,6 +57,7 @@ android {
 
     testOptions {
         unitTests.isReturnDefaultValues = true
+        unitTests.isIncludeAndroidResources = true
     }
 
 }
@@ -95,4 +96,5 @@ dependencies {
     implementation("androidx.slidingpanelayout:slidingpanelayout:1.2.0")
 
     testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
 }
