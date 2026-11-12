@@ -57,6 +57,8 @@ final class SliderDialog {
          */
         final boolean continuous;
         final Apply apply;
+        /** 拖的时候每动一格叫一次，只为让框里的示意跟着变（不存、不推）；可以没有。 */
+        private Apply watch;
         private SeekBar bar;
 
         Slider(CharSequence label, int min, int max, int start, String unit, CharSequence note,
@@ -75,6 +77,12 @@ final class SliderDialog {
         int value() {
             return bar != null ? min + bar.getProgress() : start;
         }
+
+        /** 拖的时候每动一格告诉 {@code onMove}（框里的示意用，{@link HudSketchView}）。 */
+        Slider watch(Apply onMove) {
+            watch = onMove;
+            return this;
+        }
     }
 
     private SliderDialog() {
@@ -82,17 +90,66 @@ final class SliderDialog {
 
     /** 弹框：标题、几根拖动条、「取消」「保存」。存了之后叫 {@code onSaved}（更新那一行的值）。 */
     static void show(Context context, CharSequence title, List<Slider> sliders, Runnable onSaved) {
+        show(context, title, null, null, sliders, onSaved);
+    }
+
+    /**
+     * @param note   标题下面一句，可以没有
+     * @param sketch 拖动条上面的一块示意，可以没有（HUD 画面的位置与大小，{@link HudSketchView}）。
+     *               有它时框加宽、拖动条排成两列、整块能滚：一块示意加五根拖动条竖着排，一屏放不下
+     */
+    static void show(Context context, CharSequence title, @androidx.annotation.Nullable CharSequence note,
+                     @androidx.annotation.Nullable View sketch, List<Slider> sliders, Runnable onSaved) {
         int pad = dp(context, 24);
         LinearLayout box = new LinearLayout(context);
         box.setOrientation(LinearLayout.VERTICAL);
         box.setPadding(pad, pad / 2, pad, 0);
-        for (Slider slider : sliders) {
-            box.addView(block(context, slider));
+        if (note != null) {
+            box.addView(CamDialogs.note(context, note));
+        }
+        if (sketch == null) {
+            for (Slider slider : sliders) {
+                box.addView(block(context, slider));
+            }
+        } else {
+            LinearLayout.LayoutParams above = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            above.topMargin = dp(context, 12);
+            above.bottomMargin = dp(context, 8);
+            box.addView(sketch, above);
+            LinearLayout row = null;
+            for (int i = 0; i < sliders.size(); i++) {
+                if (i % 2 == 0) {
+                    row = new LinearLayout(context);
+                    row.setOrientation(LinearLayout.HORIZONTAL);
+                    row.setBaselineAligned(false);
+                    box.addView(row);
+                }
+                LinearLayout.LayoutParams cell =
+                        new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+                if (i % 2 == 1) {
+                    cell.setMarginStart(pad);
+                }
+                row.addView(block(context, sliders.get(i)), cell);
+            }
+            if (row != null && sliders.size() % 2 == 1) {
+                // 单出来的那一根只占半行，和上面的对齐
+                LinearLayout.LayoutParams blank = new LinearLayout.LayoutParams(0, 0, 1f);
+                blank.setMarginStart(pad);
+                row.addView(new View(context), blank);
+            }
+        }
+        View content = box;
+        if (sketch != null) {
+            android.widget.ScrollView scroll = new android.widget.ScrollView(context);
+            scroll.addView(box);
+            content = scroll;
         }
         final boolean[] saved = {false};
-        CamDialogs.show(new MaterialAlertDialogBuilder(context, R.style.Theme_Cam_MaterialAlertDialog)
+        androidx.appcompat.app.AlertDialog shown = CamDialogs.show(
+                new MaterialAlertDialogBuilder(context, R.style.Theme_Cam_MaterialAlertDialog)
                 .setTitle(title)
-                .setView(box)
+                .setView(content)
                 .setPositiveButton(R.string.action_save, (dialog, which) -> {
                     saved[0] = true;
                     for (Slider slider : sliders) {
@@ -115,6 +172,11 @@ final class SliderDialog {
                         }
                     }
                 }));
+        if (sketch != null && shown != null && shown.getWindow() != null) {
+            int screen = context.getResources().getDisplayMetrics().widthPixels;
+            shown.getWindow().setLayout(Math.min(dp(context, 1120), screen - dp(context, 96)),
+                    ViewGroup.LayoutParams.WRAP_CONTENT);
+        }
     }
 
     /** 一根拖动条那一块：上面名字和当前值，中间拖动条，下面说明。 */
@@ -149,6 +211,9 @@ final class SliderDialog {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                 value.setText((slider.min + progress) + slider.unit);
+                if (slider.watch != null) {
+                    slider.watch.set(slider.min + progress);
+                }
                 if (fromUser && slider.continuous) {
                     slider.apply.set(slider.min + progress);
                 }

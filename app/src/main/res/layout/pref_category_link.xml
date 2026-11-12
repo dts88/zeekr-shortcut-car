@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  组名那一行，右边带一个入口（LinkCategory，ui-spec §三「组名右边的入口」）。
+  左边照 pref_category：小号灰字，贴着卡片边；组名可以是空的。右边的入口是能量色的字，按下有涟漪，高 48dp 好点。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@android:color/transparent"
+    android:gravity="center_vertical"
+    android:minHeight="48dp"
+    android:orientation="horizontal"
+    android:paddingStart="4dp"
+    android:paddingTop="6dp"
+    android:paddingEnd="0dp"
+    android:paddingBottom="4dp">
+
+    <TextView
+        android:id="@android:id/title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textAppearance="@style/TextAppearance.Cam.Caption"
+        android:textColor="@color/text_secondary" />
+
+    <!-- 组名空着时那个 TextView 会被收起：靠这一块把入口顶到右边 -->
+    <View
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <TextView
+        android:id="@+id/pref_category_link"
+        android:layout_width="wrap_content"
+        android:layout_height="48dp"
+        android:background="?attr/selectableItemBackground"
+        android:drawableEnd="@drawable/ic_chevron_right"
+        android:drawablePadding="4dp"
+        android:drawableTint="@color/energy_text"
+        android:gravity="center_vertical"
+        android:paddingStart="12dp"
+        android:paddingEnd="8dp"
+        android:textAppearance="@style/TextAppearance.Cam.Caption"
+        android:textColor="@color/energy_text" />
+</LinearLayout>

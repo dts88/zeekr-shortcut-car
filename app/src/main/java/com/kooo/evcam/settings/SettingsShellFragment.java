@@ -123,7 +123,8 @@ public class SettingsShellFragment extends Fragment {
         if (order >= 0) {
             currentOrder = order;
         }
-        Fragment next = SettingsPreferenceFragment.forSection(screenKey);
+        // 右边是这个分区的左右两列（SettingsSectionFragment，ui-spec §三「双列」）
+        Fragment next = SettingsSectionFragment.forSection(screenKey);
         Fragment shown = getChildFragmentManager().findFragmentById(R.id.settings_detail);
         if (shown != null && MotionPolicy.decorative(requireContext())) {
             // 换分区沿纵轴走：左栏是竖着排的，点下面一行内容就从下面上来，
@@ -223,5 +224,52 @@ public class SettingsShellFragment extends Fragment {
         if (slidingPane != null) {
             slidingPane.openPane();
         }
+    }
+
+    /** 左栏每个分区名下面那一行状态照现在的设置重写（右边改了一项之后，ui-spec §十三「左栏的状态」）。 */
+    void refreshHeaders() {
+        if (!isAdded()) {
+            return;
+        }
+        Fragment headers = getChildFragmentManager().findFragmentById(R.id.settings_headers);
+        if (headers instanceof SettingsHeadersFragment) {
+            ((SettingsHeadersFragment) headers).refreshStatus();
+        }
+    }
+
+    /**
+     * 状态能点（ui-spec §十三）：换到某个分区，滚到某一行、闪两下。
+     *
+     * @param fallbackKey 那一行此刻收着（它的功能关着）时改闪这一行，一般是那个功能的第一行；可以是 null
+     */
+    public void showRow(String sectionKey, String prefKey, @Nullable String fallbackKey) {
+        View root = getView();
+        if (root == null || !isAdded()) {
+            return;
+        }
+        if (getChildFragmentManager().getBackStackEntryCount() > 0) {
+            getChildFragmentManager().popBackStackImmediate(null,
+                    androidx.fragment.app.FragmentManager.POP_BACK_STACK_INCLUSIVE);
+        }
+        Fragment shown = getChildFragmentManager().findFragmentById(R.id.settings_detail);
+        if (!sectionKey.equals(currentSection) || !(shown instanceof SettingsSectionFragment)) {
+            Fragment headers = getChildFragmentManager().findFragmentById(R.id.settings_headers);
+            int order = headers instanceof SettingsHeadersFragment
+                    ? ((SettingsHeadersFragment) headers).orderOf(sectionKey) : -1;
+            showSection(sectionKey, order);
+        }
+        // 等这一页换好、列表排好再找那一行
+        root.postDelayed(() -> {
+            if (!isAdded()) {
+                return;
+            }
+            Fragment now = getChildFragmentManager().findFragmentById(R.id.settings_detail);
+            if (now instanceof SettingsSectionFragment) {
+                SettingsSectionFragment section = (SettingsSectionFragment) now;
+                if (!section.flash(prefKey) && fallbackKey != null) {
+                    section.flash(fallbackKey);
+                }
+            }
+        }, com.kooo.evcam.ui.Motion.SLOW);
     }
 }

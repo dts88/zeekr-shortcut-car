@@ -105,6 +105,10 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
      * （{@link SettingsRegistry}），不会撞上。
      */
     private static final String ROW_OFF = "off";
+    /** 「接收的版本」三档的值（{@link #bindUpdate}）：只在这一行用，存的是原来那两个开关。 */
+    private static final String CHANNEL_STABLE = "stable";
+    private static final String CHANNEL_BETA = "beta";
+    private static final String CHANNEL_ALPHA = "alpha";
 
     private static final String ARG_SECTION = "section";
 
@@ -169,26 +173,34 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             bindDeveloper();
         }
         bindUpdate();
+        tagExperimental();
+        syncRows();
 
         // 行样式在交给列表之前套上（车机系统式：卡片行、开关在前、值在后）
         PreferenceRows.apply(getPreferenceScreen());
+        // 行出现、消失时列表按差异增删、不整页重画，展开和收起的动效才放得出来（ui-spec §十四）
+        getPreferenceManager().setPreferenceComparisonCallback(
+                new androidx.preference.PreferenceManager.SimplePreferenceComparisonCallback());
     }
 
     @Override
     public void onViewCreated(@androidx.annotation.NonNull android.view.View view,
                               @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
-        PreferenceRows.styleList(this, 28, 16);
+        // 这份列表是右边内容区的一列（SettingsSectionFragment）：两列之间、和两边的留白由列自己的内边距加外面那一层凑成
+        PreferenceRows.styleList(this, 14, 16);
+        PreferenceRows.animateChanges(this);
     }
 
     @Override
     public void onResume() {
         super.onResume();
         // 停在开发者选项这一页时把它关了（「关于与致谢」里关的）：这一页不能再留着，换回默认分区
-        if (!DeveloperMode.isUnlocked() && getArguments() != null
-                && SettingsShellFragment.DEVELOPER_SECTION.equals(getArguments().getString(ARG_SECTION))
-                && getParentFragment() instanceof SettingsShellFragment) {
-            ((SettingsShellFragment) getParentFragment()).showSection(SettingsShellFragment.DEFAULT_SECTION);
+        SettingsShellFragment shell = shell();
+        if (!DeveloperMode.isUnlocked() && getArguments() != null && shell != null
+                && String.valueOf(getArguments().getString(ARG_SECTION))
+                        .startsWith(SettingsShellFragment.DEVELOPER_SECTION)) {
+            shell.showSection(SettingsShellFragment.DEFAULT_SECTION);
             return;
         }
         // 开发者选项在「关于与致谢」（另一个 Activity）里开关：回来时变了就按新的状态整页重绑 ——
@@ -201,7 +213,9 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         updateSavedIn();
         refreshRearViewWindow();
         refreshOverlayRows();
-        refreshDriveSoundValue();
+        // 「详细参数」里可能换过画质；超级镜子、悬浮按钮可能在主界面的开关上拨过
+        refreshRecordQuality();
+        syncRows();
     }
 
     @Override
@@ -216,6 +230,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
 
     private void bindRecording() {
         bindCarModel();
+        bindRecordQuality();
 
         // 相机与视频流的参数（每一路的三条流、每一格的摆法）都在下面这个
         // 「编辑视频流配置」里。同一件事只留一个入口：两个入口意味着
@@ -227,19 +242,13 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         bindSwitch("pref_auto_record", appConfig.isAutoStartRecording(),
                 value -> appConfig.setAutoStartRecording(value));
 
-        // 拍照使用 JPEG 输出：锁成开，只有开发者选项开着时能改（关着时主界面在后台拍不到画面，见 AppConfig）。
-        // 没开时开着、灰着、点不动，下面写「需开启开发者选项」—— 读到的值本来就按开算（DEVELOPER_KEYS）
+        // 拍照使用 JPEG 输出：对所有人锁成开（关着时主界面在后台拍不到画面，见 AppConfig），只有开发者改得了 ——
+        // 4.0 起这一行在开发者选项里（ui-spec §十六），别的页上找不到它
         bindSwitch("pref_photo_via_jpeg", appConfig.isPhotoViaJpegEnabled(),
                 enabled -> {
                     appConfig.setPhotoViaJpegEnabled(enabled);
                     toast(getString(R.string.msg_restart_required));
                 });
-        SwitchPreferenceCompat jpeg = findPreference("pref_photo_via_jpeg");
-        if (jpeg != null && !boundUnlocked) {
-            jpeg.setEnabled(false);
-            jpeg.setSummary(getString(R.string.msg_dev_only));
-        }
-
 
         // 时间水印：时间和录制规格同开同关（项目所有者 2026-10-23），录像上的规格那一行跟着它（MultiCameraManager.planFor）
         bindSwitch("pref_watermark", appConfig.isTimestampWatermarkEnabled(),
@@ -261,39 +270,86 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     }
 
     /**
-     * 视频流配置。
-     *
-     * <p>「极氪7X（环视 + 前后座舱）」0.48 起对所有人开放：座舱那两路的旋转、镜像、
-     * 画面适配都做完并在车上验证过了，它不再是半成品。</p>
-     *
-     * <p>只有这两项（{@link SettingsRegistry#CAR_MODEL}）；「自定义」1.44.0 删了。</p>
+     * 摄像头：环视 / 环视 + 后座舱（4.0 起分段选择，ui-spec §十六）。就是原来的「视频流配置」：存的还是那两份预设
+     * （{@link SettingsRegistry#CAR_MODEL}），选了就换到另一份配置。车型这个字段另外还用来分开存相机映射
+     * （ZeekrMultiPlan.Stored）。回到主界面时生效：主界面照新的配置重新摆，接上时换管线（CameraManagerHolder）。
      */
     private void bindCarModel() {
-        ListPreference pref = findPreference("pref_car_model");
+        bindSegmented("pref_car_model", SettingsRegistry.CAR_MODEL,
+                SettingsRegistry.CAR_MODEL.sanitize(appConfig.getCarModel()), value -> {
+                    appConfig.setCarModel(value);
+                    new ProfileStore(requireContext()).select(ProfileMigration.presetIdFor(value));
+                    toast(getString(R.string.msg_stream_changed, nameOf(SettingsRegistry.CAR_MODEL, value)));
+                    // 两份配置各有各的画质：换过去以后下面那一行跟着换
+                    refreshRecordQuality();
+                });
+    }
+
+    /**
+     * 录制画质：省空间 / 均衡 / 最清晰（4.0，ui-spec §十六）。就是「详细参数」里那三档提到这一页，做的事一样
+     * （{@link com.kooo.evcam.profile.QualityPreset#applyTo}：统一设置各路的帧率和码率，记下选的是哪一档）。
+     * 亮着的是选过的那一档，单独调过某一路也一样（和那一页同一条规矩）；调过时下面的小字前面写「自定义」。
+     * 小字写每小时约多少、U 盘剩余空间约可录多久（{@link RecordingBudget}，和那一页是同一个数）。回到主界面时生效。
+     */
+    private void bindRecordQuality() {
+        SegmentedPreference pref = findPreference("pref_record_quality");
         if (pref == null) {
             return;
         }
-        String current = SettingsRegistry.CAR_MODEL.sanitize(appConfig.getCarModel());
-        String[] allValues = SettingsRegistry.CAR_MODEL.values();
-        String[] allNames = localizedNames(SettingsRegistry.CAR_MODEL);
-
-        pref.setPersistent(false);
-        pref.setEntries(allNames);
-        pref.setEntryValues(allValues);
-        pref.setValue(current);
-        pref.setSummary(pref.getEntry());
+        com.kooo.evcam.profile.QualityPreset[] presets = com.kooo.evcam.profile.QualityPreset.values();
+        CharSequence[] names = new CharSequence[presets.length];
+        String[] values = new String[presets.length];
+        for (int i = 0; i < presets.length; i++) {
+            values[i] = presets[i].key;
+            names[i] = getString(presets[i] == com.kooo.evcam.profile.QualityPreset.SAVE_SPACE
+                    ? R.string.editor_quality_space
+                    : presets[i] == com.kooo.evcam.profile.QualityPreset.SHARPEST
+                            ? R.string.editor_quality_sharp : R.string.editor_quality_balanced);
+        }
+        pref.setOptions(names, values);
+        refreshRecordQuality();
         pref.setOnPreferenceChangeListener((preference, newValue) -> {
-            String value = String.valueOf(newValue);
-            appConfig.setCarModel(value);
-            // 「切换视频流配置」的含义就是「切换到另一份配置」。车型这个字段另外还用来分开存相机映射
-            // （ZeekrMultiPlan.Stored）。回到主界面时生效：主界面照新的配置重新摆，接上时换管线（CameraManagerHolder）。
-            new ProfileStore(requireContext())
-                    .select(ProfileMigration.presetIdFor(value));
-            pref.setValue(value);
-            pref.setSummary(pref.getEntry());
-            toast(getString(R.string.msg_stream_changed, pref.getEntry()));
-            return false;
+            if (getContext() == null) {
+                return false;
+            }
+            ProfileStore store = new ProfileStore(requireContext());
+            com.kooo.evcam.profile.Profile profile = store.current();
+            com.kooo.evcam.profile.QualityPreset.fromKey(String.valueOf(newValue)).applyTo(profile);
+            store.save(profile);
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("设置变更: pref_record_quality → " + newValue);
+            pref.setNote(recordQualityNote(profile));
+            requestSync();
+            return true;
         });
+    }
+
+    /** 「录制画质」那一行照存下的配置显示：选的哪一档、每小时多少。 */
+    private void refreshRecordQuality() {
+        SegmentedPreference pref = findPreference("pref_record_quality");
+        if (pref == null || getContext() == null) {
+            return;
+        }
+        com.kooo.evcam.profile.Profile profile = new ProfileStore(requireContext()).current();
+        pref.setValue(profile.quality.key);
+        pref.setNote(recordQualityNote(profile));
+    }
+
+    private CharSequence recordQualityNote(com.kooo.evcam.profile.Profile profile) {
+        RecordingBudget budget = new RecordingBudget(requireContext(), profile);
+        long perHour = budget.bytesPerHourFor(null);
+        if (perHour <= 0) {
+            return null;
+        }
+        String size = String.format(java.util.Locale.US, "%.1f",
+                com.kooo.evcam.camera.StorageBudget.gigabytesPerHour(perHour));
+        // 只读快照，不碰盘（探测在 StorageState 的后台线程上）；没有 U 盘就不编一个「还能录多久」
+        com.kooo.evcam.storage.StorageState.Snapshot state = com.kooo.evcam.storage.StorageState.current();
+        long free = state.known && state.root != null ? state.freeBytes : 0;
+        int hours = Math.round(com.kooo.evcam.camera.StorageBudget.hours(free, perHour));
+        String text = hours > 0
+                ? getResources().getQuantityString(R.plurals.set_record_quality_hours, hours, size, String.valueOf(hours))
+                : getString(R.string.set_record_quality_per_hour, size);
+        return budget.tuned() ? getString(R.string.set_record_quality_custom, text) : text;
     }
 
     // ------------------------------------------------------------------ 存储
@@ -334,7 +390,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             com.kooo.evcam.blackbox.BlackBox.noteImportant("开关变更: pref_footage_lock_hazard → " + (on ? "开" : "关"));
             com.kooo.evcam.storage.AutoLock.get().settingsChanged(getContext());
         });
-        pref.addUnavailableOption(getString(R.string.set_footage_lock_horn_chip));
+        // 鸣笛：车上还读不到喇叭信号，4.0 起这一个附加项先不摆（改不了的不摆出来，ui-spec §三），读得到了再放出来
         // 按钮下面一行小字（项目所有者 2026-10-23）：紧急制动时车辆自己会打开双闪，所以「双闪」也接得住紧急制动
         pref.setOptionsNote(getString(R.string.set_footage_lock_hazard_note));
         pref.setOnPreferenceChangeListener((preference, newValue) -> {
@@ -581,12 +637,12 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
      * 存储上限（2026-10-23 合成一行）：行尾写录像、照片两个上限，点开一个框里填两项（GB），清理的规则写在框里。
      * 上限用 GB 存；留空或 0 表示不限制。
      */
+    /** 存储上限（值加说明，ui-spec §十六）：行尾写录像、照片两个上限，名字下面写按当前录制画质约保留多久；点开一个框里填两项。 */
     private void bindStorageLimits() {
         Preference pref = findPreference("pref_storage_limits");
         if (pref == null) {
             return;
         }
-        PreferenceRows.markValue(pref);
         showStorageLimits(pref);
         pref.setOnPreferenceClickListener(preference -> {
             editStorageLimits(pref);
@@ -595,8 +651,29 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     }
 
     private void showStorageLimits(Preference pref) {
-        pref.setSummary(getString(R.string.set_storage_limits_value,
-                describeLimit(appConfig.getVideoStorageLimitGb()), describeLimit(appConfig.getPhotoStorageLimitGb())));
+        String limits = getString(R.string.set_storage_limits_value,
+                describeLimit(appConfig.getVideoStorageLimitGb()), describeLimit(appConfig.getPhotoStorageLimitGb()));
+        if (pref instanceof ValueActionPreference) {
+            ((ValueActionPreference) pref).setValue(limits);
+            pref.setSummary(storageKeepNote());
+        } else {
+            pref.setSummary(limits);
+        }
+    }
+
+    /** 录像上限按当前录制画质折成小时：「存 10 GB」是多久，人自己算不出来。不限制、算不出每小时多少时不写。 */
+    private CharSequence storageKeepNote() {
+        int limit = appConfig.getVideoStorageLimitGb();
+        if (limit <= 0 || getContext() == null) {
+            return null;
+        }
+        long perHour = new RecordingBudget(requireContext(), new ProfileStore(requireContext()).current())
+                .bytesPerHourFor(null);
+        if (perHour <= 0) {
+            return null;
+        }
+        float hours = limit / com.kooo.evcam.camera.StorageBudget.gigabytesPerHour(perHour);
+        return getString(R.string.set_storage_limits_keep, String.format(java.util.Locale.US, "%.1f", hours));
     }
 
     /** 一个框里两个数字输入框：录像、照片（GB）。有一个填的不是数字就都不存，提示一句。 */
@@ -852,9 +929,12 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         });
         bindSwitchMode();
 
-        // 不跟着开关走：还没打开后视镜之前，也该能先看看它怎么用
-        onClick("pref_rearview_guide",
-                pref -> com.kooo.evcam.ui.RearViewGuide.show(getActivity()));
+        // 使用指南不跟着开关走：还没打开之前，也该能先看看它怎么用。4.0 起是这一页头上右边的入口（ui-spec §三「组名右边的入口」）
+        LinkCategory head = findPreference("cat_rearview");
+        if (head != null) {
+            head.setLink(getString(R.string.set_rearview_guide_title),
+                    () -> com.kooo.evcam.ui.RearViewGuide.show(getActivity()));
+        }
 
         bindFisheye();
         bindRearViewWindow();
@@ -898,6 +978,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 }
             }
             com.kooo.evcam.blackbox.BlackBox.noteImportant("设置变更: pref_rearview → " + value);
+            requestSync();
             return true;
         });
     }
@@ -1095,16 +1176,16 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     // ------------------------------------------------------------------ 盲区画面
 
     /**
-     * 超级镜子分区里的「盲区画面」一组：单独的窗口，不挂在超级镜子下面（项目所有者 2026-10-16）。「盲区画面」那一行是开关和情境
-     * 合成的分段选择（{@link #bindSideViewRow}，项目所有者 2026-11-11）；显示位置、最低车速、中控屏上的位置和大小、HUD 画面一组
-     * （原来「盲区画面」那一页的）照原来的次序排在下面、同一页，「关闭」时变灰（dependency）。
+     * 「盲区画面」分区（项目所有者 2026-11-12 从超级镜子分区里分出来）：单独的窗口，和超级镜子各管各的。左列是「盲区画面」那一行
+     * （开关和情境合成的分段选择，{@link #bindSideViewRow}）、显示位置、最低车速、中控屏上的位置和大小；右列是「HUD 画面」一组，
+     * 4.0 起四行（原来十行）：位置与大小、亮度、对比度各点开一个框，左右翻转一个开关。十个数值的范围、默认值、意思不变（ui-spec §九）。
+     * 谁出现、谁变灰在 {@link #syncRows}。
      */
     private void bindSideView() {
         bindSideViewRow();
         bindSegmented("pref_side_view_target", SettingsRegistry.SIDE_VIEW_TARGET,
                 appConfig.getSideViewTarget(), value -> {
                     appConfig.setSideViewTarget(value);
-                    syncSideViewRows();
                     SideViewService.applyConfig();
                 });
         bindSlider("pref_side_view_min_speed", 0, AppConfig.SIDE_VIEW_MAX_MIN_SPEED,
@@ -1118,47 +1199,93 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             appConfig.setHudMirrored(value);
             SideViewService.applyConfig();
         });
-        bindSlider("pref_hud_height", AppConfig.HUD_MIN_HEIGHT, AppConfig.HUD_MAX_HEIGHT, appConfig.getHudHeight(), "%",
-                value -> {
-                    appConfig.setHudHeight(value);
+        bindHudPlace();
+        bindHudPair("pref_hud_brightness", R.string.set_hud_brightness_title, this::showHudBrightness, () -> java.util.Arrays.asList(
+                hudSlider(R.string.set_hud_opacity_title, 0, AppConfig.HUD_MIN_OPACITY, 100, appConfig.getHudOpacity(),
+                        appConfig::setHudOpacity),
+                hudSlider(R.string.set_hud_night_title, R.string.set_hud_night_summary, AppConfig.HUD_MIN_NIGHT, 100,
+                        appConfig.getHudNight(), appConfig::setHudNight)));
+        bindHudPair("pref_hud_contrast_pair", R.string.set_hud_contrast_pair_title, this::showHudContrast, () -> java.util.Arrays.asList(
+                hudSlider(R.string.set_hud_contrast_title, R.string.set_hud_contrast_summary, AppConfig.HUD_MIN_CONTRAST,
+                        AppConfig.HUD_MAX_CONTRAST, appConfig.getHudContrast(), appConfig::setHudContrast),
+                hudSlider(R.string.set_hud_contrast_night_title, R.string.set_hud_contrast_night_summary,
+                        AppConfig.HUD_MIN_CONTRAST, AppConfig.HUD_MAX_CONTRAST, appConfig.getHudContrastNight(),
+                        appConfig::setHudContrastNight)));
+    }
+
+    /** HUD 画面的一根拖动条：松手时存下并推给盲区画面（每推一次要走一趟服务，不边拖边推）；取消时回到打开时的值。 */
+    private SliderDialog.Slider hudSlider(int titleRes, int noteRes, int min, int max, int current, IntSetter setter) {
+        return new SliderDialog.Slider(getString(titleRes), min, max, current, "%",
+                noteRes == 0 ? null : getString(noteRes), true, false, value -> {
+                    setter.set(value);
                     SideViewService.applyConfig();
                 });
-        bindSlider("pref_hud_shape", AppConfig.HUD_MIN_SHAPE, AppConfig.HUD_MAX_SHAPE, appConfig.getHudShape(), "%",
-                value -> {
-                    appConfig.setHudShape(value);
-                    SideViewService.applyConfig();
-                });
-        bindSlider("pref_hud_edge", 0, 100, appConfig.getHudEdge(), "%", value -> {
-            appConfig.setHudEdge(value);
-            SideViewService.applyConfig();
+    }
+
+    private interface SliderList {
+        java.util.List<SliderDialog.Slider> make();
+    }
+
+    /** HUD 画面里两根拖动条合成的一行（亮度、对比度）：行尾写两个值，点开一个框。 */
+    private void bindHudPair(String key, int titleRes, java.util.function.Consumer<ValueActionPreference> show,
+                             SliderList sliders) {
+        ValueActionPreference pref = findPreference(key);
+        if (pref == null) {
+            return;
+        }
+        show.accept(pref);
+        pref.setOnPreferenceClickListener(preference -> {
+            SliderDialog.show(requireContext(), getString(titleRes), sliders.make(), () -> show.accept(pref));
+            return true;
         });
-        bindSlider("pref_hud_vertical", 0, 100, appConfig.getHudVertical(), "%", value -> {
-            appConfig.setHudVertical(value);
-            SideViewService.applyConfig();
+    }
+
+    private void showHudBrightness(ValueActionPreference pref) {
+        pref.setValue(getString(R.string.set_hud_brightness_value, appConfig.getHudOpacity(), appConfig.getHudNight()));
+    }
+
+    private void showHudContrast(ValueActionPreference pref) {
+        pref.setValue(getString(R.string.set_hud_contrast_pair_value, appConfig.getHudContrast(),
+                appConfig.getHudContrastNight()));
+    }
+
+    /**
+     * HUD 画面的「位置与大小」（4.0，ui-spec §十六）：点开一个框，上面是 HUD 的示意（{@link HudSketchView}，左右两个画面现在在哪、多大），
+     * 下面五根拖动条：画面高度、画面形状、离边距离、上下位置、边缘渐隐。拖的时候示意当场跟着变；松手时存下并推给盲区画面。
+     * 示意只是画，不让 HUD 显示画面 —— 要在 HUD 上看效果照旧打着转向灯调。
+     */
+    private void bindHudPlace() {
+        ValueActionPreference pref = findPreference("pref_hud_place");
+        if (pref == null) {
+            return;
+        }
+        showHudPlace(pref);
+        pref.setOnPreferenceClickListener(preference -> {
+            Context context = requireContext();
+            HudSketchView sketch = new HudSketchView(context);
+            sketch.set(appConfig.getHudHeight(), appConfig.getHudShape(), appConfig.getHudEdge(),
+                    appConfig.getHudVertical(), appConfig.getHudFade());
+            java.util.List<SliderDialog.Slider> sliders = java.util.Arrays.asList(
+                    hudSlider(R.string.set_hud_height_title, R.string.set_hud_height_summary, AppConfig.HUD_MIN_HEIGHT,
+                            AppConfig.HUD_MAX_HEIGHT, appConfig.getHudHeight(), appConfig::setHudHeight)
+                            .watch(sketch::setHeightPercent),
+                    hudSlider(R.string.set_hud_shape_title, R.string.set_hud_shape_summary, AppConfig.HUD_MIN_SHAPE,
+                            AppConfig.HUD_MAX_SHAPE, appConfig.getHudShape(), appConfig::setHudShape)
+                            .watch(sketch::setShapePercent),
+                    hudSlider(R.string.set_hud_edge_title, R.string.set_hud_edge_summary, 0, 100, appConfig.getHudEdge(),
+                            appConfig::setHudEdge).watch(sketch::setEdgePercent),
+                    hudSlider(R.string.set_hud_vertical_title, R.string.set_hud_vertical_summary, 0, 100,
+                            appConfig.getHudVertical(), appConfig::setHudVertical).watch(sketch::setVerticalPercent),
+                    hudSlider(R.string.set_hud_fade_title, R.string.set_hud_fade_summary, 0, AppConfig.HUD_MAX_FADE,
+                            appConfig.getHudFade(), appConfig::setHudFade).watch(sketch::setFadePercent));
+            SliderDialog.show(context, getString(R.string.set_hud_place_title), getString(R.string.dlg_hud_place_note),
+                    sketch, sliders, () -> showHudPlace(pref));
+            return true;
         });
-        bindSlider("pref_hud_opacity", AppConfig.HUD_MIN_OPACITY, 100, appConfig.getHudOpacity(), "%", value -> {
-            appConfig.setHudOpacity(value);
-            SideViewService.applyConfig();
-        });
-        bindSlider("pref_hud_contrast", AppConfig.HUD_MIN_CONTRAST, AppConfig.HUD_MAX_CONTRAST,
-                appConfig.getHudContrast(), "%", value -> {
-                    appConfig.setHudContrast(value);
-                    SideViewService.applyConfig();
-                });
-        bindSlider("pref_hud_contrast_night", AppConfig.HUD_MIN_CONTRAST, AppConfig.HUD_MAX_CONTRAST,
-                appConfig.getHudContrastNight(), "%", value -> {
-                    appConfig.setHudContrastNight(value);
-                    SideViewService.applyConfig();
-                });
-        bindSlider("pref_hud_night", AppConfig.HUD_MIN_NIGHT, 100, appConfig.getHudNight(), "%", value -> {
-            appConfig.setHudNight(value);
-            SideViewService.applyConfig();
-        });
-        bindSlider("pref_hud_fade", 0, AppConfig.HUD_MAX_FADE, appConfig.getHudFade(), "%", value -> {
-            appConfig.setHudFade(value);
-            SideViewService.applyConfig();
-        });
-        syncSideViewRows();
+    }
+
+    private void showHudPlace(ValueActionPreference pref) {
+        pref.setValue(getString(R.string.set_hud_place_value, appConfig.getHudHeight(), appConfig.getHudEdge()));
     }
 
     /**
@@ -1226,7 +1353,6 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             } else {
                 if (!value.equals(appConfig.getSideViewMode())) {
                     appConfig.setSideViewMode(value);
-                    syncSideViewRows();
                     SideViewService.applyConfig();
                 }
                 if (!wasOn) {
@@ -1235,6 +1361,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             }
             com.kooo.evcam.blackbox.BlackBox.noteImportant("设置变更: pref_side_view → " + value);
             pref.setNote(sideViewNote(value));
+            requestSync();
             return true;
         });
     }
@@ -1265,27 +1392,6 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         return index >= 0 ? localizedNames(spec)[index] : "";
     }
 
-    /**
-     * 显示位置决定哪些可用：只有中控屏时 HUD 画面那一组不可用，只有 HUD 时最低车速、中控屏上的位置和大小不可用（只管中控屏）。
-     * 情境是简洁时最低车速也不可用：简洁里没有只打转向灯的那一种（项目所有者 2026-11-09）。
-     * 「盲区画面」是「关闭」时这些都变灰（preferences.xml 里的 dependency，和这里的不可用叠在一起）；情境换了这里跟着再对一次。
-     */
-    private void syncSideViewRows() {
-        String target = appConfig.getSideViewTarget();
-        Preference hud = findPreference("cat_side_view_hud");
-        if (hud != null) {
-            hud.setEnabled(!AppConfig.SIDE_VIEW_TARGET_CENTER.equals(target));
-        }
-        Preference minSpeed = findPreference("pref_side_view_min_speed");
-        if (minSpeed != null) {
-            minSpeed.setEnabled(!AppConfig.SIDE_VIEW_TARGET_HUD.equals(target)
-                    && !AppConfig.SIDE_VIEW_MODE_MINIMAL.equals(appConfig.getSideViewMode()));
-        }
-        Preference place = findPreference("pref_side_view_place");
-        if (place != null) {
-            place.setEnabled(!AppConfig.SIDE_VIEW_TARGET_HUD.equals(target));
-        }
-    }
 
     // ------------------------------------------------------------------ 悬浮窗
 
@@ -1296,7 +1402,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     private void bindFloating() {
         // 按钮显示出来时自己问相机管家在不在录，这里不用再推状态
         bindOverlaySwitch("pref_recording_floating", appConfig.isRecordingFloatingEnabled(),
-                OverlayCoordinator::setRecordButtonEnabled, null);
+                OverlayCoordinator::setRecordButtonEnabled, on -> requestSync());
         SwitchChipsPreference floating = findPreference("pref_recording_floating");
         if (floating != null) {
             floating.addOption(getString(R.string.set_floating_duration_title),
@@ -1608,9 +1714,12 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             });
             backup.setAction(getString(R.string.action_export), () -> SettingsBackupFlow.export(requireActivity()));
         }
-        // 车辆信号（试验性）：车机能读到的车辆信号。只在这一页开着时多读浮点和定位，离开就放掉（离散信号熄屏判断一直在读）
-        onClick("pref_vehicle_info", pref ->
-                openFragment(new VehicleInfoFragment(), R.string.set_vehicle_info_title));
+        // 「车辆信号」那一页 4.0 起只从「录制 → 行驶信息条」进（以前这里还有一个入口，两个入口进同一页）。
+        // 初始设置（再走一遍首次启动的七步，ui-spec §十五）：那七步做出来之前这一行先不摆
+        Preference firstRun = findPreference("pref_first_run");
+        if (firstRun != null) {
+            firstRun.setVisible(false);
+        }
         bindDriveSound();
 
         // 开机自启动接手全部保活手段（规格 §6）：关了就把定时任务也取消，别等它下次到点再自己退出
@@ -1989,24 +2098,211 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     // ------------------------------------------------------------------ 检查更新
 
     /**
-     * 检查更新：点那一行就查；另有一个「接收 Beta 版」开关。
-     *
-     * <p>当前版本写在那一行的说明里 —— 点之前就知道本机装的是哪个，
-     * 查完提示「已是最新」时也对得上。</p>
+     * 更新与关于（4.0，ui-spec §十六）：「检查更新」行尾写本机装的是哪个版本，点这一行或行尾的「检查」就查；
+     * 「接收的版本」三档合成一行分段 —— 存的还是原来两个开关：正式版 = 都关，Beta 版 = 只开 Beta，Alpha 版 = 都开
+     * （Beta 关着时 Alpha 本来就不算数，UpdateFlow）；「关于与致谢」点了直接打开关于页。
      */
     private void bindUpdate() {
-        androidx.preference.Preference check = findPreference("pref_check_update");
+        ValueActionPreference check = findPreference("pref_check_update");
         if (check != null && getContext() != null) {
-            check.setSummary(getString(R.string.set_check_update_summary,
+            check.setValue(getString(R.string.set_check_update_summary,
                     com.kooo.evcam.update.UpdateFlow.currentVersion(getContext())));
+            check.setAction(getString(R.string.action_check),
+                    () -> com.kooo.evcam.update.UpdateFlow.start(getActivity()));
         }
         onClick("pref_check_update",
                 pref -> com.kooo.evcam.update.UpdateFlow.start(getActivity()));
-        bindSwitch("pref_update_beta", appConfig.isUpdateBetaEnabled(),
-                value -> appConfig.setUpdateBetaEnabled(value));
-        // 随「接收 Beta 版」（XML 里的 dependency）：Beta 关着时它不可用，也不算数（UpdateFlow）
-        bindSwitch("pref_update_alpha", appConfig.isUpdateAlphaEnabled(),
-                value -> appConfig.setUpdateAlphaEnabled(value));
+
+        SegmentedPreference channel = findPreference("pref_update_channel");
+        if (channel != null) {
+            channel.setOptions(new CharSequence[] {getString(R.string.opt_channel_stable),
+                    getString(R.string.opt_channel_beta), getString(R.string.opt_channel_alpha)},
+                    new String[] {CHANNEL_STABLE, CHANNEL_BETA, CHANNEL_ALPHA});
+            String current = !appConfig.isUpdateBetaEnabled() ? CHANNEL_STABLE
+                    : appConfig.isUpdateAlphaEnabled() ? CHANNEL_ALPHA : CHANNEL_BETA;
+            channel.setValue(current);
+            channel.setSummary(channelNote(current));
+            channel.setOnPreferenceChangeListener((preference, newValue) -> {
+                String value = String.valueOf(newValue);
+                appConfig.setUpdateBetaEnabled(!CHANNEL_STABLE.equals(value));
+                appConfig.setUpdateAlphaEnabled(CHANNEL_ALPHA.equals(value));
+                com.kooo.evcam.blackbox.BlackBox.noteImportant("设置变更: pref_update_channel → " + value);
+                channel.setSummary(channelNote(value));
+                return true;
+            });
+        }
+        // 关于不是右边的一页：点了直接打开关于页
+        onClick("pref_about", pref -> startActivity(new Intent(requireContext(),
+                com.kooo.evcam.zeekr.AboutActivity.class)));
+    }
+
+    private CharSequence channelNote(String channel) {
+        return getString(CHANNEL_ALPHA.equals(channel) ? R.string.set_update_alpha_summary
+                : CHANNEL_BETA.equals(channel) ? R.string.set_update_channel_beta : R.string.set_update_channel_stable);
+    }
+
+    // ------------------------------------------------------------------ 谁出现、谁变灰、名称旁的标签
+
+    /**
+     * 哪些行出现、哪些变灰（ui-spec §三「关着收起，挡住变灰」、§十六）。规则只写在这一处，照 AppConfig 此刻的值对：
+     * 功能关着，依赖它的行不出现；功能开着、只是这一行被别的选择挡住，变灰并写明原因。XML 里不写 dependency ——
+     * 有的规则跨列（「盲区画面」那一行在左列，它管的「HUD 画面」一组在右列），两列各对各有的那几行（找不到的跳过）。
+     */
+    void syncRows() {
+        if (appConfig == null || getPreferenceScreen() == null || getContext() == null) {
+            return;
+        }
+        boolean mirror = appConfig.isRearViewEnabled();
+        show("pref_rearview_switch_mode", mirror);
+        show("pref_rearview_camera_label", mirror);
+        show("cat_rearview_window", mirror);
+
+        boolean side = appConfig.isSideViewEnabled();
+        String target = appConfig.getSideViewTarget();
+        boolean hudOnly = AppConfig.SIDE_VIEW_TARGET_HUD.equals(target);
+        boolean centerOnly = AppConfig.SIDE_VIEW_TARGET_CENTER.equals(target);
+        boolean minimal = AppConfig.SIDE_VIEW_MODE_MINIMAL.equals(appConfig.getSideViewMode());
+        show("pref_side_view_target", side);
+        show("pref_side_view_min_speed", side);
+        show("pref_side_view_place", side);
+        show("cat_side_view_hud", side);
+        // 最低车速、中控屏上的位置和大小只管中控屏；简洁里没有只打转向灯的那一种，最低车速也用不上
+        CharSequence onHud = reason(R.string.set_side_view_target_title, R.string.opt_side_view_target_hud);
+        block("pref_side_view_min_speed", hudOnly ? onHud
+                : minimal ? reason(R.string.set_side_view_title, R.string.opt_side_view_mode_minimal) : null);
+        block("pref_side_view_place", hudOnly ? onHud : null);
+        block("cat_side_view_hud", centerOnly
+                ? reason(R.string.set_side_view_target_title, R.string.opt_side_view_target_center) : null);
+
+        boolean floating = appConfig.isRecordingFloatingEnabled();
+        show("pref_floating_tap", floating);
+        show("pref_floating_long_press", floating);
+        show("pref_floating_appearance", floating);
+
+        // 灵动贴：总开关下面的都跟着它（绑定的每一台是代码里加的行，SmartButtonRows）
+        androidx.preference.PreferenceCategory buttons = findPreference("cat_smart_buttons");
+        if (buttons != null) {
+            boolean smart = appConfig.isSmartButtonsEnabled();
+            for (int i = 0; i < buttons.getPreferenceCount(); i++) {
+                Preference row = buttons.getPreference(i);
+                if (!SmartButtonRows.SWITCH_KEY.equals(row.getKey()) && row.isVisible() != smart) {
+                    row.setVisible(smart);
+                }
+            }
+        }
+
+        boolean sound = appConfig.isDriveSoundEnabled();
+        // 声音风格：四种以内摆成分段，再多用单选框（开发者选项开着时六种）
+        boolean many = SettingsRegistry.DRIVE_SOUND_STYLE.offeredTo(DeveloperMode.isUnlocked()).values().length > 4;
+        show("pref_drive_sound_style", sound && !many);
+        show("pref_drive_sound_style_all", sound && many);
+        show("pref_drive_sound_standard", sound);
+        show("pref_drive_sound_volume", sound);
+        show("pref_drive_sound_output", sound);
+    }
+
+    private void show(String key, boolean visible) {
+        Preference pref = findPreference(key);
+        if (pref != null && pref.isVisible() != visible) {
+            pref.setVisible(visible);
+        }
+    }
+
+    /** 「「显示位置」为「HUD」时不可用」这样的一句：哪一项、选的是什么。 */
+    private CharSequence reason(int settingRes, int valueRes) {
+        return getString(R.string.reason_when, getString(settingRes), getString(valueRes));
+    }
+
+    /** 每一行本来的说明（{@link #block} 在后面接原因，恢复时要用）。 */
+    private final java.util.Map<String, CharSequence> ownSummaries = new java.util.HashMap<>();
+
+    /**
+     * 这一行（或这一组）被别的选择挡住：变灰，说明后面另起一行写原因；{@code reason} 是 null 就恢复。
+     * 组的原因写在组名下面那一行小字，组里的行跟着组变灰。
+     */
+    private void block(String key, @Nullable CharSequence reason) {
+        Preference pref = findPreference(key);
+        if (pref == null) {
+            return;
+        }
+        if (!ownSummaries.containsKey(key)) {
+            ownSummaries.put(key, pref.getSummary());
+        }
+        CharSequence own = ownSummaries.get(key);
+        pref.setEnabled(reason == null);
+        pref.setSummary(reason == null ? own
+                : android.text.TextUtils.isEmpty(own) ? reason : own + "\n" + reason);
+    }
+
+    /** 试验性的功能：名称旁一个小标签（ui-spec §三「试验性标签」），名称后面不再写「（试验性）」。 */
+    private void tagExperimental() {
+        for (String key : new String[] {"pref_info_bar", "cat_smart_buttons", "cat_drive_sound", "pref_vehicle_status"}) {
+            Preference pref = findPreference(key);
+            if (pref != null && getContext() != null) {
+                pref.setTitle(com.kooo.evcam.ui.TagSpan.append(requireContext(), pref.getTitle(),
+                        R.string.tag_experimental));
+            }
+        }
+    }
+
+    /** 改了一项、别的行可能要跟着出现或变灰：等这一下点击处理完，这个分区的两列都再对一遍，左栏的状态也跟着写。 */
+    private void requestSync() {
+        android.view.View view = getView();
+        if (view == null) {
+            syncSection();
+        } else {
+            view.post(this::syncSection);
+        }
+    }
+
+    private void syncSection() {
+        if (!isAdded()) {
+            return;
+        }
+        androidx.fragment.app.Fragment parent = getParentFragment();
+        if (parent instanceof SettingsSectionFragment) {
+            ((SettingsSectionFragment) parent).syncColumns();
+        } else {
+            syncRows();
+        }
+        SettingsShellFragment shell = shell();
+        if (shell != null) {
+            shell.refreshHeaders();
+        }
+    }
+
+    /** 设置的外壳：这份列表是内容区的一列，往上找（不在两栏设置里时是 null）。 */
+    @Nullable
+    private SettingsShellFragment shell() {
+        androidx.fragment.app.Fragment parent = getParentFragment();
+        while (parent != null && !(parent instanceof SettingsShellFragment)) {
+            parent = parent.getParentFragment();
+        }
+        return (SettingsShellFragment) parent;
+    }
+
+    /**
+     * 这一列有这一行就滚到它、闪两下（从主界面、状态条点过来时，ui-spec §十四「指给你看」）；没有、或者这一行此刻收着，返回 false。
+     */
+    boolean flash(String key) {
+        Preference pref = findPreference(key);
+        androidx.recyclerview.widget.RecyclerView list = getListView();
+        if (pref == null || !pref.isVisible() || list == null) {
+            return false;
+        }
+        scrollToPreference(pref);
+        list.postDelayed(() -> {
+            if (!(list.getAdapter() instanceof androidx.preference.PreferenceGroup.PreferencePositionCallback)) {
+                return;
+            }
+            int position = ((androidx.preference.PreferenceGroup.PreferencePositionCallback) list.getAdapter())
+                    .getPreferenceAdapterPosition(pref);
+            androidx.recyclerview.widget.RecyclerView.ViewHolder holder = list.findViewHolderForAdapterPosition(position);
+            if (holder != null) {
+                com.kooo.evcam.ui.RowFlash.play(holder.itemView);
+            }
+        }, com.kooo.evcam.ui.Motion.FAST);
+        return true;
     }
 
     // ------------------------------------------------------------------ 小工具
@@ -2092,12 +2388,13 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     }
 
     /**
-     * 录制声音（设置 → 录制，2026-10-24 起正式功能、默认开）：打开时没有录音权限就先问系统，给了才打开。开关显示的是会不会真录
-     * （开着、又有权限）—— 默认开着而还没给过权限、在系统设置里收回了权限，这里都显示关着。改了之后前台服务重走一遍
-     * （带上 / 去掉麦克风类型）；录法从下一次开录起。主界面起来时还会问一次（MainActivity.requestMicrophoneIfWanted）。
+     * 录制声音（设置 → 录制）：打开时没有录音权限就先问系统，给了才打开。开关显示的是会不会真录（开着、又有权限）——
+     * 默认开着而还没给过权限、在系统设置里收回了权限，这里都显示关着。改了之后前台服务重走一遍（带上 / 去掉麦克风类型）；
+     * 录法从下一次开录起。主界面起来时还会问一次（MainActivity.requestMicrophoneIfWanted）。
+     * 麦克风来源对所有人固定为原始（项目所有者 2026-11-12），另一种在开发者选项「声音」一组里（{@link #bindDriveSound}）。
      */
     private void bindFootageAudio() {
-        SwitchNavPreference pref = findPreference("pref_footage_audio");
+        SwitchPreferenceCompat pref = findPreference("pref_footage_audio");
         if (pref == null) {
             return;
         }
@@ -2112,31 +2409,18 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             setFootageAudio(on);
             return true;
         });
-        // 麦克风来源（2026-10-23 起在这一行的下一层）：行尾写来源，点这一行选
-        showFootageAudioSource(pref);
-        pref.setOnPreferenceClickListener(preference -> {
-            SettingSpec spec = SettingsRegistry.FOOTAGE_AUDIO_SOURCE;
-            showChoice(getString(R.string.set_footage_audio_source_title), null, null, localizedNames(spec),
-                    spec.values(), spec.sanitize(appConfig.getFootageAudioSource()), value -> {
-                        appConfig.setFootageAudioSource(value);
-                        showFootageAudioSource(pref);
-                    });
-            return true;
-        });
     }
 
-    /** 录制声音那一行的行尾：来源的短名字（框里的长名字带着说明）。 */
-    private void showFootageAudioSource(SwitchNavPreference pref) {
-        boolean call = com.kooo.evcam.AppConfig.FOOTAGE_AUDIO_CALL.equals(
-                SettingsRegistry.FOOTAGE_AUDIO_SOURCE.sanitize(appConfig.getFootageAudioSource()));
-        pref.setValue(getString(call ? R.string.set_footage_audio_source_call_short
-                : R.string.set_footage_audio_source_raw_short));
-    }
 
     /**
-     * 模拟声浪（设置 → 系统，试验性；2026-10-24 从开发者选项挪来）：开关、声音风格、听感、播放喇叭、车外线路、车外音量、音量、转速变化方式、变速箱，
-     * 改了马上生效（{@code sound.DriveSound}）。2026-10-23 起开关加下一层：行尾写音量和转速变化方式，点这一行进「模拟声浪」页
-     * （preferences.xml 里嵌着的 screen_drive_sound）；那一页的几行不在这一页时 {@code findPreference} 是 null，跳过。
+     * 模拟声浪（试验性）：4.0 起在「通用」页右列一组（原来是「系统」页的一行加一页九行，ui-spec §十六）。开关一行；开着时出现
+     * 声音风格、标准模式下播放、声浪音量、播放喇叭，都是分段选择，改了马上生效（{@code sound.DriveSound}）。
+     * 声音风格所有人两种、摆成分段；开发者选项开着时六种，换成单选框（同一个设置两种摆法，{@link #syncRows} 只留一行）。
+     * 车外音量单独一组「车外喇叭」，一直在：礼让语音也用它。
+     *
+     * <p>听感、转速变化方式、变速箱、车外线路和录制声音的麦克风来源在开发者选项「声音」一组（项目所有者 2026-11-12：
+     * 对所有人固定为车内、连续、8 速自动、BUS12、原始，另一种只在那里选得到；{@code AppConfig.DEVELOPER_KEYS}）。
+     * 那一组的几行不在这一页时 {@code findPreference} 是 null，跳过。</p>
      */
     private void bindDriveSound() {
         bindSwitch("pref_drive_sound", appConfig.isDriveSoundEnabled(), value -> {
@@ -2147,45 +2431,32 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             appConfig.setDriveSoundStandardEnabled(value);
             refreshDriveSound();
         });
-        SwitchNavPreference row = findPreference("pref_drive_sound");
-        if (row != null) {
-            showDriveSound(row);
-            row.setOnPreferenceClickListener(preference -> {
-                openFragment(SettingsPreferenceFragment.forSection("screen_drive_sound"), R.string.dev_drive_sound_group);
-                return true;
-            });
-        }
-        bindEnum("pref_drive_sound_style", SettingsRegistry.DRIVE_SOUND_STYLE, appConfig.getDriveSoundStyle(),
+        bindSegmented("pref_drive_sound_style", SettingsRegistry.DRIVE_SOUND_STYLE, appConfig.getDriveSoundStyle(),
+                this::setDriveSoundStyle);
+        bindEnum("pref_drive_sound_style_all", SettingsRegistry.DRIVE_SOUND_STYLE, appConfig.getDriveSoundStyle(),
+                this::setDriveSoundStyle);
+        bindSegmented("pref_drive_sound_volume", SettingsRegistry.DRIVE_SOUND_VOLUME, appConfig.getDriveSoundVolume(),
                 value -> {
-                    appConfig.setDriveSoundStyle(value);
-                    showDriveSoundRows(value);
+                    appConfig.setDriveSoundVolume(value);
                     refreshDriveSound();
                 });
-        bindEnum("pref_drive_sound_view", SettingsRegistry.DRIVE_SOUND_VIEW, appConfig.getDriveSoundView(),
-                value -> {
-                    appConfig.setDriveSoundView(value);
-                    refreshDriveSound();
-                });
-        bindEnum("pref_drive_sound_output", SettingsRegistry.DRIVE_SOUND_OUTPUT, appConfig.getDriveSoundOutput(),
+        bindSegmented("pref_drive_sound_output", SettingsRegistry.DRIVE_SOUND_OUTPUT, appConfig.getDriveSoundOutput(),
                 value -> {
                     appConfig.setDriveSoundOutput(value);
-                    showExteriorRows(value);
                     refreshDriveSound();
                 });
-        bindEnum("pref_drive_sound_exterior_route", SettingsRegistry.DRIVE_SOUND_EXTERIOR_ROUTE,
-                appConfig.getDriveSoundExteriorRoute(), value -> {
-                    appConfig.setDriveSoundExteriorRoute(value);
-                    refreshDriveSound();
-                });
-        bindEnum("pref_drive_sound_exterior_volume", SettingsRegistry.DRIVE_SOUND_EXTERIOR_VOLUME,
+        bindSegmented("pref_drive_sound_exterior_volume", SettingsRegistry.DRIVE_SOUND_EXTERIOR_VOLUME,
                 appConfig.getDriveSoundExteriorVolume(), value -> {
                     appConfig.setDriveSoundExteriorVolume(value);
                     refreshDriveSound();
                 });
-        showExteriorRows(appConfig.getDriveSoundOutput());
-        bindEnum("pref_drive_sound_volume", SettingsRegistry.DRIVE_SOUND_VOLUME, appConfig.getDriveSoundVolume(),
+
+        // 开发者选项「声音」一组
+        bindEnum("pref_footage_audio_source", SettingsRegistry.FOOTAGE_AUDIO_SOURCE, appConfig.getFootageAudioSource(),
+                value -> appConfig.setFootageAudioSource(value));
+        bindEnum("pref_drive_sound_view", SettingsRegistry.DRIVE_SOUND_VIEW, appConfig.getDriveSoundView(),
                 value -> {
-                    appConfig.setDriveSoundVolume(value);
+                    appConfig.setDriveSoundView(value);
                     refreshDriveSound();
                 });
         bindEnum("pref_drive_sound_rpm", SettingsRegistry.DRIVE_SOUND_RPM, appConfig.getDriveSoundRpm(),
@@ -2198,7 +2469,18 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                     appConfig.setDriveSoundGearbox(value);
                     refreshDriveSound();
                 });
+        bindEnum("pref_drive_sound_exterior_route", SettingsRegistry.DRIVE_SOUND_EXTERIOR_ROUTE,
+                appConfig.getDriveSoundExteriorRoute(), value -> {
+                    appConfig.setDriveSoundExteriorRoute(value);
+                    refreshDriveSound();
+                });
         showDriveSoundRows(appConfig.getDriveSoundStyle());
+    }
+
+    private void setDriveSoundStyle(String value) {
+        appConfig.setDriveSoundStyle(value);
+        showDriveSoundRows(value);
+        refreshDriveSound();
     }
 
     /**
@@ -2216,31 +2498,8 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         }
     }
 
-    /** 「车外线路」「车外音量」只在「播放喇叭」用到车外时显示（设置值不动，换回去时还在）。 */
-    private void showExteriorRows(String output) {
-        boolean exterior = !AppConfig.DRIVE_SOUND_OUTPUT_CABIN.equals(output);
-        for (String key : new String[] {"pref_drive_sound_exterior_route", "pref_drive_sound_exterior_volume"}) {
-            Preference row = findPreference(key);
-            if (row != null) {
-                row.setVisible(exterior);
-            }
-        }
-    }
 
-    /** 模拟声浪那一行的行尾：音量和转速变化方式。 */
-    private void showDriveSound(SwitchNavPreference row) {
-        row.setValue(getString(R.string.dev_drive_sound_value,
-                nameOf(SettingsRegistry.DRIVE_SOUND_VOLUME, appConfig.getDriveSoundVolume()),
-                nameOf(SettingsRegistry.DRIVE_SOUND_RPM, appConfig.getDriveSoundRpm())));
-    }
 
-    /** 从「模拟声浪」页回来时音量、转速变化方式可能改过。 */
-    private void refreshDriveSoundValue() {
-        SwitchNavPreference row = findPreference("pref_drive_sound");
-        if (row != null && getContext() != null) {
-            showDriveSound(row);
-        }
-    }
 
     private void refreshDriveSound() {
         Context context = getContext();
@@ -2294,6 +2553,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             setter.set(on);
             // 开关什么时候被改过，黑匣子里要看得到 —— 否则一段时间线对不上当时的设置
             com.kooo.evcam.blackbox.BlackBox.noteImportant("开关变更: " + key + " → " + (on ? "开" : "关"));
+            requestSync();
             return true;
         });
     }
@@ -2316,6 +2576,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         pref.setValue(spec.sanitize(current));
         pref.setOnPreferenceChangeListener((preference, newValue) -> {
             setter.set(String.valueOf(newValue));
+            requestSync();
             return true;
         });
     }
@@ -2437,9 +2698,9 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
      */
     /** @param titleRes 这个二级界面叫什么；标题区显示它，返回时自动退回上一层的名字 */
     private void openFragment(androidx.fragment.app.Fragment fragment, int titleRes) {
-        if (getParentFragment() instanceof SettingsShellFragment) {
-            ((SettingsShellFragment) getParentFragment())
-                    .openDetail(fragment, getString(titleRes));
+        SettingsShellFragment shell = shell();
+        if (shell != null) {
+            shell.openDetail(fragment, getString(titleRes));
             return;
         }
         if (getActivity() == null) {

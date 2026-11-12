@@ -1,122 +1,97 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  设置界面的结构。
+  设置界面的结构（4.0，ui-spec §十六）。
 
-  这里只声明「有哪些设置、怎么排、互相之间的启用关系」，不声明取值 ——
-  所有 Preference 都在代码里 setPersistent(false)，读写一律走 AppConfig。
+  这里只声明「有哪些设置、怎么排」，不声明取值 —— 所有 Preference 都在代码里 setPersistent(false)，读写一律走 AppConfig。
+  AppConfig 是这些设置唯一的真相来源，它的 getter/setter 里带着夹取、默认值、迁移和联动；让 Preference 自己往
+  SharedPreferences 里写，就等于开了第二条写入路径。所以这里的 key 只是标识符，不是存储键。
 
-  这样做的理由：AppConfig 是这些设置唯一的真相来源，它的 getter/setter 里带着
-  夹取、默认值、迁移和联动。如果让 Preference 自己往 SharedPreferences 里写，
-  就等于开了第二条写入路径 —— key 一旦对不上，表现是「设置悄悄不生效」，
-  而这类问题在这个项目里已经反复出现过。所以这里的 key 只是标识符，不是存储键。
+  顶层的每个 PreferenceScreen 是一个分区（左栏的一行）。分区下面的两个 PreferenceScreen（…_left、…_right）是右边内容区的
+  左右两列（ui-spec §三「双列」）：右边按 key 各取一列出来显示（SettingsSectionFragment）。列里再用 PreferenceCategory 分组。
 
-  分区是<b>嵌套的 PreferenceScreen</b> 而不是 PreferenceCategory：
-  只有前者能被 setPreferencesFromResource(res, rootKey) 单独取出来，
-  两栏布局的右侧就是靠这个按 key 加载某一段的。
-  分区里再按用途分组用 PreferenceCategory：只是标题，不带 key（开发者选项分区的测试逐个核对 key）；
-  组名只用术语表里的词（项目所有者 2026-10-19 定的分组）。
+  谁开着才出现、谁被什么挡住变灰，不写在这里（没有 android:dependency）：规则在 SettingsPreferenceFragment.syncRows 一处，
+  因为有的规则跨列（「盲区画面」那一行在左列，它管的「HUD 画面」一组在右列）。
 -->
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
-
-    <!--
-      车机上没有系统返回键可用，侧滑抽屉在行车时也不好按，
-      所以把「返回主界面」明确放在最上面一条。
-    -->
-    <Preference
-        android:key="pref_back_to_recording"
-        android:title="@string/set_back_to_recording" />
 
     <!-- ==================== 录制 ==================== -->
     <PreferenceScreen
         android:key="screen_recording"
         android:title="@string/set_section_recording">
 
-        <PreferenceCategory
-            android:title="@string/set_group_stream">
+        <PreferenceScreen android:key="screen_recording_left">
 
-            <ListPreference
-                android:key="pref_car_model"
-                android:title="@string/set_car_model_title"
-                android:summary="%s"
-                app:useSimpleSummaryProvider="false" />
+            <PreferenceCategory android:title="@string/set_group_auto_record">
 
-            <Preference
-                android:key="pref_profile_editor"
-                android:title="@string/set_profile_editor_title"
-                android:summary="@string/set_profile_editor_summary" />
+                <!-- 「我要它一直在录」是设定状态的一部分，不是规则，所以在录制分区（lifecycle-spec §3.2） -->
+                <SwitchPreferenceCompat
+                    android:key="pref_auto_record"
+                    android:title="@string/set_auto_record_title"
+                    android:summary="@string/set_auto_record_summary" />
 
-            <!--
-              录制声音（2026-10-24 从开发者选项挪来，项目所有者：正式功能、默认开）：只给环视录像。
-              开关加下一层：行尾写麦克风来源，点这一行选。开着、没有录音权限时开关显示关（显示值 = 实际生效值）；
-              主界面起来时问一次权限，不给就关掉（MainActivity.requestMicrophoneIfWanted）
-            -->
-            <com.kooo.evcam.settings.SwitchNavPreference
-                android:key="pref_footage_audio"
-                android:title="@string/set_footage_audio_title"
-                android:summary="@string/set_footage_audio_summary" />
-        </PreferenceCategory>
+                <!-- 熄屏后还录不录。开关加下一层：行尾写熄屏后的帧率、下面一行是哨兵模式此刻开没开，点这一行选帧率 -->
+                <com.kooo.evcam.settings.SwitchNavPreference
+                    android:key="pref_screen_off_keep_recording"
+                    android:title="@string/set_screen_off_keep_title"
+                    android:summary="@string/set_screen_off_keep_summary" />
+            </PreferenceCategory>
 
-        <PreferenceCategory
-            android:title="@string/set_group_auto_record">
+            <PreferenceCategory android:title="@string/set_group_picture_sound">
 
-            <!-- 「我要它一直在录」是设定状态的一部分，不是规则，所以在录制分区（规格 §3.2） -->
-            <SwitchPreferenceCompat
-                android:key="pref_auto_record"
-                android:title="@string/set_auto_record_title"
-                android:summary="@string/set_auto_record_summary" />
+                <!-- 摄像头：环视 / 环视 + 后座舱。就是原来的「视频流配置」，存的还是那两份预设（SettingsRegistry.CAR_MODEL） -->
+                <com.kooo.evcam.settings.SegmentedPreference
+                    android:key="pref_car_model"
+                    android:title="@string/set_car_model_title" />
 
-            <!--
-              熄屏后还录不录：2026-10-19 起从「系统」挪到这里，和「启动自动录制」一组（项目所有者定；规格 lifecycle-spec 开头）。
-              2026-11-04 起开关加下一层（项目所有者）：行尾写熄屏后的帧率、下面一行是哨兵模式此刻开没开，点这一行选帧率
-            -->
-            <com.kooo.evcam.settings.SwitchNavPreference
-                android:key="pref_screen_off_keep_recording"
-                android:title="@string/set_screen_off_keep_title"
-                android:summary="@string/set_screen_off_keep_summary" />
-        </PreferenceCategory>
+                <!--
+                  录制画质：省空间 / 均衡 / 最清晰。编辑器里那三档提到这一页（profile.QualityPreset，做的事一样）；
+                  下面一行小字写每小时约多少 GB、U 盘剩余空间约可录多久（settings.RecordingBudget）
+                -->
+                <com.kooo.evcam.settings.SegmentedPreference
+                    android:key="pref_record_quality"
+                    android:title="@string/editor_quality_title" />
 
-        <!-- 组的次序：视频流、自动录制、行驶信息条、水印、拍照（项目所有者 2026-10-24 把拍照和行驶信息条对调） -->
-        <PreferenceCategory
-            android:title="@string/set_info_bar_title">
+                <!-- 详细参数：原来的「编辑视频流配置」那一页。每一路的参数、每一格的摆法只有这一个入口 -->
+                <Preference
+                    android:key="pref_profile_editor"
+                    android:title="@string/set_profile_editor_title"
+                    android:summary="@string/set_profile_editor_summary" />
 
-            <!-- 行驶信息条（试验项目）：录像下方一条车辆信号。开关加下一层：点这一行进「车辆信号」勾显示哪几项（系统页那个入口照旧） -->
-            <com.kooo.evcam.settings.SwitchNavPreference
-                android:key="pref_info_bar"
-                android:title="@string/set_info_bar_title"
-                android:summary="@string/set_info_bar_summary" />
-        </PreferenceCategory>
+                <!--
+                  录制声音：只给环视录像。开着、没有录音权限时开关显示关（显示值 = 实际生效值）。
+                  麦克风来源对所有人固定（项目所有者 2026-11-12），另一种在开发者选项里
+                -->
+                <SwitchPreferenceCompat
+                    android:key="pref_footage_audio"
+                    android:title="@string/set_footage_audio_title"
+                    android:summary="@string/set_footage_audio_summary" />
+            </PreferenceCategory>
+        </PreferenceScreen>
 
-        <!--
-          水印（项目所有者 2026-10-23 整理，ui-spec §十一）：时间和录制规格同开同关，合成「时间水印」一项；
-          车牌号水印和车牌号合成一行（开关加下一层）；应用水印挪到开发者选项。
-        -->
-        <PreferenceCategory
-            android:title="@string/set_group_stamps">
+        <PreferenceScreen android:key="screen_recording_right">
 
-            <SwitchPreferenceCompat
-                android:key="pref_watermark"
-                android:title="@string/set_watermark_title"
-                android:summaryOn="@string/set_watermark_on"
-                android:summaryOff="@string/set_watermark_off" />
+            <PreferenceCategory android:title="@string/set_group_stamps_info">
 
-            <com.kooo.evcam.settings.SwitchNavPreference
-                android:key="pref_license_plate"
-                android:title="@string/set_plate_switch_title"
-                android:summary="@string/set_plate_switch_summary" />
-        </PreferenceCategory>
+                <!-- 时间和录制规格同开同关（项目所有者 2026-10-23） -->
+                <SwitchPreferenceCompat
+                    android:key="pref_watermark"
+                    android:title="@string/set_watermark_title"
+                    android:summaryOn="@string/set_watermark_on"
+                    android:summaryOff="@string/set_watermark_off" />
 
-        <PreferenceCategory
-            android:title="@string/set_group_photo">
+                <com.kooo.evcam.settings.SwitchNavPreference
+                    android:key="pref_license_plate"
+                    android:title="@string/set_plate_switch_title"
+                    android:summary="@string/set_plate_switch_summary" />
 
-            <!-- 拍照使用 JPEG 输出：锁成开，只有开发者选项开着时能改（项目所有者 2026-10-09；行留在录制分区）。
-                 关着时照片只能从主界面的预览上截，主界面在后台时没有预览，悬浮按钮怎么拍都拍不到画面
-                 （AppConfig.isPhotoViaJpegEnabled） -->
-            <SwitchPreferenceCompat
-                android:key="pref_photo_via_jpeg"
-                android:title="@string/set_photo_jpeg_title"
-                android:summary="@string/set_photo_jpeg_summary" />
-        </PreferenceCategory>
+                <!-- 行驶信息条（试验性，名称旁带标签）：点这一行进「车辆信号」勾显示哪几项，那一页只从这里进 -->
+                <com.kooo.evcam.settings.SwitchNavPreference
+                    android:key="pref_info_bar"
+                    android:title="@string/set_info_bar_title"
+                    android:summary="@string/set_info_bar_summary" />
+            </PreferenceCategory>
+        </PreferenceScreen>
     </PreferenceScreen>
 
     <!-- ==================== 存储 ==================== -->
@@ -124,558 +99,484 @@
         android:key="screen_storage"
         android:title="@string/set_section_storage">
 
-        <!-- 这一页不分组（项目所有者 2026-10-23 删掉存储位置、自动清理、锁定影像三个小标题，ui-spec §十一） -->
-        <!--
-          存储位置（2026-10-23 整理）：这两句不再各占一行，挪进选盘的框里（选哪个盘之前正好要知道）——
-          标题下面写录像保存在哪（此刻的状态，SettingsPreferenceFragment.updateSavedIn），
-          选项下面写推荐 USB-A 口的 U 盘（说明，dialogMessage）
-        -->
-        <ListPreference
-            android:key="pref_storage_location"
-            android:title="@string/set_storage_location_title"
-            android:dialogMessage="@string/set_storage_port_note"
-            android:summary="%s" />
+        <PreferenceScreen android:key="screen_storage_left">
 
-        <!-- 存储上限（2026-10-23 合成一行）：行尾写录像、照片两个上限，点开一个框里填两项，清理的规则写在框里 -->
-        <Preference
-            android:key="pref_storage_limits"
-            android:title="@string/set_storage_limits_title" />
+            <!-- 选盘之前要知道的两句写在选盘的框里：标题下面写录像保存在哪，选项下面写推荐 USB-A 口的 U 盘 -->
+            <ListPreference
+                android:key="pref_storage_location"
+                android:title="@string/set_storage_location_title"
+                android:dialogMessage="@string/set_storage_port_note"
+                android:summary="%s" />
 
-        <!--
-          锁定影像（2026-10-23 合成一行，开关加附加项）：锁定的不被自动清理删掉（FootageLocks）；行尾写锁了多少；
-          开着时下面一排「自动锁定」按钮：闪远光（AutoLock），默认关 —— 自动锁的也占空间，锁满了就停录。
-          鸣笛：车上还读不到喇叭信号，按钮摆着、置灰按不动，读得到了再放开
-        -->
-        <com.kooo.evcam.settings.SwitchChipsPreference
-            android:key="pref_footage_lock"
-            android:title="@string/set_footage_lock_title"
-            android:summary="@string/set_footage_lock_summary" />
+            <!-- 存储上限：行尾写录像、照片两个上限，名字下面写按当前录制画质约保留多久；点开一个框里填两项 -->
+            <com.kooo.evcam.settings.ValueActionPreference
+                android:key="pref_storage_limits"
+                android:title="@string/set_storage_limits_title" />
+
+            <!-- 锁定影像（开关加附加项）：开着时下面一排「自动锁定」：闪远光、双闪。鸣笛等读得到喇叭信号再摆出来 -->
+            <com.kooo.evcam.settings.SwitchChipsPreference
+                android:key="pref_footage_lock"
+                android:title="@string/set_footage_lock_title"
+                android:summary="@string/set_footage_lock_summary" />
+        </PreferenceScreen>
+
+        <!-- 右列现在空着（U 盘用量条做出来时放这里） -->
+        <PreferenceScreen android:key="screen_storage_right" />
     </PreferenceScreen>
 
-    <!--
-      ==================== 超级镜子 ====================
-      分三组，各有小标题：超级镜子、盲区画面、HUD 画面（项目所有者 2026-11-11；2026-10-23 起不分组）。
-      「超级镜子」「盲区画面」那一行是开关合进分段（ui-spec §三）：行尾第一段「关闭」，再是几档；选中「关闭」时写着
-      dependency 指向它的几行变灰，和开关关着一样（SegmentedPreference.setOffValue）。
-    -->
+    <!-- ==================== 超级镜子 ==================== -->
     <PreferenceScreen
         android:key="screen_rearview"
         android:title="@string/set_section_rearview">
 
-        <PreferenceCategory android:title="@string/set_section_rearview">
+        <PreferenceScreen android:key="screen_rearview_left">
 
-            <!-- 不依赖开关：没打开后视镜之前，也该能先看看它怎么用 -->
-            <Preference
-                android:key="pref_rearview_guide"
-                android:title="@string/set_rearview_guide_title"
-                android:summary="@string/set_rearview_guide_summary" />
+            <!-- 不写组名；这一行的右边是「使用指南」（不依赖开关：没打开之前也该能先看看怎么用） -->
+            <com.kooo.evcam.settings.LinkCategory android:key="cat_rearview">
 
-            <!--
-              超级镜子：关闭 / 四向 / 前后 / 后视 + 后座舱（项目所有者 2026-11-11，开关和切换范围合成一行；切换范围 2026-10-19
-              取代「只显示前后视」开关）。存的还是开没开和切换范围两样（SettingsPreferenceFragment.bindRearViewRow）。
-            -->
-            <com.kooo.evcam.settings.SegmentedPreference
-                android:key="pref_rearview"
-                android:title="@string/set_section_rearview" />
+                <!-- 超级镜子：关闭 / 四向 / 前后 / 后视 + 后座舱（开关合进分段，存的还是开没开和切换范围两样） -->
+                <com.kooo.evcam.settings.SegmentedPreference
+                    android:key="pref_rearview"
+                    android:title="@string/set_section_rearview" />
 
-            <!-- 方向标签：2026-10-23 起是超级镜子那一行的附加项，那一行改成分段以后单独一行（2026-11-11） -->
-            <SwitchPreferenceCompat
-                android:key="pref_rearview_camera_label"
-                android:dependency="pref_rearview"
-                android:title="@string/set_rearview_camera_label_title"
-                android:summary="@string/set_rearview_camera_label_summary" />
+                <!-- 切换方式：滑动切换 / 点按切换。存的还是那个开关（AppConfig.isRearViewButtonMode） -->
+                <com.kooo.evcam.settings.SegmentedPreference
+                    android:key="pref_rearview_switch_mode"
+                    android:title="@string/set_rearview_switch_mode_title" />
 
-            <!--
-              切换方式：滑动切换 / 点按切换，二选一，默认滑动切换（项目所有者 2026-10-23；原来的「按键模式」开关 ——
-              点按切换时横划不换路，两样本来就只能用一样）。存的还是那个开关（AppConfig.isRearViewButtonMode）
-            -->
-            <com.kooo.evcam.settings.SegmentedPreference
-                android:key="pref_rearview_switch_mode"
-                android:dependency="pref_rearview"
-                android:title="@string/set_rearview_switch_mode_title" />
+                <SwitchPreferenceCompat
+                    android:key="pref_rearview_camera_label"
+                    android:title="@string/set_rearview_camera_label_title"
+                    android:summary="@string/set_rearview_camera_label_summary" />
+            </com.kooo.evcam.settings.LinkCategory>
+        </PreferenceScreen>
 
-            <!-- 鱼眼校正（2026-10-23 和视野角度合成一行，开关加下一层）：行尾写视野角度，点这一行在框里拖 -->
-            <com.kooo.evcam.settings.SwitchNavPreference
-                android:key="pref_rearview_fisheye"
-                android:dependency="pref_rearview"
-                android:title="@string/set_rearview_fisheye_title"
-                android:summary="@string/set_rearview_fisheye_summary" />
+        <PreferenceScreen android:key="screen_rearview_right">
 
-            <!--
-              窗口（2026-10-23 宽度、高度、重置合成一行，值加一个按钮）：行尾写宽和高；点这一行在整个屏幕上调
-              （zeekr.RearViewWindowEditor），行尾「重置」= 原来的「重置窗口与画面」（先问一句）
-            -->
-            <com.kooo.evcam.settings.ValueActionPreference
-                android:key="pref_rearview_window"
-                android:dependency="pref_rearview"
-                android:title="@string/set_group_window"
-                android:summary="@string/set_rearview_window_summary" />
-        </PreferenceCategory>
+            <PreferenceCategory
+                android:key="cat_rearview_window"
+                android:title="@string/set_group_window">
 
-        <!--
-          盲区画面：单独的窗口，不挂在超级镜子下面 —— 两个窗口各管各的（项目所有者 2026-10-16）。
-          那一行：关闭 / 丰富 / 标准 / 简洁（项目所有者 2026-11-11，开关和情境合成一行），说明下面一行小字说选中的这一档
-          什么时候显示。原来「盲区画面」页的选项照原来的次序排在下面（2026-11-11），「关闭」时变灰（dependency）；
-          哪些可用另看显示位置、情境（SettingsPreferenceFragment.syncSideViewRows）。
-        -->
-        <PreferenceCategory android:title="@string/set_side_view_title">
+                <!-- 鱼眼校正（开关加下一层）：行尾写视野角度，点这一行在框里拖 -->
+                <com.kooo.evcam.settings.SwitchNavPreference
+                    android:key="pref_rearview_fisheye"
+                    android:title="@string/set_rearview_fisheye_title"
+                    android:summary="@string/set_rearview_fisheye_summary" />
 
+                <!-- 窗口（值加一个按钮）：行尾写宽和高；点这一行在整个屏幕上调，行尾「重置」先问一句 -->
+                <com.kooo.evcam.settings.ValueActionPreference
+                    android:key="pref_rearview_window"
+                    android:title="@string/set_group_window"
+                    android:summary="@string/set_rearview_window_summary" />
+            </PreferenceCategory>
+        </PreferenceScreen>
+    </PreferenceScreen>
+
+    <!-- ==================== 盲区画面 ==================== -->
+    <!-- 项目所有者 2026-11-12：从「超级镜子」分区里分出来，单独一个分区。单独的窗口，和超级镜子各管各的 -->
+    <PreferenceScreen
+        android:key="screen_side_view"
+        android:title="@string/set_side_view_title">
+
+        <PreferenceScreen android:key="screen_side_view_left">
+
+            <!-- 盲区画面：关闭 / 丰富 / 标准 / 简洁（开关合进分段），说明下面一行小字说选中的这一档什么时候显示 -->
             <com.kooo.evcam.settings.SegmentedPreference
                 android:key="pref_side_view"
                 android:title="@string/set_side_view_title"
                 android:summary="@string/set_side_view_summary" />
 
-            <!-- 显示位置：中控屏 / HUD / 中控屏和 HUD，摆在行里点一次（2026-10-21，默认两处） -->
+            <!-- 显示位置：中控屏 / HUD / 中控屏和 HUD -->
             <com.kooo.evcam.settings.SegmentedPreference
                 android:key="pref_side_view_target"
-                android:dependency="pref_side_view"
                 android:title="@string/set_side_view_target_title" />
 
-            <!-- 只管中控屏：显示位置是「HUD」时不可用 -->
+            <!-- 只管中控屏：显示位置是「HUD」、或情境是「简洁」时变灰，写明原因 -->
             <SeekBarPreference
                 android:key="pref_side_view_min_speed"
-                android:dependency="pref_side_view"
                 android:title="@string/set_side_view_min_speed_title"
                 android:summary="@string/set_side_view_min_speed_summary"
                 app:showSeekBarValue="true" />
 
-            <!--
-              中控屏上的位置和大小（2026-11-03，值加一个按钮）：行尾写左侧那个的宽和高、「重置」；点这一行在整个屏幕上调
-              左右两个框（zeekr.SideViewPlacementEditor）。调盲区画面位置和大小只有这里。显示位置是「HUD」时不可用。
-            -->
+            <!-- 中控屏上的位置和大小（值加一个按钮）：点这一行在整个屏幕上调左右两个框。显示位置是「HUD」时变灰 -->
             <com.kooo.evcam.settings.ValueActionPreference
                 android:key="pref_side_view_place"
-                android:dependency="pref_side_view"
                 android:title="@string/set_side_view_place_title"
                 android:summary="@string/set_side_view_place_summary" />
-        </PreferenceCategory>
+        </PreferenceScreen>
 
-        <!--
-          HUD 上的盲区画面（2026-10-21）：大小、位置和样子；拉直、视野、朝向和中控屏共用。默认值照 FerixzTanz 在他 7X 上调的。
-          显示位置是「中控屏」时整组不可用。
-        -->
-        <PreferenceCategory
-            android:key="cat_side_view_hud"
-            android:dependency="pref_side_view"
-            android:title="@string/set_group_side_view_hud">
-
-            <SwitchPreferenceCompat
-                android:key="pref_hud_mirror"
-                android:title="@string/set_hud_mirror_title"
-                android:summary="@string/set_hud_mirror_summary" />
-
-            <SeekBarPreference
-                android:key="pref_hud_height"
-                android:title="@string/set_hud_height_title"
-                android:summary="@string/set_hud_height_summary"
-                app:showSeekBarValue="true" />
-
-            <SeekBarPreference
-                android:key="pref_hud_shape"
-                android:title="@string/set_hud_shape_title"
-                android:summary="@string/set_hud_shape_summary"
-                app:showSeekBarValue="true" />
-
-            <SeekBarPreference
-                android:key="pref_hud_edge"
-                android:title="@string/set_hud_edge_title"
-                android:summary="@string/set_hud_edge_summary"
-                app:showSeekBarValue="true" />
-
-            <SeekBarPreference
-                android:key="pref_hud_vertical"
-                android:title="@string/set_hud_vertical_title"
-                android:summary="@string/set_hud_vertical_summary"
-                app:showSeekBarValue="true" />
-
-            <SeekBarPreference
-                android:key="pref_hud_opacity"
-                android:title="@string/set_hud_opacity_title"
-                app:showSeekBarValue="true" />
-
-            <SeekBarPreference
-                android:key="pref_hud_contrast"
-                android:title="@string/set_hud_contrast_title"
-                android:summary="@string/set_hud_contrast_summary"
-                app:showSeekBarValue="true" />
-
-            <SeekBarPreference
-                android:key="pref_hud_contrast_night"
-                android:title="@string/set_hud_contrast_night_title"
-                android:summary="@string/set_hud_contrast_night_summary"
-                app:showSeekBarValue="true" />
-
-            <SeekBarPreference
-                android:key="pref_hud_night"
-                android:title="@string/set_hud_night_title"
-                android:summary="@string/set_hud_night_summary"
-                app:showSeekBarValue="true" />
-
-            <SeekBarPreference
-                android:key="pref_hud_fade"
-                android:title="@string/set_hud_fade_title"
-                android:summary="@string/set_hud_fade_summary"
-                app:showSeekBarValue="true" />
-        </PreferenceCategory>
-    </PreferenceScreen>
-
-    <!-- ==================== 悬浮键与灵动贴 ==================== -->
-    <!--
-      2026-10-30 这一页多了灵动贴（项目所有者）：页名「悬浮键与灵动贴」（只改页名这一处，别处照旧叫「悬浮按钮」）；
-      页里两组，各有小标题：「悬浮按钮」「灵动贴（试验性）」
-    -->
-    <PreferenceScreen
-        android:key="screen_floating"
-        android:title="@string/set_section_floating_page">
-
-        <!--
-          悬浮按钮（2026-10-23 整理）：总开关一行，开着时下面「录制时长」「锁定位置」两个附加项（原来各占一行）
-        -->
-        <PreferenceCategory
-            android:key="cat_floating_button"
-            android:title="@string/set_section_floating">
-
-            <com.kooo.evcam.settings.SwitchChipsPreference
-                android:key="pref_recording_floating"
-                android:title="@string/set_section_floating"
-                android:summary="@string/set_recording_floating_summary" />
-
-            <ListPreference
-                android:key="pref_floating_tap"
-                android:dependency="pref_recording_floating"
-                android:title="@string/set_floating_tap_title" />
-
-            <ListPreference
-                android:key="pref_floating_long_press"
-                android:dependency="pref_recording_floating"
-                android:title="@string/set_floating_long_press_title" />
+        <PreferenceScreen android:key="screen_side_view_right">
 
             <!--
-              外观（2026-10-23 按钮大小、透明度、时长文字大小合成一行，值加一个按钮）：行尾写大小和透明度，点这一行在一个框里拖、
-              按钮当场跟着变（SliderDialog）；行尾「重置」= 原来的「重置悬浮按钮」，位置也回去，所以先问一句
+              HUD 画面：原来十行，4.0 合成四行（ui-spec §十六）。十个数值的范围、默认值、意思不变（ui-spec §九）。
+              盲区画面开着才出现；显示位置是「中控屏」时整组变灰，原因写在组名下面
             -->
-            <com.kooo.evcam.settings.ValueActionPreference
-                android:key="pref_floating_appearance"
-                android:dependency="pref_recording_floating"
-                android:title="@string/set_group_appearance" />
-        </PreferenceCategory>
+            <PreferenceCategory
+                android:key="cat_side_view_hud"
+                android:title="@string/set_group_side_view_hud">
 
-        <!--
-          灵动贴（试验性，2026-10-30 从 zeekr-shortcut-lab 搬来，button.SmartButtons）：总开关一行（2026-11-04：关着时不扫描蓝牙）；
-          「绑定灵动贴」一行（2026-11-04 代替「搜索灵动贴」）；绑定的每一台一行（SmartButtonRows 在代码里加：说明写单击、双击各做什么，
-          下面一行版本和序列号，行尾电量和「删除」，点这一行改单击、双击）。总开关关着时下面几行灰着
-        -->
-        <PreferenceCategory
-            android:key="cat_smart_buttons"
-            android:title="@string/set_group_smart_button">
+                <!-- 位置与大小：点开示意框，五根拖动条（画面高度、画面形状、离边距离、上下位置、边缘渐隐） -->
+                <com.kooo.evcam.settings.ValueActionPreference
+                    android:key="pref_hud_place"
+                    android:title="@string/set_hud_place_title" />
 
-            <SwitchPreferenceCompat
-                android:key="pref_smart_buttons"
-                android:title="@string/set_smart_buttons_title"
-                android:summary="@string/set_smart_buttons_summary" />
+                <!-- 亮度：画面透明度、夜间亮度 -->
+                <com.kooo.evcam.settings.ValueActionPreference
+                    android:key="pref_hud_brightness"
+                    android:title="@string/set_hud_brightness_title" />
 
-            <Preference
-                android:key="pref_smart_button_bind"
-                android:dependency="pref_smart_buttons"
-                android:title="@string/set_smart_button_bind_title"
-                android:summary="@string/set_smart_button_bind_summary" />
-        </PreferenceCategory>
-    </PreferenceScreen>
+                <!-- 对比度：白天、夜间 -->
+                <com.kooo.evcam.settings.ValueActionPreference
+                    android:key="pref_hud_contrast_pair"
+                    android:title="@string/set_hud_contrast_pair_title" />
 
-    <!-- ==================== 界面 ==================== -->
-    <PreferenceScreen
-        android:key="screen_interface"
-        android:title="@string/set_section_interface">
-
-        <ListPreference
-            android:key="pref_language"
-            android:title="@string/set_language_title"
-            android:summary="%s" />
-
-        <!-- 2026-10-23 起这一页不分组 -->
-        <!-- 两个选项：摆在行里点一次，不弹框 -->
-        <com.kooo.evcam.settings.SegmentedPreference
-            android:key="pref_rail_side"
-            android:title="@string/set_rail_side_title" />
-
-        <SwitchPreferenceCompat
-            android:key="pref_recording_stats"
-            android:title="@string/set_recording_stats_title"
-            android:summary="@string/set_recording_stats_summary" />
-
-        <SwitchPreferenceCompat
-            android:key="pref_reduce_motion"
-            android:title="@string/set_reduce_motion_title"
-            android:summary="@string/set_reduce_motion_summary" />
-
-        <!--
-          鱼眼校正（2026-10-23 校正方式和校正视野合成一行）：管主界面预览、照片回放、录像回放里那个鱼眼按钮怎么校正
-          （开关在那个按钮上，这里只管「怎么校正」）。行尾写方式和视野；点这一行，框里选方式、拖视野 ——
-          两种投影的视野上限不同，拖动条跟着方式变
-        -->
-        <com.kooo.evcam.settings.ValueActionPreference
-            android:key="pref_fisheye"
-            android:title="@string/set_rearview_fisheye_title"
-            android:summary="@string/set_fisheye_scope_summary" />
-    </PreferenceScreen>
-
-    <!-- ==================== 系统 ==================== -->
-    <PreferenceScreen
-        android:key="screen_system"
-        android:title="@string/set_section_system">
-
-        <!-- 这个分区只回答两个问题（规格 §0）：App 不在了要不要自己回来；熄屏算不算出状况 -->
-        <SwitchPreferenceCompat
-            android:key="pref_auto_start"
-            android:defaultValue="true"
-            android:title="@string/set_auto_start_title"
-            android:summary="@string/set_auto_start_summary" />
-
-        <Preference
-            android:key="pref_diagnostics"
-            android:title="@string/set_diagnostics_title"
-            android:summary="@string/set_diagnostics_summary" />
-
-        <!--
-          设置备份（2026-10-23 导出、导入合成一行，值加一个按钮）：和诊断报告放在同一个文件夹。点这一行导入
-          （说明写着能导入哪个大版本的文件，由代码填），行尾「导出」
-        -->
-        <com.kooo.evcam.settings.ValueActionPreference
-            android:key="pref_settings_backup"
-            android:title="@string/set_settings_backup_title" />
-
-        <!-- 车辆信号（试验性，2026-10-23 由「系统信息」改名）：车机能读到的车辆信号；勾上的显示在行驶信息条上 -->
-        <Preference
-            android:key="pref_vehicle_info"
-            android:title="@string/set_vehicle_info_title"
-            android:summary="@string/set_vehicle_info_summary" />
-
-        <!--
-          模拟声浪（试验性；项目所有者 2026-10-21 定，2026-10-24 从开发者选项挪来，保留试验性的标注）：
-          运动、标准模式下合成发动机声（sound.DriveSound）。开关加下一层：行尾写音量和转速变化方式，点这一行进下面的「模拟声浪」页
-        -->
-        <com.kooo.evcam.settings.SwitchNavPreference
-            android:key="pref_drive_sound"
-            android:title="@string/dev_drive_sound_title"
-            android:summary="@string/dev_drive_sound_summary" />
-
-        <!--
-          模拟声浪的下一层（嵌着的 PreferenceScreen，上一层不列成一行，见 SettingsPreferenceFragment.hideSubPages）。
-          和开关不在同一页，不写 dependency
-        -->
-        <PreferenceScreen
-            android:key="screen_drive_sound"
-            android:title="@string/dev_drive_sound_group">
-
-            <!-- 标准模式下播放（项目所有者 2026-10-24，默认关，像更新页的「接收 Alpha 版」）：关着时标准模式没有声浪 -->
-            <SwitchPreferenceCompat
-                android:key="pref_drive_sound_standard"
-                android:title="@string/dev_drive_sound_standard_title"
-                android:summary="@string/dev_drive_sound_standard_summary" />
-
-            <ListPreference
-                android:key="pref_drive_sound_style"
-                android:title="@string/dev_drive_sound_style_title"
-                android:summary="%s" />
-
-            <ListPreference
-                android:key="pref_drive_sound_view"
-                android:title="@string/dev_drive_sound_view_title"
-                android:summary="%s" />
-
-            <ListPreference
-                android:key="pref_drive_sound_output"
-                android:title="@string/dev_drive_sound_output_title"
-                android:summary="%s" />
-
-            <ListPreference
-                android:key="pref_drive_sound_exterior_route"
-                android:title="@string/dev_drive_sound_route_title"
-                android:summary="%s" />
-
-            <ListPreference
-                android:key="pref_drive_sound_exterior_volume"
-                android:title="@string/dev_drive_sound_exterior_volume_title"
-                android:summary="%s" />
-
-            <ListPreference
-                android:key="pref_drive_sound_volume"
-                android:title="@string/dev_drive_sound_volume_title"
-                android:summary="%s" />
-
-            <ListPreference
-                android:key="pref_drive_sound_rpm"
-                android:title="@string/dev_drive_sound_rpm_title"
-                android:summary="%s" />
-
-            <ListPreference
-                android:key="pref_drive_sound_gearbox"
-                android:title="@string/dev_drive_sound_gearbox_title"
-                android:summary="%s" />
+                <SwitchPreferenceCompat
+                    android:key="pref_hud_mirror"
+                    android:title="@string/set_hud_mirror_title"
+                    android:summary="@string/set_hud_mirror_summary" />
+            </PreferenceCategory>
         </PreferenceScreen>
     </PreferenceScreen>
 
+    <!-- ==================== 按键 ==================== -->
+    <PreferenceScreen
+        android:key="screen_floating"
+        android:title="@string/set_section_keys">
+
+        <PreferenceScreen android:key="screen_floating_left">
+
+            <PreferenceCategory
+                android:key="cat_floating_button"
+                android:title="@string/set_section_floating">
+
+                <!-- 悬浮按钮（开关加附加项）：附加项「录制时长」「锁定位置」 -->
+                <com.kooo.evcam.settings.SwitchChipsPreference
+                    android:key="pref_recording_floating"
+                    android:title="@string/set_section_floating"
+                    android:summary="@string/set_recording_floating_summary" />
+
+                <ListPreference
+                    android:key="pref_floating_tap"
+                    android:title="@string/set_floating_tap_title" />
+
+                <ListPreference
+                    android:key="pref_floating_long_press"
+                    android:title="@string/set_floating_long_press_title" />
+
+                <!-- 外观（值加一个按钮）：点这一行三根拖动条一个框，行尾「重置」位置也回去，先问一句 -->
+                <com.kooo.evcam.settings.ValueActionPreference
+                    android:key="pref_floating_appearance"
+                    android:title="@string/set_group_appearance" />
+            </PreferenceCategory>
+        </PreferenceScreen>
+
+        <PreferenceScreen android:key="screen_floating_right">
+
+            <!-- 灵动贴（试验性，组名旁带标签）：总开关；绑定的每一台一行（代码里加，SmartButtonRows）；绑定灵动贴 -->
+            <PreferenceCategory
+                android:key="cat_smart_buttons"
+                android:title="@string/set_smart_buttons_title">
+
+                <SwitchPreferenceCompat
+                    android:key="pref_smart_buttons"
+                    android:title="@string/set_smart_buttons_title"
+                    android:summary="@string/set_smart_buttons_summary" />
+
+                <Preference
+                    android:key="pref_smart_button_bind"
+                    android:title="@string/set_smart_button_bind_title"
+                    android:summary="@string/set_smart_button_bind_summary" />
+            </PreferenceCategory>
+        </PreferenceScreen>
+    </PreferenceScreen>
+
+    <!-- ==================== 通用 ==================== -->
+    <!-- 原来的「界面」「系统」两页合成这一页；声音收在这里（项目所有者 2026-11-12） -->
+    <PreferenceScreen
+        android:key="screen_general"
+        android:title="@string/set_section_general">
+
+        <PreferenceScreen android:key="screen_general_left">
+
+            <SwitchPreferenceCompat
+                android:key="pref_auto_start"
+                android:defaultValue="true"
+                android:title="@string/set_auto_start_title"
+                android:summary="@string/set_auto_start_summary" />
+
+            <ListPreference
+                android:key="pref_language"
+                android:title="@string/set_language_title"
+                android:summary="%s" />
+
+            <com.kooo.evcam.settings.SegmentedPreference
+                android:key="pref_rail_side"
+                android:title="@string/set_rail_side_title" />
+
+            <PreferenceCategory android:title="@string/set_group_display">
+
+                <!-- 管主界面预览、照片回放、录像回放里「鱼眼校正」开着时怎么校正；开关是主界面动作栏上那一块 -->
+                <com.kooo.evcam.settings.ValueActionPreference
+                    android:key="pref_fisheye"
+                    android:title="@string/set_rearview_fisheye_title"
+                    android:summary="@string/set_fisheye_scope_summary" />
+
+                <SwitchPreferenceCompat
+                    android:key="pref_recording_stats"
+                    android:title="@string/set_recording_stats_title"
+                    android:summary="@string/set_recording_stats_summary" />
+
+                <SwitchPreferenceCompat
+                    android:key="pref_reduce_motion"
+                    android:title="@string/set_reduce_motion_title"
+                    android:summary="@string/set_reduce_motion_summary" />
+            </PreferenceCategory>
+
+            <PreferenceCategory android:title="@string/set_group_maintenance">
+
+                <!-- 设置备份（值加一个按钮）：点这一行导入，行尾「导出」 -->
+                <com.kooo.evcam.settings.ValueActionPreference
+                    android:key="pref_settings_backup"
+                    android:title="@string/set_settings_backup_title" />
+
+                <Preference
+                    android:key="pref_diagnostics"
+                    android:title="@string/set_diagnostics_title"
+                    android:summary="@string/set_diagnostics_summary" />
+
+                <!-- 初始设置：再走一遍首次启动的七步（ui-spec §十五） -->
+                <Preference
+                    android:key="pref_first_run"
+                    android:title="@string/set_first_run_title"
+                    android:summary="@string/set_first_run_summary" />
+            </PreferenceCategory>
+        </PreferenceScreen>
+
+        <PreferenceScreen android:key="screen_general_right">
+
+            <!--
+              模拟声浪（试验性，组名旁带标签）：原来是「系统」页的一行加一页九行，4.0 起都在这里，关着时只有第一行。
+              听感、转速变化方式、变速箱、车外线路对所有人固定，另一种在开发者选项里（项目所有者 2026-11-12）
+            -->
+            <PreferenceCategory
+                android:key="cat_drive_sound"
+                android:title="@string/dev_drive_sound_title">
+
+                <SwitchPreferenceCompat
+                    android:key="pref_drive_sound"
+                    android:title="@string/dev_drive_sound_title"
+                    android:summary="@string/dev_drive_sound_summary" />
+
+                <!-- 所有人两种，分段；开发者选项开着时六种，换成单选框（代码里换，SettingsPreferenceFragment.bindDriveSound） -->
+                <com.kooo.evcam.settings.SegmentedPreference
+                    android:key="pref_drive_sound_style"
+                    android:title="@string/dev_drive_sound_style_title" />
+
+                <ListPreference
+                    android:key="pref_drive_sound_style_all"
+                    android:title="@string/dev_drive_sound_style_title"
+                    android:summary="%s" />
+
+                <SwitchPreferenceCompat
+                    android:key="pref_drive_sound_standard"
+                    android:title="@string/dev_drive_sound_standard_title"
+                    android:summary="@string/dev_drive_sound_standard_summary" />
+
+                <com.kooo.evcam.settings.SegmentedPreference
+                    android:key="pref_drive_sound_volume"
+                    android:title="@string/dev_drive_sound_volume_title" />
+
+                <com.kooo.evcam.settings.SegmentedPreference
+                    android:key="pref_drive_sound_output"
+                    android:title="@string/dev_drive_sound_output_title" />
+            </PreferenceCategory>
+
+            <!-- 车外喇叭：礼让语音和车外播放的模拟声浪共用，所以单独一组、一直在（不跟着模拟声浪收起） -->
+            <PreferenceCategory
+                android:key="cat_exterior_speaker"
+                android:title="@string/set_group_exterior_speaker"
+                android:summary="@string/set_group_exterior_speaker_note">
+
+                <com.kooo.evcam.settings.SegmentedPreference
+                    android:key="pref_drive_sound_exterior_volume"
+                    android:title="@string/dev_drive_sound_exterior_volume_title" />
+            </PreferenceCategory>
+        </PreferenceScreen>
+    </PreferenceScreen>
+
+    <!-- ==================== 更新与关于 ==================== -->
+    <PreferenceScreen
+        android:key="screen_update"
+        android:title="@string/set_section_update_about">
+
+        <PreferenceScreen android:key="screen_update_left">
+
+            <!-- 检查更新（值加一个按钮）：行尾写当前版本，按钮「检查」 -->
+            <com.kooo.evcam.settings.ValueActionPreference
+                android:key="pref_check_update"
+                android:title="@string/set_check_update_title" />
+
+            <!-- 接收的版本：正式版 / Beta 版 / Alpha 版。存的还是原来两个开关（AppConfig.isUpdateBetaEnabled / isUpdateAlphaEnabled） -->
+            <com.kooo.evcam.settings.SegmentedPreference
+                android:key="pref_update_channel"
+                android:title="@string/set_update_channel_title" />
+
+            <!-- 关于不是分区里的一页：点了直接打开关于页 -->
+            <Preference
+                android:key="pref_about"
+                android:title="@string/set_section_about" />
+        </PreferenceScreen>
+
+        <PreferenceScreen android:key="screen_update_right" />
+    </PreferenceScreen>
+
     <!--
-      开发者选项。默认整块隐藏，在「关于与致谢」里点击「安全须知」再输密码才出现，
-      重启、更新都不会关（见 DeveloperMode）—— 里面要么是没做完的，要么是排查用的。
-      关闭后整块隐藏，里面的设置按没存过算（AppConfig.DEVELOPER_KEYS）。
+      ==================== 开发者选项 ====================
+      藏着，解锁后才有。关着时这里的设置一律按默认值算、存着的值不动（AppConfig.DEVELOPER_KEYS；
+      DeveloperSettingsTest 对着这一段逐行核对）。组名不带 key。
     -->
     <PreferenceScreen
         android:key="screen_developer"
         android:title="@string/set_section_developer">
 
-        <Preference
-            android:key="pref_permissions"
-            android:title="@string/dev_permissions_title"
-            android:summary="@string/dev_permissions_summary" />
+        <PreferenceScreen android:key="screen_developer_left">
 
-        <!--
-          车辆状态（2026-10-23 从界面页挪来）：2026-10-24 模拟声浪挪去系统页后「试验性功能」组只剩它，
-          组去掉（一组一行的不成组，ui-spec §三），放在最上面
-        -->
-        <SwitchPreferenceCompat
-            android:key="pref_vehicle_status"
-            android:title="@string/set_vehicle_status_title"
-            android:summary="@string/set_vehicle_status_summary" />
+            <Preference
+                android:key="pref_permissions"
+                android:title="@string/dev_permissions_title"
+                android:summary="@string/dev_permissions_summary" />
 
-        <PreferenceCategory
-            android:title="@string/set_section_recording">
-
-            <!-- 原来「高级」里的那几项：录制管线、编码、画面调节、相机映射、调试日志 ——
-                 都是排查问题时才动的东西，和开发者工具放在一起 -->
-            <ListPreference
-                android:key="pref_recording_mode"
-                android:title="@string/set_recording_mode_title"
-                android:summary="%s" />
-
+            <!-- 车辆状态（试验性，名称旁带标签） -->
             <SwitchPreferenceCompat
-                android:key="pref_force_h264"
-                android:title="@string/set_force_h264_title"
-                android:summary="@string/set_force_h264_summary" />
+                android:key="pref_vehicle_status"
+                android:title="@string/set_vehicle_status_title"
+                android:summary="@string/set_vehicle_status_summary" />
+
+            <PreferenceCategory android:title="@string/set_section_recording">
+
+                <ListPreference
+                    android:key="pref_recording_mode"
+                    android:title="@string/set_recording_mode_title"
+                    android:summary="%s" />
+
+                <SwitchPreferenceCompat
+                    android:key="pref_force_h264"
+                    android:title="@string/set_force_h264_title"
+                    android:summary="@string/set_force_h264_summary" />
+
+                <!--
+                  熄屏录制 = 熄屏持续录制 + 防止休眠（规格 §3.3）。2026-11-02 停用（项目所有者：从来没有启用过），这一行从开发者选项里拿掉；
+                  要恢复时放回下面这一行（开关加下一层：行尾写最长多久，点这一行填小时数）：
+                <com.kooo.evcam.settings.SwitchNavPreference
+                    android:key="pref_screen_off_recording"
+                    android:title="@string/set_screen_off_title"
+                    android:summary="@string/set_screen_off_summary" />
+                -->
+
+                <!-- 拍照使用 JPEG 输出：对所有人锁成开（关着时主界面在后台拍不到画面），只有这里改得了。4.0 起从录制页挪来 -->
+                <SwitchPreferenceCompat
+                    android:key="pref_photo_via_jpeg"
+                    android:title="@string/set_photo_jpeg_title"
+                    android:summary="@string/set_photo_jpeg_summary" />
+
+                <SwitchPreferenceCompat
+                    android:key="pref_watermark_brand"
+                    android:title="@string/set_watermark_brand_title"
+                    android:summary="@string/set_watermark_brand_summary" />
+            </PreferenceCategory>
+
+            <PreferenceCategory android:title="@string/set_group_cameras">
+
+                <com.kooo.evcam.settings.ValueActionPreference
+                    android:key="pref_image_adjust"
+                    android:title="@string/set_image_adjust_title"
+                    android:summary="@string/set_image_adjust_summary" />
+
+                <Preference
+                    android:key="pref_camera_mapping"
+                    android:title="@string/set_camera_mapping_title"
+                    android:summary="@string/set_camera_mapping_summary" />
+
+                <SwitchPreferenceCompat
+                    android:key="pref_camera_holder_suspects"
+                    android:title="@string/dev_camera_suspects_title"
+                    android:summary="@string/dev_camera_suspects_summary" />
+
+                <com.kooo.evcam.settings.ValueActionPreference
+                    android:key="pref_side_view_calibration"
+                    android:title="@string/dev_side_view_calibration_title" />
+            </PreferenceCategory>
+        </PreferenceScreen>
+
+        <PreferenceScreen android:key="screen_developer_right">
+
+            <PreferenceCategory android:title="@string/set_rearview_fisheye_title">
+
+                <SwitchPreferenceCompat
+                    android:key="pref_gpu_fisheye_preview"
+                    android:title="@string/dev_gpu_fisheye_preview_title"
+                    android:summary="@string/dev_gpu_fisheye_preview_summary" />
+
+                <SwitchPreferenceCompat
+                    android:key="pref_gpu_fisheye_video"
+                    android:title="@string/dev_gpu_fisheye_video_title"
+                    android:summary="@string/dev_gpu_fisheye_video_summary" />
+
+                <SwitchPreferenceCompat
+                    android:key="pref_raw_frame_dump"
+                    android:title="@string/dev_raw_frame_title"
+                    android:summary="@string/dev_raw_frame_summary" />
+            </PreferenceCategory>
 
             <!--
-              熄屏录制 = 熄屏持续录制 + 防止休眠（规格 §3.3）。2026-11-02 停用（项目所有者：从来没有启用过），这一行从开发者选项里拿掉；
-              要恢复时放回下面这一行（2026-10-23 和时长上限合成一行，开关加下一层：行尾写最长多久，点这一行填小时数）：
-            <com.kooo.evcam.settings.SwitchNavPreference
-                android:key="pref_screen_off_recording"
-                android:title="@string/set_screen_off_title"
-                android:summary="@string/set_screen_off_summary" />
+              声音：这五项当初是两种做法都做出来、上车比了再定。项目所有者 2026-11-12 定：对所有人固定为原始、车内、连续、
+              8 速自动、BUS12，另一种只在这里选得到
             -->
+            <PreferenceCategory android:title="@string/dev_group_sound">
 
-            <!-- 应用水印（2026-10-23 从录制页挪来）：固定开着、点不动，只是摆出来让人知道录像和照片上有这一行字 -->
-            <SwitchPreferenceCompat
-                android:key="pref_watermark_brand"
-                android:title="@string/set_watermark_brand_title"
-                android:summary="@string/set_watermark_brand_summary" />
-        </PreferenceCategory>
+                <ListPreference
+                    android:key="pref_footage_audio_source"
+                    android:title="@string/set_footage_audio_source_title"
+                    android:summary="%s" />
 
-        <PreferenceCategory
-            android:title="@string/set_group_cameras">
+                <ListPreference
+                    android:key="pref_drive_sound_view"
+                    android:title="@string/dev_drive_sound_view_title"
+                    android:summary="%s" />
 
-            <!-- 画面调节（2026-10-23 和恢复默认值合成一行，值加一个按钮）：点这一行打开调节窗口，行尾「重置」 -->
-            <com.kooo.evcam.settings.ValueActionPreference
-                android:key="pref_image_adjust"
-                android:title="@string/set_image_adjust_title"
-                android:summary="@string/set_image_adjust_summary" />
+                <ListPreference
+                    android:key="pref_drive_sound_rpm"
+                    android:title="@string/dev_drive_sound_rpm_title"
+                    android:summary="%s" />
 
-            <Preference
-                android:key="pref_camera_mapping"
-                android:title="@string/set_camera_mapping_title"
-                android:summary="@string/set_camera_mapping_summary" />
+                <ListPreference
+                    android:key="pref_drive_sound_gearbox"
+                    android:title="@string/dev_drive_sound_gearbox_title"
+                    android:summary="%s" />
 
-            <!-- 别的程序占用 / 放开相机时，查那几秒里谁起停了前台服务、切了前后台（CameraHolderSuspects） -->
-            <SwitchPreferenceCompat
-                android:key="pref_camera_holder_suspects"
-                android:title="@string/dev_camera_suspects_title"
-                android:summary="@string/dev_camera_suspects_summary" />
+                <ListPreference
+                    android:key="pref_drive_sound_exterior_route"
+                    android:title="@string/dev_drive_sound_route_title"
+                    android:summary="%s" />
+            </PreferenceCategory>
 
-            <!--
-              盲区画面标定（2026-10-23 三根拖动条合成一行）：每一路画面的朝向是猜的，上车标定之后再定默认值
-              （AppConfig.SIDE_VIEW_DEFAULT_*）。行尾写三个角度，点这一行在一个框里拖，盲区画面跟着变（SliderDialog）
-            -->
-            <com.kooo.evcam.settings.ValueActionPreference
-                android:key="pref_side_view_calibration"
-                android:title="@string/dev_side_view_calibration_title" />
-        </PreferenceCategory>
+            <PreferenceCategory android:title="@string/set_group_files">
 
-        <PreferenceCategory
-            android:title="@string/set_rearview_fisheye_title">
+                <Preference
+                    android:key="pref_repair_mp4"
+                    android:title="@string/dev_repair_mp4_title"
+                    android:summary="@string/dev_repair_mp4_summary" />
 
-            <SwitchPreferenceCompat
-                android:key="pref_gpu_fisheye_preview"
-                android:title="@string/dev_gpu_fisheye_preview_title"
-                android:summary="@string/dev_gpu_fisheye_preview_summary" />
-
-            <SwitchPreferenceCompat
-                android:key="pref_gpu_fisheye_video"
-                android:title="@string/dev_gpu_fisheye_video_title"
-                android:summary="@string/dev_gpu_fisheye_video_summary" />
-
-            <SwitchPreferenceCompat
-                android:key="pref_raw_frame_dump"
-                android:title="@string/dev_raw_frame_title"
-                android:summary="@string/dev_raw_frame_summary" />
-        </PreferenceCategory>
-
-        <PreferenceCategory
-            android:title="@string/set_group_files">
+                <Preference
+                    android:key="pref_archive"
+                    android:title="@string/dev_archive_title"
+                    android:summary="@string/dev_archive_summary" />
+            </PreferenceCategory>
 
             <Preference
-                android:key="pref_repair_mp4"
-                android:title="@string/dev_repair_mp4_title"
-                android:summary="@string/dev_repair_mp4_summary" />
-
-            <Preference
-                android:key="pref_archive"
-                android:title="@string/dev_archive_title"
-                android:summary="@string/dev_archive_summary" />
-        </PreferenceCategory>
-
-        <Preference
-            android:key="pref_developer_note"
-            android:selectable="false"
-            android:summary="@string/dev_note" />
+                android:key="pref_developer_note"
+                android:selectable="false"
+                android:summary="@string/dev_note" />
+        </PreferenceScreen>
     </PreferenceScreen>
-
-    <!--
-      检查更新放在顶层：藏在「关于与致谢」里面没人找得到，而这是安装新版本的唯一途径。
-      原来是左栏里一个点了就查的动作行；加了「接收 Beta 版」之后改成一个分区 ——
-      左边选、右边改，和其他分区一个样子。
-    -->
-    <PreferenceScreen
-        android:key="screen_update"
-        android:title="@string/set_check_update_title">
-
-        <Preference
-            android:key="pref_check_update"
-            android:title="@string/set_check_update_title" />
-
-        <SwitchPreferenceCompat
-            android:key="pref_update_beta"
-            android:title="@string/set_update_beta_title"
-            android:summary="@string/set_update_beta_summary" />
-
-        <!--
-          接收 Alpha 版（项目所有者 2026-10-23，默认关）：随「接收 Beta 版」—— 正式版、Beta、Alpha 一档比一档新、一档比一档没验证过，
-          要 Alpha 先得要 Beta（update.GithubReleases）
-        -->
-        <SwitchPreferenceCompat
-            android:key="pref_update_alpha"
-            android:dependency="pref_update_beta"
-            android:title="@string/set_update_alpha_title"
-            android:summary="@string/set_update_alpha_summary" />
-    </PreferenceScreen>
-
-    <!--
-      关于：顶层一行，点了直接打开关于页。以前是一个分区，里面只有「关于本应用」和「诊断信息」两行，
-      多点一层才到。诊断信息搬去了「系统」—— 它是给所有人导出报告用的，不该跟着「关于与致谢」藏一层。
-    -->
-    <Preference
-        android:key="pref_about"
-        android:title="@string/set_section_about" />
-
-    <!-- 退出放在最底下：和主界面那个「隐藏到后台」分开，往下找得到，手滑点不到 -->
-    <Preference
-        android:key="pref_exit"
-        android:title="@string/nav_exit" />
 </PreferenceScreen>

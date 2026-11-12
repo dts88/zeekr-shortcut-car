@@ -719,7 +719,14 @@ public class AppConfig {
                 KEY_SIDE_VIEW_BACK,                   // 盲区画面的三个标定角度 → 默认
                 KEY_SIDE_VIEW_UP,
                 KEY_SIDE_VIEW_FOV,
-                KEY_VEHICLE_STATUS));                 // 主界面的车辆状态面板 → 关（2026-10-23 挪进开发者选项）
+                KEY_VEHICLE_STATUS,                   // 主界面的车辆状态面板 → 关（2026-10-23 挪进开发者选项）
+                // 4.0（项目所有者 2026-11-12）：当初两种做法都做出来、上车比了再定的五项，对所有人固定为默认的那一种，
+                // 另一种只在开发者选项「声音」一组里选得到
+                SettingsRegistry.FOOTAGE_AUDIO_SOURCE.key,       // 麦克风来源 → 原始
+                SettingsRegistry.DRIVE_SOUND_VIEW.key,           // 听感 → 车内
+                SettingsRegistry.DRIVE_SOUND_RPM.key,            // 转速变化方式 → 连续
+                SettingsRegistry.DRIVE_SOUND_GEARBOX.key,        // 变速箱 → 8 速自动
+                SettingsRegistry.DRIVE_SOUND_EXTERIOR_ROUTE.key));  // 车外线路 → BUS12（外部通知）
         for (String slot : CAMERA_OVERRIDE_SLOTS) {
             keys.add(KEY_CAMERA_OVERRIDE_PREFIX + slot);  // 相机映射 → 自动分配
         }

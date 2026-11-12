@@ -42,16 +42,16 @@
     <string name="set_section_floating">悬浮按钮</string>
     <string name="set_section_system">系统</string>
     <string name="set_section_about">关于与致谢</string>
-    <string name="set_car_model_title">视频流配置</string>
-    <string name="set_profile_editor_title">编辑视频流配置</string>
-    <string name="set_profile_editor_summary">录制画质、各路摄像头参数和主界面画面布局</string>
+    <string name="set_car_model_title">摄像头</string>
+    <string name="set_profile_editor_title">详细参数</string>
+    <string name="set_profile_editor_summary">各路摄像头的分辨率、帧率、码率、片段时长和主界面画面布局</string>
     <string name="set_photo_jpeg_title">拍照使用 JPEG 输出</string>
     <string name="set_photo_jpeg_summary">使用摄像头的 JPEG 输出，按最大尺寸拍照；关闭后从预览画面截取，分辨率与预览相同。重启应用后生效。</string>
     <string name="set_watermark_title">时间水印</string>
     <string name="set_watermark_on">在录像和照片上叠加日期和时间，录像另外标注分辨率、实测帧率、编码和实时码率；预览画面中不显示</string>
     <string name="set_watermark_off">录像和照片不叠加日期、时间和录制规格</string>
     <string name="set_info_bar_title">行驶信息条</string>
-    <string name="set_info_bar_summary">在环视录像画面下方附加一栏车辆信号。试验性功能。</string>
+    <string name="set_info_bar_summary">在环视录像画面下方附加一栏车辆信号</string>
     <string name="set_info_bar_value">已选 %1$d 项</string>
     <string name="set_storage_location_title">存储位置</string>
     <string name="set_storage_port_note">推荐选择 USB-A 口的 U 盘。经实测，下车后 Type-C 口会断电，之后如仍在录制，将录制到 USB-A 口的 U 盘。</string>
@@ -248,8 +248,8 @@
     <string name="set_screen_off_keep_summary">下车后继续录制环视。需开启哨兵模式，使车机保持唤醒状态。</string>
     <!-- 熄屏后的帧率（熄屏持续录制的下一层，2026-11-04）：框的标题、选项下面的说明、跟随那一项 -->
     <string name="set_screen_off_fps_title">熄屏后的帧率</string>
-    <string name="set_screen_off_fps_note">熄屏后只录制环视时按所选帧率录制，录像占用的空间更小；亮屏或开车时恢复视频流配置的帧率。</string>
-    <string name="opt_screen_off_fps_follow">跟随视频流配置</string>
+    <string name="set_screen_off_fps_note">熄屏后只录制环视时按所选帧率录制，录像占用的空间更小；亮屏或开车时恢复。</string>
+    <string name="opt_screen_off_fps_follow">跟随录制画质</string>
     <string name="sentry_status_on">哨兵模式：已开启</string>
     <string name="sentry_status_armed">哨兵模式：已布防</string>
     <string name="sentry_status_off">哨兵模式：未开启</string>
@@ -258,7 +258,7 @@
     <string name="set_recording_mode_title">录制模式</string>
     <string name="set_recording_mode_summary">%1$s；录制固定使用 MediaCodec，此项不生效</string>
     <string name="set_force_h264_title">强制 H.264</string>
-    <string name="set_force_h264_summary">所有摄像头统一使用 H.264 编码，覆盖「编辑视频流配置」中各路的编码设置</string>
+    <string name="set_force_h264_summary">所有摄像头统一使用 H.264 编码，覆盖「详细参数」中各路的编码设置</string>
     <string name="set_image_adjust_title">画面调节</string>
     <string name="set_image_adjust_summary">打开画面调节窗口，实时调整曝光、白平衡、降噪等参数</string>
     <string name="set_camera_mapping_title">摄像头映射</string>
@@ -284,7 +284,7 @@
     <string name="settings_import_failed">无法导入设置</string>
     <string name="settings_imported_reopen">已导入设置，重新打开应用后生效</string>
     <!-- 车辆信号（试验性）：分组、信号名、值 -->
-    <string name="set_vehicle_info_title">车辆信号（试验性）</string>
+    <string name="set_vehicle_info_title">车辆信号</string>
     <string name="set_vehicle_info_summary">车机可读取的车辆信号及当前状态；勾选的项目显示在行驶信息条上</string>
     <string name="vi_legend">勾选的项目显示在行驶信息条上（需开启「设置 → 录制 → 行驶信息条」）：有图标的显示为图标，其余暂以文字显示，每行下方注明；超出信息条宽度的不显示。名称颜色表示验证程度：正文色为实车测试结果一致（持续交叉验证）；灰色为可用、细节待定；淡灰色为可读取但未验证，需开启开发者选项才能勾选。</string>
     <string name="vi_position">位置（经纬度）</string>
@@ -441,8 +441,8 @@
 
     <!-- 设置里的枚举选项 -->
     <string name="opt_mode_auto">自动（推荐）</string>
-    <string name="opt_model_zeekr">极氪7X（环视）</string>
-    <string name="opt_model_zeekr_multi">极氪7X（环视 + 后座舱）</string>
+    <string name="opt_model_zeekr">环视</string>
+    <string name="opt_model_zeekr_multi">环视 + 后座舱</string>
 
     <!-- 设置界面里的提示与对话框 -->
     <string name="msg_stream_changed">视频流配置已改为「%1$s」</string>
@@ -766,7 +766,7 @@
     <string name="set_section_interface">界面</string>
     <string name="set_reduce_motion_title">录制时减少动效</string>
     <string name="set_reduce_motion_summary">录制时关闭界面过渡、画面缩放等装饰动效，减少 GPU 占用；录制键和进度环不受影响</string>
-    <string name="set_vehicle_status_title">车辆状态（试验性）</string>
+    <string name="set_vehicle_status_title">车辆状态</string>
     <string name="set_vehicle_status_summary">在主界面「鱼眼校正」下方，以行驶信息条的图标显示喇叭和刹车、油门深度；喇叭信号暂无法读取</string>
     <string name="opt_projection_rectilinear">直线</string>
     <string name="opt_projection_cylindrical">宽视野（地平线弯曲）</string>
@@ -783,8 +783,8 @@
     <string name="record_unavailable_detail">未检测到 U 盘</string>
     <string name="record_waiting_cameras">等待摄像头</string>
     <string name="record_waiting_detail">恢复后自动继续</string>
-    <string name="status_profile_composite">极氪7X（环视）</string>
-    <string name="status_profile_composite_multi">极氪7X（环视 + 后座舱）</string>
+    <string name="status_profile_composite">环视</string>
+    <string name="status_profile_composite_multi">环视 + 后座舱</string>
     <string name="status_fps">≤%1$s fps</string>
     <string name="status_bitrate_very_low">极低码率</string>
     <string name="status_bitrate_low">低码率</string>
@@ -1039,7 +1039,7 @@
     <string name="set_footage_audio_source_call_short">通话</string>
     <string name="msg_footage_audio_no_permission">没有录音权限，录制声音没有打开</string>
     <string name="dev_drive_sound_group">模拟声浪</string>
-    <string name="dev_drive_sound_title">模拟声浪（试验性）</string>
+    <string name="dev_drive_sound_title">模拟声浪</string>
     <string name="dev_drive_sound_summary">运动模式下（可选标准模式）按油门、车速和加减速合成发动机声，从「播放喇叭」选的喇叭播放，车内喇叭跟随媒体音量。停车时切换到这些模式会先播放启动声。</string>
     <string name="dev_drive_sound_standard_title">标准模式下播放</string>
     <string name="dev_drive_sound_standard_summary">在标准模式下也播放模拟声浪，换挡比运动模式平和。关闭时只在运动模式下播放。</string>
@@ -1160,4 +1160,46 @@
     <string name="dev_note">在「设置 → 关于与致谢」中点击「安全须知」可关闭开发者选项，关闭后此分区隐藏</string>
     <string name="set_rearview_camera_label_title">方向标签</string>
     <string name="set_rearview_camera_label_summary">在窗口左上角显示当前画面的方向</string>
+
+    <!-- 4.0 设置的结构（ui-spec §十六；项目所有者 2026-11-12 批准中文，英文、马来文待整理） -->
+    <string name="set_section_keys">按键</string>
+    <string name="set_section_general">通用</string>
+    <string name="set_section_update_about">更新与关于</string>
+    <string name="set_group_picture_sound">画面与声音</string>
+    <string name="set_group_stamps_info">水印与行驶信息条</string>
+    <string name="set_group_display">显示</string>
+    <string name="set_group_maintenance">维护</string>
+    <string name="set_group_exterior_speaker">车外喇叭</string>
+    <string name="set_group_exterior_speaker_note">礼让语音和车外播放的模拟声浪共用</string>
+    <string name="dev_group_sound">声音</string>
+    <string name="set_record_quality_per_hour">每小时约 %1$s GB</string>
+    <string name="set_record_quality_custom">自定义 · %1$s</string>
+    <string name="set_storage_limits_keep">按当前录制画质，录像约保留最近 %1$s 小时</string>
+    <string name="set_first_run_title">初始设置</string>
+    <string name="set_first_run_summary">重新选择语言、操作按钮位置和常用功能</string>
+    <string name="set_hud_place_title">位置与大小</string>
+    <string name="set_hud_place_value">高度 %1$d%% · 离边 %2$d%%</string>
+    <string name="dlg_hud_place_note">左右两个画面位置对称。</string>
+    <string name="hud_sketch_label">HUD 示意</string>
+    <string name="set_hud_brightness_title">亮度</string>
+    <string name="set_hud_brightness_value">透明度 %1$d%% · 夜间 %2$d%%</string>
+    <string name="set_hud_contrast_pair_title">对比度</string>
+    <string name="set_hud_contrast_pair_value">白天 %1$d · 夜间 %2$d</string>
+    <string name="reason_when">「%1$s」为「%2$s」时不可用</string>
+    <string name="set_update_channel_title">接收的版本</string>
+    <string name="opt_channel_stable">正式版</string>
+    <string name="opt_channel_beta">Beta 版</string>
+    <string name="opt_channel_alpha">Alpha 版</string>
+    <string name="set_update_channel_stable">仅检查正式版</string>
+    <string name="set_update_channel_beta">检查正式版和 Beta 版</string>
+    <string name="action_check">检查</string>
+    <string name="tag_experimental">试验性</string>
+    <string name="header_recording_on">录制中 · %1$s</string>
+    <string name="header_recording_off">未录制 · %1$s</string>
+    <string name="header_storage_free">剩余 %1$s</string>
+    <string name="header_enabled_count">已开启 %1$d 项</string>
+    <string name="header_none_enabled">未开启</string>
+    <plurals name="set_record_quality_hours">
+        <item quantity="other">每小时约 %1$s GB，U 盘剩余空间约可录 %2$s 小时</item>
+    </plurals>
 </resources>

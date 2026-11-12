@@ -9,6 +9,7 @@ package com.kooo.evcam.settings;
 
 import static org.junit.Assert.assertTrue;
 
+import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.screens.ShotActivity;
 import com.kooo.evcam.screens.Shots;
 
@@ -22,15 +23,15 @@ import org.robolectric.annotation.GraphicsMode;
 
 import java.io.File;
 
-/** 设置的每一页画成图片，白天、夜间各一套（{@link Shots}）。 */
+/** 设置的每一页画成图片：白天、夜间各一套，另加一套可选功能全开的（{@link Shots}）。 */
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = 34, application = android.app.Application.class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 public class SettingsShotsTest {
 
     private static final String[] SECTIONS = {
-            "screen_recording", "screen_storage", "screen_rearview", "screen_floating",
-            "screen_interface", "screen_system", "screen_update",
+            "screen_recording", "screen_storage", "screen_rearview", "screen_side_view", "screen_floating",
+            "screen_general", "screen_update",
     };
 
     @Test
@@ -41,6 +42,16 @@ public class SettingsShotsTest {
     @Test
     public void everySectionByNight() {
         shoot(Shots.NIGHT, "night");
+    }
+
+    /** 可选的功能都打开：关着时只有一行的那几页，展开以后是什么样。 */
+    @Test
+    public void everySectionWithEverythingOn() {
+        AppConfig config = new AppConfig(RuntimeEnvironment.getApplication());
+        config.setRearViewEnabled(true);
+        config.setSideViewEnabled(true);
+        config.setDriveSoundEnabled(true);
+        shoot(Shots.DAY, "day-on");
     }
 
     private void shoot(String qualifiers, String tag) {
