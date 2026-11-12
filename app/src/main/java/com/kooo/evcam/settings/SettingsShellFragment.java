@@ -43,6 +43,9 @@ import com.kooo.evcam.ui.MotionPolicy;
 public class SettingsShellFragment extends Fragment {
 
     private static final String STATE_SECTION = "section";
+    private static final String ARG_SECTION = "section";
+    private static final String ARG_ROW = "row";
+    private static final String ARG_FALLBACK = "fallback";
 
     /** 打开设置时默认停在哪一段。 */
     static final String DEFAULT_SECTION = "screen_recording";
@@ -55,6 +58,17 @@ public class SettingsShellFragment extends Fragment {
     private String currentSection = DEFAULT_SECTION;
     /** 当前分区在左栏的行号，决定下一次切换往上还是往下走。 */
     private int currentOrder = -1;
+
+    /** 打开设置就停在某个分区、指着某一行（从主界面的状态点过来，{@link #showRow}）。 */
+    public static SettingsShellFragment at(String sectionKey, String prefKey, @Nullable String fallbackKey) {
+        SettingsShellFragment fragment = new SettingsShellFragment();
+        Bundle args = new Bundle();
+        args.putString(ARG_SECTION, sectionKey);
+        args.putString(ARG_ROW, prefKey);
+        args.putString(ARG_FALLBACK, fallbackKey);
+        fragment.setArguments(args);
+        return fragment;
+    }
 
     @Nullable
     @Override
@@ -75,6 +89,7 @@ public class SettingsShellFragment extends Fragment {
         // 进出二级界面时标题区要跟着变
         getChildFragmentManager().addOnBackStackChangedListener(this::refreshTitle);
         com.kooo.evcam.ui.StatusLine.fill(view);
+        com.kooo.evcam.ui.StatusLine.link(view, this::showRow);
 
         if (savedInstanceState != null) {
             String saved = savedInstanceState.getString(STATE_SECTION);
@@ -83,11 +98,20 @@ public class SettingsShellFragment extends Fragment {
             }
         }
 
+        Bundle args = getArguments();
+        if (savedInstanceState == null && args != null && args.getString(ARG_SECTION) != null) {
+            currentSection = args.getString(ARG_SECTION);
+        }
         if (savedInstanceState == null) {
             getChildFragmentManager().beginTransaction()
                     .replace(R.id.settings_headers, new SettingsHeadersFragment())
                     .commit();
             showSection(currentSection);
+            if (args != null && args.getString(ARG_ROW) != null) {
+                String row = args.getString(ARG_ROW);
+                String fallback = args.getString(ARG_FALLBACK);
+                view.post(() -> showRow(currentSection, row, fallback));
+            }
         }
         refreshTitle();
     }

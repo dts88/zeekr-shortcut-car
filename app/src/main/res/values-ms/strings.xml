@@ -752,7 +752,7 @@
     <string name="set_reduce_motion_title">Kurangkan animasi semasa merakam</string>
     <string name="set_reduce_motion_summary">Mematikan peralihan dan animasi hiasan lain semasa merakam supaya GPU digunakan oleh pengekod. Butang rakam dan gelang kemajuan masih beranimasi.</string>
     <string name="set_vehicle_status_title">Status kenderaan</string>
-    <string name="set_vehicle_status_summary">Memaparkan hon serta pedal brek dan pendikit di bawah Luruskan pada skrin utama, menggunakan ikon Bar maklumat pemanduan; isyarat hon belum dapat dibaca</string>
+    <string name="set_vehicle_status_summary">Memaparkan hon serta pedal brek dan pendikit di bawah suis pada skrin utama, menggunakan ikon Bar maklumat pemanduan; isyarat hon belum dapat dibaca</string>
     <string name="opt_projection_rectilinear">Garisan lurus</string>
     <string name="opt_projection_cylindrical">Luas (ufuk melengkung)</string>
     <string name="set_fisheye_fov_title">Medan pandangan dibetulkan</string>
@@ -1186,4 +1186,9 @@
     <plurals name="set_record_quality_hours">
         <item quantity="other">Kira-kira %1$s GB sejam; kira-kira %2$s jam lagi pada pemacu USB</item>
     </plurals>
+    <!-- 4.0 主界面动作栏的六块开关（ui-spec §十三） -->
+    <string name="quick_on">Hidup</string>
+    <string name="quick_off">Mati</string>
+    <string name="quick_smart_bound">%1$d dipasangkan</string>
+    <string name="quick_smart_none">Tiada dipasangkan</string>
 </resources>

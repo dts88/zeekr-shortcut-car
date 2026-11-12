@@ -524,7 +524,17 @@ public class MainActivity extends AppCompatActivity {
         updateStatusLine();
 
         // 录制按钮：点击切换录制状态
-        btnStartRecord.setOnClickListener(v -> toggleRecording());
+        btnStartRecord.setOnClickListener(v -> {
+            if (!openStorageIfNoDrive()) {
+                toggleRecording();
+            }
+        });
+        // 熄屏提示那一行（录制键下面）：点了去管它的那一行设置
+        View screenOffHint = findViewById(R.id.record_hint);
+        if (screenOffHint != null) {
+            screenOffHint.setOnClickListener(v ->
+                    openSettingsRow("screen_recording", "pref_screen_off_keep_recording", null));
+        }
 
         // 隐藏到后台：录制和悬浮按钮照旧，只把界面收起来。
         // 长按是退出，和抽屉、设置左栏最底下的「退出应用」是同一件事。退出会停掉录制，
@@ -545,7 +555,11 @@ public class MainActivity extends AppCompatActivity {
                     getString(R.string.nav_exit), null);
         }
 
-        btnTakePhoto.setOnClickListener(v -> takePicture());
+        btnTakePhoto.setOnClickListener(v -> {
+            if (!openStorageIfNoDrive()) {
+                takePicture();
+            }
+        });
 
         // 启用的那几路各挂一块画布（PreviewSlots）；没启用的不挂，它那一格在多路布局里藏起来
         for (String key : PreviewSlots.KEYS) {
@@ -1051,6 +1065,7 @@ public class MainActivity extends AppCompatActivity {
         shownFallback = StorageHelper.recordingFallback();
         com.kooo.evcam.ui.StatusLine.overlay(recordingLayout);
         com.kooo.evcam.ui.StatusLine.fill(recordingLayout);
+        com.kooo.evcam.ui.StatusLine.link(recordingLayout, this::openSettingsRow);
     }
 
     /**
@@ -1387,6 +1402,34 @@ public class MainActivity extends AppCompatActivity {
      */
     private void showSettingsInterface() {
         showFragment(new com.kooo.evcam.settings.SettingsShellFragment());
+    }
+
+    /**
+     * 状态能点（ui-spec §十三）：打开设置里管这件事的那一行，那一行闪两下。设置已经开着就在里面换过去。
+     *
+     * @param fallbackKey 那一行此刻收着（它的功能关着）时改闪哪一行；可以是 null
+     */
+    public void openSettingsRow(String section, String key, @androidx.annotation.Nullable String fallbackKey) {
+        Fragment shown = getSupportFragmentManager().findFragmentById(R.id.fragment_container);
+        if (shown instanceof com.kooo.evcam.settings.SettingsShellFragment
+                && fragmentContainer.getVisibility() == View.VISIBLE) {
+            ((com.kooo.evcam.settings.SettingsShellFragment) shown).showRow(section, key, fallbackKey);
+            return;
+        }
+        showFragment(com.kooo.evcam.settings.SettingsShellFragment.at(section, key, fallbackKey));
+        if (drawer != null) {
+            drawer.select(R.id.nav_settings);
+        }
+    }
+
+    /** 没有 U 盘（探测过、确实没有）：录不了、拍不了。这时点录制键、拍照，去的是「设置 → 存储 → 存储位置」。 */
+    private boolean openStorageIfNoDrive() {
+        com.kooo.evcam.storage.StorageState.Snapshot storage = com.kooo.evcam.storage.StorageState.current();
+        if (!storage.known || storage.available || keeper.view() != CameraKeeper.View.IDLE) {
+            return false;
+        }
+        openSettingsRow("screen_storage", "pref_storage_location", null);
+        return true;
     }
 
 

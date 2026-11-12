@@ -20,11 +20,11 @@ import com.kooo.evcam.AppLog;
 import com.kooo.evcam.R;
 
 /**
- * 「鱼眼校正」按钮：主界面、图片回看、视频回看上都是它，拨的是同一个开关
- * （{@link AppConfig#isFisheyeCorrection}）。
+ * 「鱼眼校正」按钮：图片回看、视频回看上都是它，拨的是同一个开关
+ * （{@link AppConfig#isFisheyeCorrection}）。主界面上是动作栏六块开关里的一块（{@link QuickSwitches}，4.0 起），拨的也是它。
  *
  * <p>点击和显示都在按钮自己身上，所在的界面不用接线：放进布局就能用。
- * 这样主界面那一个不用动 MainActivity。画面那边（预览容器、视频外框、图片回看）
+ * 画面那边（预览容器、视频外框、图片回看）
  * 各自听 {@link AppConfig#onFisheyeChanged}，开关一变就重画。</p>
  *
  * <p>开着的时候按主色点亮 —— 一眼能看出现在看到的画面动过手脚。</p>

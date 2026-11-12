@@ -763,7 +763,7 @@
     <string name="set_reduce_motion_title">Less motion while recording</string>
     <string name="set_reduce_motion_summary">Turns off transitions and other decorative animation while recording, leaving the GPU to the encoder. The record button and progress ring still animate.</string>
     <string name="set_vehicle_status_title">Vehicle status</string>
-    <string name="set_vehicle_status_summary">Shows the horn and the brake and throttle pedals below Straighten on the main screen, using the Driving info bar icons; the horn signal can\'t be read yet</string>
+    <string name="set_vehicle_status_summary">Shows the horn and the brake and throttle pedals below the switches on the main screen, using the Driving info bar icons; the horn signal can\'t be read yet</string>
     <string name="opt_projection_rectilinear">Straight lines</string>
     <string name="opt_projection_cylindrical">Wide (curved horizon)</string>
     <string name="set_fisheye_fov_title">Corrected field of view</string>
@@ -1210,4 +1210,9 @@
         <item quantity="one">About %1$s GB per hour; about %2$s hour left on the USB drive</item>
         <item quantity="other">About %1$s GB per hour; about %2$s hours left on the USB drive</item>
     </plurals>
+    <!-- 4.0 主界面动作栏的六块开关（ui-spec §十三） -->
+    <string name="quick_on">On</string>
+    <string name="quick_off">Off</string>
+    <string name="quick_smart_bound">%1$d paired</string>
+    <string name="quick_smart_none">None paired</string>
 </resources>

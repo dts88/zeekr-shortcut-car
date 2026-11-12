@@ -996,7 +996,8 @@ public class AppConfig {
     /**
      * 环视画面在屏幕上是否做鱼眼校正：主界面预览、图片回看、视频回看共用这一个开关。
      *
-     * <p>三处各有一个按钮（{@code FisheyeToggleButton}），拨的都是它。和后视镜那一档各管各的。
+     * <p>主界面动作栏上是六块开关里的一块（{@code ui.QuickSwitches}），两处回看各有一个按钮
+     * （{@code FisheyeToggleButton}），拨的都是它。和后视镜那一档各管各的。
      * 只改屏幕上看到的样子：录像和照片落盘的都是原始画面，一个字节都不动。
      * 默认关 —— 回看首先要能看到「拍下来的就是这样」。</p>
      *
@@ -1036,6 +1037,13 @@ public class AppConfig {
     /** 熄屏后录像会怎样（{@code ScreenOffPlan}）看的这几项，一变就叫 {@code action}（主线程）。拿住返回值，同上。 */
     public SharedPreferences.OnSharedPreferenceChangeListener onScreenOffPlanChanged(Runnable action) {
         return onChanged(action, KEY_SCREEN_OFF_RECORDING, KEY_SCREEN_OFF_KEEP_RECORDING, KEY_AUTO_START_RECORDING);
+    }
+
+    /** 主界面动作栏的六块开关（{@code ui.QuickSwitches}）看的这几项，一变就叫 {@code action}（主线程）。拿住返回值，同上。 */
+    public SharedPreferences.OnSharedPreferenceChangeListener onQuickSwitchesChanged(Runnable action) {
+        return onChanged(action, KEY_REARVIEW_ENABLED, SettingsRegistry.REARVIEW_VIEWS.key, KEY_SIDE_VIEW_ENABLED,
+                SettingsRegistry.SIDE_VIEW_MODE.key, KEY_RECORDING_FLOATING_ENABLED, KEY_SMART_BUTTONS_ENABLED,
+                KEY_SMART_BUTTONS, KEY_DRIVE_SOUND, KEY_PHOTO_FISHEYE);
     }
 
     /** 这几项里有一项变了就叫 {@code action}。返回的监听器调用方要拿住，用完交给 {@link #removeChangeListener}。 */

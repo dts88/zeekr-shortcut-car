@@ -2,8 +2,8 @@
 <!--
   ④ 动作栏：这个界面能做的事，按重要性从上往下。三份主界面布局 <include> 同一份。
 
-  按钮：btn_start_record / btn_take_photo / btn_video_playback / btn_photo_playback /
-  btn_fisheye / vehicle_status_panel / btn_settings / btn_minimize。四宫格键撤了 —— 放大哪一格改成直接点那一格，
+  按钮：btn_start_record / record_hint / btn_take_photo / btn_video_playback / btn_photo_playback /
+  quick_switches / vehicle_status_panel / btn_settings / btn_minimize。四宫格键撤了 —— 放大哪一格改成直接点那一格，
   再点还原（MainActivity.setupCompositeControls），拍照因此独占一行。右下角原来的「×」改成
   「隐藏到后台」；真正的退出在抽屉和设置左栏的最底下。
 
@@ -106,20 +106,32 @@
                     android:textAppearance="@style/TextAppearance.Cam.Caption" />
 
                 <!-- 录制中才有：熄屏后这段录像会怎样（自己读设置和这一次录像里有没有环视，熄屏 v3 起不看哨兵模式；RecordButtonUi 管显隐） -->
-                <com.kooo.evcam.ui.ScreenOffHintView
-                    android:id="@+id/record_hint"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="3dp"
-                    android:maxLines="2"
-                    android:textColor="@color/text_secondary"
-                    android:textAppearance="@style/TextAppearance.Cam.Micro"
-                    android:visibility="gone" />
             </LinearLayout>
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
     <!-- 拍照独占一行：四宫格键撤了，放大一格改成直接点画面 -->
+    <!--
+      熄屏提示（「熄屏后继续录制环视」那三句）：4.0 起从录制键里拿出来，在它下面单独一行，录着、等待摄像头时才有。
+      拿出来是为了它能单独点：点了去「设置 → 录制 → 熄屏持续录制」（ui-spec §十三「状态能点」）。显隐照旧由 RecordButtonUi 管
+    -->
+    <com.kooo.evcam.ui.ScreenOffHintView
+        android:id="@+id/record_hint"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:background="?attr/selectableItemBackground"
+        android:drawableEnd="@drawable/ic_chevron_right"
+        android:drawableTint="@color/text_tertiary"
+        android:gravity="center_vertical"
+        android:maxLines="2"
+        android:minHeight="44dp"
+        android:paddingStart="22dp"
+        android:paddingEnd="12dp"
+        android:textAppearance="@style/TextAppearance.Cam.Micro"
+        android:textColor="@color/text_secondary"
+        android:visibility="gone" />
+
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btn_take_photo"
         style="@style/Widget.Cam.RailTile"
@@ -157,17 +169,25 @@
     </LinearLayout>
 
     <!--
-      环视画面的鱼眼校正，和图片回看、视频回看上那个是同一个开关。只改屏幕上的样子，
-      录像不动。按钮自己管点击和颜色（FisheyeToggleButton），MainActivity 不用接线；
-      画面那边由 FourLaneContainer 自己听开关。先放在这里试效果，位置以后再定。
+      六块开关（4.0，ui-spec §十三，项目所有者 2026-11-12）：超级镜子、盲区画面、悬浮按钮、灵动贴、模拟声浪、鱼眼校正。
+      原来这里是一个临时的「鱼眼校正」键，另两个开关在抽屉里。控件自己管点击和显示（ui/QuickSwitches）。
+      「鱼眼校正」那一块和图片回看、视频回看上的按钮是同一个开关：只改屏幕上的样子，录像不动；画面那边由
+      FourLaneContainer 自己听开关
     -->
-    <com.kooo.evcam.ui.FisheyeToggleButton
-        android:id="@+id/btn_fisheye"
-        style="@style/Widget.Cam.RailSmall"
+    <TextView
         android:layout_width="match_parent"
-        android:layout_height="@dimen/rail_small_height"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="6dp"
         android:layout_marginTop="@dimen/gutter"
-        android:text="@string/photo_fisheye" />
+        android:layout_marginBottom="6dp"
+        android:text="@string/nav_group_switches"
+        android:textAppearance="@style/TextAppearance.Cam.Micro"
+        android:textColor="@color/text_secondary" />
+
+    <com.kooo.evcam.ui.QuickSwitches
+        android:id="@+id/quick_switches"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
 
     <!--
       车辆状态（试验性，设置 → 界面）：用信息条的图标显示哨兵模式、刹车 / 油门、驾驶辅助、喇叭。

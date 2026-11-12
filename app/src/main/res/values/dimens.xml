@@ -18,6 +18,7 @@
     <dimen name="record_ring_size">68dp</dimen>
     <dimen name="rail_tile_height">104dp</dimen>
     <dimen name="rail_small_height">72dp</dimen>
+    <dimen name="rail_switch_height">84dp</dimen>
     <dimen name="icon_button_size">48dp</dimen>
     <!-- 车辆信号页每一行旁边的信息条图标（ui.InfoBarCellView）：高固定，宽按那一格的比例 -->
     <dimen name="info_cell_icon_height">44dp</dimen>
