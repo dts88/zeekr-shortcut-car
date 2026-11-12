@@ -13,7 +13,6 @@ import android.animation.ValueAnimator;
 import android.graphics.Rect;
 import android.view.View;
 import android.view.ViewTreeObserver;
-import android.view.animation.PathInterpolator;
 
 /**
  * 主界面「点一路放大」的过渡：从它原来在屏幕上的那一块长到铺满，收回时反过来。
@@ -32,8 +31,8 @@ import android.view.animation.PathInterpolator;
  */
 public final class PreviewExpandAnimator {
 
-    /** 和四宫格里一格长大的过渡同一组数。 */
-    private static final long DURATION_MS = 280L;
+    /** 和四宫格里一格长大的过渡同一组数（{@code FourLaneContainer}）：最长的一档，挪位置的标准曲线。 */
+    private static final long DURATION_MS = Motion.SLOW;
 
     private final Rect clip = new Rect();
     private ValueAnimator running;
@@ -109,7 +108,7 @@ public final class PreviewExpandAnimator {
         view.setPivotY(0f);
         ValueAnimator animator = ValueAnimator.ofFloat(0f, 1f);
         animator.setDuration(DURATION_MS);
-        animator.setInterpolator(new PathInterpolator(0.4f, 0f, 0.2f, 1f));
+        animator.setInterpolator(Motion.standard());
         animator.addUpdateListener(animation -> apply(view, laidOut,
                 ExpandGeometry.lerp(from, to, (float) animation.getAnimatedValue())));
         animator.addListener(new AnimatorListenerAdapter() {

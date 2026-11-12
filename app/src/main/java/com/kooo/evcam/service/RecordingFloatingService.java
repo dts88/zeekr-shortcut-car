@@ -420,6 +420,8 @@ public class RecordingFloatingService extends Service {
                 PixelFormat.TRANSLUCENT);
 
         layoutParams.gravity = Gravity.TOP | Gravity.START;
+        // 出现和收起：淡入淡出（ui-spec §十四），不放装饰动效时不放
+        layoutParams.windowAnimations = com.kooo.evcam.ui.MotionPolicy.overlayWindowAnimations(this);
 
         // 恢复上次拖到的位置；没存过就用默认位置
         placeAtSavedOrDefault(buttonSize);

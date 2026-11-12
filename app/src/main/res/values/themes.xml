@@ -128,7 +128,27 @@
       对话框：每一个颜色都显式给到语义色，日夜各自解析。
       按钮不可见那个老问题，根子就是「靠主题属性推出按钮颜色」—— 这里不给它推的机会。
     -->
+    <!--
+      窗口的出现和收起（ui-spec §十四）。Float：对话框、拖动条框（浮起来的）。Fade：悬浮按钮、全屏编辑框（不带相机画面的悬浮窗）。
+      None：不放装饰动效时用（ui/MotionPolicy）。超级镜子、盲区画面的窗口不用这些：它们照旧先盖黑等新帧。
+    -->
+    <style name="Animation.Cam.Float" parent="@android:style/Animation">
+        <item name="android:windowEnterAnimation">@anim/window_float_in</item>
+        <item name="android:windowExitAnimation">@anim/window_float_out</item>
+    </style>
+
+    <style name="Animation.Cam.Fade" parent="@android:style/Animation">
+        <item name="android:windowEnterAnimation">@anim/window_fade_in</item>
+        <item name="android:windowExitAnimation">@anim/window_fade_out</item>
+    </style>
+
+    <style name="Animation.Cam.None" parent="@android:style/Animation">
+        <item name="android:windowEnterAnimation">@null</item>
+        <item name="android:windowExitAnimation">@null</item>
+    </style>
+
     <style name="Theme.Cam.MaterialAlertDialog" parent="ThemeOverlay.Material3.MaterialAlertDialog">
+        <item name="android:windowAnimationStyle">@style/Animation.Cam.Float</item>
         <item name="colorSurface">@color/surface</item>
         <item name="colorOnSurface">@color/text_primary</item>
         <item name="colorOnSurfaceVariant">@color/text_secondary</item>

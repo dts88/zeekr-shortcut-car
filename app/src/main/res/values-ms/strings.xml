@@ -8,25 +8,18 @@
     <string name="set_back_to_recording">Kembali ke skrin utama</string>
     <string name="set_check_update_title">Semak kemas kini</string>
     <string name="set_check_update_summary">Versi semasa %1$s</string>
-    <string name="set_update_beta_title">Termasuk keluaran beta</string>
-    <string name="set_update_beta_summary">Jika dimatikan, hanya keluaran stabil disemak</string>
-    <string name="set_update_alpha_title">Termasuk keluaran alpha</string>
     <string name="set_update_alpha_summary">Keluaran alpha ialah binaan ujian yang masih dibangunkan dan mungkin tidak stabil</string>
     <string name="upd_none_release">Tiada keluaran stabil yang boleh dipasang</string>
     <string name="set_section_recording">Rakaman</string>
     <string name="set_section_storage">Storan</string>
     <!-- 设置页里的分组标题（项目所有者 2026-10-19） -->
-    <string name="set_group_stream">Strim</string>
     <string name="set_group_auto_record">Rakaman automatik</string>
-    <string name="set_group_photo">Foto</string>
-    <string name="set_group_stamps">Tera</string>
     <string name="set_group_window">Tetingkap</string>
     <string name="set_group_appearance">Penampilan</string>
     <string name="set_group_cameras">Kamera</string>
     <string name="set_group_files">Penyelenggaraan fail</string>
     <string name="set_section_rearview">Cermin super</string>
     <string name="set_section_floating">Butang terapung</string>
-    <string name="set_section_system">Sistem</string>
     <string name="set_section_about">Perihal &amp; penghargaan</string>
     <string name="set_car_model_title">Kamera</string>
     <string name="set_profile_editor_title">Tetapan terperinci</string>
@@ -61,7 +54,6 @@
     <string name="dlg_rearview_reset_title">Set semula tetingkap dan paparan?</string>
     <string name="rearview_editor_hint">Seret tepi atau sudut untuk menukar lebar dan tinggi, atau cubit dengan dua jari. Seret di dalam bingkai untuk mengalihkannya; kedudukan tidak disimpan.</string>
     <string name="set_rearview_guide_title">Cara guna</string>
-    <string name="set_rearview_guide_summary">Zon gerak isyarat, tukar kamera, bingkai, lekap tepi dan ubah saiz</string>
     <string name="set_side_view_title">Paparan titik buta</string>
     <string name="set_side_view_summary">Memaparkan kamera sisi di sebelah skrin itu mengikut mod yang dipilih</string>
     <string name="set_side_view_min_speed_title">Kelajuan minimum</string>
@@ -127,8 +119,6 @@
     <string name="floating_action_play_outside_voice">Mainkan mesej budi bahasa pada pembesar suara luar</string>
     <string name="msg_outside_voice_failed">Pembesar suara luar tidak memainkan mesej</string>
     <!-- 灵动贴（试验性，2026-10-30 项目所有者批准，button.SmartButtons） -->
-    <string name="set_section_floating_page">Butang terapung dan butang pintar</string>
-    <string name="set_group_smart_button">Butang pintar (percubaan)</string>
     <string name="set_smart_buttons_title">Butang pintar</string>
     <string name="set_smart_buttons_summary">Menjalankan tindakan yang dipilih apabila butang pintar yang dipasangkan ditekan; jika dimatikan, tidak mengimbas peranti Bluetooth</string>
     <string name="set_smart_button_bind_title">Pasangkan butang pintar</string>
@@ -261,7 +251,6 @@
     <string name="settings_imported_reopen">Tetapan diimport; berkuat kuasa selepas apl dibuka semula</string>
     <!-- Vehicle signals (experimental): groups, signal names, values -->
     <string name="set_vehicle_info_title">Isyarat kenderaan</string>
-    <string name="set_vehicle_info_summary">Isyarat kenderaan yang didedahkan unit kepala dan keadaan semasanya; item yang ditanda dipaparkan pada Bar maklumat pemanduan</string>
     <string name="vi_legend">Item yang ditanda dipaparkan pada Bar maklumat pemanduan (memerlukan Tetapan → Rakaman → Bar maklumat pemanduan): sebagai ikon jika ada, jika tidak sebagai teks buat masa ini, seperti dinyatakan di bawah setiap baris; item yang tidak muat tidak dipaparkan. Warna label menunjukkan tahap pengesahan: warna teks biasa, konsisten dalam ujian di kereta (masih disemak silang); kelabu, boleh digunakan, butiran belum muktamad; kelabu pudar, boleh dibaca tetapi belum disahkan, hanya boleh ditanda apabila pilihan pembangun dihidupkan.</string>
     <string name="vi_position">Kedudukan (lat/long)</string>
     <string name="vi_position_source">Lokasi sistem</string>
@@ -422,7 +411,6 @@
 
     <!-- Gesaan dan dialog tetapan -->
     <string name="msg_stream_changed">Profil strim ditetapkan kepada “%1$s”.</string>
-    <string name="msg_dev_only">Memerlukan pilihan pembangun</string>
     <string name="dlg_internal_title">Guna storan dalaman?</string>
     <string name="dlg_internal_msg">Rakaman menulis data secara berterusan. Storan dalaman mempunyai hayat tulis yang terhad dan biasanya tidak boleh diganti.\n\nPemacu USB disyorkan: ia boleh diganti jika rosak, dan boleh dicabut untuk menyalin fail.</string>
     <string name="dlg_internal_ok">Guna storan dalaman juga</string>
@@ -745,7 +733,6 @@
     <string name="opt_rail_left">Kiri</string>
 
     <!-- Bahagian antara muka · soalan sebelah semasa mula pertama · rakaman tidak tersedia · bar status -->
-    <string name="set_section_interface">Antara muka</string>
     <string name="set_reduce_motion_title">Kurangkan animasi semasa merakam</string>
     <string name="set_reduce_motion_summary">Mematikan peralihan dan animasi hiasan lain semasa merakam supaya GPU digunakan oleh pengekod. Butang rakam dan gelang kemajuan masih beranimasi.</string>
     <string name="set_vehicle_status_title">Status kenderaan</string>
@@ -1013,10 +1000,7 @@
     <string name="set_footage_audio_source_title">Sumber mikrofon</string>
     <string name="set_footage_audio_source_raw">Asal (tanpa pemprosesan, lebih perlahan)</string>
     <string name="set_footage_audio_source_call">Panggilan (pengurangan hingar dan pembatalan gema)</string>
-    <string name="set_footage_audio_source_raw_short">Asal</string>
-    <string name="set_footage_audio_source_call_short">Panggilan</string>
     <string name="msg_footage_audio_no_permission">Tiada kebenaran mikrofon, Rakam bunyi kekal dimatikan</string>
-    <string name="dev_drive_sound_group">Bunyi pemanduan</string>
     <string name="dev_drive_sound_title">Bunyi pemanduan simulasi</string>
     <string name="dev_drive_sound_summary">Dalam mod Sukan (dan mod Standard jika dipilih), menjana bunyi enjin daripada pendikit, kelajuan dan pecutan serta memainkannya melalui pembesar suara yang dipilih dalam Pembesar suara (pembesar suara kabin mengikut kelantangan media). Bertukar ke mod ini semasa berhenti memainkan bunyi enjin dihidupkan.</string>
     <string name="dev_drive_sound_standard_title">Main dalam mod Standard</string>
@@ -1046,7 +1030,6 @@
     <string name="dev_drive_sound_route_notify">BUS12 (pemberitahuan luar)</string>
     <string name="dev_drive_sound_route_playback">BUS11 (main balik luar)</string>
     <string name="dev_drive_sound_exterior_volume_title">Kelantangan luar</string>
-    <string name="dev_drive_sound_value">%1$s · %2$s</string>
     <string name="msg_drive_sound_on">Bunyi pemanduan simulasi dihidupkan</string>
     <string name="msg_drive_sound_off">Bunyi pemanduan simulasi dimatikan</string>
     <string name="dev_perm_all_files">Akses semua fail</string>
@@ -1139,7 +1122,7 @@
     <string name="set_rearview_camera_label_title">Label arah</string>
     <string name="set_rearview_camera_label_summary">Menunjukkan arah paparan semasa di penjuru kiri atas tetingkap</string>
 
-    <!-- 4.0 设置的结构（ui-spec §十六；项目所有者 2026-11-12 批准中文，英文、马来文待整理） -->
+    <!-- 4.0 设置的结构（ui-spec §十六；项目所有者 2026-11-12 批准中文，英文、马来文 2026-11-12 整理过一遍，待项目所有者看） -->
     <string name="set_section_keys">Butang</string>
     <string name="set_section_general">Umum</string>
     <string name="set_section_update_about">Kemas kini &amp; perihal</string>
@@ -1190,23 +1173,23 @@
     <string name="setup_back">Kembali</string>
     <string name="setup_next">Seterusnya</string>
     <string name="setup_continue">Teruskan</string>
-    <string name="setup_enter">Pergi ke Skrin utama</string>
+    <string name="setup_enter">Pergi ke skrin utama</string>
     <string name="setup_step_language">Bahasa</string>
     <string name="setup_step_side">Tempat duduk pemandu</string>
     <string name="setup_step_drive">Pemacu USB</string>
     <string name="setup_step_features">Ciri biasa</string>
     <string name="setup_step_done">Selesai</string>
-    <string name="setup_language_note">Anda boleh menukarnya dalam Tetapan → Umum → Bahasa</string>
-    <string name="setup_side_note">Butang tindakan diletakkan di sebelah pemandu. Anda boleh menukarnya dalam Tetapan → Umum → Sebelah butang tindakan</string>
-    <string name="setup_side_lhd">Pemanduan kiri</string>
-    <string name="setup_side_rhd">Pemanduan kanan</string>
+    <string name="setup_language_note">Boleh ditukar dalam Tetapan → Umum → Bahasa</string>
+    <string name="setup_side_note">Butang tindakan diletakkan di sebelah pemandu. Boleh ditukar dalam Tetapan → Umum → Sebelah butang tindakan</string>
+    <string name="setup_side_lhd">Stereng kiri</string>
+    <string name="setup_side_rhd">Stereng kanan</string>
     <string name="setup_drive_found">Pemacu USB dikesan</string>
     <string name="setup_drive_space">%1$s kosong daripada %2$s</string>
     <string name="setup_drive_missing">Tiada pemacu USB dikesan</string>
-    <string name="setup_drive_later">Anda boleh memasukkannya kemudian</string>
-    <string name="setup_record_note">Anda boleh menukarnya dalam Tetapan → Rakaman</string>
-    <string name="setup_features_note">Hidupkan apa yang anda perlukan. Anda boleh menukarnya dalam Tetapan → Cermin super, Tetapan → Paparan titik buta dan Tetapan → Butang</string>
+    <string name="setup_drive_later">Boleh dimasukkan kemudian</string>
+    <string name="setup_record_note">Boleh ditukar dalam Tetapan → Rakaman</string>
+    <string name="setup_features_note">Hidupkan yang diperlukan. Boleh ditukar dalam Tetapan → Cermin super, Tetapan → Paparan titik buta dan Tetapan → Butang</string>
     <string name="setup_done_title">Persediaan selesai</string>
     <string name="regroup_title">Tetapan telah disusun semula</string>
-    <string name="regroup_body">Tetapan telah berpindah; pilihan anda yang sedia ada kekal.\n\nAntara muka dan Sistem kini Umum; Bunyi pemanduan simulasi juga dalam Umum.\nPaparan titik buta telah dipindahkan keluar daripada Cermin super ke bahagiannya sendiri.\nButang terapung dan butang pintar kini Butang.\nSemak kemas kini dan Perihal &amp; penghargaan kini Kemas kini &amp; perihal.\nSuis untuk Cermin super, Butang terapung dan lain-lain berada di sebelah butang tindakan pada skrin utama.</string>
+    <string name="regroup_body">Tetapan telah berpindah; tetapan sedia ada tidak berubah.\n\nAntara muka dan Sistem kini Umum, dan Bunyi pemanduan simulasi juga dalam Umum.\nPaparan titik buta dipindahkan keluar daripada Cermin super ke bahagiannya sendiri.\nButang terapung dan butang pintar kini dinamakan Butang.\nSemak kemas kini dan Perihal &amp; penghargaan kini Kemas kini &amp; perihal.\nSuis untuk Cermin super, Butang terapung dan lain-lain berada di sebelah butang tindakan pada skrin utama.</string>
 </resources>

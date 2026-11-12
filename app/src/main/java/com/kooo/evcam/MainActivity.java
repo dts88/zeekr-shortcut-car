@@ -1211,6 +1211,7 @@ public class MainActivity extends AppCompatActivity implements com.kooo.evcam.se
         // 可能刚在设置里换了录像盘：状态条的余量按新盘重算（探测缓存已在设置里清掉）
         updateStatusLine();
         recordingLayout.setVisibility(View.VISIBLE);
+        settleFragmentContainer();
         fragmentContainer.setVisibility(View.GONE);
         // 可能刚在设置里改了视频流配置、摄像头开关、各路参数、摄像头映射：这一刻生效，照存下的配置重新摆、接上时换管线
         relayoutIfConfigChanged("settings");
@@ -1228,16 +1229,29 @@ public class MainActivity extends AppCompatActivity implements com.kooo.evcam.se
     private void showFragment(Fragment fragment) {
         recordingLayout.setVisibility(View.GONE);
         fragmentContainer.setVisibility(View.VISIBLE);
-        // 进一层：沿 Z 轴放大淡入，和设置里进二级界面是同一个动作。
+        // 换界面（ui-spec §十四）：新的一面淡入、从稍大收到原大。动的是放界面的这个容器，画面那一层不动。
         // 录制中（且开着「录制时减少动效」）或系统关了动画时直接切
+        settleFragmentContainer();
         if (com.kooo.evcam.ui.MotionPolicy.decorative(this)) {
-            fragment.setEnterTransition(new com.google.android.material.transition.MaterialSharedAxis(
-                    com.google.android.material.transition.MaterialSharedAxis.Z, true));
+            fragmentContainer.setAlpha(0f);
+            fragmentContainer.setScaleX(com.kooo.evcam.ui.Motion.ARRIVE_SCALE);
+            fragmentContainer.setScaleY(com.kooo.evcam.ui.Motion.ARRIVE_SCALE);
+            fragmentContainer.animate().alpha(1f).scaleX(1f).scaleY(1f)
+                    .setDuration(com.kooo.evcam.ui.Motion.SLOW)
+                    .setInterpolator(com.kooo.evcam.ui.Motion.enter()).start();
         }
         getSupportFragmentManager().beginTransaction()
                 .replace(R.id.fragment_container, fragment)
                 .setPrimaryNavigationFragment(fragment)
                 .commit();
+    }
+
+    /** 放界面的容器回到原样（换界面的动效可能停在半路）。 */
+    private void settleFragmentContainer() {
+        fragmentContainer.animate().cancel();
+        fragmentContainer.setAlpha(1f);
+        fragmentContainer.setScaleX(1f);
+        fragmentContainer.setScaleY(1f);
     }
 
     /**
@@ -1258,7 +1272,7 @@ public class MainActivity extends AppCompatActivity implements com.kooo.evcam.se
         if (row.indexOfChild(rail) != target) {
             if (row.isLaidOut() && com.kooo.evcam.ui.MotionPolicy.decorative(this)) {
                 android.transition.TransitionManager.beginDelayedTransition(row,
-                        new android.transition.ChangeBounds().setDuration(250));
+                        new android.transition.ChangeBounds().setDuration(com.kooo.evcam.ui.Motion.MEDIUM));
             }
             row.removeView(rail);
             row.addView(rail, left ? 0 : row.getChildCount());
@@ -2742,11 +2756,16 @@ public class MainActivity extends AppCompatActivity implements com.kooo.evcam.se
         // 先问当前这一层自己能不能退一步。设置页的二级界面（权限、相机映射）
         // 进的是设置外壳自己的子返回栈，活动这一层的返回栈是空的 ——
         // 不问它，从二级界面按返回会一路跳回录制界面，而不是回到刚才那个分区。
-        // 初始设置里返回键是「上一步」；已经在第一步，照主界面那样退到后台
+        // 初始设置里返回键是「上一步」。已经在第一步：首次启动的照主界面那样退到后台（还没走完，下次打开接着走）；
+        // 从设置里再走一遍的，回主界面
         Fragment setup = fragmentManager.findFragmentById(R.id.fragment_container);
         if (setup instanceof com.kooo.evcam.setup.SetupFragment && setup.isAdded()) {
             if (!((com.kooo.evcam.setup.SetupFragment) setup).back()) {
-                moveTaskToBack(true);
+                if (appConfig.needsSetup()) {
+                    moveTaskToBack(true);
+                } else {
+                    goToRecordingInterface();
+                }
             }
             return;
         }

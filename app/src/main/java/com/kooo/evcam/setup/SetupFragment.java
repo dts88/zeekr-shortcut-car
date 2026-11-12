@@ -240,7 +240,7 @@ public class SetupFragment extends Fragment implements StorageState.Listener {
                     }
                     render();
                     block.setTranslationX(shift);
-                    block.animate().alpha(1f).translationX(0f).setDuration(Motion.MEDIUM)
+                    block.animate().alpha(1f).translationX(0f).setDuration(Motion.SLOW - Motion.LEAVE)
                             .setInterpolator(Motion.enter()).withEndAction(() -> moving = false).start();
                 }).start();
     }

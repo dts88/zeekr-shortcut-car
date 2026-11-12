@@ -29,10 +29,11 @@ public final class Motion {
     public static final long LEAVE = 100;
     /** 收起比展开快一点：要走的东西不用人等。 */
     public static final long COLLAPSE = 200;
-    /** 一行一行长出来时，后一行比前一行晚这么多。 */
-    public static final long STAGGER = 30;
     /** 被指到的那一行闪一下的时长；闪两下。 */
     public static final long FLASH = 270;
+
+    /** 换界面时新的一面从多大收到原大（主界面、设置、初始设置之间）。 */
+    public static final float ARRIVE_SCALE = 1.03f;
 
     private static final Interpolator ENTER = new PathInterpolator(0.05f, 0.7f, 0.1f, 1f);
     private static final Interpolator EXIT = new PathInterpolator(0.3f, 0f, 0.8f, 0.15f);

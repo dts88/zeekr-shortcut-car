@@ -8,25 +8,18 @@
     <string name="set_back_to_recording">Back to main screen</string>
     <string name="set_check_update_title">Check for updates</string>
     <string name="set_check_update_summary">Current version %1$s</string>
-    <string name="set_update_beta_title">Include beta releases</string>
-    <string name="set_update_beta_summary">When off, checks stable releases only</string>
-    <string name="set_update_alpha_title">Include alpha releases</string>
     <string name="set_update_alpha_summary">Alpha releases are test builds still in development and may be unstable</string>
     <string name="upd_none_release">No installable stable release found</string>
     <string name="set_section_recording">Recording</string>
     <string name="set_section_storage">Storage</string>
     <!-- 设置页里的分组标题（项目所有者 2026-10-19） -->
-    <string name="set_group_stream">Stream</string>
     <string name="set_group_auto_record">Automatic recording</string>
-    <string name="set_group_photo">Photos</string>
-    <string name="set_group_stamps">Stamps</string>
     <string name="set_group_window">Window</string>
     <string name="set_group_appearance">Appearance</string>
     <string name="set_group_cameras">Cameras</string>
     <string name="set_group_files">File maintenance</string>
     <string name="set_section_rearview">Super mirror</string>
     <string name="set_section_floating">Floating button</string>
-    <string name="set_section_system">System</string>
     <string name="set_section_about">About &amp; credits</string>
     <string name="set_car_model_title">Cameras</string>
     <string name="set_profile_editor_title">Detailed settings</string>
@@ -61,7 +54,6 @@
     <string name="dlg_rearview_reset_title">Reset window and view?</string>
     <string name="rearview_editor_hint">Drag an edge or corner to change the width and height, or pinch with two fingers. Drag inside the frame to move it; the position is not saved.</string>
     <string name="set_rearview_guide_title">How to use</string>
-    <string name="set_rearview_guide_summary">Gesture zones, switching cameras, framing, docking and resizing</string>
     <string name="set_side_view_title">Blind spot view</string>
     <string name="set_side_view_summary">Shows the side camera on that side of the screen, depending on the chosen mode</string>
     <string name="set_side_view_min_speed_title">Minimum speed</string>
@@ -127,8 +119,6 @@
     <string name="floating_action_play_outside_voice">Play the courtesy message on the exterior speaker</string>
     <string name="msg_outside_voice_failed">The exterior speaker didn\'t play</string>
     <!-- 灵动贴（试验性，2026-10-30 项目所有者批准，button.SmartButtons） -->
-    <string name="set_section_floating_page">Floating button and smart buttons</string>
-    <string name="set_group_smart_button">Smart buttons (experimental)</string>
     <string name="set_smart_buttons_title">Smart buttons</string>
     <string name="set_smart_buttons_summary">Runs the chosen action when a paired smart button is pressed; when off, doesn\'t scan for Bluetooth devices</string>
     <string name="set_smart_button_bind_title">Pair smart button</string>
@@ -261,7 +251,6 @@
     <string name="settings_imported_reopen">Settings imported; they take effect after the app is reopened</string>
     <!-- Vehicle signals (experimental): groups, signal names, values -->
     <string name="set_vehicle_info_title">Vehicle signals</string>
-    <string name="set_vehicle_info_summary">Vehicle signals the head unit exposes and their current state; ticked items appear on the Driving info bar</string>
     <string name="vi_legend">Ticked items appear on the Driving info bar (requires Settings → Recording → Driving info bar): as an icon where one exists, otherwise as text for now, as noted under each row; items that don\'t fit are left out. Label color shows how well a signal is verified: normal text color, consistent in on-car tests (still cross-checked); grey, usable with details pending; faint grey, readable but unverified, can be ticked only with developer options on.</string>
     <string name="vi_position">Position (lat/long)</string>
     <string name="vi_position_source">System location</string>
@@ -422,7 +411,6 @@
 
     <!-- Settings prompts and dialogs -->
     <string name="msg_stream_changed">Stream profile set to “%1$s”.</string>
-    <string name="msg_dev_only">Requires developer options</string>
     <string name="dlg_internal_title">Use internal storage?</string>
     <string name="dlg_internal_msg">Recording writes data continuously. Internal storage has limited write endurance and usually can\'t be replaced.\n\nA USB drive is recommended: it can be replaced if it fails, and removed to copy files.</string>
     <string name="dlg_internal_ok">Use internal storage anyway</string>
@@ -756,7 +744,6 @@
     <string name="opt_rail_left">Left</string>
 
     <!-- Interface section · first-launch side question · record unavailable · status bar -->
-    <string name="set_section_interface">Interface</string>
     <string name="set_reduce_motion_title">Less motion while recording</string>
     <string name="set_reduce_motion_summary">Turns off transitions and other decorative animation while recording, leaving the GPU to the encoder. The record button and progress ring still animate.</string>
     <string name="set_vehicle_status_title">Vehicle status</string>
@@ -1032,10 +1019,7 @@
     <string name="set_footage_audio_source_title">Microphone source</string>
     <string name="set_footage_audio_source_raw">Raw (unprocessed, quieter)</string>
     <string name="set_footage_audio_source_call">Call (noise reduction and echo cancellation)</string>
-    <string name="set_footage_audio_source_raw_short">Raw</string>
-    <string name="set_footage_audio_source_call_short">Call</string>
     <string name="msg_footage_audio_no_permission">No microphone permission, Record sound stays off</string>
-    <string name="dev_drive_sound_group">Drive sound</string>
     <string name="dev_drive_sound_title">Simulated drive sound</string>
     <string name="dev_drive_sound_summary">In Sport mode (optionally Standard too), synthesizes engine sound from the throttle, speed and acceleration and plays it through the speakers chosen in Speakers (the cabin speakers follow the media volume). Switching to these modes while stopped plays an engine start.</string>
     <string name="dev_drive_sound_standard_title">Play in Standard mode</string>
@@ -1065,7 +1049,6 @@
     <string name="dev_drive_sound_route_notify">BUS12 (outer notify)</string>
     <string name="dev_drive_sound_route_playback">BUS11 (outer playback)</string>
     <string name="dev_drive_sound_exterior_volume_title">Exterior volume</string>
-    <string name="dev_drive_sound_value">%1$s · %2$s</string>
     <string name="msg_drive_sound_on">Simulated drive sound on</string>
     <string name="msg_drive_sound_off">Simulated drive sound off</string>
     <string name="dev_perm_all_files">All files access</string>
@@ -1162,7 +1145,7 @@
     <string name="set_rearview_camera_label_title">Direction label</string>
     <string name="set_rearview_camera_label_summary">Shows the direction of the current view in the top-left corner of the window</string>
 
-    <!-- 4.0 设置的结构（ui-spec §十六；项目所有者 2026-11-12 批准中文，英文、马来文待整理） -->
+    <!-- 4.0 设置的结构（ui-spec §十六；项目所有者 2026-11-12 批准中文，英文、马来文 2026-11-12 整理过一遍，待项目所有者看） -->
     <string name="set_section_keys">Buttons</string>
     <string name="set_section_general">General</string>
     <string name="set_section_update_about">Updates &amp; about</string>
@@ -1214,23 +1197,23 @@
     <string name="setup_back">Back</string>
     <string name="setup_next">Next</string>
     <string name="setup_continue">Continue</string>
-    <string name="setup_enter">Go to Main screen</string>
+    <string name="setup_enter">Go to main screen</string>
     <string name="setup_step_language">Language</string>
     <string name="setup_step_side">Driver\'s seat</string>
     <string name="setup_step_drive">USB drive</string>
     <string name="setup_step_features">Common features</string>
     <string name="setup_step_done">Done</string>
-    <string name="setup_language_note">You can change this in Settings → General → Language</string>
-    <string name="setup_side_note">The action buttons go on the driver\'s side. You can change this in Settings → General → Action button side</string>
+    <string name="setup_language_note">Can be changed in Settings → General → Language</string>
+    <string name="setup_side_note">The action buttons go on the driver\'s side. Can be changed in Settings → General → Action button side</string>
     <string name="setup_side_lhd">Left-hand drive</string>
     <string name="setup_side_rhd">Right-hand drive</string>
     <string name="setup_drive_found">USB drive detected</string>
     <string name="setup_drive_space">%1$s free of %2$s</string>
     <string name="setup_drive_missing">No USB drive detected</string>
-    <string name="setup_drive_later">You can insert one later</string>
-    <string name="setup_record_note">You can change these in Settings → Recording</string>
-    <string name="setup_features_note">Turn on what you need. You can change these in Settings → Super mirror, Settings → Blind spot view and Settings → Buttons</string>
+    <string name="setup_drive_later">Can be inserted later</string>
+    <string name="setup_record_note">These can be changed in Settings → Recording</string>
+    <string name="setup_features_note">Turn on what\'s needed. These can be changed in Settings → Super mirror, Settings → Blind spot view and Settings → Buttons</string>
     <string name="setup_done_title">Setup complete</string>
     <string name="regroup_title">Settings have been rearranged</string>
-    <string name="regroup_body">Settings have moved; the ones you already chose stay as they are.\n\nInterface and System are now General; Simulated drive sound is in General too.\nBlind spot view has moved out of Super mirror into its own section.\nFloating button and smart buttons is now Buttons.\nCheck for updates and About &amp; credits are now Updates &amp; about.\nSwitches for Super mirror, Floating button and more are next to the action buttons on the main screen.</string>
+    <string name="regroup_body">Settings have moved; existing settings are unchanged.\n\nInterface and System are now General, and Simulated drive sound is in General too.\nBlind spot view has moved out of Super mirror into its own section.\nFloating button and smart buttons is now called Buttons.\nCheck for updates and About &amp; credits are now Updates &amp; about.\nSwitches for Super mirror, Floating button and others are next to the action buttons on the main screen.</string>
 </resources>

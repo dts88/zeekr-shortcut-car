@@ -22,25 +22,18 @@
     <string name="set_back_to_recording">返回主界面</string>
     <string name="set_check_update_title">检查更新</string>
     <string name="set_check_update_summary">当前版本 %1$s</string>
-    <string name="set_update_beta_title">接收 Beta 版</string>
-    <string name="set_update_beta_summary">关闭后，仅检查正式版</string>
-    <string name="set_update_alpha_title">接收 Alpha 版</string>
     <string name="set_update_alpha_summary">Alpha 版是开发中的测试版本，可能不稳定</string>
     <string name="upd_none_release">未找到可安装的正式版</string>
     <string name="set_section_recording">录制</string>
     <string name="set_section_storage">存储</string>
     <!-- 设置页里的分组标题（项目所有者 2026-10-19） -->
-    <string name="set_group_stream">视频流</string>
     <string name="set_group_auto_record">自动录制</string>
-    <string name="set_group_photo">拍照</string>
-    <string name="set_group_stamps">水印</string>
     <string name="set_group_window">窗口</string>
     <string name="set_group_appearance">外观</string>
     <string name="set_group_cameras">摄像头</string>
     <string name="set_group_files">文件维护</string>
     <string name="set_section_rearview">超级镜子</string>
     <string name="set_section_floating">悬浮按钮</string>
-    <string name="set_section_system">系统</string>
     <string name="set_section_about">关于与致谢</string>
     <string name="set_car_model_title">摄像头</string>
     <string name="set_profile_editor_title">详细参数</string>
@@ -76,7 +69,6 @@
     <string name="dlg_rearview_reset_title">重置窗口与画面？</string>
     <string name="rearview_editor_hint">拖动边或角调整宽度和高度，也可以双指缩放。拖动框内可以移动，位置不保存。</string>
     <string name="set_rearview_guide_title">使用指南</string>
-    <string name="set_rearview_guide_summary">手势区域、切换画面、调整取景、贴边隐藏、调整窗口大小</string>
     <!-- 盲区画面（超级镜子分区里的一组，和超级镜子各管各的）：文字 2026-10-17 项目所有者批准 -->
     <string name="set_side_view_title">盲区画面</string>
     <string name="set_side_view_summary">按所选情境在屏幕该侧显示侧方摄像头画面</string>
@@ -148,8 +140,6 @@
     <string name="floating_action_play_outside_voice">车外喇叭播放礼让语音</string>
     <string name="msg_outside_voice_failed">车外喇叭没有播放</string>
     <!-- 灵动贴（试验性，2026-10-30 项目所有者批准，button.SmartButtons） -->
-    <string name="set_section_floating_page">悬浮键与灵动贴</string>
-    <string name="set_group_smart_button">灵动贴（试验性）</string>
     <string name="set_smart_buttons_title">灵动贴</string>
     <string name="set_smart_buttons_summary">按下已绑定的灵动贴时执行所选动作；关闭后，不扫描蓝牙</string>
     <string name="set_smart_button_bind_title">绑定灵动贴</string>
@@ -285,7 +275,6 @@
     <string name="settings_imported_reopen">已导入设置，重新打开应用后生效</string>
     <!-- 车辆信号（试验性）：分组、信号名、值 -->
     <string name="set_vehicle_info_title">车辆信号</string>
-    <string name="set_vehicle_info_summary">车机可读取的车辆信号及当前状态；勾选的项目显示在行驶信息条上</string>
     <string name="vi_legend">勾选的项目显示在行驶信息条上（需开启「设置 → 录制 → 行驶信息条」）：有图标的显示为图标，其余暂以文字显示，每行下方注明；超出信息条宽度的不显示。名称颜色表示验证程度：正文色为实车测试结果一致（持续交叉验证）；灰色为可用、细节待定；淡灰色为可读取但未验证，需开启开发者选项才能勾选。</string>
     <string name="vi_position">位置（经纬度）</string>
     <string name="vi_position_source">系统定位</string>
@@ -446,7 +435,6 @@
 
     <!-- 设置界面里的提示与对话框 -->
     <string name="msg_stream_changed">视频流配置已改为「%1$s」</string>
-    <string name="msg_dev_only">需开启开发者选项</string>
     <string name="dlg_internal_title">使用内置存储？</string>
     <string name="dlg_internal_msg">录制时会持续写入数据。内置存储的写入寿命有限，且通常无法更换。\n\n建议使用 U 盘：损坏后可随时更换，也便于取下拷贝文件。</string>
     <string name="dlg_internal_ok">仍然使用内置存储</string>
@@ -760,7 +748,6 @@
     <string name="opt_rail_left">左侧</string>
 
     <!-- 界面分区 · 首次启动问舵位 · 录制键不可用 · 状态条 -->
-    <string name="set_section_interface">界面</string>
     <string name="set_reduce_motion_title">录制时减少动效</string>
     <string name="set_reduce_motion_summary">录制时关闭界面过渡、画面缩放等装饰动效，减少 GPU 占用；录制键和进度环不受影响</string>
     <string name="set_vehicle_status_title">车辆状态</string>
@@ -1029,10 +1016,7 @@
     <string name="set_footage_audio_source_title">麦克风来源</string>
     <string name="set_footage_audio_source_raw">原始（不经处理，声音较小）</string>
     <string name="set_footage_audio_source_call">通话（经降噪和回声消除）</string>
-    <string name="set_footage_audio_source_raw_short">原始</string>
-    <string name="set_footage_audio_source_call_short">通话</string>
     <string name="msg_footage_audio_no_permission">没有录音权限，录制声音没有打开</string>
-    <string name="dev_drive_sound_group">模拟声浪</string>
     <string name="dev_drive_sound_title">模拟声浪</string>
     <string name="dev_drive_sound_summary">运动模式下（可选标准模式）按油门、车速和加减速合成发动机声，从「播放喇叭」选的喇叭播放，车内喇叭跟随媒体音量。停车时切换到这些模式会先播放启动声。</string>
     <string name="dev_drive_sound_standard_title">标准模式下播放</string>
@@ -1062,7 +1046,6 @@
     <string name="dev_drive_sound_route_notify">BUS12（外部通知）</string>
     <string name="dev_drive_sound_route_playback">BUS11（外部播放）</string>
     <string name="dev_drive_sound_exterior_volume_title">车外音量</string>
-    <string name="dev_drive_sound_value">%1$s · %2$s</string>
     <string name="msg_drive_sound_on">已开启模拟声浪</string>
     <string name="msg_drive_sound_off">已关闭模拟声浪</string>
     <string name="dev_perm_all_files">所有文件访问</string>

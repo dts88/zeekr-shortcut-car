@@ -7,6 +7,7 @@
 
 package com.kooo.evcam.settings;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import com.kooo.evcam.AppConfig;
@@ -52,6 +53,22 @@ public class SettingsShotsTest {
         config.setSideViewEnabled(true);
         config.setDriveSoundEnabled(true);
         shoot(Shots.DAY, "day-on");
+    }
+
+    /** 状态能点（ui-spec §十三）：从主界面带着「去哪一行」打开设置，停在那一行所在的分区；已经开着就在里面换过去。 */
+    @Test
+    public void openingAtARowLandsOnItsSection() {
+        RuntimeEnvironment.setQualifiers(Shots.DAY);
+        ShotActivity activity = Robolectric.buildActivity(ShotActivity.class).setup().get();
+        Shots.stillFrames(activity);
+        SettingsShellFragment shell = SettingsShellFragment.at("screen_storage", "pref_storage_location", null);
+        activity.getSupportFragmentManager().beginTransaction().replace(activity.container, shell).commitNow();
+        Shots.settle();
+        assertEquals("screen_storage", shell.currentSection());
+
+        shell.showRow("screen_recording", "pref_record_quality", null);
+        Shots.settle();
+        assertEquals("screen_recording", shell.currentSection());
     }
 
     private void shoot(String qualifiers, String tag) {

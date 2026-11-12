@@ -153,9 +153,9 @@ public class SettingsShellFragment extends Fragment {
         if (shown != null && MotionPolicy.decorative(requireContext())) {
             // 换分区沿纵轴走：左栏是竖着排的，点下面一行内容就从下面上来，
             // 点上面一行就从上面下来 —— 动作的方向和手指在列表里移动的方向一致。
-            // 平级切换不用横向（那读起来像「进了下一级」），也不用 Z 轴（那是进二级界面）
-            shown.setExitTransition(new MaterialSharedAxis(MaterialSharedAxis.Y, down));
-            next.setEnterTransition(new MaterialSharedAxis(MaterialSharedAxis.Y, down));
+            // 平级切换不用横向（那是往前一步、往回一步），也不用放大缩小（那是换界面）
+            shown.setExitTransition(axis(MaterialSharedAxis.Y, down));
+            next.setEnterTransition(axis(MaterialSharedAxis.Y, down));
         }
         getChildFragmentManager().beginTransaction()
                 .setReorderingAllowed(true)
@@ -213,6 +213,13 @@ public class SettingsShellFragment extends Fragment {
         navButton.setContentDescription(getString(R.string.cd_menu));
     }
 
+    /** 设置里的过渡都是这一种做法、一个时长（ui-spec §十四：最长的一档）。 */
+    private static MaterialSharedAxis axis(int axis, boolean forward) {
+        MaterialSharedAxis transition = new MaterialSharedAxis(axis, forward);
+        transition.setDuration(com.kooo.evcam.ui.Motion.SLOW);
+        return transition;
+    }
+
     /**
      * 分区内部再往下走（权限、相机映射这些自带界面的）。
      *
@@ -220,17 +227,17 @@ public class SettingsShellFragment extends Fragment {
      * 进了二级界面还看得见自己在设置的哪一块。进返回栈，返回键回到分区。</p>
      */
     void openDetail(Fragment fragment, CharSequence title) {
-        // 进二级界面沿 Z 轴：新的一层从稍小放大到位，旧的一层稍放大并淡出；
-        // 返回时两者各自倒放 —— 深了一层还是退回一层，看动作就知道
+        // 往前一步、往回一步（ui-spec §十四）：进下一层，新的从右边进来、旧的向左退；返回时倒放 ——
+        // 深了一层还是退回一层，看动作就知道。和初始设置里换步是同一个动作
         Fragment shown = getChildFragmentManager().findFragmentById(R.id.settings_detail);
         boolean animate = MotionPolicy.decorative(requireContext());
         if (shown != null) {
-            shown.setExitTransition(animate ? new MaterialSharedAxis(MaterialSharedAxis.Z, true) : null);
-            shown.setReenterTransition(animate ? new MaterialSharedAxis(MaterialSharedAxis.Z, false) : null);
+            shown.setExitTransition(animate ? axis(MaterialSharedAxis.X, true) : null);
+            shown.setReenterTransition(animate ? axis(MaterialSharedAxis.X, false) : null);
         }
         if (animate) {
-            fragment.setEnterTransition(new MaterialSharedAxis(MaterialSharedAxis.Z, true));
-            fragment.setReturnTransition(new MaterialSharedAxis(MaterialSharedAxis.Z, false));
+            fragment.setEnterTransition(axis(MaterialSharedAxis.X, true));
+            fragment.setReturnTransition(axis(MaterialSharedAxis.X, false));
         }
         // 打上类名当 tag：被换下去的那一层还在返回栈里活着，
         // 有 tag 才找得回来。摆位那一页要改的正是被它换下去的配置编辑里
