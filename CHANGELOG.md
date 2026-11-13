@@ -9,7 +9,10 @@ commit message, not here.
 
 ## [Unreleased]
 
-Nothing yet.
+- Alerts (new section in Settings, off by default): with the car parked and Sentry Mode on, the app
+  sends one picture of all four cameras to a Telegram chat when the hazards come on, the high beams
+  flash, or a door opens. The bot token is typed on the car screen and can be found together with the
+  chat id under Alerts; it stays on the car and out of the settings export.
 
 ## [4.4.1-alpha] - 2026-11-14
 

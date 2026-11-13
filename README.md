@@ -74,6 +74,27 @@ The file is served over your local network only while the dialog is open, from a
 address, and only that one file. Both devices need to be on the same network — the easiest way is
 to turn on the phone's hotspot and connect the car to it.
 
+### Alerts while parked
+
+With the car parked and Sentry Mode on, the app can send you a picture when something happens to it.
+Off by default; set it up once, from the car screen, and nothing needs rebuilding.
+
+- One picture of all four cameras, taken by the same photo path the shutter button uses, so it looks
+  like a photo you would have taken yourself.
+- It goes to a Telegram chat when the hazards come on, the high beams flash, or any door, the frunk or
+  the trunk opens.
+- **Settings → Alerts**: paste the bot token from @BotFather, then tap **Find chat id** — send the bot
+  one message from your phone first, and the row fills in the chat it came from. **Send a test picture**
+  proves the whole path before you rely on it.
+- One alert per minute at most, six an hour. The cooldown is there because one event trips several
+  signals at once.
+- The bot token stays on this car, in its own store: it is not in the exported settings, not in a
+  diagnostics report, and not in the log.
+
+This car has no impact, horn, airbag or tamper signal on the bus that this app can read, so a knock
+that never lights the hazards and never opens a door will not be seen. The picture is the four
+surround cameras stitched into the 2×2 grid, not the cabin cameras.
+
 ### Experimental
 
 - *Smart buttons*: connect Bluetooth buttons named `ZEEKR_button`. Single and double press each run
