@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [4.2.0-alpha] - 2026-11-14
+
+- Main screen: while recording, when only the car's Sentry Mode is missing for recording to continue with the screen off, a Turn on Sentry Mode key appears beside the record key. It turns Sentry Mode on and slides away.
+- Record key: the second line while recording shows the time recorded ("Recording 12:34") instead of the clip progress. Shorter English and Malay screen-off hints.
+- Settings: Recording status (the chip in the corner of the picture) is off by default.
+
 ## [4.1.1-alpha] - 2026-11-13
 
 - Main screen: in the three-by-two picture area the Surround pictures fill their cells, so they line up with the cabin picture.
