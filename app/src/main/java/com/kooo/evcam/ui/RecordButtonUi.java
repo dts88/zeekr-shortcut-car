@@ -13,6 +13,7 @@ import android.animation.ArgbEvaluator;
 import android.animation.ValueAnimator;
 import android.content.Context;
 import android.content.res.ColorStateList;
+import android.graphics.Rect;
 import android.graphics.drawable.GradientDrawable;
 import android.os.SystemClock;
 import android.text.TextPaint;
@@ -95,24 +96,40 @@ public final class RecordButtonUi {
     private enum SentryKey { HIDDEN, OFFERED, TURNING_ON, LIT, TURNING_OFF }
 
     /**
-     * 图标从没开到开着的过渡（项目所有者 2026-11-14）：灯芯先由图标的本色变红，三道光跟着变红，最后整个图标鼓一下再收回。
-     * 900 ms，比别处的动效（最长 300 ms）长得多 —— 项目所有者定的：「有一个充裕的时间展示图标的变化过程」。
-     * 是状态本身在变，不算装饰（同录制键的圆变方），录制时也照常放；系统关了动画时直接到开着的样子。
+     * 图标从没开到开着的过渡（项目所有者 2026-11-14）：不是换个颜色，是一段动画 —— 红的灯芯像警灯一样从左到右转过去，
+     * 转 {@link #SENTRY_SWEEPS} 圈（红和本色交替），再转进来、定住，整颗是红的；头顶三道光从靠灯的一头往外长成红的；
+     * 末了整个图标鼓一下再收回。一共 1.5 秒，比别处的动效（最长 300 ms）长得多 —— 项目所有者定的：
+     * 「有一个充裕的时间展示图标的变化过程」。是状态本身在变，不算装饰（同录制键的圆变方），录制时也照常放；
+     * 系统关了动画时直接到开着的样子。
      */
-    private static final long SENTRY_LIGHT_MS = 3 * Motion.SLOW;
-    /** 从开着变回没开（反悔关掉了）：不用慢慢看，一档。 */
+    private static final long SENTRY_LIGHT_MS = 5 * Motion.SLOW;
+    /** 从开着变回没开（反悔关掉了）：三道光缩回去、红的灯芯退出去，不转圈，一档。 */
     private static final long SENTRY_UNLIGHT_MS = Motion.SLOW;
     /** 点亮之后至少让人看这么久，键才收起。 */
     private static final long SENTRY_LIT_HOLD_MS = 2 * Motion.SLOW;
-    /** 过渡里各段占哪一截（0–1）：灯芯在这之前变完。 */
-    private static final float SENTRY_LAMP_BY = 0.45f;
-    /** 三道光从这里开始变、到这里变完（和灯芯搭着一点）。 */
-    private static final float SENTRY_RAYS_FROM = 0.35f;
-    private static final float SENTRY_RAYS_BY = 0.8f;
+    /** 过渡里各段占哪一截（0–1）。灯芯转圈：从头到这里，转这么多圈。 */
+    static final float SENTRY_SWEEP_BY = 0.54f;
+    static final int SENTRY_SWEEPS = 3;
+    /** 转圈时露出红色的那个窗口有多宽（灯芯宽的几成）。 */
+    static final float SENTRY_BAND = 0.5f;
+    /** 灯芯定住：转完圈之后红的再从左边进来，到这里铺满整颗。 */
+    static final float SENTRY_FILL_BY = 0.72f;
+    /** 三道光往外长：从这里到这里（和灯芯定住搭着一点）。 */
+    static final float SENTRY_RAYS_FROM = 0.66f;
+    static final float SENTRY_RAYS_BY = 0.92f;
     /** 整个图标从这里开始鼓，到头收回。 */
-    private static final float SENTRY_SWELL_FROM = 0.4f;
+    private static final float SENTRY_SWELL_FROM = 0.66f;
     /** 鼓到最大时比原来大多少。 */
     private static final float SENTRY_SWELL = 0.12f;
+    /** 图标画布上的位置（{@code ic_sentry_*.xml}，画布宽 24 格）：灯芯左右两边。 */
+    private static final float ICON_UNITS = 24f;
+    private static final float LAMP_LEFT = 9.1f;
+    private static final float LAMP_RIGHT = 14.9f;
+    /** 红的三道光那个窗口：没露时左、上、右三边贴着灯罩（光都在外面）；露完到画布边。右边和左边对称。 */
+    private static final float RAYS_LEFT_IN = 5.3f;
+    private static final float RAYS_LEFT_OUT = 1.4f;
+    private static final float RAYS_TOP_IN = 4.7f;
+    private static final float RAYS_TOP_OUT = 0.6f;
     /** 键往外滑的时候，滑出去不到一半（分出去的还剩这么多以上）还点得到：反悔。 */
     static final float SENTRY_CANCEL_UNTIL = 0.5f;
 
@@ -142,11 +159,14 @@ public final class RecordButtonUi {
     /** 录制键那一行（不在那种布局里时是 null，就没有「开启哨兵模式」）。 */
     private final RecordKeyRow row;
     private final View sentryKey;
-    /** 图标那一小块，里面三层叠着：灯罩和底座（不变色）、灯芯、三道光（后两层开着时是红的）。 */
+    /**
+     * 图标那一小块，里面五层叠着：三道光、灯罩和底座、灯芯是图标的本色，不变；灯芯、三道光各另有一份红的盖在上面，
+     * 平时不露，点亮时按窗口露出来（{@link #applyLit}）。
+     */
     private final View sentryIcon;
-    private final ImageView sentryBody;
-    private final ImageView sentryLamp;
-    private final ImageView sentryRays;
+    private final ImageView sentryLampOn;
+    private final ImageView sentryRaysOn;
+    private final Rect sentryClip = new Rect();
     private final View sentryLabel;
     /** 录制键里面那一排（左右留白在它身上）和右边那几行字（和点之间的距离在它身上）。 */
     private final View content;
@@ -162,7 +182,6 @@ public final class RecordButtonUi {
     /** 这一次录像已经录了多久（第二行写的）。 */
     private long recordedMs;
     private final Runnable sentryUnconfirmed = this::onSentryUnconfirmed;
-    private final ArgbEvaluator sentryColors = new ArgbEvaluator();
     private ValueAnimator lightAnimator;
     /** 过渡正往哪个样子去（{@link #lightAnimator} 在走时才有意义）。 */
     private float lightTarget;
@@ -206,9 +225,8 @@ public final class RecordButtonUi {
         this.row = root.getParent() instanceof RecordKeyRow ? (RecordKeyRow) root.getParent() : null;
         this.sentryKey = row == null ? null : row.findViewById(R.id.btn_sentry_on);
         this.sentryIcon = sentryKey == null ? null : sentryKey.findViewById(R.id.sentry_key_icon);
-        this.sentryBody = sentryKey == null ? null : sentryKey.findViewById(R.id.sentry_key_body);
-        this.sentryLamp = sentryKey == null ? null : sentryKey.findViewById(R.id.sentry_key_lamp);
-        this.sentryRays = sentryKey == null ? null : sentryKey.findViewById(R.id.sentry_key_rays);
+        this.sentryLampOn = sentryKey == null ? null : sentryKey.findViewById(R.id.sentry_key_lamp_on);
+        this.sentryRaysOn = sentryKey == null ? null : sentryKey.findViewById(R.id.sentry_key_rays_on);
         this.sentryLabel = sentryKey == null ? null : sentryKey.findViewById(R.id.sentry_key_label);
         if (sentryKey != null) {
             // 第一行的宽变了（右边分出去、收回来）：等这一次排完再看字放不放得下
@@ -219,7 +237,15 @@ public final class RecordButtonUi {
             });
             row.setOnSplitListener(this::onSplit);
             sentryKey.setOnClickListener(v -> onSentryKeyTapped());
-            ImageViewCompat.setImageTintList(sentryBody, ColorStateList.valueOf(color(R.color.text_primary)));
+            // 本色的三层是正文色（夜间接近白；白天是深色：灰底上白的看不见），红的两层用「正在录」那一种红
+            // （项目所有者 2026-11-14 给的图样：白色的灯座、红色的灯和光）
+            ColorStateList base = ColorStateList.valueOf(color(R.color.text_primary));
+            ColorStateList red = ColorStateList.valueOf(color(R.color.recording));
+            for (int id : new int[] {R.id.sentry_key_rays, R.id.sentry_key_body, R.id.sentry_key_lamp}) {
+                ImageViewCompat.setImageTintList(sentryKey.findViewById(id), base);
+            }
+            ImageViewCompat.setImageTintList(sentryLampOn, red);
+            ImageViewCompat.setImageTintList(sentryRaysOn, red);
             applyLit(0f);
             if (hint instanceof ScreenOffHintView) {
                 ((ScreenOffHintView) hint).setOnJudged(this::judgeSentry);
@@ -566,13 +592,17 @@ public final class RecordButtonUi {
             }
             lightAnimator.cancel();
         }
-        if (lit == target) {
+        boolean up = target >= 1f;
+        // 往回走只倒到转圈之前那一刻（那时红的已经都退干净了，和没开一个样子），不把转圈倒着再放一遍
+        float end = up ? 1f : SENTRY_SWEEP_BY;
+        if (lit == target || (!up && lit <= end)) {
+            applyLit(target);
             return;
         }
         lightTarget = target;
-        ValueAnimator animator = ValueAnimator.ofFloat(lit, target);
-        animator.setDuration(Math.max(1,
-                Math.round((target > lit ? SENTRY_LIGHT_MS : SENTRY_UNLIGHT_MS) * Math.abs(target - lit))));
+        ValueAnimator animator = ValueAnimator.ofFloat(lit, end);
+        animator.setDuration(Math.max(1, up ? Math.round(SENTRY_LIGHT_MS * (1f - lit))
+                : Math.round(SENTRY_UNLIGHT_MS * (lit - end) / (1f - end))));
         // 匀速走：先后在 applyLit 里按段分
         animator.setInterpolator(new LinearInterpolator());
         animator.addUpdateListener(a -> applyLit((float) a.getAnimatedValue()));
@@ -606,21 +636,76 @@ public final class RecordButtonUi {
     }
 
     /**
-     * 图标的样子，0 = 没开、1 = 开着，中间分三段（各占哪一截见常量）：灯芯先由图标的本色（正文色，夜间接近白）变红，
-     * 三道光跟着变红，最后整个图标鼓一下再收回。红用的是「正在录」那一种（项目所有者 2026-11-14 给的图样：白色的灯座、
-     * 红色的灯和光）。
+     * 图标的样子，0 = 没开、1 = 开着。中间是一段动画（各段占哪一截见常量），靠两个窗口做出来 —— 红的灯芯、红的三道光
+     * 各是盖在本色上面的一层，只在窗口里露出来（{@link View#setClipBounds}，不重画、不重新布局）：
+     *
+     * <ol>
+     *   <li>灯芯转圈：一个竖着的窗口从灯芯左边扫到右边外面，一圈一圈（{@link #lampWindow}），看着是红的一面转过去、
+     *       本色的一面转回来，像警灯；</li>
+     *   <li>灯芯定住：最后一圈红的转进来不再出去，铺满整颗；</li>
+     *   <li>三道光长出去：窗口从贴着灯罩往外放大到画布边，红的光从靠灯的一头露到另一头；</li>
+     *   <li>整个图标鼓一下再收回。</li>
+     * </ol>
      */
     private void applyLit(float value) {
         lit = Math.max(0f, Math.min(1f, value));
-        int base = color(R.color.text_primary);
-        int red = color(R.color.recording);
-        ImageViewCompat.setImageTintList(sentryLamp, ColorStateList.valueOf(
-                (int) sentryColors.evaluate(part(lit, 0f, SENTRY_LAMP_BY), base, red)));
-        ImageViewCompat.setImageTintList(sentryRays, ColorStateList.valueOf(
-                (int) sentryColors.evaluate(part(lit, SENTRY_RAYS_FROM, SENTRY_RAYS_BY), base, red)));
+        int width = sentryIcon.getLayoutParams().width;
+        int height = sentryIcon.getLayoutParams().height;
+        float unit = width / ICON_UNITS;
+
+        float lampLeft = LAMP_LEFT * unit;
+        float lampWidth = (LAMP_RIGHT - LAMP_LEFT) * unit;
+        lampWindow(lit, lampSpan);
+        showThrough(sentryLampOn, lampLeft + lampSpan[0] * lampWidth, 0f, lampLeft + lampSpan[1] * lampWidth, height);
+
+        float grow = part(lit, SENTRY_RAYS_FROM, SENTRY_RAYS_BY);
+        float left = RAYS_LEFT_IN + (RAYS_LEFT_OUT - RAYS_LEFT_IN) * grow;
+        float top = RAYS_TOP_IN + (RAYS_TOP_OUT - RAYS_TOP_IN) * grow;
+        if (grow <= 0f) {
+            sentryRaysOn.setVisibility(View.INVISIBLE);
+        } else {
+            showThrough(sentryRaysOn, left * unit, top * unit, (ICON_UNITS - left) * unit, height);
+        }
+
         float swell = 1f + SENTRY_SWELL * (float) Math.sin(Math.PI * part(lit, SENTRY_SWELL_FROM, 1f));
         sentryIcon.setScaleX(swell);
         sentryIcon.setScaleY(swell);
+    }
+
+    private final float[] lampSpan = new float[2];
+
+    /**
+     * 红的灯芯此刻露出哪一段：{@code out[0]}、{@code out[1]} 是窗口的左右两边，灯芯宽的几成（0 = 灯芯左边，1 = 右边），
+     * 两个一样就是不露。转圈时窗口宽 {@link #SENTRY_BAND}，每一圈从左边外面进来、到右边外面出去；转完之后从左边进来铺满。
+     */
+    static void lampWindow(float lit, float[] out) {
+        float from;
+        float to;
+        if (lit <= 0f) {
+            from = 0f;
+            to = 0f;
+        } else if (lit < SENTRY_SWEEP_BY) {
+            float turns = lit / SENTRY_SWEEP_BY * SENTRY_SWEEPS;
+            float within = turns - (float) Math.floor(turns);
+            to = within * (1f + SENTRY_BAND);
+            from = to - SENTRY_BAND;
+        } else {
+            from = 0f;
+            to = part(lit, SENTRY_SWEEP_BY, SENTRY_FILL_BY);
+        }
+        out[0] = Math.max(0f, Math.min(1f, from));
+        out[1] = Math.max(0f, Math.min(1f, to));
+    }
+
+    /** 这一层只在这个窗口里露出来（视图自己的坐标）；窗口是空的就整层不显示。 */
+    private void showThrough(View layer, float left, float top, float right, float bottom) {
+        sentryClip.set(Math.round(left), Math.round(top), Math.round(right), Math.round(bottom));
+        if (sentryClip.isEmpty()) {
+            layer.setVisibility(View.INVISIBLE);
+            return;
+        }
+        layer.setClipBounds(sentryClip);
+        layer.setVisibility(View.VISIBLE);
     }
 
     /** 整个过渡走到 {@code t} 时，占 {@code from}–{@code to} 那一截的这一段走了多少（0–1）。 */

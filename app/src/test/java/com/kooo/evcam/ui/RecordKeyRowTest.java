@@ -30,7 +30,7 @@ public class RecordKeyRowTest {
     /** 没分时录制键占满；分完让出那个键的宽加一道缝；过渡中按比例。 */
     @Test
     public void theRecordKeyGivesUpTheKeyAndAGutter() {
-        int key = 128;  // 中文的那个键：64 dp
+        int key = 106;  // 中文的那个键：53 dp
         assertEquals(ROW, RecordKeyRow.recordWidth(ROW, GUTTER, key, 0f));
         assertEquals(ROW - key - GUTTER, RecordKeyRow.recordWidth(ROW, GUTTER, key, 1f));
         assertEquals(ROW - (key + GUTTER) / 2, RecordKeyRow.recordWidth(ROW, GUTTER, key, 0.5f));
@@ -54,6 +54,41 @@ public class RecordKeyRowTest {
         assertFalse(RecordButtonUi.withinReach(true, 0.49f));
         assertFalse(RecordButtonUi.withinReach(true, 0f));
         assertTrue("拉回来的路上（没在往外滑）都点得到", RecordButtonUi.withinReach(false, 0.2f));
+    }
+
+    /**
+     * 点亮时红的灯芯像警灯一样转：一个窗口每一圈从灯芯左边外面进来、到右边外面出去，转三圈；之后从左边进来铺满、定住。
+     * 窗口两边一样就是不露。
+     */
+    @Test
+    public void theRedLampSweepsThreeTimesThenStays() {
+        float[] w = new float[2];
+        RecordButtonUi.lampWindow(0f, w);
+        assertEquals("没开：不露", w[0], w[1], 0f);
+        float turn = RecordButtonUi.SENTRY_SWEEP_BY / RecordButtonUi.SENTRY_SWEEPS;
+        for (int n = 0; n < RecordButtonUi.SENTRY_SWEEPS; n++) {
+            RecordButtonUi.lampWindow(n * turn + turn * 0.02f, w);
+            assertEquals("第 " + (n + 1) + " 圈刚进来：贴着左边", 0f, w[0], 0f);
+            assertTrue("露一点点", w[1] > 0f && w[1] < 0.1f);
+            RecordButtonUi.lampWindow(n * turn + turn * 0.5f, w);
+            assertEquals("转到一半：窗口有那么宽", RecordButtonUi.SENTRY_BAND, w[1] - w[0], 0.001f);
+            RecordButtonUi.lampWindow(n * turn + turn * 0.98f, w);
+            assertEquals("快出去了：贴着右边", 1f, w[1], 0f);
+            assertTrue("只剩一点点", w[1] - w[0] < 0.1f);
+        }
+        RecordButtonUi.lampWindow(RecordButtonUi.SENTRY_SWEEP_BY, w);
+        assertEquals("转完三圈那一刻不露（往回走就停在这里）", w[0], w[1], 0f);
+        RecordButtonUi.lampWindow((RecordButtonUi.SENTRY_SWEEP_BY + RecordButtonUi.SENTRY_FILL_BY) / 2f, w);
+        assertEquals("定住：从左边铺进来", 0f, w[0], 0f);
+        assertEquals(0.5f, w[1], 0.001f);
+        for (float lit : new float[] {RecordButtonUi.SENTRY_FILL_BY, 0.9f, 1f}) {
+            RecordButtonUi.lampWindow(lit, w);
+            assertEquals(0f, w[0], 0f);
+            assertEquals("铺满之后一直是整颗", 1f, w[1], 0f);
+        }
+        assertTrue("三道光在灯芯快定住时才开始长", RecordButtonUi.SENTRY_RAYS_FROM > RecordButtonUi.SENTRY_SWEEP_BY
+                && RecordButtonUi.SENTRY_RAYS_FROM < RecordButtonUi.SENTRY_FILL_BY
+                && RecordButtonUi.SENTRY_RAYS_BY < 1f);
     }
 
     /** 点亮的过渡按段走：每一段在它那一截里从 0 走到 1，截外不动。 */

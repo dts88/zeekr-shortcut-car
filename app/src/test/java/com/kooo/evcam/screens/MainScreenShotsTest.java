@@ -62,7 +62,7 @@ public class MainScreenShotsTest {
     }
 
     /**
-     * 录着、只差哨兵模式：录制键右边切一块给「开启哨兵模式」（项目所有者 2026-11-13）。那个键照图标和字的宽（中文 64 dp），
+     * 录着、只差哨兵模式：录制键右边切一块给「开启哨兵模式」（项目所有者 2026-11-13）。那个键照图标和字的宽（中文约 53 dp），
      * 最宽这一行的四分之一（92 dp）；录制键让出它和一道缝，字那一块窄了，三行都要放得下、不被省略。收回之后一切照旧。
      */
     @Test
@@ -120,7 +120,8 @@ public class MainScreenShotsTest {
         assertEquals(View.VISIBLE, key.getVisibility());
         assertTrue("那个键最宽四分之一（" + quarter + "），量出来 " + keyWidth, keyWidth <= quarter);
         View icon = key.findViewById(R.id.sentry_key_icon);
-        assertEquals("图标 44 dp", Math.round(44 * density), icon.getWidth());
+        assertEquals("图标宽 30 dp（项目所有者 2026-11-14：比 44 dp 小三成）", Math.round(30 * density), icon.getWidth());
+        assertEquals("图标高 33 dp（再高一些）", Math.round(33 * density), icon.getHeight());
         assertEquals("那个键照图标和字里宽的那个，两边各 10 dp：图标 " + icon.getWidth() + "，字 " + label.getWidth(),
                 Math.max(icon.getWidth(), label.getWidth()) + Math.round(20 * density), keyWidth);
         assertEquals("那个键贴着这一行的右边", row.getWidth(), key.getRight());
@@ -142,31 +143,42 @@ public class MainScreenShotsTest {
             assertEquals("熄屏提示一行写完", 1, hint.getLineCount());
             assertEquals("那个键上的字两行：哨兵 / 模式（项目所有者 2026-11-14 删了「开启」、中文也折行）", 2,
                     label.getLineCount());
-            assertEquals("中文的那个键 64 dp（四分之一是 92 dp）", Math.round(64 * density), keyWidth);
+            assertTrue("中文的那个键约 53 dp（四分之一是 92 dp）；量出来 " + keyWidth / density,
+                    keyWidth <= Math.round(56 * density));
         } else {
             assertEquals("那个键上的字两行", 2, label.getLineCount());
         }
 
-        // 图标三层：灯罩和底座是正文色；灯芯、三道光没开时同色
-        android.widget.ImageView body = key.findViewById(R.id.sentry_key_body);
-        android.widget.ImageView lamp = key.findViewById(R.id.sentry_key_lamp);
-        android.widget.ImageView rays = key.findViewById(R.id.sentry_key_rays);
+        // 图标五层：三道光、灯罩和底座、灯芯是正文色；灯芯、三道光各另有一份红的，没开时不露
+        android.widget.ImageView lampOn = key.findViewById(R.id.sentry_key_lamp_on);
+        android.widget.ImageView raysOn = key.findViewById(R.id.sentry_key_rays_on);
         int base = activity.getColor(R.color.text_primary);
         int red = activity.getColor(R.color.recording);
-        assertEquals(base, tintOf(body));
-        assertEquals("没开时灯芯同色", base, tintOf(lamp));
-        assertEquals("没开时三道光同色", base, tintOf(rays));
+        for (int id : new int[] {R.id.sentry_key_rays, R.id.sentry_key_body, R.id.sentry_key_lamp}) {
+            assertEquals(base, tintOf(key.findViewById(id)));
+        }
+        assertEquals(red, tintOf(lampOn));
+        assertEquals(red, tintOf(raysOn));
+        assertEquals("没开时红的灯芯不露", View.INVISIBLE, lampOn.getVisibility());
+        assertEquals("没开时红的光不露", View.INVISIBLE, raysOn.getVisibility());
 
-        // 哨兵模式开上了（项目所有者 2026-11-14）：图标先从没开变成开着 —— 灯芯、三道光变红；键还在、还点得到
-        // （再点一下是反悔）。让人看清之后才收起
+        // 哨兵模式开上了（项目所有者 2026-11-14）：图标先从没开变成开着 —— 红的灯芯、红的三道光整个露出来；
+        // 键还在、还点得到（再点一下是反悔）。让人看清之后才收起
         // （测试里系统动画是关的，过渡一步到位；点亮后还要停 600 ms 才收，这里不往后拨钟）
         record.setSentryKey(false, true);
         Shots.save(activity, "main-sentry-scratch");
         assertEquals("点亮的时候键还在", View.VISIBLE, key.getVisibility());
         assertTrue("亮着的时候还点得到：反悔", key.isClickable());
-        assertEquals("开着时灯芯是红的", red, tintOf(lamp));
-        assertEquals("开着时三道光是红的", red, tintOf(rays));
-        assertEquals("灯罩和底座不变色", base, tintOf(body));
+        assertEquals("开着时红的灯芯露着", View.VISIBLE, lampOn.getVisibility());
+        assertEquals("开着时红的光露着", View.VISIBLE, raysOn.getVisibility());
+        android.graphics.Rect window = new android.graphics.Rect();
+        assertTrue(lampOn.getClipBounds(window));
+        float unit = lampOn.getWidth() / 24f;
+        assertTrue("红的灯芯整颗露出来：窗口 " + window, window.left <= Math.round(9.1f * unit)
+                && window.right >= Math.round(14.9f * unit) && window.top == 0 && window.bottom == lampOn.getHeight());
+        assertTrue(raysOn.getClipBounds(window));
+        assertTrue("红的光整个露出来：窗口 " + window, window.left <= Math.round(1.8f * unit)
+                && window.top <= Math.round(1.0f * unit) && window.right >= Math.round(22.2f * unit));
         assertEquals("鼓的那一下收回来了", 1f, key.findViewById(R.id.sentry_key_icon).getScaleX(), 0.001f);
         File lit = Shots.save(activity, "main-sentry-lit-" + tag);
         assertTrue(lit + " 是空的", lit.length() > 10_000);
@@ -184,8 +196,8 @@ public class MainScreenShotsTest {
         record.setSentryKey(true, false);
         Shots.save(activity, "main-sentry-scratch");
         assertEquals(View.VISIBLE, key.getVisibility());
-        assertEquals("再出现时回到没开的样子", base, tintOf(lamp));
-        assertEquals(base, tintOf(rays));
+        assertEquals("再出现时回到没开的样子", View.INVISIBLE, lampOn.getVisibility());
+        assertEquals(View.INVISIBLE, raysOn.getVisibility());
         assertTrue(key.isClickable());
         record.setSentryKey(false, false);
         Shots.save(activity, "main-sentry-scratch");
@@ -203,8 +215,8 @@ public class MainScreenShotsTest {
     }
 
     /**
-     * 点亮的过渡在车上是 900 ms，电脑上一步到位、看不到中间：把过渡停在几处各出一张，拼起来给项目所有者看先后
-     * （灯芯先红，三道光跟着红，图标鼓一下）。只为出图：直接叫录制键里那个不公开的 applyLit。
+     * 点亮的过渡在车上是 1.5 秒，电脑上一步到位、看不到中间：把过渡停在几处各出一张，拼起来给项目所有者看先后
+     * （红的灯芯转三圈、定住，三道光长出去，图标鼓一下）。只为出图：直接叫录制键里那个不公开的 applyLit。
      */
     @Test
     public void lightingFilmStrip() throws Exception {
@@ -222,24 +234,30 @@ public class MainScreenShotsTest {
         Shots.save(activity, "main-sentry-scratch");
         java.lang.reflect.Method applyLit = RecordButtonUi.class.getDeclaredMethod("applyLit", float.class);
         applyLit.setAccessible(true);
-        int[] percents = {0, 20, 40, 55, 70, 85, 100};
+        int[] percents = {0, 6, 12, 24, 30, 42, 48, 60, 68, 76, 86, 100};
         for (int percent : percents) {
             applyLit.invoke(record, percent / 100f);
             File file = Shots.save(activity, "main-sentry-light-" + percent);
             assertTrue(file + " 是空的", file.length() > 10_000);
         }
-        android.widget.ImageView lamp = rail.findViewById(R.id.sentry_key_lamp);
-        android.widget.ImageView rays = rail.findViewById(R.id.sentry_key_rays);
-        int base = activity.getColor(R.color.text_primary);
-        int red = activity.getColor(R.color.recording);
-        applyLit.invoke(record, 0.3f);
-        assertTrue("三成时灯芯已经在变", tintOf(lamp) != base && tintOf(lamp) != red);
-        assertEquals("三成时三道光还没动", base, tintOf(rays));
-        applyLit.invoke(record, 0.5f);
-        assertEquals("一半时灯芯已经红了", red, tintOf(lamp));
-        assertTrue("一半时三道光在变", tintOf(rays) != base && tintOf(rays) != red);
-        applyLit.invoke(record, 0.7f);
-        assertTrue("七成时图标鼓着", rail.findViewById(R.id.sentry_key_icon).getScaleX() > 1.05f);
+        View lampOn = rail.findViewById(R.id.sentry_key_lamp_on);
+        View raysOn = rail.findViewById(R.id.sentry_key_rays_on);
+        android.graphics.Rect window = new android.graphics.Rect();
+        float unit = lampOn.getWidth() / 24f;
+        applyLit.invoke(record, 0.09f);
+        assertEquals("转圈时红的灯芯露着一条", View.VISIBLE, lampOn.getVisibility());
+        assertTrue(lampOn.getClipBounds(window));
+        assertTrue("那一条比整颗窄：" + window, window.width() < Math.round(5.8f * unit));
+        assertEquals("转圈时三道光还没动", View.INVISIBLE, raysOn.getVisibility());
+        applyLit.invoke(record, 0.54f);
+        assertEquals("转完三圈那一刻红的转出去了", View.INVISIBLE, lampOn.getVisibility());
+        applyLit.invoke(record, 0.8f);
+        assertTrue(lampOn.getClipBounds(window));
+        assertTrue("定住之后整颗是红的：" + window, window.width() >= Math.round(5.8f * unit) - 1);
+        assertEquals("三道光在往外长", View.VISIBLE, raysOn.getVisibility());
+        assertTrue(raysOn.getClipBounds(window));
+        assertTrue("还没长到头：" + window, window.top > Math.round(1.0f * unit));
+        assertTrue("图标鼓着", rail.findViewById(R.id.sentry_key_icon).getScaleX() > 1.05f);
         new File("build/outputs/screenshots/main-sentry-scratch.png").delete();
     }
 

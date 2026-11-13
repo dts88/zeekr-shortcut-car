@@ -158,7 +158,8 @@
 
         <!--
           「开启哨兵模式」：只在录着、只差哨兵模式就能熄屏接着录时从右边滑进来；点了打开车的哨兵模式，开上之后图标
-          从没开变成开着（灯芯和光变红），再滑出去，录制键回到原来的宽；滑出去一半之前再点一下是反悔，关掉哨兵模式。键上只写「哨兵 / 模式」两行（项目所有者 2026-11-14：
+          从没开变成开着（灯芯像警灯一样红白转几圈后定成红的，三道光长成红的），再滑出去，录制键回到原来的宽；
+          滑出去一半之前再点一下是反悔，关掉哨兵模式。键上只写「哨兵 / 模式」两行（项目所有者 2026-11-14：
           删掉「开启」，中文也折行，省宽度）。和「拍照」一样的灰底（项目所有者 2026-11-13：不要橙色实底）。宽照字来
           （图标和字里宽的那个，加两边各 10dp，最宽这一行的四分之一）：项目所有者说四分之一只是估的，能窄就窄
         -->
@@ -185,13 +186,30 @@
                 android:paddingStart="10dp"
                 android:paddingEnd="10dp">
 
-                <!-- 图标三层叠着：灯罩和底座、灯芯、三道光（没开时同色，开着时后两层是红的，点亮时灯芯先变、光跟着变；
-                     RecordButtonUi 着色） -->
+                <!--
+                  图标（30 × 33dp：项目所有者 2026-11-14 定比原来的 44dp 小三成、再高一些）。五层叠着：三道光、灯罩和底座、灯芯
+                  是图标的本色；灯芯和三道光各另有一份红的盖在上面，平时不露，点亮时按窗口露出来 —— 红的灯芯像警灯一样
+                  转几圈后整颗定住，红的光从靠灯的一头长出去（RecordButtonUi 着色、定窗口）
+                -->
                 <FrameLayout
                     android:id="@+id/sentry_key_icon"
-                    android:layout_width="44dp"
-                    android:layout_height="44dp"
+                    android:layout_width="30dp"
+                    android:layout_height="33dp"
                     android:importantForAccessibility="no">
+
+                    <ImageView
+                        android:id="@+id/sentry_key_rays"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:importantForAccessibility="no"
+                        android:src="@drawable/ic_sentry_rays" />
+
+                    <ImageView
+                        android:id="@+id/sentry_key_rays_on"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:importantForAccessibility="no"
+                        android:src="@drawable/ic_sentry_rays" />
 
                     <ImageView
                         android:id="@+id/sentry_key_body"
@@ -208,11 +226,11 @@
                         android:src="@drawable/ic_sentry_lamp" />
 
                     <ImageView
-                        android:id="@+id/sentry_key_rays"
+                        android:id="@+id/sentry_key_lamp_on"
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
                         android:importantForAccessibility="no"
-                        android:src="@drawable/ic_sentry_rays" />
+                        android:src="@drawable/ic_sentry_lamp" />
                 </FrameLayout>
 
                 <TextView
