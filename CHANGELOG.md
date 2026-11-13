@@ -11,6 +11,10 @@ commit message, not here.
 
 Nothing yet.
 
+## [4.3.0-alpha] - 2026-11-14
+
+- Smart buttons: each paired button can be given a name or location (up to 20 characters) in Settings → Buttons.
+
 ## [4.2.2-alpha] - 2026-11-14
 
 - Sentry Mode key: fixed the key getting out of step with the car after turning Sentry Mode on and off several times in a row.
