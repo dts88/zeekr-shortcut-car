@@ -147,6 +147,7 @@
     <string name="dlg_smart_button_bind_note">长按灵动贴约 3 秒，直到背光闪烁</string>
     <string name="dlg_smart_button_bind_connecting">正在连接灵动贴…</string>
     <string name="smart_button_name">灵动贴 %1$s</string>
+    <string name="set_smart_button_label">名称 / 位置</string>
     <string name="smart_button_battery">电量 %1$d%%</string>
     <string name="smart_button_summary">单击：%1$s；双击：%2$s</string>
     <string name="smart_button_version">版本 %1$s</string>

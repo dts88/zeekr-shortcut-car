@@ -2382,6 +2382,11 @@ public class AppConfig {
     private static final String KEY_SMART_BUTTONS_ENABLED = "smart_buttons_enabled";
     /** 每一台单击 / 双击做什么：{@code smart_button_action.<地址>.<1 或 2>}，值是 {@code button.SmartButtonAction} 的 key。 */
     private static final String KEY_SMART_BUTTON_ACTION_PREFIX = "smart_button_action.";
+    /**
+     * 每一台的「名称 / 位置」（项目所有者 2026-11-14）：{@code smart_button_name.<地址>}，用户自己打的字；没起名就没有这一项。
+     * 是设置：导出、导入跟着走，所以读的时候当不可信的洗一遍（{@code button.DeviceLabel}）。
+     */
+    private static final String KEY_SMART_BUTTON_NAME_PREFIX = "smart_button_name.";
 
     /** 灵动贴开着没有；默认开：一台都没绑的本来就不扫。 */
     public boolean isSmartButtonsEnabled() {
@@ -2414,14 +2419,38 @@ public class AppConfig {
         prefs.edit().putString(KEY_SMART_BUTTONS, String.join(",", buttons)).apply();
     }
 
-    /** 删掉一台，连同它两种按法选的动作。 */
+    /** 删掉一台，连同它两种按法选的动作、起的名字。 */
     public void removeSmartButton(String address) {
         java.util.List<String> buttons = getSmartButtons();
         buttons.remove(address);
         prefs.edit().putString(KEY_SMART_BUTTONS, String.join(",", buttons))
                 .remove(smartButtonActionKey(address, com.kooo.evcam.button.SmartButtonAd.SINGLE))
                 .remove(smartButtonActionKey(address, com.kooo.evcam.button.SmartButtonAd.DOUBLE))
+                .remove(KEY_SMART_BUTTON_NAME_PREFIX + address)
                 .apply();
+    }
+
+    /**
+     * 这一台的「名称 / 位置」：用户起的名字，洗过的（最多 {@code DeviceLabel.MAX} 个字、只有看得见的字）；没起过、
+     * 存的不是字、洗完什么都不剩，都是空串 —— 界面那边照旧显示默认的「灵动贴 xxxx」。
+     *
+     * <p>存着的值不可信（导入的备份、被人改过的文件），所以每次读都洗，不指望写的时候洗过。</p>
+     */
+    public String getSmartButtonName(String address) {
+        Object stored = prefs.getAll().get(KEY_SMART_BUTTON_NAME_PREFIX + address);
+        return stored instanceof String ? com.kooo.evcam.button.DeviceLabel.clean((String) stored) : "";
+    }
+
+    /** 起名字：洗过再存；洗完是空的（没填、全是空白）就把这一项删掉，回到默认名。 */
+    public void setSmartButtonName(String address, String name) {
+        String clean = com.kooo.evcam.button.DeviceLabel.clean(name);
+        SharedPreferences.Editor editor = prefs.edit();
+        if (clean.isEmpty()) {
+            editor.remove(KEY_SMART_BUTTON_NAME_PREFIX + address);
+        } else {
+            editor.putString(KEY_SMART_BUTTON_NAME_PREFIX + address, clean);
+        }
+        editor.apply();
     }
 
     /** 这一台这种按法（1 单击、2 双击）做什么；没选过是「不使用」。 */

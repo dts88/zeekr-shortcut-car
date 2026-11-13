@@ -127,6 +127,7 @@
     <string name="dlg_smart_button_bind_connecting">Menyambung ke butang pintar…</string>
     <string name="smart_button_name">Butang pintar %1$s</string>
     <string name="smart_button_battery">Bateri %1$d%%</string>
+    <string name="set_smart_button_label">Nama / lokasi</string>
     <string name="smart_button_summary">Tekan sekali: %1$s; tekan dua kali: %2$s</string>
     <string name="smart_button_version">Versi %1$s</string>
     <string name="smart_button_serial">Nombor siri %1$s</string>

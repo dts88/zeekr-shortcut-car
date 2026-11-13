@@ -127,6 +127,7 @@
     <string name="dlg_smart_button_bind_connecting">Connecting to the smart button…</string>
     <string name="smart_button_name">Smart button %1$s</string>
     <string name="smart_button_battery">Battery %1$d%%</string>
+    <string name="set_smart_button_label">Name / location</string>
     <string name="smart_button_summary">Single press: %1$s; double press: %2$s</string>
     <string name="smart_button_version">Version %1$s</string>
     <string name="smart_button_serial">Serial number %1$s</string>
