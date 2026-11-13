@@ -11,6 +11,16 @@ commit message, not here.
 
 Nothing yet.
 
+## [4.0.1-alpha] - 2026-11-13
+
+- Settings: one column per section; Maintenance is the last group of General.
+- Main screen: the action rail fits the screen and Settings stays at the bottom; Take photo, the playback keys and the switches are lower.
+- Main screen: the screen-off hint is back inside the record key and no longer opens a setting.
+- Main screen: the Floating button and Smart buttons switches are removed; four switches remain.
+- Floating button: hidden while the main screen is in front.
+- The one-time note after upgrading is removed.
+- Diagnostics: screen size, density, font scale and the system animation scales.
+
 ## [4.0.0-alpha] - 2026-11-12
 
 - Settings: seven sections (Recording, Storage, Super mirror, Blind spot view, Buttons, General, Updates & about), two columns each; a feature that is off takes one row and its rows appear when it is turned on; greyed rows say why; the left column shows each section's state and no longer has Back to main screen and Exit rows. Settings from 3.x are kept.
