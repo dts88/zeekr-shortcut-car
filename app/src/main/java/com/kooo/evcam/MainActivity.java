@@ -526,12 +526,6 @@ public class MainActivity extends AppCompatActivity implements com.kooo.evcam.se
                 toggleRecording();
             }
         });
-        // 熄屏提示那一行（录制键下面）：点了去管它的那一行设置
-        View screenOffHint = findViewById(R.id.record_hint);
-        if (screenOffHint != null) {
-            screenOffHint.setOnClickListener(v ->
-                    openSettingsRow("screen_recording", "pref_screen_off_keep_recording", null));
-        }
 
         // 隐藏到后台：录制和悬浮按钮照旧，只把界面收起来。
         // 长按是退出，和抽屉、设置左栏最底下的「退出应用」是同一件事。退出会停掉录制，

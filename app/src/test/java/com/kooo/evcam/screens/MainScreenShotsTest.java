@@ -8,6 +8,7 @@
 package com.kooo.evcam.screens;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
@@ -71,10 +72,10 @@ public class MainScreenShotsTest {
         View rail = frame.findViewById(R.id.action_rail);
         assertNotNull("主界面里没有动作栏", rail);
         assertNotNull("动作栏上没有六块开关", rail.findViewById(R.id.quick_switches));
-        View hint = rail.findViewById(R.id.record_hint);
-        assertNotNull("动作栏上没有熄屏提示那一行", hint);
-        assertEquals("熄屏提示应该在录制键外面、和它并排在同一列里",
-                rail.findViewById(R.id.btn_start_record).getParent(), hint.getParent());
+        View card = rail.findViewById(R.id.btn_start_record);
+        View hint = card.findViewById(R.id.record_hint);
+        assertNotNull("熄屏提示应该在录制键里面（项目所有者 2026-11-13）", hint);
+        assertFalse("熄屏提示只是说明，不能单独点", hint.isClickable());
 
         RecordButtonUi record = new RecordButtonUi(rail.findViewById(R.id.btn_start_record));
         record.setState(recording ? RecordButtonUi.State.RECORDING : RecordButtonUi.State.IDLE);
@@ -88,6 +89,9 @@ public class MainScreenShotsTest {
         assertTrue(file + " 是空的", file.length() > 10_000);
         if (recording) {
             assertEquals("录着的时候熄屏提示那一行要在", View.VISIBLE, hint.getVisibility());
+            android.graphics.Rect inside = new android.graphics.Rect();
+            assertTrue("熄屏提示不在屏幕里", hint.getGlobalVisibleRect(inside));
+            assertEquals("熄屏提示在录制键里被裁掉了一截", hint.getHeight(), inside.height());
         }
         // 4.0.0 在实车上把「设置」那一行顶出了屏幕：照实车的尺寸，这一行要整个在屏幕里，中间那一段也不用滚
         View settings = rail.findViewById(R.id.btn_settings);
