@@ -633,14 +633,15 @@
   - 更新与关于：set_update_channel_title「接收的版本」、opt_channel_stable / _beta / _alpha、set_update_channel_stable / _beta、action_check。
   - 标签 tag_experimental「试验性」：行驶信息条、灵动贴、模拟声浪、车辆状态的名称里去掉「（试验性）」，set_info_bar_summary 末尾的
     「试验性功能。」跟着去掉。
-  - 主界面六块开关：小标题用已有的 nav_group_switches「开关」；quick_on「开」、quick_off「关」、quick_smart_bound「已绑定 %1$d 个」、
-    quick_smart_none「未绑定」。
+  - 主界面的开关：小标题用已有的 nav_group_switches「开关」；quick_on「开」、quick_off「关」。quick_smart_bound「已绑定 %1$d 个」、
+    quick_smart_none「未绑定」随「灵动贴」那一块 2026-11-13 删掉。
   - 初始设置：setup_skip「跳过设置」、setup_back「上一步」、setup_next「下一步」、setup_continue「继续」、setup_enter「进入主界面」；
     七步的名字 setup_step_language「语言」、guide_title「开始之前」（已有）、setup_step_side「驾驶座位置」、setup_step_drive「U 盘」、
     set_section_recording「录制」（已有）、setup_step_features「常用功能」*（原来写的「行车画面与按键」）、setup_step_done「完成」；
     setup_language_note、setup_side_note、setup_side_lhd「左舵车」/ _rhd「右舵车」、setup_drive_found / _space / _missing / _later、
     setup_record_note、setup_features_note*、setup_done_title「设置完成」。正文用已有的 guide_1、guide_2、set_storage_port_note、guide_4。
   - 升级后的一个框：regroup_title「设置已重新整理」、regroup_body*（照新的分区重写的六句），按钮用已有的「知道了」。
+    2026-11-13 项目所有者定删掉这个框，两条文字跟着删。
   - 连带修改（引用了旧路径的句子，意思不动）：guide_4「设置 → 通用 → 诊断信息」；dlg_internal_locked_msg、dev_note
     「设置 → 更新与关于 → 关于与致谢」；set_vehicle_status_summary「在主界面的开关下方…」。
   - 不用了、已删：msg_language_hint、msg_rail_side_hint、dlg_rail_side_lhd / _rhd、guide_3（菜单键、超级镜子手势那一段：手势在超级镜子的

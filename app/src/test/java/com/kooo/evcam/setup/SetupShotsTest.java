@@ -81,7 +81,7 @@ public class SetupShotsTest {
     }
 
     @Test
-    public void skippingMarksSetupDoneAndNewInstallsSkipTheRegroupNote() {
+    public void skippingMarksSetupDone() {
         RuntimeEnvironment.setQualifiers(Shots.DAY);
         AppConfig config = new AppConfig(RuntimeEnvironment.getApplication());
         assertTrue("新装的要走初始设置", config.needsSetup());
@@ -94,7 +94,6 @@ public class SetupShotsTest {
         Shots.settle();
 
         assertFalse("跳过以后不再走", config.needsSetup());
-        assertTrue("新装的不用看「设置已重新整理」", config.isRegroupNoteSeen());
     }
 
     private void shoot(String qualifiers, String tag) {

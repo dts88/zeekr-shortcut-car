@@ -1187,12 +1187,10 @@
         <item quantity="one">About %1$s GB per hour; about %2$s hour left on the USB drive</item>
         <item quantity="other">About %1$s GB per hour; about %2$s hours left on the USB drive</item>
     </plurals>
-    <!-- 4.0 主界面动作栏的六块开关（ui-spec §十三） -->
+    <!-- 主界面动作栏的四块开关（ui-spec §十三） -->
     <string name="quick_on">On</string>
     <string name="quick_off">Off</string>
-    <string name="quick_smart_bound">%1$d paired</string>
-    <string name="quick_smart_none">None paired</string>
-    <!-- 4.0 初始设置（ui-spec §十五）、升级后「设置已重新整理」那个框 -->
+    <!-- 4.0 初始设置（ui-spec §十五） -->
     <string name="setup_skip">Skip setup</string>
     <string name="setup_back">Back</string>
     <string name="setup_next">Next</string>
@@ -1214,6 +1212,4 @@
     <string name="setup_record_note">These can be changed in Settings → Recording</string>
     <string name="setup_features_note">Turn on what\'s needed. These can be changed in Settings → Super mirror, Settings → Blind spot view and Settings → Buttons</string>
     <string name="setup_done_title">Setup complete</string>
-    <string name="regroup_title">Settings have been rearranged</string>
-    <string name="regroup_body">Settings have moved; existing settings are unchanged.\n\nInterface and System are now General, and Simulated drive sound is in General too.\nBlind spot view has moved out of Super mirror into its own section.\nFloating button and smart buttons is now called Buttons.\nCheck for updates and About &amp; credits are now Updates &amp; about.\nSwitches for Super mirror, Floating button and others are next to the action buttons on the main screen.</string>
 </resources>

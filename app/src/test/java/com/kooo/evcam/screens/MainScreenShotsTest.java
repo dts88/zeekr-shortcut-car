@@ -33,7 +33,7 @@ import java.io.File;
 
 /**
  * 主界面画成图片（{@link Shots}）：画面那一块是空的（电脑上没有相机），看的是动作栏和状态条 ——
- * 录制键、熄屏提示那一行、六块开关、状态条的两格。
+ * 录制键和它里面的熄屏提示、四块开关、状态条的两格。
  */
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = 34, application = android.app.Application.class)
@@ -50,7 +50,7 @@ public class MainScreenShotsTest {
         shoot(Shots.NIGHT, "night", false);
     }
 
-    /** 开关都开着、正在录：六块都亮，录制键下面有熄屏提示那一行。 */
+    /** 开关都开着、正在录：四块都亮，录制键里有熄屏提示那一行。 */
     @Test
     public void mainScreenRecordingWithEverythingOn() {
         AppConfig config = new AppConfig(RuntimeEnvironment.getApplication());
@@ -71,7 +71,9 @@ public class MainScreenShotsTest {
 
         View rail = frame.findViewById(R.id.action_rail);
         assertNotNull("主界面里没有动作栏", rail);
-        assertNotNull("动作栏上没有六块开关", rail.findViewById(R.id.quick_switches));
+        android.view.ViewGroup switches = rail.findViewById(R.id.quick_switches);
+        assertNotNull("动作栏上没有那几块开关", switches);
+        assertEquals("开关是四块、两排（项目所有者 2026-11-13 删了「悬浮按钮」「灵动贴」两块）", 2, switches.getChildCount());
         View card = rail.findViewById(R.id.btn_start_record);
         View hint = card.findViewById(R.id.record_hint);
         assertNotNull("熄屏提示应该在录制键里面（项目所有者 2026-11-13）", hint);

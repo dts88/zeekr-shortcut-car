@@ -1125,8 +1125,9 @@ public class MainActivity extends AppCompatActivity implements com.kooo.evcam.se
     }
 
     /**
-     * 首次启动（ui-spec §十五）：该走初始设置的走初始设置（新装的；或者很早的版本升上来、语言或驾驶座位置还没问过的）；
-     * 不用走的、从 4.0 以前升上来的，第一次打开时看一个框「设置已重新整理」。4.0 以前这里是两个框加一个说明框。
+     * 首次启动（ui-spec §十五）：该走初始设置的走初始设置（新装的；或者很早的版本升上来、语言或驾驶座位置还没问过的），
+     * 别的什么都不弹。4.0 以前这里是两个框加一个说明框；4.0.0 给升级上来的人弹过一个「设置已重新整理」，
+     * 项目所有者 2026-11-13 定删掉。
      */
     private void checkFirstLaunch() {
         if (appConfig == null) {
@@ -1142,10 +1143,6 @@ public class MainActivity extends AppCompatActivity implements com.kooo.evcam.se
                     showSetup();
                 }
             }, 300);
-            return;
-        }
-        if (!appConfig.isRegroupNoteSeen()) {
-            main.postDelayed(this::showRegroupNote, 300);
         }
     }
 
@@ -1158,8 +1155,6 @@ public class MainActivity extends AppCompatActivity implements com.kooo.evcam.se
     @Override
     public void onSetupFinished() {
         goToRecordingInterface();
-        // 升级上来、刚补问完的：接着看「设置已重新整理」
-        checkFirstLaunch();
     }
 
     @Override
@@ -1167,18 +1162,6 @@ public class MainActivity extends AppCompatActivity implements com.kooo.evcam.se
         if (drawer != null) {
             drawer.setLocked(showing);
         }
-    }
-
-    /** 升级到 4.0 的人第一次打开时：设置挪了地方，说一声哪几页合并了、改名了。只出一次。 */
-    private void showRegroupNote() {
-        if (isFinishing() || isDestroyed() || appConfig.isRegroupNoteSeen()) {
-            return;
-        }
-        appConfig.setRegroupNoteSeen();
-        com.kooo.evcam.ui.CamDialogs.show(new MaterialAlertDialogBuilder(this, R.style.Theme_Cam_MaterialAlertDialog)
-                .setTitle(R.string.regroup_title)
-                .setMessage(R.string.regroup_body)
-                .setPositiveButton(R.string.action_got_it, null));
     }
 
     /**
@@ -1207,6 +1190,7 @@ public class MainActivity extends AppCompatActivity implements com.kooo.evcam.se
         recordingLayout.setVisibility(View.VISIBLE);
         settleFragmentContainer();
         fragmentContainer.setVisibility(View.GONE);
+        reportMainScreenInFront();
         // 可能刚在设置里改了视频流配置、摄像头开关、各路参数、摄像头映射：这一刻生效，照存下的配置重新摆、接上时换管线
         relayoutIfConfigChanged("settings");
     }
@@ -1223,6 +1207,7 @@ public class MainActivity extends AppCompatActivity implements com.kooo.evcam.se
     private void showFragment(Fragment fragment) {
         recordingLayout.setVisibility(View.GONE);
         fragmentContainer.setVisibility(View.VISIBLE);
+        reportMainScreenInFront();
         // 换界面（ui-spec §十四）：新的一面淡入、从稍大收到原大。动的是放界面的这个容器，画面那一层不动。
         // 录制中（且开着「录制时减少动效」）或系统关了动画时直接切
         settleFragmentContainer();
@@ -1238,6 +1223,16 @@ public class MainActivity extends AppCompatActivity implements com.kooo.evcam.se
                 .replace(R.id.fragment_container, fragment)
                 .setPrimaryNavigationFragment(fragment)
                 .commit();
+    }
+
+    /**
+     * 主界面（预览那一页）此刻在不在前台，报给悬浮按钮：在的话它收起来 —— 录制键就在动作栏上，按钮只会压住画面和标题
+     * （ui-spec §十三，项目所有者 2026-11-13）。设置、回放这些页在前面时不算：在「设置 → 按键」调它的大小、透明度时要看得见。
+     */
+    private void reportMainScreenInFront() {
+        boolean inFront = !isInBackground && fragmentContainer != null
+                && fragmentContainer.getVisibility() != View.VISIBLE;
+        OverlayCoordinator.onMainScreenInFront(this, inFront);
     }
 
     /** 放界面的容器回到原样（换界面的动效可能停在半路）。 */
@@ -2540,6 +2535,10 @@ public class MainActivity extends AppCompatActivity implements com.kooo.evcam.se
         android.os.PowerManager power = (android.os.PowerManager) getSystemService(Context.POWER_SERVICE);
         pausedByScreenOff = !isFinishing() && !isChangingConfigurations() && power != null && !power.isInteractive();
         keeper.mainScreenForeground(false);
+        if (!isChangingConfigurations()) {
+            // 深浅色、语言重建时不报：马上又回到前台，报了按钮会闪一下
+            reportMainScreenInFront();
+        }
         previewStall.stop();
         AppLog.d(TAG, "onPause called, isRecording=" + isRecording());
 
@@ -2607,6 +2606,7 @@ public class MainActivity extends AppCompatActivity implements com.kooo.evcam.se
         isInBackground = false;
         pausedByScreenOff = false;
         keeper.mainScreenForeground(true);
+        reportMainScreenInFront();
         previewStall.start();
         AppLog.i(TAG, "onResume " + instanceTag() + " surround: " + describeComposite());
         

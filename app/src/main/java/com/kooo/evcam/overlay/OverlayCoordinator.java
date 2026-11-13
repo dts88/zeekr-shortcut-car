@@ -141,6 +141,20 @@ public final class OverlayCoordinator {
 
 
     /**
+     * 主界面（预览那一页）到了前台、离开了前台（{@code MainActivity} 报）。在前台时悬浮按钮收起来：录制键就在动作栏上，
+     * 按钮只会压住画面和标题（项目所有者 2026-11-13）；离开了照设置显示回来。显示还是收起由按钮的服务自己照这个状态摆
+     * （别处叫它显示时也一样），这里只是告诉它变了。
+     */
+    public static void onMainScreenInFront(Context context, boolean inFront) {
+        if (!RecordingFloatingService.setMainScreenInFront(inFront)) {
+            return;
+        }
+        if (new AppConfig(context).isRecordingFloatingEnabled() && canShowOverlay(context)) {
+            sendToRecordingFloating(context, RecordingFloatingService.ACTION_SHOW);
+        }
+    }
+
+    /**
      * 主界面销毁时的清理。
      *
      * <p>什么都不用停：后视镜和悬浮按钮是<b>脱离主界面用的</b>，

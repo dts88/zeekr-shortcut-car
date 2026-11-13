@@ -268,7 +268,7 @@ public class RecordingFloatingService extends Service {
                     mainHandler.post(this::resetPosition);
                 }
             } else {
-                showFloatingWindow();
+                placeFloatingWindow();
             }
         }
         // 被杀了要不要重启：跟着「开机自启动」开关（规格 §6）。悬浮按钮由 Recovery 按设置恢复，不用自己粘着
@@ -304,6 +304,30 @@ public class RecordingFloatingService extends Service {
     }
 
     // ========== 悬浮窗管理 ==========
+
+    /**
+     * 主界面（预览那一页）此刻在不在前台。在的话按钮收起来：录制键就在动作栏上（项目所有者 2026-11-13）。
+     * 进程里只有一个主界面，记在这里；它不在了（进程被杀后只恢复了服务）就是不在前台。
+     */
+    private static volatile boolean mainScreenInFront;
+
+    /** @return 变了没有；变了的话调用方再发一次 {@link #ACTION_SHOW}，让按钮照新的状态摆 */
+    public static boolean setMainScreenInFront(boolean inFront) {
+        if (mainScreenInFront == inFront) {
+            return false;
+        }
+        mainScreenInFront = inFront;
+        return true;
+    }
+
+    /** 叫它显示时照现在的情况摆：主界面在前台就收起，否则显示。 */
+    private void placeFloatingWindow() {
+        if (mainScreenInFront) {
+            hideFloatingWindow();
+        } else {
+            showFloatingWindow();
+        }
+    }
 
     private void showFloatingWindow() {
         if (floatingContainer != null) {

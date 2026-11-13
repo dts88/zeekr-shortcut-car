@@ -531,13 +531,9 @@ public class SetupFragment extends Fragment implements StorageState.Listener {
 
     // ------------------------------------------------------------------ 收尾
 
-    /** 走完或者跳过：记下「问过了」，回主界面。新装的不用再看「设置已重新整理」那个框（那是给升级上来的人看的）。 */
+    /** 走完或者跳过：记下「问过了」，回主界面。 */
     private void finish() {
-        boolean fresh = config.isFirstLaunch();
         config.setSetupDone();
-        if (fresh) {
-            config.setRegroupNoteSeen();
-        }
         com.kooo.evcam.blackbox.BlackBox.noteImportant("setup: " + (step == DONE ? "done" : "skipped at " + (step + 1)));
         Host host = host();
         if (host != null) {

@@ -31,7 +31,6 @@ public class AppConfig {
     private static final String KEY_FIRST_LAUNCH = "first_launch";  // 首次启动标记
     private static final String KEY_LANGUAGE_CHOSEN = "language_chosen";  // 首次启动的语言选择是否已完成
     private static final String KEY_RAIL_SIDE_CHOSEN = "rail_side_chosen";  // 「方向盘在哪边」是否问过
-    private static final String KEY_REGROUP_NOTE_SEEN = "regroup_note_seen";  // 升级到 4.0：「设置已重新整理」那个框看过没有
     private static final String KEY_REDUCE_MOTION_RECORDING = "reduce_motion_recording";  // 录制时减少动效
     private static final String KEY_SCREEN_OFF_WAKE_MINUTES = "screen_off_wake_min";  // 熄屏录制：最多不让车机睡多久（分钟）
     // 开机自启动（2.10.4 起含保活）。键名沿用合并前「保持后台运行」的，老用户的选择才接得上
@@ -246,15 +245,6 @@ public class AppConfig {
     public void setSetupDone() {
         prefs.edit().putBoolean(KEY_FIRST_LAUNCH, false).putBoolean(KEY_LANGUAGE_CHOSEN, true)
                 .putBoolean(KEY_RAIL_SIDE_CHOSEN, true).apply();
-    }
-
-    /** 升级到 4.0 的人第一次打开时看的那个框（「设置已重新整理」）看过没有。新装的走完初始设置就算看过。 */
-    public boolean isRegroupNoteSeen() {
-        return prefs.getBoolean(KEY_REGROUP_NOTE_SEEN, false);
-    }
-
-    public void setRegroupNoteSeen() {
-        prefs.edit().putBoolean(KEY_REGROUP_NOTE_SEEN, true).apply();
     }
 
 
@@ -772,7 +762,6 @@ public class AppConfig {
                 KEY_FIRST_LAUNCH,
                 KEY_LANGUAGE_CHOSEN,
                 KEY_RAIL_SIDE_CHOSEN,
-                KEY_REGROUP_NOTE_SEEN,
                 KEY_UI_LEFT_FOR_SCREEN_OFF,
                 KEY_FRONT_CABIN_IN_USE,
                 KEY_LAST_DETECTED_SD_PATH,
@@ -789,10 +778,12 @@ public class AppConfig {
      *   <li>{@code watermark_spec_enabled}：「水印显示录制规格」。2026-10-23 起录制规格跟着「时间水印」同开同关（项目所有者）。</li>
      *   <li>{@code relay_write_enabled}：EVCam 的「中转写入」（先写内置存储、每段写完再搬到 U 盘）。2026-11-02 停用，
      *       2026-11-06 删掉（项目所有者：完全没用到的 EVCam 代码全部删除）。</li>
+     *   <li>{@code regroup_note_seen}：4.0.0 给升级上来的人弹的「设置已重新整理」那个框看过没有。框 2026-11-13 删掉
+     *       （项目所有者）。</li>
      * </ul>
      */
     private static final String[] RETIRED_KEYS = {"cabins_one_shot_revert_pending", "watermark_spec_enabled",
-            "relay_write_enabled"};
+            "relay_write_enabled", "regroup_note_seen"};
 
     /** 进程起来时调一次：去掉的功能留下的键（{@link #RETIRED_KEYS}）有就删。 */
     public void forgetRetiredKeys() {
@@ -1013,7 +1004,7 @@ public class AppConfig {
     /**
      * 环视画面在屏幕上是否做鱼眼校正：主界面预览、图片回看、视频回看共用这一个开关。
      *
-     * <p>主界面动作栏上是六块开关里的一块（{@code ui.QuickSwitches}），两处回看各有一个按钮
+     * <p>主界面动作栏上是四块开关里的一块（{@code ui.QuickSwitches}），两处回看各有一个按钮
      * （{@code FisheyeToggleButton}），拨的都是它。和后视镜那一档各管各的。
      * 只改屏幕上看到的样子：录像和照片落盘的都是原始画面，一个字节都不动。
      * 默认关 —— 回看首先要能看到「拍下来的就是这样」。</p>
@@ -1056,11 +1047,10 @@ public class AppConfig {
         return onChanged(action, KEY_SCREEN_OFF_RECORDING, KEY_SCREEN_OFF_KEEP_RECORDING, KEY_AUTO_START_RECORDING);
     }
 
-    /** 主界面动作栏的六块开关（{@code ui.QuickSwitches}）看的这几项，一变就叫 {@code action}（主线程）。拿住返回值，同上。 */
+    /** 主界面动作栏的四块开关（{@code ui.QuickSwitches}）看的这几项，一变就叫 {@code action}（主线程）。拿住返回值，同上。 */
     public SharedPreferences.OnSharedPreferenceChangeListener onQuickSwitchesChanged(Runnable action) {
         return onChanged(action, KEY_REARVIEW_ENABLED, SettingsRegistry.REARVIEW_VIEWS.key, KEY_SIDE_VIEW_ENABLED,
-                SettingsRegistry.SIDE_VIEW_MODE.key, KEY_RECORDING_FLOATING_ENABLED, KEY_SMART_BUTTONS_ENABLED,
-                KEY_SMART_BUTTONS, KEY_DRIVE_SOUND, KEY_PHOTO_FISHEYE);
+                SettingsRegistry.SIDE_VIEW_MODE.key, KEY_DRIVE_SOUND, KEY_PHOTO_FISHEYE);
     }
 
     /** 这几项里有一项变了就叫 {@code action}。返回的监听器调用方要拿住，用完交给 {@link #removeChangeListener}。 */
