@@ -6,11 +6,11 @@
   AppConfig 是这些设置唯一的真相来源，它的 getter/setter 里带着夹取、默认值、迁移和联动；让 Preference 自己往
   SharedPreferences 里写，就等于开了第二条写入路径。所以这里的 key 只是标识符，不是存储键。
 
-  顶层的每个 PreferenceScreen 是一个分区（左栏的一行）。分区下面的两个 PreferenceScreen（…_left、…_right）是右边内容区的
-  左右两列（ui-spec §三「双列」）：右边按 key 各取一列出来显示（SettingsSectionFragment）。列里再用 PreferenceCategory 分组。
+  顶层的每个 PreferenceScreen 是一个分区（左栏的一行），右边按 key 把它取出来显示，一列排到底
+  （ui-spec §三「单列」，项目所有者 2026-11-13：4.0.0 的左右两列在实车上太乱，改回一列）。分区里用 PreferenceCategory 分组，
+  每个功能的第一行是它开不开，它的细项紧跟在下面。
 
-  谁开着才出现、谁被什么挡住变灰，不写在这里（没有 android:dependency）：规则在 SettingsPreferenceFragment.syncRows 一处，
-  因为有的规则跨列（「盲区画面」那一行在左列，它管的「HUD 画面」一组在右列）。
+  谁开着才出现、谁被什么挡住变灰，不写在这里（没有 android:dependency）：规则在 SettingsPreferenceFragment.syncRows 一处。
 -->
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
@@ -20,78 +20,72 @@
         android:key="screen_recording"
         android:title="@string/set_section_recording">
 
-        <PreferenceScreen android:key="screen_recording_left">
+        <PreferenceCategory android:title="@string/set_group_auto_record">
 
-            <PreferenceCategory android:title="@string/set_group_auto_record">
+            <!-- 「我要它一直在录」是设定状态的一部分，不是规则，所以在录制分区（lifecycle-spec §3.2） -->
+            <SwitchPreferenceCompat
+                android:key="pref_auto_record"
+                android:title="@string/set_auto_record_title"
+                android:summary="@string/set_auto_record_summary" />
 
-                <!-- 「我要它一直在录」是设定状态的一部分，不是规则，所以在录制分区（lifecycle-spec §3.2） -->
-                <SwitchPreferenceCompat
-                    android:key="pref_auto_record"
-                    android:title="@string/set_auto_record_title"
-                    android:summary="@string/set_auto_record_summary" />
+            <!-- 熄屏后还录不录。开关加下一层：行尾写熄屏后的帧率、下面一行是哨兵模式此刻开没开，点这一行选帧率 -->
+            <com.kooo.evcam.settings.SwitchNavPreference
+                android:key="pref_screen_off_keep_recording"
+                android:title="@string/set_screen_off_keep_title"
+                android:summary="@string/set_screen_off_keep_summary" />
+        </PreferenceCategory>
 
-                <!-- 熄屏后还录不录。开关加下一层：行尾写熄屏后的帧率、下面一行是哨兵模式此刻开没开，点这一行选帧率 -->
-                <com.kooo.evcam.settings.SwitchNavPreference
-                    android:key="pref_screen_off_keep_recording"
-                    android:title="@string/set_screen_off_keep_title"
-                    android:summary="@string/set_screen_off_keep_summary" />
-            </PreferenceCategory>
+        <PreferenceCategory android:title="@string/set_group_picture_sound">
 
-            <PreferenceCategory android:title="@string/set_group_picture_sound">
+            <!-- 摄像头：环视 / 环视 + 后座舱。就是原来的「视频流配置」，存的还是那两份预设（SettingsRegistry.CAR_MODEL） -->
+            <com.kooo.evcam.settings.SegmentedPreference
+                android:key="pref_car_model"
+                android:title="@string/set_car_model_title" />
 
-                <!-- 摄像头：环视 / 环视 + 后座舱。就是原来的「视频流配置」，存的还是那两份预设（SettingsRegistry.CAR_MODEL） -->
-                <com.kooo.evcam.settings.SegmentedPreference
-                    android:key="pref_car_model"
-                    android:title="@string/set_car_model_title" />
+            <!--
+              录制画质：省空间 / 均衡 / 最清晰。编辑器里那三档提到这一页（profile.QualityPreset，做的事一样）；
+              下面一行小字写每小时约多少 GB、U 盘剩余空间约可录多久（settings.RecordingBudget）
+            -->
+            <com.kooo.evcam.settings.SegmentedPreference
+                android:key="pref_record_quality"
+                android:title="@string/editor_quality_title" />
 
-                <!--
-                  录制画质：省空间 / 均衡 / 最清晰。编辑器里那三档提到这一页（profile.QualityPreset，做的事一样）；
-                  下面一行小字写每小时约多少 GB、U 盘剩余空间约可录多久（settings.RecordingBudget）
-                -->
-                <com.kooo.evcam.settings.SegmentedPreference
-                    android:key="pref_record_quality"
-                    android:title="@string/editor_quality_title" />
+            <!-- 详细参数：原来的「编辑视频流配置」那一页。每一路的参数、每一格的摆法只有这一个入口 -->
+            <Preference
+                android:key="pref_profile_editor"
+                android:title="@string/set_profile_editor_title"
+                android:summary="@string/set_profile_editor_summary" />
 
-                <!-- 详细参数：原来的「编辑视频流配置」那一页。每一路的参数、每一格的摆法只有这一个入口 -->
-                <Preference
-                    android:key="pref_profile_editor"
-                    android:title="@string/set_profile_editor_title"
-                    android:summary="@string/set_profile_editor_summary" />
+            <!--
+              录制声音：只给环视录像。开着、没有录音权限时开关显示关（显示值 = 实际生效值）。
+              麦克风来源对所有人固定（项目所有者 2026-11-12），另一种在开发者选项里
+            -->
+            <SwitchPreferenceCompat
+                android:key="pref_footage_audio"
+                android:title="@string/set_footage_audio_title"
+                android:summary="@string/set_footage_audio_summary" />
+        </PreferenceCategory>
 
-                <!--
-                  录制声音：只给环视录像。开着、没有录音权限时开关显示关（显示值 = 实际生效值）。
-                  麦克风来源对所有人固定（项目所有者 2026-11-12），另一种在开发者选项里
-                -->
-                <SwitchPreferenceCompat
-                    android:key="pref_footage_audio"
-                    android:title="@string/set_footage_audio_title"
-                    android:summary="@string/set_footage_audio_summary" />
-            </PreferenceCategory>
-        </PreferenceScreen>
+        <PreferenceCategory android:title="@string/set_group_stamps_info">
 
-        <PreferenceScreen android:key="screen_recording_right">
+            <!-- 时间和录制规格同开同关（项目所有者 2026-10-23） -->
+            <SwitchPreferenceCompat
+                android:key="pref_watermark"
+                android:title="@string/set_watermark_title"
+                android:summaryOn="@string/set_watermark_on"
+                android:summaryOff="@string/set_watermark_off" />
 
-            <PreferenceCategory android:title="@string/set_group_stamps_info">
+            <com.kooo.evcam.settings.SwitchNavPreference
+                android:key="pref_license_plate"
+                android:title="@string/set_plate_switch_title"
+                android:summary="@string/set_plate_switch_summary" />
 
-                <!-- 时间和录制规格同开同关（项目所有者 2026-10-23） -->
-                <SwitchPreferenceCompat
-                    android:key="pref_watermark"
-                    android:title="@string/set_watermark_title"
-                    android:summaryOn="@string/set_watermark_on"
-                    android:summaryOff="@string/set_watermark_off" />
-
-                <com.kooo.evcam.settings.SwitchNavPreference
-                    android:key="pref_license_plate"
-                    android:title="@string/set_plate_switch_title"
-                    android:summary="@string/set_plate_switch_summary" />
-
-                <!-- 行驶信息条（试验性，名称旁带标签）：点这一行进「车辆信号」勾显示哪几项，那一页只从这里进 -->
-                <com.kooo.evcam.settings.SwitchNavPreference
-                    android:key="pref_info_bar"
-                    android:title="@string/set_info_bar_title"
-                    android:summary="@string/set_info_bar_summary" />
-            </PreferenceCategory>
-        </PreferenceScreen>
+            <!-- 行驶信息条（试验性，名称旁带标签）：点这一行进「车辆信号」勾显示哪几项，那一页只从这里进 -->
+            <com.kooo.evcam.settings.SwitchNavPreference
+                android:key="pref_info_bar"
+                android:title="@string/set_info_bar_title"
+                android:summary="@string/set_info_bar_summary" />
+        </PreferenceCategory>
     </PreferenceScreen>
 
     <!-- ==================== 存储 ==================== -->
@@ -99,29 +93,23 @@
         android:key="screen_storage"
         android:title="@string/set_section_storage">
 
-        <PreferenceScreen android:key="screen_storage_left">
+        <!-- 选盘之前要知道的两句写在选盘的框里：标题下面写录像保存在哪，选项下面写推荐 USB-A 口的 U 盘 -->
+        <ListPreference
+            android:key="pref_storage_location"
+            android:title="@string/set_storage_location_title"
+            android:dialogMessage="@string/set_storage_port_note"
+            android:summary="%s" />
 
-            <!-- 选盘之前要知道的两句写在选盘的框里：标题下面写录像保存在哪，选项下面写推荐 USB-A 口的 U 盘 -->
-            <ListPreference
-                android:key="pref_storage_location"
-                android:title="@string/set_storage_location_title"
-                android:dialogMessage="@string/set_storage_port_note"
-                android:summary="%s" />
+        <!-- 存储上限：行尾写录像、照片两个上限，名字下面写按当前录制画质约保留多久；点开一个框里填两项 -->
+        <com.kooo.evcam.settings.ValueActionPreference
+            android:key="pref_storage_limits"
+            android:title="@string/set_storage_limits_title" />
 
-            <!-- 存储上限：行尾写录像、照片两个上限，名字下面写按当前录制画质约保留多久；点开一个框里填两项 -->
-            <com.kooo.evcam.settings.ValueActionPreference
-                android:key="pref_storage_limits"
-                android:title="@string/set_storage_limits_title" />
-
-            <!-- 锁定影像（开关加附加项）：开着时下面一排「自动锁定」：闪远光、双闪。鸣笛等读得到喇叭信号再摆出来 -->
-            <com.kooo.evcam.settings.SwitchChipsPreference
-                android:key="pref_footage_lock"
-                android:title="@string/set_footage_lock_title"
-                android:summary="@string/set_footage_lock_summary" />
-        </PreferenceScreen>
-
-        <!-- 右列现在空着（U 盘用量条做出来时放这里） -->
-        <PreferenceScreen android:key="screen_storage_right" />
+        <!-- 锁定影像（开关加附加项）：开着时下面一排「自动锁定」：闪远光、双闪。鸣笛等读得到喇叭信号再摆出来 -->
+        <com.kooo.evcam.settings.SwitchChipsPreference
+            android:key="pref_footage_lock"
+            android:title="@string/set_footage_lock_title"
+            android:summary="@string/set_footage_lock_summary" />
     </PreferenceScreen>
 
     <!-- ==================== 超级镜子 ==================== -->
@@ -129,47 +117,41 @@
         android:key="screen_rearview"
         android:title="@string/set_section_rearview">
 
-        <PreferenceScreen android:key="screen_rearview_left">
+        <!-- 不写组名；这一行的右边是「使用指南」（不依赖开关：没打开之前也该能先看看怎么用） -->
+        <com.kooo.evcam.settings.LinkCategory android:key="cat_rearview">
 
-            <!-- 不写组名；这一行的右边是「使用指南」（不依赖开关：没打开之前也该能先看看怎么用） -->
-            <com.kooo.evcam.settings.LinkCategory android:key="cat_rearview">
+            <!-- 超级镜子：关闭 / 四向 / 前后 / 后视 + 后座舱（开关合进分段，存的还是开没开和切换范围两样） -->
+            <com.kooo.evcam.settings.SegmentedPreference
+                android:key="pref_rearview"
+                android:title="@string/set_section_rearview" />
 
-                <!-- 超级镜子：关闭 / 四向 / 前后 / 后视 + 后座舱（开关合进分段，存的还是开没开和切换范围两样） -->
-                <com.kooo.evcam.settings.SegmentedPreference
-                    android:key="pref_rearview"
-                    android:title="@string/set_section_rearview" />
+            <!-- 切换方式：滑动切换 / 点按切换。存的还是那个开关（AppConfig.isRearViewButtonMode） -->
+            <com.kooo.evcam.settings.SegmentedPreference
+                android:key="pref_rearview_switch_mode"
+                android:title="@string/set_rearview_switch_mode_title" />
 
-                <!-- 切换方式：滑动切换 / 点按切换。存的还是那个开关（AppConfig.isRearViewButtonMode） -->
-                <com.kooo.evcam.settings.SegmentedPreference
-                    android:key="pref_rearview_switch_mode"
-                    android:title="@string/set_rearview_switch_mode_title" />
+            <SwitchPreferenceCompat
+                android:key="pref_rearview_camera_label"
+                android:title="@string/set_rearview_camera_label_title"
+                android:summary="@string/set_rearview_camera_label_summary" />
+        </com.kooo.evcam.settings.LinkCategory>
 
-                <SwitchPreferenceCompat
-                    android:key="pref_rearview_camera_label"
-                    android:title="@string/set_rearview_camera_label_title"
-                    android:summary="@string/set_rearview_camera_label_summary" />
-            </com.kooo.evcam.settings.LinkCategory>
-        </PreferenceScreen>
+        <PreferenceCategory
+            android:key="cat_rearview_window"
+            android:title="@string/set_group_window">
 
-        <PreferenceScreen android:key="screen_rearview_right">
+            <!-- 鱼眼校正（开关加下一层）：行尾写视野角度，点这一行在框里拖 -->
+            <com.kooo.evcam.settings.SwitchNavPreference
+                android:key="pref_rearview_fisheye"
+                android:title="@string/set_rearview_fisheye_title"
+                android:summary="@string/set_rearview_fisheye_summary" />
 
-            <PreferenceCategory
-                android:key="cat_rearview_window"
-                android:title="@string/set_group_window">
-
-                <!-- 鱼眼校正（开关加下一层）：行尾写视野角度，点这一行在框里拖 -->
-                <com.kooo.evcam.settings.SwitchNavPreference
-                    android:key="pref_rearview_fisheye"
-                    android:title="@string/set_rearview_fisheye_title"
-                    android:summary="@string/set_rearview_fisheye_summary" />
-
-                <!-- 窗口（值加一个按钮）：行尾写宽和高；点这一行在整个屏幕上调，行尾「重置」先问一句 -->
-                <com.kooo.evcam.settings.ValueActionPreference
-                    android:key="pref_rearview_window"
-                    android:title="@string/set_group_window"
-                    android:summary="@string/set_rearview_window_summary" />
-            </PreferenceCategory>
-        </PreferenceScreen>
+            <!-- 窗口（值加一个按钮）：行尾写宽和高；点这一行在整个屏幕上调，行尾「重置」先问一句 -->
+            <com.kooo.evcam.settings.ValueActionPreference
+                android:key="pref_rearview_window"
+                android:title="@string/set_group_window"
+                android:summary="@string/set_rearview_window_summary" />
+        </PreferenceCategory>
     </PreferenceScreen>
 
     <!-- ==================== 盲区画面 ==================== -->
@@ -178,64 +160,58 @@
         android:key="screen_side_view"
         android:title="@string/set_side_view_title">
 
-        <PreferenceScreen android:key="screen_side_view_left">
+        <!-- 盲区画面：关闭 / 丰富 / 标准 / 简洁（开关合进分段），说明下面一行小字说选中的这一档什么时候显示 -->
+        <com.kooo.evcam.settings.SegmentedPreference
+            android:key="pref_side_view"
+            android:title="@string/set_side_view_title"
+            android:summary="@string/set_side_view_summary" />
 
-            <!-- 盲区画面：关闭 / 丰富 / 标准 / 简洁（开关合进分段），说明下面一行小字说选中的这一档什么时候显示 -->
-            <com.kooo.evcam.settings.SegmentedPreference
-                android:key="pref_side_view"
-                android:title="@string/set_side_view_title"
-                android:summary="@string/set_side_view_summary" />
+        <!-- 显示位置：中控屏 / HUD / 中控屏和 HUD -->
+        <com.kooo.evcam.settings.SegmentedPreference
+            android:key="pref_side_view_target"
+            android:title="@string/set_side_view_target_title" />
 
-            <!-- 显示位置：中控屏 / HUD / 中控屏和 HUD -->
-            <com.kooo.evcam.settings.SegmentedPreference
-                android:key="pref_side_view_target"
-                android:title="@string/set_side_view_target_title" />
+        <!-- 只管中控屏：显示位置是「HUD」、或情境是「简洁」时变灰，写明原因 -->
+        <SeekBarPreference
+            android:key="pref_side_view_min_speed"
+            android:title="@string/set_side_view_min_speed_title"
+            android:summary="@string/set_side_view_min_speed_summary"
+            app:showSeekBarValue="true" />
 
-            <!-- 只管中控屏：显示位置是「HUD」、或情境是「简洁」时变灰，写明原因 -->
-            <SeekBarPreference
-                android:key="pref_side_view_min_speed"
-                android:title="@string/set_side_view_min_speed_title"
-                android:summary="@string/set_side_view_min_speed_summary"
-                app:showSeekBarValue="true" />
+        <!-- 中控屏上的位置和大小（值加一个按钮）：点这一行在整个屏幕上调左右两个框。显示位置是「HUD」时变灰 -->
+        <com.kooo.evcam.settings.ValueActionPreference
+            android:key="pref_side_view_place"
+            android:title="@string/set_side_view_place_title"
+            android:summary="@string/set_side_view_place_summary" />
 
-            <!-- 中控屏上的位置和大小（值加一个按钮）：点这一行在整个屏幕上调左右两个框。显示位置是「HUD」时变灰 -->
+        <!--
+          HUD 画面：原来十行，4.0 合成四行（ui-spec §十六）。十个数值的范围、默认值、意思不变（ui-spec §九）。
+          盲区画面开着才出现；显示位置是「中控屏」时整组变灰，原因写在组名下面
+        -->
+        <PreferenceCategory
+            android:key="cat_side_view_hud"
+            android:title="@string/set_group_side_view_hud">
+
+            <!-- 位置与大小：点开示意框，五根拖动条（画面高度、画面形状、离边距离、上下位置、边缘渐隐） -->
             <com.kooo.evcam.settings.ValueActionPreference
-                android:key="pref_side_view_place"
-                android:title="@string/set_side_view_place_title"
-                android:summary="@string/set_side_view_place_summary" />
-        </PreferenceScreen>
+                android:key="pref_hud_place"
+                android:title="@string/set_hud_place_title" />
 
-        <PreferenceScreen android:key="screen_side_view_right">
+            <!-- 亮度：画面透明度、夜间亮度 -->
+            <com.kooo.evcam.settings.ValueActionPreference
+                android:key="pref_hud_brightness"
+                android:title="@string/set_hud_brightness_title" />
 
-            <!--
-              HUD 画面：原来十行，4.0 合成四行（ui-spec §十六）。十个数值的范围、默认值、意思不变（ui-spec §九）。
-              盲区画面开着才出现；显示位置是「中控屏」时整组变灰，原因写在组名下面
-            -->
-            <PreferenceCategory
-                android:key="cat_side_view_hud"
-                android:title="@string/set_group_side_view_hud">
+            <!-- 对比度：白天、夜间 -->
+            <com.kooo.evcam.settings.ValueActionPreference
+                android:key="pref_hud_contrast_pair"
+                android:title="@string/set_hud_contrast_pair_title" />
 
-                <!-- 位置与大小：点开示意框，五根拖动条（画面高度、画面形状、离边距离、上下位置、边缘渐隐） -->
-                <com.kooo.evcam.settings.ValueActionPreference
-                    android:key="pref_hud_place"
-                    android:title="@string/set_hud_place_title" />
-
-                <!-- 亮度：画面透明度、夜间亮度 -->
-                <com.kooo.evcam.settings.ValueActionPreference
-                    android:key="pref_hud_brightness"
-                    android:title="@string/set_hud_brightness_title" />
-
-                <!-- 对比度：白天、夜间 -->
-                <com.kooo.evcam.settings.ValueActionPreference
-                    android:key="pref_hud_contrast_pair"
-                    android:title="@string/set_hud_contrast_pair_title" />
-
-                <SwitchPreferenceCompat
-                    android:key="pref_hud_mirror"
-                    android:title="@string/set_hud_mirror_title"
-                    android:summary="@string/set_hud_mirror_summary" />
-            </PreferenceCategory>
-        </PreferenceScreen>
+            <SwitchPreferenceCompat
+                android:key="pref_hud_mirror"
+                android:title="@string/set_hud_mirror_title"
+                android:summary="@string/set_hud_mirror_summary" />
+        </PreferenceCategory>
     </PreferenceScreen>
 
     <!-- ==================== 按键 ==================== -->
@@ -243,51 +219,45 @@
         android:key="screen_floating"
         android:title="@string/set_section_keys">
 
-        <PreferenceScreen android:key="screen_floating_left">
+        <PreferenceCategory
+            android:key="cat_floating_button"
+            android:title="@string/set_section_floating">
 
-            <PreferenceCategory
-                android:key="cat_floating_button"
-                android:title="@string/set_section_floating">
+            <!-- 悬浮按钮（开关加附加项）：附加项「录制时长」「锁定位置」 -->
+            <com.kooo.evcam.settings.SwitchChipsPreference
+                android:key="pref_recording_floating"
+                android:title="@string/set_section_floating"
+                android:summary="@string/set_recording_floating_summary" />
 
-                <!-- 悬浮按钮（开关加附加项）：附加项「录制时长」「锁定位置」 -->
-                <com.kooo.evcam.settings.SwitchChipsPreference
-                    android:key="pref_recording_floating"
-                    android:title="@string/set_section_floating"
-                    android:summary="@string/set_recording_floating_summary" />
+            <ListPreference
+                android:key="pref_floating_tap"
+                android:title="@string/set_floating_tap_title" />
 
-                <ListPreference
-                    android:key="pref_floating_tap"
-                    android:title="@string/set_floating_tap_title" />
+            <ListPreference
+                android:key="pref_floating_long_press"
+                android:title="@string/set_floating_long_press_title" />
 
-                <ListPreference
-                    android:key="pref_floating_long_press"
-                    android:title="@string/set_floating_long_press_title" />
+            <!-- 外观（值加一个按钮）：点这一行三根拖动条一个框，行尾「重置」位置也回去，先问一句 -->
+            <com.kooo.evcam.settings.ValueActionPreference
+                android:key="pref_floating_appearance"
+                android:title="@string/set_group_appearance" />
+        </PreferenceCategory>
 
-                <!-- 外观（值加一个按钮）：点这一行三根拖动条一个框，行尾「重置」位置也回去，先问一句 -->
-                <com.kooo.evcam.settings.ValueActionPreference
-                    android:key="pref_floating_appearance"
-                    android:title="@string/set_group_appearance" />
-            </PreferenceCategory>
-        </PreferenceScreen>
+        <!-- 灵动贴（试验性，组名旁带标签）：总开关；绑定的每一台一行（代码里加，SmartButtonRows）；绑定灵动贴 -->
+        <PreferenceCategory
+            android:key="cat_smart_buttons"
+            android:title="@string/set_smart_buttons_title">
 
-        <PreferenceScreen android:key="screen_floating_right">
+            <SwitchPreferenceCompat
+                android:key="pref_smart_buttons"
+                android:title="@string/set_smart_buttons_title"
+                android:summary="@string/set_smart_buttons_summary" />
 
-            <!-- 灵动贴（试验性，组名旁带标签）：总开关；绑定的每一台一行（代码里加，SmartButtonRows）；绑定灵动贴 -->
-            <PreferenceCategory
-                android:key="cat_smart_buttons"
-                android:title="@string/set_smart_buttons_title">
-
-                <SwitchPreferenceCompat
-                    android:key="pref_smart_buttons"
-                    android:title="@string/set_smart_buttons_title"
-                    android:summary="@string/set_smart_buttons_summary" />
-
-                <Preference
-                    android:key="pref_smart_button_bind"
-                    android:title="@string/set_smart_button_bind_title"
-                    android:summary="@string/set_smart_button_bind_summary" />
-            </PreferenceCategory>
-        </PreferenceScreen>
+            <Preference
+                android:key="pref_smart_button_bind"
+                android:title="@string/set_smart_button_bind_title"
+                android:summary="@string/set_smart_button_bind_summary" />
+        </PreferenceCategory>
     </PreferenceScreen>
 
     <!-- ==================== 通用 ==================== -->
@@ -296,112 +266,107 @@
         android:key="screen_general"
         android:title="@string/set_section_general">
 
-        <PreferenceScreen android:key="screen_general_left">
+        <SwitchPreferenceCompat
+            android:key="pref_auto_start"
+            android:defaultValue="true"
+            android:title="@string/set_auto_start_title"
+            android:summary="@string/set_auto_start_summary" />
+
+        <ListPreference
+            android:key="pref_language"
+            android:title="@string/set_language_title"
+            android:summary="%s" />
+
+        <com.kooo.evcam.settings.SegmentedPreference
+            android:key="pref_rail_side"
+            android:title="@string/set_rail_side_title" />
+
+        <PreferenceCategory android:title="@string/set_group_display">
+
+            <!-- 管主界面预览、照片回放、录像回放里「鱼眼校正」开着时怎么校正；开关是主界面动作栏上那一块 -->
+            <com.kooo.evcam.settings.ValueActionPreference
+                android:key="pref_fisheye"
+                android:title="@string/set_rearview_fisheye_title"
+                android:summary="@string/set_fisheye_scope_summary" />
 
             <SwitchPreferenceCompat
-                android:key="pref_auto_start"
-                android:defaultValue="true"
-                android:title="@string/set_auto_start_title"
-                android:summary="@string/set_auto_start_summary" />
+                android:key="pref_recording_stats"
+                android:title="@string/set_recording_stats_title"
+                android:summary="@string/set_recording_stats_summary" />
+
+            <SwitchPreferenceCompat
+                android:key="pref_reduce_motion"
+                android:title="@string/set_reduce_motion_title"
+                android:summary="@string/set_reduce_motion_summary" />
+        </PreferenceCategory>
+
+        <!--
+          模拟声浪（试验性，组名旁带标签）：原来是「系统」页的一行加一页九行，4.0 起都在这里，关着时只有第一行。
+          听感、转速变化方式、变速箱、车外线路对所有人固定，另一种在开发者选项里（项目所有者 2026-11-12）
+        -->
+        <PreferenceCategory
+            android:key="cat_drive_sound"
+            android:title="@string/dev_drive_sound_title">
+
+            <SwitchPreferenceCompat
+                android:key="pref_drive_sound"
+                android:title="@string/dev_drive_sound_title"
+                android:summary="@string/dev_drive_sound_summary" />
+
+            <!-- 所有人两种，分段；开发者选项开着时六种，换成单选框（代码里换，SettingsPreferenceFragment.bindDriveSound） -->
+            <com.kooo.evcam.settings.SegmentedPreference
+                android:key="pref_drive_sound_style"
+                android:title="@string/dev_drive_sound_style_title" />
 
             <ListPreference
-                android:key="pref_language"
-                android:title="@string/set_language_title"
+                android:key="pref_drive_sound_style_all"
+                android:title="@string/dev_drive_sound_style_title"
                 android:summary="%s" />
 
+            <SwitchPreferenceCompat
+                android:key="pref_drive_sound_standard"
+                android:title="@string/dev_drive_sound_standard_title"
+                android:summary="@string/dev_drive_sound_standard_summary" />
+
             <com.kooo.evcam.settings.SegmentedPreference
-                android:key="pref_rail_side"
-                android:title="@string/set_rail_side_title" />
+                android:key="pref_drive_sound_volume"
+                android:title="@string/dev_drive_sound_volume_title" />
 
-            <PreferenceCategory android:title="@string/set_group_display">
+            <com.kooo.evcam.settings.SegmentedPreference
+                android:key="pref_drive_sound_output"
+                android:title="@string/dev_drive_sound_output_title" />
+        </PreferenceCategory>
 
-                <!-- 管主界面预览、照片回放、录像回放里「鱼眼校正」开着时怎么校正；开关是主界面动作栏上那一块 -->
-                <com.kooo.evcam.settings.ValueActionPreference
-                    android:key="pref_fisheye"
-                    android:title="@string/set_rearview_fisheye_title"
-                    android:summary="@string/set_fisheye_scope_summary" />
+        <!-- 车外喇叭：礼让语音和车外播放的模拟声浪共用，所以单独一组、一直在（不跟着模拟声浪收起） -->
+        <PreferenceCategory
+            android:key="cat_exterior_speaker"
+            android:title="@string/set_group_exterior_speaker"
+            android:summary="@string/set_group_exterior_speaker_note">
 
-                <SwitchPreferenceCompat
-                    android:key="pref_recording_stats"
-                    android:title="@string/set_recording_stats_title"
-                    android:summary="@string/set_recording_stats_summary" />
+            <com.kooo.evcam.settings.SegmentedPreference
+                android:key="pref_drive_sound_exterior_volume"
+                android:title="@string/dev_drive_sound_exterior_volume_title" />
+        </PreferenceCategory>
 
-                <SwitchPreferenceCompat
-                    android:key="pref_reduce_motion"
-                    android:title="@string/set_reduce_motion_title"
-                    android:summary="@string/set_reduce_motion_summary" />
-            </PreferenceCategory>
+        <!-- 维护放在最后：用得最少（单列里的先后照用得多少排，项目所有者 2026-11-13 改回单列） -->
+        <PreferenceCategory android:title="@string/set_group_maintenance">
 
-            <PreferenceCategory android:title="@string/set_group_maintenance">
+            <!-- 设置备份（值加一个按钮）：点这一行导入，行尾「导出」 -->
+            <com.kooo.evcam.settings.ValueActionPreference
+                android:key="pref_settings_backup"
+                android:title="@string/set_settings_backup_title" />
 
-                <!-- 设置备份（值加一个按钮）：点这一行导入，行尾「导出」 -->
-                <com.kooo.evcam.settings.ValueActionPreference
-                    android:key="pref_settings_backup"
-                    android:title="@string/set_settings_backup_title" />
+            <Preference
+                android:key="pref_diagnostics"
+                android:title="@string/set_diagnostics_title"
+                android:summary="@string/set_diagnostics_summary" />
 
-                <Preference
-                    android:key="pref_diagnostics"
-                    android:title="@string/set_diagnostics_title"
-                    android:summary="@string/set_diagnostics_summary" />
-
-                <!-- 初始设置：再走一遍首次启动的七步（ui-spec §十五） -->
-                <Preference
-                    android:key="pref_first_run"
-                    android:title="@string/set_first_run_title"
-                    android:summary="@string/set_first_run_summary" />
-            </PreferenceCategory>
-        </PreferenceScreen>
-
-        <PreferenceScreen android:key="screen_general_right">
-
-            <!--
-              模拟声浪（试验性，组名旁带标签）：原来是「系统」页的一行加一页九行，4.0 起都在这里，关着时只有第一行。
-              听感、转速变化方式、变速箱、车外线路对所有人固定，另一种在开发者选项里（项目所有者 2026-11-12）
-            -->
-            <PreferenceCategory
-                android:key="cat_drive_sound"
-                android:title="@string/dev_drive_sound_title">
-
-                <SwitchPreferenceCompat
-                    android:key="pref_drive_sound"
-                    android:title="@string/dev_drive_sound_title"
-                    android:summary="@string/dev_drive_sound_summary" />
-
-                <!-- 所有人两种，分段；开发者选项开着时六种，换成单选框（代码里换，SettingsPreferenceFragment.bindDriveSound） -->
-                <com.kooo.evcam.settings.SegmentedPreference
-                    android:key="pref_drive_sound_style"
-                    android:title="@string/dev_drive_sound_style_title" />
-
-                <ListPreference
-                    android:key="pref_drive_sound_style_all"
-                    android:title="@string/dev_drive_sound_style_title"
-                    android:summary="%s" />
-
-                <SwitchPreferenceCompat
-                    android:key="pref_drive_sound_standard"
-                    android:title="@string/dev_drive_sound_standard_title"
-                    android:summary="@string/dev_drive_sound_standard_summary" />
-
-                <com.kooo.evcam.settings.SegmentedPreference
-                    android:key="pref_drive_sound_volume"
-                    android:title="@string/dev_drive_sound_volume_title" />
-
-                <com.kooo.evcam.settings.SegmentedPreference
-                    android:key="pref_drive_sound_output"
-                    android:title="@string/dev_drive_sound_output_title" />
-            </PreferenceCategory>
-
-            <!-- 车外喇叭：礼让语音和车外播放的模拟声浪共用，所以单独一组、一直在（不跟着模拟声浪收起） -->
-            <PreferenceCategory
-                android:key="cat_exterior_speaker"
-                android:title="@string/set_group_exterior_speaker"
-                android:summary="@string/set_group_exterior_speaker_note">
-
-                <com.kooo.evcam.settings.SegmentedPreference
-                    android:key="pref_drive_sound_exterior_volume"
-                    android:title="@string/dev_drive_sound_exterior_volume_title" />
-            </PreferenceCategory>
-        </PreferenceScreen>
+            <!-- 初始设置：再走一遍首次启动的七步（ui-spec §十五） -->
+            <Preference
+                android:key="pref_first_run"
+                android:title="@string/set_first_run_title"
+                android:summary="@string/set_first_run_summary" />
+        </PreferenceCategory>
     </PreferenceScreen>
 
     <!-- ==================== 更新与关于 ==================== -->
@@ -409,25 +374,20 @@
         android:key="screen_update"
         android:title="@string/set_section_update_about">
 
-        <PreferenceScreen android:key="screen_update_left">
+        <!-- 检查更新（值加一个按钮）：行尾写当前版本，按钮「检查」 -->
+        <com.kooo.evcam.settings.ValueActionPreference
+            android:key="pref_check_update"
+            android:title="@string/set_check_update_title" />
 
-            <!-- 检查更新（值加一个按钮）：行尾写当前版本，按钮「检查」 -->
-            <com.kooo.evcam.settings.ValueActionPreference
-                android:key="pref_check_update"
-                android:title="@string/set_check_update_title" />
+        <!-- 接收的版本：正式版 / Beta 版 / Alpha 版。存的还是原来两个开关（AppConfig.isUpdateBetaEnabled / isUpdateAlphaEnabled） -->
+        <com.kooo.evcam.settings.SegmentedPreference
+            android:key="pref_update_channel"
+            android:title="@string/set_update_channel_title" />
 
-            <!-- 接收的版本：正式版 / Beta 版 / Alpha 版。存的还是原来两个开关（AppConfig.isUpdateBetaEnabled / isUpdateAlphaEnabled） -->
-            <com.kooo.evcam.settings.SegmentedPreference
-                android:key="pref_update_channel"
-                android:title="@string/set_update_channel_title" />
-
-            <!-- 关于不是分区里的一页：点了直接打开关于页 -->
-            <Preference
-                android:key="pref_about"
-                android:title="@string/set_section_about" />
-        </PreferenceScreen>
-
-        <PreferenceScreen android:key="screen_update_right" />
+        <!-- 关于不是分区里的一页：点了直接打开关于页 -->
+        <Preference
+            android:key="pref_about"
+            android:title="@string/set_section_about" />
     </PreferenceScreen>
 
     <!--
@@ -439,144 +399,138 @@
         android:key="screen_developer"
         android:title="@string/set_section_developer">
 
-        <PreferenceScreen android:key="screen_developer_left">
+        <Preference
+            android:key="pref_permissions"
+            android:title="@string/dev_permissions_title"
+            android:summary="@string/dev_permissions_summary" />
 
-            <Preference
-                android:key="pref_permissions"
-                android:title="@string/dev_permissions_title"
-                android:summary="@string/dev_permissions_summary" />
+        <!-- 车辆状态（试验性，名称旁带标签） -->
+        <SwitchPreferenceCompat
+            android:key="pref_vehicle_status"
+            android:title="@string/set_vehicle_status_title"
+            android:summary="@string/set_vehicle_status_summary" />
 
-            <!-- 车辆状态（试验性，名称旁带标签） -->
+        <PreferenceCategory android:title="@string/set_section_recording">
+
+            <ListPreference
+                android:key="pref_recording_mode"
+                android:title="@string/set_recording_mode_title"
+                android:summary="%s" />
+
             <SwitchPreferenceCompat
-                android:key="pref_vehicle_status"
-                android:title="@string/set_vehicle_status_title"
-                android:summary="@string/set_vehicle_status_summary" />
-
-            <PreferenceCategory android:title="@string/set_section_recording">
-
-                <ListPreference
-                    android:key="pref_recording_mode"
-                    android:title="@string/set_recording_mode_title"
-                    android:summary="%s" />
-
-                <SwitchPreferenceCompat
-                    android:key="pref_force_h264"
-                    android:title="@string/set_force_h264_title"
-                    android:summary="@string/set_force_h264_summary" />
-
-                <!--
-                  熄屏录制 = 熄屏持续录制 + 防止休眠（规格 §3.3）。2026-11-02 停用（项目所有者：从来没有启用过），这一行从开发者选项里拿掉；
-                  要恢复时放回下面这一行（开关加下一层：行尾写最长多久，点这一行填小时数）：
-                <com.kooo.evcam.settings.SwitchNavPreference
-                    android:key="pref_screen_off_recording"
-                    android:title="@string/set_screen_off_title"
-                    android:summary="@string/set_screen_off_summary" />
-                -->
-
-                <!-- 拍照使用 JPEG 输出：对所有人锁成开（关着时主界面在后台拍不到画面），只有这里改得了。4.0 起从录制页挪来 -->
-                <SwitchPreferenceCompat
-                    android:key="pref_photo_via_jpeg"
-                    android:title="@string/set_photo_jpeg_title"
-                    android:summary="@string/set_photo_jpeg_summary" />
-
-                <SwitchPreferenceCompat
-                    android:key="pref_watermark_brand"
-                    android:title="@string/set_watermark_brand_title"
-                    android:summary="@string/set_watermark_brand_summary" />
-            </PreferenceCategory>
-
-            <PreferenceCategory android:title="@string/set_group_cameras">
-
-                <com.kooo.evcam.settings.ValueActionPreference
-                    android:key="pref_image_adjust"
-                    android:title="@string/set_image_adjust_title"
-                    android:summary="@string/set_image_adjust_summary" />
-
-                <Preference
-                    android:key="pref_camera_mapping"
-                    android:title="@string/set_camera_mapping_title"
-                    android:summary="@string/set_camera_mapping_summary" />
-
-                <SwitchPreferenceCompat
-                    android:key="pref_camera_holder_suspects"
-                    android:title="@string/dev_camera_suspects_title"
-                    android:summary="@string/dev_camera_suspects_summary" />
-
-                <com.kooo.evcam.settings.ValueActionPreference
-                    android:key="pref_side_view_calibration"
-                    android:title="@string/dev_side_view_calibration_title" />
-            </PreferenceCategory>
-        </PreferenceScreen>
-
-        <PreferenceScreen android:key="screen_developer_right">
-
-            <PreferenceCategory android:title="@string/set_rearview_fisheye_title">
-
-                <SwitchPreferenceCompat
-                    android:key="pref_gpu_fisheye_preview"
-                    android:title="@string/dev_gpu_fisheye_preview_title"
-                    android:summary="@string/dev_gpu_fisheye_preview_summary" />
-
-                <SwitchPreferenceCompat
-                    android:key="pref_gpu_fisheye_video"
-                    android:title="@string/dev_gpu_fisheye_video_title"
-                    android:summary="@string/dev_gpu_fisheye_video_summary" />
-
-                <SwitchPreferenceCompat
-                    android:key="pref_raw_frame_dump"
-                    android:title="@string/dev_raw_frame_title"
-                    android:summary="@string/dev_raw_frame_summary" />
-            </PreferenceCategory>
+                android:key="pref_force_h264"
+                android:title="@string/set_force_h264_title"
+                android:summary="@string/set_force_h264_summary" />
 
             <!--
-              声音：这五项当初是两种做法都做出来、上车比了再定。项目所有者 2026-11-12 定：对所有人固定为原始、车内、连续、
-              8 速自动、BUS12，另一种只在这里选得到
+              熄屏录制 = 熄屏持续录制 + 防止休眠（规格 §3.3）。2026-11-02 停用（项目所有者：从来没有启用过），这一行从开发者选项里拿掉；
+              要恢复时放回下面这一行（开关加下一层：行尾写最长多久，点这一行填小时数）：
+            <com.kooo.evcam.settings.SwitchNavPreference
+                android:key="pref_screen_off_recording"
+                android:title="@string/set_screen_off_title"
+                android:summary="@string/set_screen_off_summary" />
             -->
-            <PreferenceCategory android:title="@string/dev_group_sound">
 
-                <ListPreference
-                    android:key="pref_footage_audio_source"
-                    android:title="@string/set_footage_audio_source_title"
-                    android:summary="%s" />
+            <!-- 拍照使用 JPEG 输出：对所有人锁成开（关着时主界面在后台拍不到画面），只有这里改得了。4.0 起从录制页挪来 -->
+            <SwitchPreferenceCompat
+                android:key="pref_photo_via_jpeg"
+                android:title="@string/set_photo_jpeg_title"
+                android:summary="@string/set_photo_jpeg_summary" />
 
-                <ListPreference
-                    android:key="pref_drive_sound_view"
-                    android:title="@string/dev_drive_sound_view_title"
-                    android:summary="%s" />
+            <SwitchPreferenceCompat
+                android:key="pref_watermark_brand"
+                android:title="@string/set_watermark_brand_title"
+                android:summary="@string/set_watermark_brand_summary" />
+        </PreferenceCategory>
 
-                <ListPreference
-                    android:key="pref_drive_sound_rpm"
-                    android:title="@string/dev_drive_sound_rpm_title"
-                    android:summary="%s" />
+        <PreferenceCategory android:title="@string/set_group_cameras">
 
-                <ListPreference
-                    android:key="pref_drive_sound_gearbox"
-                    android:title="@string/dev_drive_sound_gearbox_title"
-                    android:summary="%s" />
-
-                <ListPreference
-                    android:key="pref_drive_sound_exterior_route"
-                    android:title="@string/dev_drive_sound_route_title"
-                    android:summary="%s" />
-            </PreferenceCategory>
-
-            <PreferenceCategory android:title="@string/set_group_files">
-
-                <Preference
-                    android:key="pref_repair_mp4"
-                    android:title="@string/dev_repair_mp4_title"
-                    android:summary="@string/dev_repair_mp4_summary" />
-
-                <Preference
-                    android:key="pref_archive"
-                    android:title="@string/dev_archive_title"
-                    android:summary="@string/dev_archive_summary" />
-            </PreferenceCategory>
+            <com.kooo.evcam.settings.ValueActionPreference
+                android:key="pref_image_adjust"
+                android:title="@string/set_image_adjust_title"
+                android:summary="@string/set_image_adjust_summary" />
 
             <Preference
-                android:key="pref_developer_note"
-                android:selectable="false"
-                android:summary="@string/dev_note" />
-        </PreferenceScreen>
+                android:key="pref_camera_mapping"
+                android:title="@string/set_camera_mapping_title"
+                android:summary="@string/set_camera_mapping_summary" />
+
+            <SwitchPreferenceCompat
+                android:key="pref_camera_holder_suspects"
+                android:title="@string/dev_camera_suspects_title"
+                android:summary="@string/dev_camera_suspects_summary" />
+
+            <com.kooo.evcam.settings.ValueActionPreference
+                android:key="pref_side_view_calibration"
+                android:title="@string/dev_side_view_calibration_title" />
+        </PreferenceCategory>
+
+        <PreferenceCategory android:title="@string/set_rearview_fisheye_title">
+
+            <SwitchPreferenceCompat
+                android:key="pref_gpu_fisheye_preview"
+                android:title="@string/dev_gpu_fisheye_preview_title"
+                android:summary="@string/dev_gpu_fisheye_preview_summary" />
+
+            <SwitchPreferenceCompat
+                android:key="pref_gpu_fisheye_video"
+                android:title="@string/dev_gpu_fisheye_video_title"
+                android:summary="@string/dev_gpu_fisheye_video_summary" />
+
+            <SwitchPreferenceCompat
+                android:key="pref_raw_frame_dump"
+                android:title="@string/dev_raw_frame_title"
+                android:summary="@string/dev_raw_frame_summary" />
+        </PreferenceCategory>
+
+        <!--
+          声音：这五项当初是两种做法都做出来、上车比了再定。项目所有者 2026-11-12 定：对所有人固定为原始、车内、连续、
+          8 速自动、BUS12，另一种只在这里选得到
+        -->
+        <PreferenceCategory android:title="@string/dev_group_sound">
+
+            <ListPreference
+                android:key="pref_footage_audio_source"
+                android:title="@string/set_footage_audio_source_title"
+                android:summary="%s" />
+
+            <ListPreference
+                android:key="pref_drive_sound_view"
+                android:title="@string/dev_drive_sound_view_title"
+                android:summary="%s" />
+
+            <ListPreference
+                android:key="pref_drive_sound_rpm"
+                android:title="@string/dev_drive_sound_rpm_title"
+                android:summary="%s" />
+
+            <ListPreference
+                android:key="pref_drive_sound_gearbox"
+                android:title="@string/dev_drive_sound_gearbox_title"
+                android:summary="%s" />
+
+            <ListPreference
+                android:key="pref_drive_sound_exterior_route"
+                android:title="@string/dev_drive_sound_route_title"
+                android:summary="%s" />
+        </PreferenceCategory>
+
+        <PreferenceCategory android:title="@string/set_group_files">
+
+            <Preference
+                android:key="pref_repair_mp4"
+                android:title="@string/dev_repair_mp4_title"
+                android:summary="@string/dev_repair_mp4_summary" />
+
+            <Preference
+                android:key="pref_archive"
+                android:title="@string/dev_archive_title"
+                android:summary="@string/dev_archive_summary" />
+        </PreferenceCategory>
+
+        <Preference
+            android:key="pref_developer_note"
+            android:selectable="false"
+            android:summary="@string/dev_note" />
     </PreferenceScreen>
 </PreferenceScreen>

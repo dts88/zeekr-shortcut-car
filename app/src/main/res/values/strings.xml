@@ -1179,12 +1179,10 @@
     <plurals name="set_record_quality_hours">
         <item quantity="other">每小时约 %1$s GB，U 盘剩余空间约可录 %2$s 小时</item>
     </plurals>
-    <!-- 4.0 主界面动作栏的六块开关（ui-spec §十三） -->
+    <!-- 主界面动作栏的四块开关（ui-spec §十三） -->
     <string name="quick_on">开</string>
     <string name="quick_off">关</string>
-    <string name="quick_smart_bound">已绑定 %1$d 个</string>
-    <string name="quick_smart_none">未绑定</string>
-    <!-- 4.0 初始设置（ui-spec §十五）、升级后「设置已重新整理」那个框 -->
+    <!-- 4.0 初始设置（ui-spec §十五） -->
     <string name="setup_skip">跳过设置</string>
     <string name="setup_back">上一步</string>
     <string name="setup_next">下一步</string>
@@ -1206,6 +1204,4 @@
     <string name="setup_record_note">以下各项可在「设置 → 录制」中修改</string>
     <string name="setup_features_note">按需开启，可在「设置 → 超级镜子」「设置 → 盲区画面」「设置 → 按键」中修改</string>
     <string name="setup_done_title">设置完成</string>
-    <string name="regroup_title">设置已重新整理</string>
-    <string name="regroup_body">设置项的位置有调整，已有的设置保持不变。\n\n「界面」和「系统」合并为「通用」，「模拟声浪」也在「通用」。\n「盲区画面」从「超级镜子」中分出，单独一个分区。\n「悬浮键与灵动贴」改名为「按键」。\n「检查更新」和「关于与致谢」合并为「更新与关于」。\n超级镜子、悬浮按钮等开关在主界面的操作按钮一侧。</string>
 </resources>

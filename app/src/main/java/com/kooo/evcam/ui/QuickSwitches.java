@@ -29,10 +29,11 @@ import com.kooo.evcam.overlay.OverlayCoordinator;
 import com.kooo.evcam.settings.SettingsRegistry;
 
 /**
- * 主界面动作栏上的六块开关（ui-spec §十三，项目所有者 2026-11-12）：超级镜子、盲区画面、悬浮按钮、灵动贴、模拟声浪、鱼眼校正。
+ * 主界面动作栏上的四块开关（ui-spec §十三）：超级镜子、盲区画面、模拟声浪、鱼眼校正。4.0.0 是六块，
+ * 「悬浮按钮」「灵动贴」两块项目所有者 2026-11-13 定删掉（它们的开关在「设置 → 按键」）。
  * 每块上面是名字，下面一行是现在的状态，右上角一个点（开着是能量色）；点一下就开、关。
  *
- * <p>这六样原来分在三处：抽屉里两行开关、动作栏上一个临时的「鱼眼校正」键、其余只在设置里。放到动作栏是因为它在驾驶座一侧，
+ * <p>这几样原来分在三处：抽屉里一行开关、动作栏上一个临时的「鱼眼校正」键、其余只在设置里。放到动作栏是因为它在驾驶座一侧，
  * 伸手就到。它们只是设置里那几个开关的另一个入口：值是同一份（{@link AppConfig}），开、关走的也是同一条路
  * （{@link OverlayCoordinator}：没有悬浮窗权限时不拨上去，去要权限）。</p>
  *
@@ -43,14 +44,11 @@ public class QuickSwitches extends LinearLayout {
 
     private static final int MIRROR = 0;
     private static final int SIDE_VIEW = 1;
-    private static final int FLOATING = 2;
-    private static final int SMART_BUTTONS = 3;
-    private static final int DRIVE_SOUND = 4;
-    private static final int FISHEYE = 5;
+    private static final int DRIVE_SOUND = 2;
+    private static final int FISHEYE = 3;
 
     private static final int[] NAMES = {R.string.set_section_rearview, R.string.set_side_view_title,
-            R.string.set_section_floating, R.string.set_smart_buttons_title, R.string.dev_drive_sound_title,
-            R.string.set_rearview_fisheye_title};
+            R.string.dev_drive_sound_title, R.string.set_rearview_fisheye_title};
 
     private final AppConfig config;
     private final TextView[] states = new TextView[NAMES.length];
@@ -136,20 +134,6 @@ public class QuickSwitches extends LinearLayout {
                     return;
                 }
                 break;
-            case FLOATING:
-                on = !config.isRecordingFloatingEnabled();
-                if (!overlay(OverlayCoordinator.setRecordButtonEnabled(context, on))) {
-                    return;
-                }
-                break;
-            case SMART_BUTTONS:
-                on = !config.isSmartButtonsEnabled();
-                config.setSmartButtonsEnabled(on);
-                com.kooo.evcam.button.SmartButtons buttons = com.kooo.evcam.button.SmartButtons.get();
-                if (buttons != null) {
-                    buttons.setEnabled(on);
-                }
-                break;
             case DRIVE_SOUND:
                 on = !config.isDriveSoundEnabled();
                 config.setDriveSoundEnabled(on);
@@ -181,11 +165,6 @@ public class QuickSwitches extends LinearLayout {
         boolean side = config.isSideViewEnabled();
         show(SIDE_VIEW, side, side ? SettingsRegistry.SIDE_VIEW_MODE.label(getContext(), config.getSideViewMode())
                 : getContext().getString(R.string.opt_off));
-        show(FLOATING, config.isRecordingFloatingEnabled(), null);
-        boolean smart = config.isSmartButtonsEnabled();
-        int bound = config.getSmartButtons().size();
-        show(SMART_BUTTONS, smart, !smart ? null : bound > 0
-                ? getContext().getString(R.string.quick_smart_bound, bound) : getContext().getString(R.string.quick_smart_none));
         show(DRIVE_SOUND, config.isDriveSoundEnabled(), null);
         show(FISHEYE, config.isFisheyeCorrection(), null);
     }

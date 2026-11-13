@@ -81,9 +81,6 @@ public class DeveloperSettingsTest {
         ROWS.put("pref_drive_sound_rpm", Arrays.asList("drive_sound_rpm"));
         ROWS.put("pref_drive_sound_gearbox", Arrays.asList("drive_sound_gearbox"));
         ROWS.put("pref_drive_sound_exterior_route", Arrays.asList("drive_sound_exterior_route"));
-        // 分区下面的左右两列（ui-spec §三「双列」）：只是容器
-        ROWS.put("screen_developer_left", NONE);
-        ROWS.put("screen_developer_right", NONE);
 
         OUTSIDE.put("pref_storage_location", Arrays.asList("storage_location"));
     }

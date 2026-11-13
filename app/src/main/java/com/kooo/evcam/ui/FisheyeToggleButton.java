@@ -21,7 +21,7 @@ import com.kooo.evcam.R;
 
 /**
  * 「鱼眼校正」按钮：图片回看、视频回看上都是它，拨的是同一个开关
- * （{@link AppConfig#isFisheyeCorrection}）。主界面上是动作栏六块开关里的一块（{@link QuickSwitches}，4.0 起），拨的也是它。
+ * （{@link AppConfig#isFisheyeCorrection}）。主界面上是动作栏四块开关里的一块（{@link QuickSwitches}，4.0 起），拨的也是它。
  *
  * <p>点击和显示都在按钮自己身上，所在的界面不用接线：放进布局就能用。
  * 画面那边（预览容器、视频外框、图片回看）

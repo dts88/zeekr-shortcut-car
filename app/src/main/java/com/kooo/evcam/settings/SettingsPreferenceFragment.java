@@ -222,10 +222,9 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     public void onViewCreated(@androidx.annotation.NonNull android.view.View view,
                               @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
-        // 这份列表是右边内容区的一列（SettingsSectionFragment）：两列之间、和两边的留白由列自己的内边距加外面那一层凑成
         // 摆在初始设置里的那几行（forRows）贴着那一步的标题排，自己不再留左右的白
         boolean inSetup = getArguments() != null && getArguments().getStringArray(ARG_ROWS) != null;
-        PreferenceRows.styleList(this, inSetup ? 0 : 14, inSetup ? 8 : 16);
+        PreferenceRows.styleList(this, inSetup ? 0 : 28, inSetup ? 8 : 16);
         PreferenceRows.animateChanges(this);
     }
 
@@ -2187,8 +2186,8 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
 
     /**
      * 哪些行出现、哪些变灰（ui-spec §三「关着收起，挡住变灰」、§十六）。规则只写在这一处，照 AppConfig 此刻的值对：
-     * 功能关着，依赖它的行不出现；功能开着、只是这一行被别的选择挡住，变灰并写明原因。XML 里不写 dependency ——
-     * 有的规则跨列（「盲区画面」那一行在左列，它管的「HUD 画面」一组在右列），两列各对各有的那几行（找不到的跳过）。
+     * 功能关着，依赖它的行不出现；功能开着、只是这一行被别的选择挡住，变灰并写明原因。XML 里不写 dependency。
+     * 这一页没有的行跳过（初始设置里只摆几行，{@link #forRows}）。
      */
     void syncRows() {
         if (appConfig == null || getPreferenceScreen() == null || getContext() == null) {
@@ -2287,7 +2286,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         }
     }
 
-    /** 改了一项、别的行可能要跟着出现或变灰：等这一下点击处理完，这个分区的两列都再对一遍，左栏的状态也跟着写。 */
+    /** 改了一项、别的行可能要跟着出现或变灰：等这一下点击处理完，这一页再对一遍，左栏的状态也跟着写。 */
     private void requestSync() {
         android.view.View view = getView();
         if (view == null) {
@@ -2301,19 +2300,14 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         if (!isAdded()) {
             return;
         }
-        androidx.fragment.app.Fragment parent = getParentFragment();
-        if (parent instanceof SettingsSectionFragment) {
-            ((SettingsSectionFragment) parent).syncColumns();
-        } else {
-            syncRows();
-        }
+        syncRows();
         SettingsShellFragment shell = shell();
         if (shell != null) {
             shell.refreshHeaders();
         }
     }
 
-    /** 设置的外壳：这份列表是内容区的一列，往上找（不在两栏设置里时是 null）。 */
+    /** 设置的外壳：往上找（不在两栏设置里时是 null，比如摆在初始设置里）。 */
     @Nullable
     private SettingsShellFragment shell() {
         androidx.fragment.app.Fragment parent = getParentFragment();
@@ -2324,7 +2318,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     }
 
     /**
-     * 这一列有这一行就滚到它、闪两下（从主界面、状态条点过来时，ui-spec §十四「指给你看」）；没有、或者这一行此刻收着，返回 false。
+     * 这一页有这一行就滚到它、闪两下（从主界面、状态条点过来时，ui-spec §十四「指给你看」）；没有、或者这一行此刻收着，返回 false。
      */
     boolean flash(String key) {
         Preference pref = findPreference(key);
@@ -2455,7 +2449,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
 
 
     /**
-     * 模拟声浪（试验性）：4.0 起在「通用」页右列一组（原来是「系统」页的一行加一页九行，ui-spec §十六）。开关一行；开着时出现
+     * 模拟声浪（试验性）：4.0 起在「通用」页里一组（原来是「系统」页的一行加一页九行，ui-spec §十六）。开关一行；开着时出现
      * 声音风格、标准模式下播放、声浪音量、播放喇叭，都是分段选择，改了马上生效（{@code sound.DriveSound}）。
      * 声音风格所有人两种、摆成分段；开发者选项开着时六种，换成单选框（同一个设置两种摆法，{@link #syncRows} 只留一行）。
      * 车外音量单独一组「车外喇叭」，一直在：礼让语音也用它。

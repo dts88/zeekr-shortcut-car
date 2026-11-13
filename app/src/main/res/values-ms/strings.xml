@@ -1163,12 +1163,10 @@
     <plurals name="set_record_quality_hours">
         <item quantity="other">Kira-kira %1$s GB sejam; kira-kira %2$s jam lagi pada pemacu USB</item>
     </plurals>
-    <!-- 4.0 主界面动作栏的六块开关（ui-spec §十三） -->
+    <!-- 主界面动作栏的四块开关（ui-spec §十三） -->
     <string name="quick_on">Hidup</string>
     <string name="quick_off">Mati</string>
-    <string name="quick_smart_bound">%1$d dipasangkan</string>
-    <string name="quick_smart_none">Tiada dipasangkan</string>
-    <!-- 4.0 初始设置（ui-spec §十五）、升级后「设置已重新整理」那个框 -->
+    <!-- 4.0 初始设置（ui-spec §十五） -->
     <string name="setup_skip">Langkau persediaan</string>
     <string name="setup_back">Kembali</string>
     <string name="setup_next">Seterusnya</string>
@@ -1190,6 +1188,4 @@
     <string name="setup_record_note">Boleh ditukar dalam Tetapan → Rakaman</string>
     <string name="setup_features_note">Hidupkan yang diperlukan. Boleh ditukar dalam Tetapan → Cermin super, Tetapan → Paparan titik buta dan Tetapan → Butang</string>
     <string name="setup_done_title">Persediaan selesai</string>
-    <string name="regroup_title">Tetapan telah disusun semula</string>
-    <string name="regroup_body">Tetapan telah berpindah; tetapan sedia ada tidak berubah.\n\nAntara muka dan Sistem kini Umum, dan Bunyi pemanduan simulasi juga dalam Umum.\nPaparan titik buta dipindahkan keluar daripada Cermin super ke bahagiannya sendiri.\nButang terapung dan butang pintar kini dinamakan Butang.\nSemak kemas kini dan Perihal &amp; penghargaan kini Kemas kini &amp; perihal.\nSuis untuk Cermin super, Butang terapung dan lain-lain berada di sebelah butang tindakan pada skrin utama.</string>
 </resources>
