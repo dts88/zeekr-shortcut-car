@@ -43,6 +43,7 @@
     <string name="alert_headline_door">A door opened while parked</string>
     <string name="alert_headline_test">Test</string>
     <string name="alert_sentry_on">Sentry Mode: on</string>
+    <string name="alert_sentry_armed">Sentry Mode: armed (locked)</string>
     <string name="alert_sentry_off">Sentry Mode: off</string>
     <string name="alert_channel">Parked alerts</string>
     <string name="alert_channel_desc">Says here when an alert could not be sent</string>

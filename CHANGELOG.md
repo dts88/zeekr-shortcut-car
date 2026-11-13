@@ -9,6 +9,8 @@ commit message, not here.
 
 ## [Unreleased]
 
+- Alerts: nothing is sent when you come back to the car. Unlocking drops Sentry Mode out of its armed
+  value before the screen and the lamps come on, and an alert needs the armed value.
 - Alerts (new section in Settings, off by default): with the car parked and Sentry Mode on, the app
   sends one picture of all four cameras to a Telegram chat when the hazards come on, the high beams
   flash, or a door opens. The bot token is typed on the car screen and can be found together with the

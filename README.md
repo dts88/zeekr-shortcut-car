@@ -88,8 +88,8 @@ Off by default; set it up once, from the car screen, and nothing needs rebuildin
   proves the whole path before you rely on it.
 - One alert per minute at most, six an hour. The cooldown is there because one event trips several
   signals at once.
-- Coming back to the car looks the same as somebody interfering with it — the screen lights up, the
-  lamps come on — so expect one message when you return, then turn the feature off if that bothers you.
+- Coming back to the car does not send anything: unlocking drops Sentry Mode out of its armed value
+  before the screen or the lamps come back on, and the alert needs the armed value.
 - The bot token stays on this car, in its own store: it is not in the exported settings, not in a
   diagnostics report, and not in the log.
 

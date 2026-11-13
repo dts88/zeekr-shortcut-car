@@ -233,19 +233,20 @@ public final class SentryAlerts implements Telemetry.Listener {
         VehicleState state = telemetry.latest();
         boolean parked = state != null && "P".equals(state.gear);
         Integer sentry = state == null ? null : state.sentry;
-        boolean armed = sentry != null && sentry != 0;
+        // 「布防 = 锁着」：解锁那一下哨兵就 2 → 1 了，车主回来之后的亮屏、亮灯都发不出去（SentryFacts）。
+        boolean armed = SentryFacts.armed(sentry);
         policy.setParked(parked);
         policy.setArmed(armed);
 
         Boolean hazard = hazardOn(readings);
-        boolean hazardRising = Boolean.TRUE.equals(hazard) && !Boolean.TRUE.equals(lastHazard);
+        boolean hazardRising = SentryFacts.rising(hazard, lastHazard);
         Boolean flash = readings.bool(Signal.HIGH_BEAM_FLASH);
-        boolean flashRising = Boolean.TRUE.equals(flash) && !Boolean.TRUE.equals(lastFlash);
+        boolean flashRising = SentryFacts.rising(flash, lastFlash);
         boolean doorOpening = doorOpened(readings);
         Boolean lamps = lampsOn(readings);
-        boolean lampsRising = Boolean.TRUE.equals(lamps) && !Boolean.TRUE.equals(lastLamps);
+        boolean lampsRising = SentryFacts.rising(lamps, lastLamps);
         Boolean screenOn = screenLit(readings.code(Signal.SCREEN_POWER_EVENT));
-        boolean screenRising = Boolean.TRUE.equals(screenOn) && !Boolean.TRUE.equals(lastScreenOn);
+        boolean screenRising = SentryFacts.rising(screenOn, lastScreenOn);
 
         lastHazard = hazard;
         lastFlash = flash;
@@ -285,32 +286,17 @@ public final class SentryAlerts implements Telemetry.Listener {
         return indicator == null ? null : indicator == 3;
     }
 
-    /**
-     * 车外有没有灯自己亮起来：日行灯、前 / 后位置灯、近光，任一为亮。
-     *
-     * <p>停车锁车后这几盏都该是灭的。它们自己亮了，通常就是车被叫醒、解锁或者报警在闪灯。</p>
-     */
+    /** 车外有没有灯自己亮起来（{@link SentryFacts#lampsOn}）。 */
     private static Boolean lampsOn(Readings readings) {
-        Boolean drl = readings.bool(Signal.DRL);
-        Boolean front = readings.bool(Signal.FRONT_POSITION_LAMP);
-        Boolean rear = readings.bool(Signal.REAR_POSITION_LAMP);
-        Boolean low = readings.bool(Signal.LOW_BEAM);
-        if (drl == null && front == null && rear == null && low == null) {
-            return null;
-        }
-        return Boolean.TRUE.equals(drl) || Boolean.TRUE.equals(front)
-                || Boolean.TRUE.equals(rear) || Boolean.TRUE.equals(low);
+        return SentryFacts.lampsOn(readings.bool(Signal.DRL),
+                readings.bool(Signal.FRONT_POSITION_LAMP),
+                readings.bool(Signal.REAR_POSITION_LAMP),
+                readings.bool(Signal.LOW_BEAM));
     }
 
-    /** 中控屏亮着没有：{@code SCREEN_POWER_EVENT} 0 是亮着、1 是黑、其它（255）是读不到。 */
+    /** 中控屏亮着没有（{@link SentryFacts#screenLit}）。 */
     private static Boolean screenLit(Integer screenPowerEvent) {
-        if (screenPowerEvent == null) {
-            return null;
-        }
-        if (screenPowerEvent == 0) {
-            return Boolean.TRUE;
-        }
-        return screenPowerEvent == 1 ? Boolean.FALSE : null;
+        return SentryFacts.screenLit(screenPowerEvent);
     }
 
     /** 六个门里有没有一个刚从关到开。 */
@@ -402,8 +388,11 @@ public final class SentryAlerts implements Telemetry.Listener {
         return state == null ? null : state.sentry;
     }
 
-    /** 配图里那一行哨兵模式状态。 */
+    /** 配图里那一行哨兵模式状态：布防 / 开 / 关。 */
     private String sentryLine(Integer sentry) {
+        if (SentryFacts.armed(sentry)) {
+            return app.getString(R.string.alert_sentry_armed);
+        }
         boolean on = sentry != null && sentry != 0;
         return app.getString(on ? R.string.alert_sentry_on : R.string.alert_sentry_off);
     }

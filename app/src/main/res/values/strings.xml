@@ -57,6 +57,7 @@
     <string name="alert_headline_door">停车时车门被打开</string>
     <string name="alert_headline_test">测试</string>
     <string name="alert_sentry_on">哨兵模式：开</string>
+    <string name="alert_sentry_armed">哨兵模式：已布防（锁车）</string>
     <string name="alert_sentry_off">哨兵模式：关</string>
     <string name="alert_channel">停车警报</string>
     <string name="alert_channel_desc">警报发不出去时在这一栏说</string>
