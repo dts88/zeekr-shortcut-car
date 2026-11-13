@@ -8,9 +8,14 @@
 package com.kooo.evcam.settings;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
+import androidx.preference.Preference;
+
 import com.kooo.evcam.AppConfig;
+import com.kooo.evcam.R;
 import com.kooo.evcam.screens.ShotActivity;
 import com.kooo.evcam.screens.Shots;
 
@@ -53,6 +58,50 @@ public class SettingsShotsTest {
         config.setSideViewEnabled(true);
         config.setDriveSoundEnabled(true);
         shoot(Shots.DAY, "day-on");
+    }
+
+    /**
+     * 「通用」的「模拟声浪」一组：听感、转速变化方式、变速箱所有人都有（4.0.0 收进过开发者选项，项目所有者 2026-11-13
+     * 上车后要回来）；听感、变速箱跟着声音风格出现。这一组在第一屏下面，滚到它另出一张图。
+     */
+    @Test
+    public void driveSoundRowsAreThereForEveryone() {
+        assertFalse("这一条看的是开发者选项关着时", DeveloperMode.isUnlocked());
+        new AppConfig(RuntimeEnvironment.getApplication()).setDriveSoundEnabled(true);
+        RuntimeEnvironment.setQualifiers(Shots.DAY);
+        ShotActivity activity = Robolectric.buildActivity(ShotActivity.class).setup().get();
+        Shots.stillFrames(activity);
+        SettingsShellFragment shell = new SettingsShellFragment();
+        activity.getSupportFragmentManager().beginTransaction().replace(activity.container, shell).commitNow();
+        Shots.settle();
+        shell.showSection("screen_general");
+        Shots.settle();
+        SettingsPreferenceFragment section = (SettingsPreferenceFragment)
+                shell.getChildFragmentManager().findFragmentById(R.id.settings_detail);
+        assertNotNull(section);
+        for (String key : new String[] {"pref_drive_sound_style", "pref_drive_sound_view", "pref_drive_sound_rpm",
+                "pref_drive_sound_gearbox", "pref_drive_sound_standard", "pref_drive_sound_volume",
+                "pref_drive_sound_output"}) {
+            assertTrue("美式 V8 时该有 " + key, shown(section, key));
+        }
+        section.scrollToPreference("pref_drive_sound_output");
+        File file = Shots.save(activity, "settings-general-day-sound");
+        assertTrue(file + " 是空的", file.length() > 10_000);
+
+        // 超音速（旧版）：没有听感（只有美式 V8 分车内车外）、没有变速箱（固定 8 速）
+        Preference style = section.findPreference("pref_drive_sound_style");
+        assertNotNull(style);
+        style.callChangeListener(AppConfig.DRIVE_SOUND_STYLE_JET_OLD);
+        Shots.settle();
+        assertFalse(shown(section, "pref_drive_sound_view"));
+        assertFalse(shown(section, "pref_drive_sound_gearbox"));
+        assertTrue(shown(section, "pref_drive_sound_rpm"));
+    }
+
+    private static boolean shown(SettingsPreferenceFragment section, String key) {
+        Preference row = section.findPreference(key);
+        assertNotNull("少了 " + key, row);
+        return row.isVisible();
     }
 
     /** 状态能点（ui-spec §十三）：从主界面带着「去哪一行」打开设置，停在那一行所在的分区；已经开着就在里面换过去。 */

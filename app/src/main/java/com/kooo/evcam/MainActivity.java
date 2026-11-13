@@ -1637,14 +1637,9 @@ public class MainActivity extends AppCompatActivity implements com.kooo.evcam.se
             cell.translateY = lane.translateY;
             cell.fit = scaleModeOf(lane.fit);
             cell.fitCorrected = scaleModeOf(lane.fitCorrected);
-            // 三列两行（环视 + 一路座舱）：这一格摆在哪由那套摆法定，旋转、镜像、缩放平移照旧听配置
-            float[] place = threeByTwo
-                    ? com.kooo.evcam.ui.PreviewStageLayout.threeByTwoCell(cell.laneIndex) : null;
-            if (place != null) {
-                cell.x = place[0];
-                cell.y = place[1];
-                cell.width = place[2];
-                cell.height = place[3];
+            // 三列两行（环视 + 一路座舱）：这一格摆在哪、铺满由那套摆法定，旋转、镜像、裁切、缩放平移照旧听配置
+            if (threeByTwo) {
+                com.kooo.evcam.ui.PreviewStageLayout.placeThreeByTwo(cell);
             }
             cells[i] = cell;
         }
