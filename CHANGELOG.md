@@ -11,6 +11,10 @@ commit message, not here.
 
 Nothing yet.
 
+## [4.1.0-alpha] - 2026-11-13
+
+- Main screen: with Surround and one cabin camera the picture area is three columns by two rows: Front and the cabin (two cells wide) on top, Left, Rear and Right below; the cabin picture fills its two cells.
+
 ## [4.0.1-alpha] - 2026-11-13
 
 - Settings: one column per section; Maintenance is the last group of General.
