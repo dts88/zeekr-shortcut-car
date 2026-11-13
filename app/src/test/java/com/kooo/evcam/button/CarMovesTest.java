@@ -301,6 +301,25 @@ public class CarMovesTest {
         assertEquals(CarMoves.Result.UNAVAILABLE, run(car, CarMoves.sentryOn()));
     }
 
+    /** 主界面那个键亮着时再点一下（反悔）只关不开：开着写 0；关着不写，算做成；布防、读不到不写；写了没变是没生效。 */
+    @Test
+    public void sentryOffOnlyTurnsOff() {
+        FakeCar car = new FakeCar();
+        car.set(SENTRY, ALL, 1);
+        assertEquals(CarMoves.Result.DONE, run(car, CarMoves.sentryOff()));
+        assertEquals(Integer.valueOf(0), car.get(SENTRY, ALL));
+        assertEquals(SENTRY + "@" + ALL + "=0", car.writes.get(0));
+        car.writes.clear();
+        assertEquals("已经关着不写", CarMoves.Result.DONE, run(car, CarMoves.sentryOff()));
+        assertTrue(car.writes.isEmpty());
+        car.set(SENTRY, ALL, 2);
+        assertEquals("布防的那个值不写", CarMoves.Result.UNAVAILABLE, run(car, CarMoves.sentryOff()));
+        assertTrue(car.writes.isEmpty());
+        car.set(SENTRY, ALL, 1);
+        car.applies = false;
+        assertEquals(CarMoves.Result.NO_CHANGE, run(car, CarMoves.sentryOff()));
+    }
+
     /** 灵动贴的「哨兵模式」照旧是 0 / 1 互换，和「开启哨兵模式」写的是同一个。 */
     @Test
     public void sentryToggleFlipsTheSameSwitch() {

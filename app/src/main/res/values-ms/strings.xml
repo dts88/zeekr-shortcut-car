@@ -720,7 +720,7 @@
     <string name="record_idle_detail">Klip %1$d min</string>
     <string name="record_recording_detail">Merakam %1$s</string>
     <string name="record_sentry_on">Hidupkan Mod Sentry</string>
-    <string name="record_sentry_on_label">Hidupkan\nMod\nSentry</string>
+    <string name="record_sentry_on_label">Mod\nSentry</string>
     <string name="record_screen_off_continue">Terus merakam paparan sekeliling ketika skrin padam</string>
     <string name="record_screen_off_pause">Jeda bila skrin padam, sambung bila hidup</string>
     <string name="record_screen_off_stop">Berhenti apabila skrin padam</string>

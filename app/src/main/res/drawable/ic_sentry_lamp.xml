@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  哨兵模式的图标（警灯）里的灯芯：拱里的一颗，底下坐在托着它的那一块上。叠在 ic_sentry_body 上面：
+  没开时和它同色，开着时是红的；点亮的过渡里它先变（ic_sentry_rays 那三道光跟在后面）。着色由使用方决定。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="@color/text_primary"
+        android:pathData="M9.1,16.6V12.5a2.9,2.9 0 0,1 5.8,0V16.6z" />
+</vector>
