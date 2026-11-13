@@ -61,6 +61,62 @@ public class SettingsShotsTest {
     }
 
     /**
+     * 「按键」页里绑定的灵动贴（项目所有者 2026-11-14「名称 / 位置」）：起了名字的显示名字、默认名（带短编号）挪到下面那一行；
+     * 没起的照旧是默认名。存着的名字再怪（这里直接往存储里塞一段带标签、格式符、换行、方向控制符的长字，像是从改过的
+     * 备份里来的），显示出来也只是最多 20 个字的一行字。地址是随便编的。
+     */
+    @Test
+    public void namedSmartButtons() {
+        android.content.Context app = RuntimeEnvironment.getApplication();
+        AppConfig config = new AppConfig(app);
+        String first = "00:11:22:33:44:55";
+        String second = "66:77:88:99:AA:BB";
+        String third = "CC:DD:EE:FF:00:11";
+        config.addSmartButton(first);
+        config.addSmartButton(second);
+        config.addSmartButton(third);
+        config.setSmartButtonName(first, "方向盘左");
+        app.getSharedPreferences(AppConfig.PREF_NAME, android.content.Context.MODE_PRIVATE).edit()
+                .putString("smart_button_name." + second, "<b>%s</b>\n\n\u202E" + "很长的名字".repeat(30)).commit();
+
+        RuntimeEnvironment.setQualifiers(Shots.DAY);
+        ShotActivity activity = Robolectric.buildActivity(ShotActivity.class).setup().get();
+        Shots.stillFrames(activity);
+        SettingsShellFragment shell = new SettingsShellFragment();
+        activity.getSupportFragmentManager().beginTransaction().replace(activity.container, shell).commitNow();
+        Shots.settle();
+        shell.showSection("screen_floating");
+        Shots.settle();
+        SettingsPreferenceFragment section = (SettingsPreferenceFragment)
+                shell.getChildFragmentManager().findFragmentById(R.id.settings_detail);
+        assertNotNull(section);
+
+        Preference named = section.findPreference("smart_button." + first);
+        assertNotNull(named);
+        assertEquals("起了名字的显示名字", "方向盘左", String.valueOf(named.getTitle()));
+        String defaultName = activity.getString(R.string.smart_button_name,
+                com.kooo.evcam.button.SmartButtonAd.shortId(first));
+        assertTrue("默认名挪到下面那一行：" + named.getSummary(), String.valueOf(named.getSummary()).contains(defaultName));
+
+        Preference odd = section.findPreference("smart_button." + second);
+        assertNotNull(odd);
+        String shown = String.valueOf(odd.getTitle());
+        assertEquals("怪名字读出来是洗过的", com.kooo.evcam.button.DeviceLabel.clean(shown), shown);
+        assertTrue(shown.codePointCount(0, shown.length()) <= com.kooo.evcam.button.DeviceLabel.MAX);
+        assertFalse(shown.contains("\n"));
+        assertTrue("尖括号、百分号只是字：" + shown, shown.startsWith("<b>%s</b> 很长的名字"));
+
+        Preference plain = section.findPreference("smart_button." + third);
+        assertNotNull(plain);
+        assertEquals("没起名的照旧是默认名", activity.getString(R.string.smart_button_name,
+                com.kooo.evcam.button.SmartButtonAd.shortId(third)), String.valueOf(plain.getTitle()));
+
+        section.scrollToPreference("smart_button." + third);
+        File file = Shots.save(activity, "settings-floating-day-names");
+        assertTrue(file + " 是空的", file.length() > 10_000);
+    }
+
+    /**
      * 「通用」的「模拟声浪」一组：听感、转速变化方式、变速箱所有人都有（4.0.0 收进过开发者选项，项目所有者 2026-11-13
      * 上车后要回来）；听感、变速箱跟着声音风格出现。这一组在第一屏下面，滚到它另出一张图。
      */

@@ -8,6 +8,10 @@
 package com.kooo.evcam.settings;
 
 import android.content.Context;
+import android.text.InputFilter;
+import android.text.InputType;
+import android.view.inputmethod.EditorInfo;
+import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -20,6 +24,7 @@ import androidx.preference.PreferenceCategory;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.R;
+import com.kooo.evcam.button.DeviceLabel;
 import com.kooo.evcam.button.SmartButtonAction;
 import com.kooo.evcam.button.SmartButtonAd;
 import com.kooo.evcam.button.SmartButtons;
@@ -37,7 +42,8 @@ import java.util.List;
  *       {@link SmartButtons#BIND_WINDOW_MS} 里长按了没绑过的，框里改成正在连接，绑上了、拿绑过的来长按了、时间到了没找到、没连上，
  *       都提示一句、关框。人关了框就不绑了。</li>
  *   <li>绑定的每一台一行（{@link ValueActionPreference}）：名字「灵动贴 B5:E6」，说明写单击、双击各做什么，下面一行版本和序列号
- *       （有了才写），行尾值是电量，按钮「删除」（先问一句）；点这一行改单击、双击（{@link SmartButtonAction}）：先选单击还是双击，
+ *       （有了才写），行尾值是电量，按钮「删除」（先问一句）；点这一行改「名称 / 位置」（用户自己起的名字，2026-11-14，
+ *       {@link DeviceLabel}）或者改单击、双击（{@link SmartButtonAction}）：先选单击还是双击，
  *       再选一组（最上面是「不使用」），再在组里单选（2026-11-05）。</li>
  * </ul>
  *
@@ -251,11 +257,14 @@ final class SmartButtonRows {
             row.setPersistent(false);
             row.setIconSpaceReserved(false);
             row.setOrder(order++);
-            row.setTitle(context.getString(R.string.smart_button_name, SmartButtonAd.shortId(address)));
+            String named = config.getSmartButtonName(address);
+            row.setTitle(displayName(context, config, address));
             String actions = context.getString(R.string.smart_button_summary,
                     actionLabel(context, config, address, SmartButtonAd.SINGLE),
                     actionLabel(context, config, address, SmartButtonAd.DOUBLE));
-            String info = buttons == null ? "" : info(context, buttons.version(address), buttons.serial(address));
+            // 起了名字的，默认名（带短编号）挪到下面那一行最前面：还认得出是哪一台
+            String info = info(context, named.isEmpty() ? null : defaultName(context, address),
+                    buttons == null ? null : buttons.version(address), buttons == null ? null : buttons.serial(address));
             row.setSummary(info.isEmpty() ? actions : actions + "\n" + info);
             int battery = buttons == null ? -1 : buttons.battery(address);
             row.setValue(battery < 0 ? null : context.getString(R.string.smart_button_battery, battery));
@@ -270,9 +279,26 @@ final class SmartButtonRows {
         }
     }
 
-    /** 说明下面那一行：版本、序列号（有了才写），「 · 」隔开；都没有是空的。 */
-    private static String info(Context context, String version, String serial) {
+    /** 默认的名字：「灵动贴 xxxx」（短编号）。没起名时标题就是它。 */
+    private static String defaultName(Context context, String address) {
+        return context.getString(R.string.smart_button_name, SmartButtonAd.shortId(address));
+    }
+
+    /**
+     * 这一台显示成什么：用户起的「名称 / 位置」（{@link AppConfig#getSmartButtonName}，读出来就是洗过的），没起就是默认名。
+     * 只当字显示（{@code setTitle}）：不当格式串、不进日志。
+     */
+    private static String displayName(Context context, AppConfig config, String address) {
+        String named = config.getSmartButtonName(address);
+        return named.isEmpty() ? defaultName(context, address) : named;
+    }
+
+    /** 说明下面那一行：默认名（起了名字才写）、版本、序列号（有了才写），「 · 」隔开；都没有是空的。 */
+    private static String info(Context context, String defaultName, String version, String serial) {
         List<String> parts = new ArrayList<>();
+        if (defaultName != null) {
+            parts.add(defaultName);
+        }
         if (version != null) {
             parts.add(context.getString(R.string.smart_button_version, version));
         }
@@ -286,23 +312,71 @@ final class SmartButtonRows {
         return SmartButtonAction.fromKey(config.getSmartButtonAction(address, clicks)).label(context);
     }
 
-    /** 点一台：先选改单击还是双击，再选做什么。 */
+    /** 点一台：改「名称 / 位置」，或者先选改单击还是双击、再选做什么。 */
     private void editActions(String address) {
         Context context = fragment.getContext();
         if (context == null) {
             return;
         }
         AppConfig config = new AppConfig(context);
+        String name = displayName(context, config, address);
         String[] items = {
+                context.getString(R.string.set_smart_button_label) + " · " + name,
                 context.getString(R.string.set_smart_button_single) + " · "
                         + actionLabel(context, config, address, SmartButtonAd.SINGLE),
                 context.getString(R.string.set_smart_button_double) + " · "
                         + actionLabel(context, config, address, SmartButtonAd.DOUBLE)};
         CamDialogs.show(new MaterialAlertDialogBuilder(context, R.style.Theme_Cam_MaterialAlertDialog)
-                .setTitle(context.getString(R.string.smart_button_name, SmartButtonAd.shortId(address)))
-                .setItems(items, (d, which) -> pickAction(address,
-                        which == 0 ? SmartButtonAd.SINGLE : SmartButtonAd.DOUBLE))
+                .setTitle(name)
+                .setItems(items, (d, which) -> {
+                    if (which == 0) {
+                        editName(address);
+                    } else {
+                        pickAction(address, which == 1 ? SmartButtonAd.SINGLE : SmartButtonAd.DOUBLE);
+                    }
+                })
                 .setNegativeButton(R.string.action_cancel, null));
+    }
+
+    /**
+     * 改「名称 / 位置」（项目所有者 2026-11-14）：一个单行的输入框，里面是现在的名字，没起过时空着、灰字写默认名；
+     * 保存时留空就回到默认名。输入框最多让打 {@link DeviceLabel#MAX} 个字符、不让换行；真正的把关在存取那一层
+     * （{@link AppConfig#setSmartButtonName}、{@link DeviceLabel#clean}）：粘贴进来的怪字符、超长的字在那里洗掉。
+     */
+    private void editName(String address) {
+        Context context = fragment.getContext();
+        if (context == null) {
+            return;
+        }
+        AppConfig config = new AppConfig(context);
+        EditText input = nameInput(context, config.getSmartButtonName(address), defaultName(context, address));
+        int pad = dp(context, 24);
+        LinearLayout box = new LinearLayout(context);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(pad, pad / 2, pad, 0);
+        box.addView(input);
+        CamDialogs.show(new MaterialAlertDialogBuilder(context, R.style.Theme_Cam_MaterialAlertDialog)
+                .setTitle(R.string.set_smart_button_label)
+                .setView(box)
+                .setPositiveButton(R.string.action_save, (d, w) -> {
+                    new AppConfig(context).setSmartButtonName(address, input.getText().toString());
+                    rebuildRows();
+                })
+                .setNegativeButton(R.string.action_cancel, null));
+    }
+
+    /** 「名称 / 位置」的输入框：单行、普通文字键盘、最多 {@link DeviceLabel#MAX} 个字符，横屏时不让输入法占满整屏。 */
+    static EditText nameInput(Context context, String current, String hint) {
+        EditText input = CamDialogs.input(context);
+        input.setInputType(InputType.TYPE_CLASS_TEXT);
+        input.setSingleLine(true);
+        input.setMaxLines(1);
+        input.setImeOptions(EditorInfo.IME_ACTION_DONE | EditorInfo.IME_FLAG_NO_EXTRACT_UI);
+        input.setFilters(new InputFilter[] {new InputFilter.LengthFilter(DeviceLabel.MAX)});
+        input.setHint(hint);
+        input.setText(current);
+        input.setSelectAllOnFocus(true);
+        return input;
     }
 
     /**
