@@ -81,13 +81,15 @@ Off by default; set it up once, from the car screen, and nothing needs rebuildin
 
 - One picture of all four cameras, taken by the same photo path the shutter button uses, so it looks
   like a photo you would have taken yourself.
-- It goes to a Telegram chat when the hazards come on, the high beams flash, or any door, the frunk or
-  the trunk opens.
+- It goes to a Telegram chat when the hazards come on, the high beams flash, any door, the frunk or
+  the trunk opens, the car lights come on by themselves, or the centre screen lights up while parked.
 - **Settings → Alerts**: paste the bot token from @BotFather, then tap **Find chat id** — send the bot
   one message from your phone first, and the row fills in the chat it came from. **Send a test picture**
   proves the whole path before you rely on it.
 - One alert per minute at most, six an hour. The cooldown is there because one event trips several
   signals at once.
+- Coming back to the car looks the same as somebody interfering with it — the screen lights up, the
+  lamps come on — so expect one message when you return, then turn the feature off if that bothers you.
 - The bot token stays on this car, in its own store: it is not in the exported settings, not in a
   diagnostics report, and not in the log.
 

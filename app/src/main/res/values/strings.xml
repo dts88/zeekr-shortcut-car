@@ -52,6 +52,8 @@
     <string name="alert_headline_motion">停车时侦测到移动</string>
     <string name="alert_headline_hazard">停车时双闪亮起</string>
     <string name="alert_headline_flash">停车时远光闪了一下</string>
+    <string name="alert_headline_lights">停车时车灯自己亮起</string>
+    <string name="alert_headline_screen">停车时中控屏亮起</string>
     <string name="alert_headline_door">停车时车门被打开</string>
     <string name="alert_headline_test">测试</string>
     <string name="alert_sentry_on">哨兵模式：开</string>

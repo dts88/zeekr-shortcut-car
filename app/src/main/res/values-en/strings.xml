@@ -38,6 +38,8 @@
     <string name="alert_headline_motion">Movement while parked</string>
     <string name="alert_headline_hazard">Hazard lights came on while parked</string>
     <string name="alert_headline_flash">High beams flashed while parked</string>
+    <string name="alert_headline_lights">Car lights came on while parked</string>
+    <string name="alert_headline_screen">Screen came on while parked</string>
     <string name="alert_headline_door">A door opened while parked</string>
     <string name="alert_headline_test">Test</string>
     <string name="alert_sentry_on">Sentry Mode: on</string>

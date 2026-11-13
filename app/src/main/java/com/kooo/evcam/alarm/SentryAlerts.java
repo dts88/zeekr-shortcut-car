@@ -43,6 +43,8 @@ import java.util.Locale;
  *   <li><b>双闪亮起</b>（{@code INDICATOR == 3}）：车在报警时会闪灯。</li>
  *   <li><b>远光闪一下</b>（{@code HIGH_BEAM_FLASH} 上升沿）。</li>
  *   <li><b>任何一个车门 / 前备箱 / 后备箱从关到开</b>。</li>
+ *   <li><b>车灯自亮</b>（日行灯 / 前后位置灯 / 近光任一从灭到亮）：车被叫醒、解锁或报警时会亮灯。</li>
+ *   <li><b>中控屏亮起</b>（{@code SCREEN_POWER_EVENT} 从黑到亮）：哨兵模式被触发时屏幕会亮，车主回来时也会。</li>
  * </ul>
  *
  * <p>这台车上<b>没有</b>撞击、气囊、喇叭、防盗触发的信号（{@code Signal} 里就没有，
@@ -101,6 +103,8 @@ public final class SentryAlerts implements Telemetry.Listener {
     private Boolean lastDoorRearRight;
     private Boolean lastDoorFrunk;
     private Boolean lastDoorTrunk;
+    private Boolean lastLamps;
+    private Boolean lastScreenOn;
     private long failureNotifiedAt;
 
     private SentryAlerts(Context context) {
@@ -144,6 +148,8 @@ public final class SentryAlerts implements Telemetry.Listener {
             telemetry.release(USER);
             lastHazard = null;
             lastFlash = null;
+            lastLamps = null;
+            lastScreenOn = null;
             seedEdges(Readings.empty());
             BlackBox.note("停车警报：不再看车辆信号");
         }
@@ -236,12 +242,18 @@ public final class SentryAlerts implements Telemetry.Listener {
         Boolean flash = readings.bool(Signal.HIGH_BEAM_FLASH);
         boolean flashRising = Boolean.TRUE.equals(flash) && !Boolean.TRUE.equals(lastFlash);
         boolean doorOpening = doorOpened(readings);
+        Boolean lamps = lampsOn(readings);
+        boolean lampsRising = Boolean.TRUE.equals(lamps) && !Boolean.TRUE.equals(lastLamps);
+        Boolean screenOn = screenLit(readings.code(Signal.SCREEN_POWER_EVENT));
+        boolean screenRising = Boolean.TRUE.equals(screenOn) && !Boolean.TRUE.equals(lastScreenOn);
 
         lastHazard = hazard;
         lastFlash = flash;
+        lastLamps = lamps;
+        lastScreenOn = screenOn;
         rememberDoors(readings);
 
-        if (!hazardRising && !flashRising && !doorOpening) {
+        if (!hazardRising && !flashRising && !doorOpening && !lampsRising && !screenRising) {
             return;
         }
         String headline;
@@ -249,8 +261,12 @@ public final class SentryAlerts implements Telemetry.Listener {
             headline = app.getString(R.string.alert_headline_door);
         } else if (hazardRising) {
             headline = app.getString(R.string.alert_headline_hazard);
-        } else {
+        } else if (flashRising) {
             headline = app.getString(R.string.alert_headline_flash);
+        } else if (lampsRising) {
+            headline = app.getString(R.string.alert_headline_lights);
+        } else {
+            headline = app.getString(R.string.alert_headline_screen);
         }
 
         AlertPolicy.Decision decision = policy.decide(now);
@@ -267,6 +283,34 @@ public final class SentryAlerts implements Telemetry.Listener {
     private static Boolean hazardOn(Readings readings) {
         Integer indicator = readings.code(Signal.INDICATOR);
         return indicator == null ? null : indicator == 3;
+    }
+
+    /**
+     * 车外有没有灯自己亮起来：日行灯、前 / 后位置灯、近光，任一为亮。
+     *
+     * <p>停车锁车后这几盏都该是灭的。它们自己亮了，通常就是车被叫醒、解锁或者报警在闪灯。</p>
+     */
+    private static Boolean lampsOn(Readings readings) {
+        Boolean drl = readings.bool(Signal.DRL);
+        Boolean front = readings.bool(Signal.FRONT_POSITION_LAMP);
+        Boolean rear = readings.bool(Signal.REAR_POSITION_LAMP);
+        Boolean low = readings.bool(Signal.LOW_BEAM);
+        if (drl == null && front == null && rear == null && low == null) {
+            return null;
+        }
+        return Boolean.TRUE.equals(drl) || Boolean.TRUE.equals(front)
+                || Boolean.TRUE.equals(rear) || Boolean.TRUE.equals(low);
+    }
+
+    /** 中控屏亮着没有：{@code SCREEN_POWER_EVENT} 0 是亮着、1 是黑、其它（255）是读不到。 */
+    private static Boolean screenLit(Integer screenPowerEvent) {
+        if (screenPowerEvent == null) {
+            return null;
+        }
+        if (screenPowerEvent == 0) {
+            return Boolean.TRUE;
+        }
+        return screenPowerEvent == 1 ? Boolean.FALSE : null;
     }
 
     /** 六个门里有没有一个刚从关到开。 */
@@ -296,6 +340,8 @@ public final class SentryAlerts implements Telemetry.Listener {
     private void seedEdges(Readings readings) {
         lastHazard = hazardOn(readings);
         lastFlash = readings.bool(Signal.HIGH_BEAM_FLASH);
+        lastLamps = lampsOn(readings);
+        lastScreenOn = screenLit(readings.code(Signal.SCREEN_POWER_EVENT));
         rememberDoors(readings);
     }
 
