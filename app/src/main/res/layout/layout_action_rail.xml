@@ -2,7 +2,8 @@
 <!--
   ④ 动作栏：这个界面能做的事，按重要性从上往下。三份主界面布局 <include> 同一份。
 
-  按钮：btn_start_record（第三行小字是 record_hint）/ btn_take_photo / btn_video_playback / btn_photo_playback /
+  按钮：btn_start_record（第三行小字是 record_hint；右边四分之一有时切给 btn_sentry_on）/ btn_take_photo /
+  btn_video_playback / btn_photo_playback /
   quick_switches / vehicle_status_panel / btn_settings / btn_minimize。四宫格键撤了 —— 放大哪一格改成直接点那一格，
   再点还原（MainActivity.setupCompositeControls），拍照因此独占一行。右下角原来的「×」改成
   「隐藏到后台」；真正的退出在抽屉和设置左栏的最底下。
@@ -50,10 +51,19 @@
         android:layout_height="wrap_content"
         android:orientation="vertical">
 
+    <!--
+      录制键那一行（ui/RecordKeyRow）：平时录制键占满；录着、只差哨兵模式就能熄屏接着录时，右边四分之一切给
+      「开启哨兵模式」那个键（项目所有者 2026-11-13；什么时候在由 RecordButtonUi 说）
+    -->
+    <com.kooo.evcam.ui.RecordKeyRow
+        android:id="@+id/record_key_row"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/record_button_height">
+
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/btn_start_record"
         android:layout_width="match_parent"
-        android:layout_height="@dimen/record_button_height"
+        android:layout_height="match_parent"
         android:clickable="true"
         android:contentDescription="@string/record_start"
         android:focusable="true"
@@ -64,6 +74,7 @@
         app:strokeWidth="0dp">
 
         <LinearLayout
+            android:id="@+id/record_content"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:gravity="center_vertical"
@@ -97,16 +108,19 @@
             </FrameLayout>
 
             <LinearLayout
+                android:id="@+id/record_texts"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="18dp"
                 android:layout_weight="1"
                 android:orientation="vertical">
 
+                <!-- 宽占满、高固定一行：右边四分之一切出去时字那一块变窄，放不下的语言由代码把这一行的字缩小 -->
                 <TextView
                     android:id="@+id/record_title"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/text_title_line"
+                    android:gravity="center_vertical"
                     android:maxLines="1"
                     android:text="@string/record_start"
                     android:textColor="@color/text_primary"
@@ -133,6 +147,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="3dp"
+                    android:ellipsize="end"
                     android:maxLines="2"
                     android:textColor="@color/text_secondary"
                     android:textAppearance="@style/TextAppearance.Cam.Micro"
@@ -140,6 +155,53 @@
             </LinearLayout>
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
+
+        <!--
+          「开启哨兵模式」：只在录着、只差哨兵模式就能熄屏接着录时从右边滑进来；点了打开车的哨兵模式，开上之后变成对勾、
+          滑出去，录制键回到原来的宽。能量色实底：它是一句提醒，要比旁边的键显眼；红色仍然只标录制
+        -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/btn_sentry_on"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:clickable="true"
+            android:contentDescription="@string/record_sentry_on"
+            android:focusable="true"
+            android:visibility="gone"
+            app:cardBackgroundColor="@color/energy"
+            app:cardCornerRadius="@dimen/corner_radius"
+            app:cardElevation="0dp"
+            app:rippleColor="@color/nav_ripple_color"
+            app:strokeWidth="0dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp">
+
+                <ImageView
+                    android:id="@+id/sentry_key_icon"
+                    android:layout_width="30dp"
+                    android:layout_height="30dp"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/ic_sentry" />
+
+                <TextView
+                    android:id="@+id/sentry_key_label"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:gravity="center_horizontal"
+                    android:maxLines="3"
+                    android:text="@string/record_sentry_on_label"
+                    android:textAppearance="@style/TextAppearance.Cam.Micro"
+                    android:textColor="@color/on_energy" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+    </com.kooo.evcam.ui.RecordKeyRow>
 
     <!-- 拍照独占一行：四宫格键撤了，放大一格改成直接点画面。4.0.1 起矮一档（图标在字左边），给下面的开关让地方 -->
     <com.google.android.material.button.MaterialButton

@@ -216,4 +216,33 @@ public class RecordInDarkTest {
             }
         }
     }
+
+    /**
+     * 录制键旁「开启哨兵模式」那个键（项目所有者 2026-11-13）：别的条件都满足、只差哨兵模式时才在 —— 熄屏持续录制开着、
+     * 计划里有环视、停着车、读得到哨兵模式是关着的。它在的时候小字一定不是「继续录制」，哨兵模式一开小字就是「继续录制」。
+     */
+    @Test
+    public void theSentryKeyShowsOnlyWhenSentryIsTheOneThingMissing() {
+        for (boolean auto : BOTH) {
+            assertTrue(ChannelRules.onlySentryMissing(true, true, false, 0, auto));
+            assertFalse("哨兵模式开着", ChannelRules.onlySentryMissing(true, true, false, 1, auto));
+            assertFalse("布防", ChannelRules.onlySentryMissing(true, true, false, 2, auto));
+            assertFalse("读不到：也写不了", ChannelRules.onlySentryMissing(true, true, false, null, auto));
+            assertFalse("在开车：熄屏本来就接着录", ChannelRules.onlySentryMissing(true, true, true, 0, auto));
+            assertFalse("计划里没有环视：开了也不录", ChannelRules.onlySentryMissing(true, false, false, 0, auto));
+            assertFalse("熄屏持续录制关着：开了也不录", ChannelRules.onlySentryMissing(false, true, false, 0, auto));
+            for (boolean keep : BOTH) {
+                for (boolean surround : BOTH) {
+                    for (boolean driving : BOTH) {
+                        if (!ChannelRules.onlySentryMissing(keep, surround, driving, 0, auto)) {
+                            continue;
+                        }
+                        assertFalse(ChannelRules.darkOutlook(keep, surround, driving, 0, auto) == DarkOutlook.CONTINUE);
+                        assertEquals(DarkOutlook.CONTINUE, ChannelRules.darkOutlook(keep, surround, driving, 1, auto));
+                        assertEquals(DarkOutlook.CONTINUE, ChannelRules.darkOutlook(keep, surround, driving, 2, auto));
+                    }
+                }
+            }
+        }
+    }
 }

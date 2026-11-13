@@ -189,8 +189,7 @@ public final class SmartButtonAction {
                 CarMoves.toggle("ISceneMode", "SCENE_FUNC_THEATER_MODE_PASS", CarNames.ALL)));
         all.add(car("camping", Group.SCENES, R.string.smart_button_action_camping,
                 CarMoves.toggle("IVehicle", "SETTING_FUNC_CAMPING_MOD_SWITCH", CarNames.ALL)));
-        all.add(car("sentry", Group.SCENES, R.string.smart_button_action_sentry,
-                CarMoves.toggle("IVehicle", "SETTING_FUNC_VSTD_MODE_STS", CarNames.ALL)));
+        all.add(car("sentry", Group.SCENES, R.string.smart_button_action_sentry, CarMoves.sentryToggle()));
         return Collections.unmodifiableList(all);
     }
 

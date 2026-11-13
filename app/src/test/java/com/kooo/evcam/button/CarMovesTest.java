@@ -50,6 +50,7 @@ public class CarMovesTest {
     private static final int FRAGRANCE_TYPE = 0x8300;
     private static final int VIEW_360 = 0x9000;
     private static final int MIRROR = 0xA000;
+    private static final int SENTRY = 0xB000;
 
     /** 假的车辆接口：值按「号@区域」存；写了照写进去（{@link #applies}），也可以不受理。 */
     private static class FakeCar implements CarAccess {
@@ -128,6 +129,7 @@ public class CarMovesTest {
             functions.put("IFragrance.HVAC_FUNC_AIR_FRAGRANCE_TYPE_ID", FRAGRANCE_TYPE);
             functions.put("IPAS.PAS_FUNC_PAC_ACTIVATION", VIEW_360);
             functions.put("IBcm.BCM_FUNC_FOLD_REAR_MIRROR", MIRROR);
+            functions.put("IVehicle.SETTING_FUNC_VSTD_MODE_STS", SENTRY);
         }
 
         @Override
@@ -274,6 +276,40 @@ public class CarMovesTest {
         assertEquals(Integer.valueOf(1), car.read(VIEW_360));
         assertEquals(VIEW_360 + "@" + ALL + "=1", car.writes.get(0));
         assertEquals(VIEW_360 + "=1", car.writes.get(1));
+    }
+
+    /** 主界面的「开启哨兵模式」只开不关：关着写 1；开着、布防不写，算做成；写了没变是没生效；车机不受理是做不了。 */
+    @Test
+    public void sentryOnOnlyTurnsOn() {
+        FakeCar car = new FakeCar();
+        car.set(SENTRY, ALL, 0);
+        assertEquals(CarMoves.Result.DONE, run(car, CarMoves.sentryOn()));
+        assertEquals(Integer.valueOf(1), car.get(SENTRY, ALL));
+        assertEquals(SENTRY + "@" + ALL + "=1", car.writes.get(0));
+        for (int already : new int[] {1, 2}) {
+            car.writes.clear();
+            car.set(SENTRY, ALL, already);
+            assertEquals(CarMoves.Result.DONE, run(car, CarMoves.sentryOn()));
+            assertTrue("已经开着（" + already + "）不写", car.writes.isEmpty());
+            assertEquals(Integer.valueOf(already), car.get(SENTRY, ALL));
+        }
+        car.set(SENTRY, ALL, 0);
+        car.applies = false;
+        assertEquals(CarMoves.Result.NO_CHANGE, run(car, CarMoves.sentryOn()));
+        car.acceptZoned = false;
+        car.acceptPlain = false;
+        assertEquals(CarMoves.Result.UNAVAILABLE, run(car, CarMoves.sentryOn()));
+    }
+
+    /** 灵动贴的「哨兵模式」照旧是 0 / 1 互换，和「开启哨兵模式」写的是同一个。 */
+    @Test
+    public void sentryToggleFlipsTheSameSwitch() {
+        FakeCar car = new FakeCar();
+        car.set(SENTRY, ALL, 1);
+        assertEquals(CarMoves.Result.DONE, run(car, CarMoves.sentryToggle()));
+        assertEquals(Integer.valueOf(0), car.get(SENTRY, ALL));
+        assertEquals(CarMoves.Result.DONE, run(car, CarMoves.sentryToggle()));
+        assertEquals(Integer.valueOf(1), car.get(SENTRY, ALL));
     }
 
     /** 360、充电灯语：是 1 写 0，别的都写 1。 */

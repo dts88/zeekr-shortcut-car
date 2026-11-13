@@ -11,15 +11,22 @@ import android.animation.ArgbEvaluator;
 import android.animation.ValueAnimator;
 import android.content.Context;
 import android.graphics.drawable.GradientDrawable;
+import android.text.TextPaint;
+import android.util.TypedValue;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.animation.PathInterpolator;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 import androidx.core.content.ContextCompat;
+import androidx.core.widget.ImageViewCompat;
 
 import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.progressindicator.CircularProgressIndicator;
 import com.kooo.evcam.R;
+import com.kooo.evcam.button.SentrySwitch;
+import com.kooo.evcam.camera.CameraKeeper;
 
 import java.util.Locale;
 
@@ -51,6 +58,16 @@ import java.util.Locale;
  * 缩放不触发重新布局，圆角半径只重画这一块。底色切换是颜色插值。都是平台自带的
  * {@link ValueAnimator}，跟随系统的「动画时长缩放」设置，关了动画就直接跳到终态。
  * 这些都是状态本身，不算装饰，录制时也照常动（见 {@link MotionPolicy}）。</p>
+ *
+ * <h3>右边四分之一有时是另一个键：「开启哨兵模式」（项目所有者 2026-11-13）</h3>
+ *
+ * <p>录着（写着「停止录制」）、别的条件都满足、只差车的哨兵模式没开就能熄屏接着录的时候，录制键的右边四分之一切出来
+ * 一个键，点了打开哨兵模式；开上之后它变成对勾、滑出去，录制键回到原来的宽。什么时候算「只差哨兵模式」由相机管家说
+ * （{@link CameraKeeper#onlySentryMissing}），和第三行小字同一刻、照同一份事实判（{@link ScreenOffHintView#setOnJudged}）：
+ * 键在的时候小字写的一定是「熄屏暂停」或「熄屏后停止」，哨兵模式一开两样一起变。怎么分、怎么滑是 {@link RecordKeyRow} 的事，
+ * 打开哨兵模式走灵动贴那条写车的路（{@link SentrySwitch}）。</p>
+ *
+ * <p>分出去之后字那一块只剩一半多宽：留白收一点，第二行去掉「本段」两个字，第一行放不下的语言把字缩小。</p>
  */
 public final class RecordButtonUi {
 
@@ -62,6 +79,21 @@ public final class RecordButtonUi {
     private static final long WAITING_PULSE_MS = 1_600;
     private static final long FLASH_MS = Motion.SLOW;
 
+    /** 「开启哨兵模式」那个键的样子：没有、可以点、点了在等车回话、读回是开着的（对勾）。 */
+    private enum SentryKey { HIDDEN, OFFERED, BUSY, DONE }
+
+    /**
+     * 读回是开着的之后，车辆信号那一份（哨兵模式要稳住 2 秒才算，{@code VehicleStateMapper}）最多等这么久跟上、键收起；
+     * 过了还没跟上（车又把它关了）键回到可以点。
+     */
+    private static final long SENTRY_CONFIRM_MS = 5_000;
+    /** 分出去之后录制键里的留白各收多少 dp：左边、点和字之间、右边。 */
+    private static final float SPLIT_PAD_START_DP = 4f;
+    private static final float SPLIT_TEXT_GAP_DP = 4f;
+    private static final float SPLIT_PAD_END_DP = 8f;
+    /** 分出去之后第一行最小缩到多大（sp）；平时是 {@code text_title}。 */
+    private static final int COMPACT_TITLE_MIN_SP = 18;
+
     private final View root;
     private final Context context;
     private final MaterialCardView card;
@@ -72,6 +104,30 @@ public final class RecordButtonUi {
     private final View hint;
     private final GradientDrawable dotShape;
     private final float density;
+
+    /** 录制键那一行（不在那种布局里时是 null，就没有「开启哨兵模式」）。 */
+    private final RecordKeyRow row;
+    private final View sentryKey;
+    private final ImageView sentryIcon;
+    private final View sentryLabel;
+    /** 录制键里面那一排（左右留白在它身上）和右边那几行字（和点之间的距离在它身上）。 */
+    private final View content;
+    private final View texts;
+    private final int padStart;
+    private final int padEnd;
+    private final int textGap;
+    private final float titlePx;
+    private final TextPaint fitPaint = new TextPaint();
+    private SentryKey sentry = SentryKey.HIDDEN;
+    /** 右边分出去了（哪怕只分了一点）：第二行用短的写法、第一行可以缩小。 */
+    private boolean compact;
+    /** 第二行此刻写的本段已录多久。 */
+    private long shownElapsedMs;
+    private final Runnable sentryUnconfirmed = () -> {
+        if (sentry == SentryKey.DONE) {
+            showSentry(SentryKey.OFFERED);
+        }
+    };
 
     private State state;
     /** 0 = 圆，1 = 方。 */
@@ -93,6 +149,30 @@ public final class RecordButtonUi {
         this.title = root.findViewById(R.id.record_title);
         this.detail = root.findViewById(R.id.record_detail);
         this.hint = root.findViewById(R.id.record_hint);
+        this.content = root.findViewById(R.id.record_content);
+        this.texts = root.findViewById(R.id.record_texts);
+        this.padStart = content == null ? 0 : content.getPaddingStart();
+        this.padEnd = content == null ? 0 : content.getPaddingEnd();
+        this.textGap = texts != null && texts.getLayoutParams() instanceof ViewGroup.MarginLayoutParams
+                ? ((ViewGroup.MarginLayoutParams) texts.getLayoutParams()).getMarginStart() : 0;
+        this.titlePx = title == null ? 0f : title.getTextSize();
+        this.row = root.getParent() instanceof RecordKeyRow ? (RecordKeyRow) root.getParent() : null;
+        this.sentryKey = row == null ? null : row.findViewById(R.id.btn_sentry_on);
+        this.sentryIcon = sentryKey == null ? null : sentryKey.findViewById(R.id.sentry_key_icon);
+        this.sentryLabel = sentryKey == null ? null : sentryKey.findViewById(R.id.sentry_key_label);
+        if (sentryKey != null) {
+            // 第一行的宽变了（右边分出去、收回来）：等这一次排完再看字放不放得下
+            title.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> {
+                if (r - l != or - ol) {
+                    title.post(this::fitTitle);
+                }
+            });
+            row.setOnSplitListener(this::onSplit);
+            sentryKey.setOnClickListener(v -> turnSentryOn());
+            if (hint instanceof ScreenOffHintView) {
+                ((ScreenOffHintView) hint).setOnJudged(this::judgeSentry);
+            }
+        }
         if (dot != null) {
             dotShape = new GradientDrawable();
             dotShape.setColor(color(R.color.recording));
@@ -136,10 +216,14 @@ public final class RecordButtonUi {
         if (ring != null && !ring.isIndeterminate()) {
             ring.setProgressCompat((int) (clamped * 1000 / segmentMs), true);
         }
-        if (detail != null) {
-            detail.setText(context.getString(R.string.record_segment_detail,
-                    mmss(clamped), segmentMinutes));
-        }
+        shownElapsedMs = clamped;
+        showSegmentDetail();
+    }
+
+    /** 第二行「本段 mm:ss / N 分钟」；右边分出去时放不下，去掉「本段」。 */
+    private void showSegmentDetail() {
+        setDetail(context.getString(compact ? R.string.record_segment_detail_short : R.string.record_segment_detail,
+                mmss(shownElapsedMs), segmentMinutes));
     }
 
     /** 换段的一瞬：点淡下去再回来，环从零开始。 */
@@ -193,7 +277,8 @@ public final class RecordButtonUi {
                 morphTo(1f, animate);
                 backgroundTo(R.color.recording_quiet, animate);
                 setTitle(R.string.record_stop);
-                setDetail(context.getString(R.string.record_segment_detail, mmss(0), segmentMinutes));
+                shownElapsedMs = 0;
+                showSegmentDetail();
                 break;
             case WAITING:
                 setIndeterminate(false);
@@ -230,6 +315,111 @@ public final class RecordButtonUi {
                 showIdleDetail();
                 break;
         }
+        // 「开启哨兵模式」只在写着「停止录制」时有：别的状态收起；到了录制中，小字判的那一下会来叫（judgeSentry），
+        // 小字本来就看得见、不会再判的时候这里自己判一次
+        if (next != State.RECORDING) {
+            setSentryOffered(false);
+        } else if (hint != null && hint.isShown()) {
+            judgeSentry();
+        }
+    }
+
+    // ------------------------------------------------------------------ 「开启哨兵模式」
+
+    /** 小字每判一次就来一下：照同一刻的车和设置，看那个键该不该在。 */
+    private void judgeSentry() {
+        if (sentryKey == null) {
+            return;
+        }
+        setSentryOffered(state == State.RECORDING && CameraKeeper.get(context).onlySentryMissing());
+    }
+
+    /**
+     * 那个键该不该在。该在：还没有就从右边滑进来（主界面刚打开时这一行是收着的，也滑一次）；不该在：留着此刻的样子
+     * （点过的是对勾）滑出去。平时由 {@link #judgeSentry} 叫；截图测试直接叫。
+     */
+    public void setSentryOffered(boolean offered) {
+        if (sentryKey == null) {
+            return;
+        }
+        if (offered) {
+            if (sentry == SentryKey.HIDDEN) {
+                showSentry(SentryKey.OFFERED);
+            }
+            row.splitTo(true, true);
+            return;
+        }
+        if (sentry != SentryKey.HIDDEN) {
+            sentry = SentryKey.HIDDEN;
+            sentryKey.removeCallbacks(sentryUnconfirmed);
+            sentryKey.setClickable(false);
+        }
+        row.splitTo(false, true);
+    }
+
+    /** 点了那个键：写车、读回（{@link SentrySwitch}）。没做成它自己提示一句，键回到可以点。 */
+    private void turnSentryOn() {
+        if (sentry != SentryKey.OFFERED) {
+            return;
+        }
+        showSentry(SentryKey.BUSY);
+        SentrySwitch.turnOn(context, on -> {
+            if (sentry != SentryKey.BUSY) {
+                return;  // 等车回话的工夫键已经收起了（开走了、停录了）
+            }
+            if (on) {
+                showSentry(SentryKey.DONE);
+                sentryKey.postDelayed(sentryUnconfirmed, SENTRY_CONFIRM_MS);
+            } else {
+                showSentry(SentryKey.OFFERED);
+            }
+        });
+    }
+
+    private void showSentry(SentryKey next) {
+        sentry = next;
+        sentryKey.removeCallbacks(sentryUnconfirmed);
+        sentryKey.setClickable(next == SentryKey.OFFERED);
+        boolean done = next == SentryKey.DONE;
+        float dim = next == SentryKey.BUSY ? 0.5f : 1f;
+        if (sentryIcon != null) {
+            sentryIcon.setImageResource(done ? R.drawable.ic_check : R.drawable.ic_sentry);
+            // 两个图标自带的线色不一样（盾是正文色、勾是能量色），在能量色的底上都着成底上的字色
+            ImageViewCompat.setImageTintList(sentryIcon,
+                    android.content.res.ColorStateList.valueOf(color(R.color.on_energy)));
+            sentryIcon.setAlpha(dim);
+        }
+        if (sentryLabel != null) {
+            // 开上了：只留一个对勾在正中
+            sentryLabel.setVisibility(done ? View.GONE : View.VISIBLE);
+            sentryLabel.setAlpha(dim);
+        }
+    }
+
+    /** 右边分出去多少变了（{@link RecordKeyRow}，0–1）：留白跟着收，一分出去第二行就换短的写法、第一行可以缩小（{@link #fitTitle}）。 */
+    private void onSplit(float split) {
+        if (content != null) {
+            content.setPaddingRelative(padStart - Math.round(SPLIT_PAD_START_DP * density * split),
+                    content.getPaddingTop(), padEnd - Math.round(SPLIT_PAD_END_DP * density * split),
+                    content.getPaddingBottom());
+        }
+        if (texts != null && texts.getLayoutParams() instanceof ViewGroup.MarginLayoutParams) {
+            ViewGroup.MarginLayoutParams params = (ViewGroup.MarginLayoutParams) texts.getLayoutParams();
+            int gap = textGap - Math.round(SPLIT_TEXT_GAP_DP * density * split);
+            if (params.getMarginStart() != gap) {
+                params.setMarginStart(gap);
+                texts.setLayoutParams(params);
+            }
+        }
+        boolean narrow = split > 0f;
+        if (narrow == compact) {
+            return;
+        }
+        compact = narrow;
+        fitTitle();
+        if (state == State.RECORDING) {
+            showSegmentDetail();
+        }
     }
 
     private void showIdleDetail() {
@@ -239,6 +429,32 @@ public final class RecordButtonUi {
     private void setTitle(int res) {
         if (title != null) {
             title.setText(res);
+            fitTitle();
+        }
+    }
+
+    /**
+     * 第一行的字多大：平时是原来的大小；右边分出去之后字那一块窄了，放不下的语言（英文、马来文）缩到刚好放下，
+     * 最小 {@link #COMPACT_TITLE_MIN_SP}。中文四个字放得下，不变。
+     */
+    private void fitTitle() {
+        if (title == null || titlePx <= 0f) {
+            return;
+        }
+        float size = titlePx;
+        int room = title.getWidth() - title.getPaddingStart() - title.getPaddingEnd();
+        if (compact && room > 0 && title.length() > 0) {
+            fitPaint.set(title.getPaint());
+            fitPaint.setTextSize(titlePx);
+            float need = fitPaint.measureText(title.getText(), 0, title.length());
+            if (need > room) {
+                float smallest = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, COMPACT_TITLE_MIN_SP,
+                        context.getResources().getDisplayMetrics());
+                size = Math.max(smallest, titlePx * room / need);
+            }
+        }
+        if (Math.abs(title.getTextSize() - size) > 0.5f) {
+            title.setTextSize(TypedValue.COMPLEX_UNIT_PX, size);
         }
     }
 

@@ -328,6 +328,50 @@ final class CarMoves {
 
     // ================================================================= 几种换法
 
+    /** 哨兵模式的开关：灵动贴的「哨兵模式」（互换）和主界面录制键旁的「开启哨兵模式」（只开）写的是同一个。 */
+    private static final String SENTRY_IFACE = "IVehicle";
+    private static final String SENTRY_FIELD = "SETTING_FUNC_VSTD_MODE_STS";
+
+    static Job sentryToggle() {
+        return toggle(SENTRY_IFACE, SENTRY_FIELD, CarNames.ALL);
+    }
+
+    /** 哨兵模式只开不关：读到开着（1）或布防（2）不写、算做成；别的写 1、读回。 */
+    static Job sentryOn() {
+        return c -> {
+            Integer id = c.function(SENTRY_FIELD, SENTRY_IFACE);
+            if (id == null) {
+                return Result.UNAVAILABLE;
+            }
+            int zone = c.zone(CarNames.ALL);
+            Integer cur = c.read(id, zone);
+            if (cur != null && (cur == 1 || cur == 2)) {
+                c.note("already " + hex(cur));
+                return Result.DONE;
+            }
+            return c.set(id, zone, 1);
+        };
+    }
+
+    /** 没做成时提示哪一句（做成了是 null：车上看得到）。灵动贴的写车动作、主界面的「开启哨兵模式」共用。 */
+    static String failureText(Context app, String label, Result result) {
+        switch (result) {
+            case DONE:
+                return null;
+            case NO_CHANGE:
+                return app.getString(com.kooo.evcam.R.string.msg_car_action_no_change, label);
+            case POWER_SAVING:
+                return app.getString(com.kooo.evcam.R.string.msg_car_action_power_saving);
+            case MOVING:
+                return app.getString(com.kooo.evcam.R.string.msg_car_action_standstill);
+            case NOT_FITTED:
+                return app.getString(com.kooo.evcam.R.string.msg_car_action_no_fragrance);
+            case UNAVAILABLE:
+            default:
+                return app.getString(com.kooo.evcam.R.string.msg_car_action_unavailable, label);
+        }
+    }
+
     /** 0 / 1 互换（读到别的不写：比如哨兵锁车后的那个值）。 */
     static Job toggle(String iface, String field, String zoneName) {
         return toggleAny(field, zoneName, iface);

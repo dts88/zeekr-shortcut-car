@@ -734,6 +734,9 @@
     <string name="record_preparing">正在准备…</string>
     <string name="record_idle_detail">每段 %1$d 分钟</string>
     <string name="record_segment_detail">本段 %1$s / %2$d 分钟</string>
+    <string name="record_segment_detail_short">%1$s / %2$d 分钟</string>
+    <string name="record_sentry_on">开启哨兵模式</string>
+    <string name="record_sentry_on_label">开启\n哨兵模式</string>
     <string name="record_screen_off_continue">熄屏后继续录制环视</string>
     <string name="record_screen_off_pause">熄屏暂停，亮屏后恢复</string>
     <string name="record_screen_off_stop">熄屏后停止录制</string>

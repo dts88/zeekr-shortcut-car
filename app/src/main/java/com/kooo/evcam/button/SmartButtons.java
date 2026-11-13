@@ -1284,28 +1284,10 @@ public final class SmartButtons {
 
     /** 写车的没做成（主线程）：提示一句为什么。做成了不提示：车上看得到。 */
     private void carResult(String label, CarMoves.Result result) {
-        String text;
-        switch (result) {
-            case DONE:
-                return;
-            case NO_CHANGE:
-                text = app.getString(R.string.msg_car_action_no_change, label);
-                break;
-            case POWER_SAVING:
-                text = app.getString(R.string.msg_car_action_power_saving);
-                break;
-            case MOVING:
-                text = app.getString(R.string.msg_car_action_standstill);
-                break;
-            case NOT_FITTED:
-                text = app.getString(R.string.msg_car_action_no_fragrance);
-                break;
-            case UNAVAILABLE:
-            default:
-                text = app.getString(R.string.msg_car_action_unavailable, label);
-                break;
+        String text = CarMoves.failureText(app, label, result);
+        if (text != null) {
+            Toast.makeText(app, text, Toast.LENGTH_SHORT).show();
         }
-        Toast.makeText(app, text, Toast.LENGTH_SHORT).show();
     }
 
     /**

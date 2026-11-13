@@ -53,6 +53,8 @@ public class ScreenOffHintView extends AppCompatTextView {
     private Integer judgedSentry;
     private boolean judgedDriving;
     private boolean judgedVehicleJudges;
+    /** 每判一次之后叫（{@link #setOnJudged}）。 */
+    private Runnable onJudged;
 
     public ScreenOffHintView(Context context) {
         this(context, null);
@@ -61,6 +63,14 @@ public class ScreenOffHintView extends AppCompatTextView {
     public ScreenOffHintView(Context context, AttributeSet attrs) {
         super(context, attrs);
         ready = true;
+    }
+
+    /**
+     * 每判一次之后叫一下（写着的那一句变没变都叫，主线程）：录制键旁「开启哨兵模式」那个键跟着这一下看该不该在
+     * （{@link RecordButtonUi}），所以它和这行小字总是照同一刻的车和设置说话。
+     */
+    public void setOnJudged(Runnable listener) {
+        onJudged = listener;
     }
 
     @Override
@@ -145,6 +155,9 @@ public class ScreenOffHintView extends AppCompatTextView {
         if (plan != shown) {
             shown = plan;
             setText(plan.text);
+        }
+        if (onJudged != null) {
+            onJudged.run();
         }
     }
 }
