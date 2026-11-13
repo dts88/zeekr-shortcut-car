@@ -11,6 +11,11 @@ commit message, not here.
 
 Nothing yet.
 
+## [4.2.2-alpha] - 2026-11-14
+
+- Sentry Mode key: fixed the key getting out of step with the car after turning Sentry Mode on and off several times in a row.
+- Sentry Mode key: same width in all languages.
+
 ## [4.2.1-alpha] - 2026-11-14
 
 - Sentry Mode key: new beacon icon. When Sentry Mode turns on, the icon lights up before the key slides away, and the key slides away more slowly.
