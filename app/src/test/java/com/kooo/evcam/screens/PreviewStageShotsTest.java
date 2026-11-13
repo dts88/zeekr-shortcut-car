@@ -8,6 +8,7 @@
 package com.kooo.evcam.screens;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
@@ -73,6 +74,20 @@ public class PreviewStageShotsTest {
     }
 
     /** 环视 + 后座舱（实车 2026-11-13 的那种配置）：三列两行，座舱占右上两格，四边和别的格子对齐。 */
+    /** 环视四格也铺满：照「适应」的话画面上下各留一条黑边，和铺满的座舱对不齐（实车 2026-11-13）。 */
+    @Test
+    public void threeByTwoSurroundCellsFill() {
+        for (FourLaneContainer.Cell cell : threeByTwoCells()) {
+            assertEquals(FourLaneContainer.ScaleMode.FILL, cell.fit);
+            assertEquals(FourLaneContainer.ScaleMode.FILL, cell.fitCorrected);
+        }
+        FourLaneContainer.Cell other = new FourLaneContainer.Cell();
+        other.laneIndex = -1;
+        assertFalse("不是环视四路里的一路：不动", PreviewStageLayout.placeThreeByTwo(other));
+        assertNull(other.fit);
+        assertEquals(1f, other.width, 0f);
+    }
+
     @Test
     public void surroundWithOneCabinIsThreeByTwo() {
         Stage stage = inflate();
@@ -169,17 +184,13 @@ public class PreviewStageShotsTest {
         assertEquals(message + "：一格高一半", 0.5f, cell[3], 0.0001f);
     }
 
-    /** 主界面交给四宫格容器的那一份：位置照三列两行，别的都是默认。 */
+    /** 主界面交给四宫格容器的那一份：位置、铺满照三列两行，别的都是默认。 */
     private static FourLaneContainer.Cell[] threeByTwoCells() {
         FourLaneContainer.Cell[] cells = new FourLaneContainer.Cell[4];
         for (int lane = 0; lane < cells.length; lane++) {
-            float[] place = PreviewStageLayout.threeByTwoCell(lane);
             FourLaneContainer.Cell cell = new FourLaneContainer.Cell();
             cell.laneIndex = lane;
-            cell.x = place[0];
-            cell.y = place[1];
-            cell.width = place[2];
-            cell.height = place[3];
+            assertTrue(PreviewStageLayout.placeThreeByTwo(cell));
             cells[lane] = cell;
         }
         return cells;

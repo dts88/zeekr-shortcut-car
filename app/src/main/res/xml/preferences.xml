@@ -302,7 +302,8 @@
 
         <!--
           模拟声浪（试验性，组名旁带标签）：原来是「系统」页的一行加一页九行，4.0 起都在这里，关着时只有第一行。
-          听感、转速变化方式、变速箱、车外线路对所有人固定，另一种在开发者选项里（项目所有者 2026-11-12）
+          听感、转速变化方式、变速箱 4.0.0 收进过开发者选项，4.1.1 放回这里（项目所有者 2026-11-13）；
+          车外线路对所有人固定，另一种在开发者选项里（项目所有者 2026-11-12）
         -->
         <PreferenceCategory
             android:key="cat_drive_sound"
@@ -322,6 +323,20 @@
                 android:key="pref_drive_sound_style_all"
                 android:title="@string/dev_drive_sound_style_title"
                 android:summary="%s" />
+
+            <!-- 听感：只有美式 V8 分两种，别的声音风格不出现这一行 -->
+            <com.kooo.evcam.settings.SegmentedPreference
+                android:key="pref_drive_sound_view"
+                android:title="@string/dev_drive_sound_view_title" />
+
+            <com.kooo.evcam.settings.SegmentedPreference
+                android:key="pref_drive_sound_rpm"
+                android:title="@string/dev_drive_sound_rpm_title" />
+
+            <!-- 变速箱：只有两种 V8 有这一行，别的声音风格固定 8 速 -->
+            <com.kooo.evcam.settings.SegmentedPreference
+                android:key="pref_drive_sound_gearbox"
+                android:title="@string/dev_drive_sound_gearbox_title" />
 
             <SwitchPreferenceCompat
                 android:key="pref_drive_sound_standard"
@@ -484,29 +499,14 @@
         </PreferenceCategory>
 
         <!--
-          声音：这五项当初是两种做法都做出来、上车比了再定。项目所有者 2026-11-12 定：对所有人固定为原始、车内、连续、
-          8 速自动、BUS12，另一种只在这里选得到
+          声音：这两项当初是两种做法都做出来、上车比了再定。项目所有者 2026-11-12 定：对所有人固定为原始、BUS12，
+          另一种只在这里选得到（同一次定的听感、转速变化方式、变速箱 2026-11-13 放回「通用」）
         -->
         <PreferenceCategory android:title="@string/dev_group_sound">
 
             <ListPreference
                 android:key="pref_footage_audio_source"
                 android:title="@string/set_footage_audio_source_title"
-                android:summary="%s" />
-
-            <ListPreference
-                android:key="pref_drive_sound_view"
-                android:title="@string/dev_drive_sound_view_title"
-                android:summary="%s" />
-
-            <ListPreference
-                android:key="pref_drive_sound_rpm"
-                android:title="@string/dev_drive_sound_rpm_title"
-                android:summary="%s" />
-
-            <ListPreference
-                android:key="pref_drive_sound_gearbox"
-                android:title="@string/dev_drive_sound_gearbox_title"
                 android:summary="%s" />
 
             <ListPreference

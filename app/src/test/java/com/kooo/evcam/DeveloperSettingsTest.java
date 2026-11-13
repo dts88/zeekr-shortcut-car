@@ -74,25 +74,23 @@ public class DeveloperSettingsTest {
         ROWS.put("pref_archive", NONE);
         ROWS.put("pref_developer_note", NONE);
 
-        // 4.0：拍照使用 JPEG 输出从录制页挪进来；「声音」一组五行（项目所有者 2026-11-12：对所有人固定，另一种只在这里选）
+        // 4.0：拍照使用 JPEG 输出从录制页挪进来；「声音」一组两行（项目所有者 2026-11-12：对所有人固定，另一种只在这里选）
         ROWS.put("pref_photo_via_jpeg", Arrays.asList("photo_via_jpeg"));
         ROWS.put("pref_footage_audio_source", Arrays.asList("footage_audio_source"));
-        ROWS.put("pref_drive_sound_view", Arrays.asList("drive_sound_view"));
-        ROWS.put("pref_drive_sound_rpm", Arrays.asList("drive_sound_rpm"));
-        ROWS.put("pref_drive_sound_gearbox", Arrays.asList("drive_sound_gearbox"));
         ROWS.put("pref_drive_sound_exterior_route", Arrays.asList("drive_sound_exterior_route"));
 
         OUTSIDE.put("pref_storage_location", Arrays.asList("storage_location"));
     }
 
     /**
-     * 普通设置：关着开发者选项也照常读。录制声音、模拟声浪 2026-10-24 从开发者选项挪出来；其中麦克风来源、听感、
-     * 转速变化方式、变速箱、车外线路 4.0 起归开发者选项（见上面 ROWS），不在这里。
+     * 普通设置：关着开发者选项也照常读。录制声音、模拟声浪 2026-10-24 从开发者选项挪出来；其中麦克风来源、车外线路
+     * 4.0 起归开发者选项（见上面 ROWS），不在这里；听感、转速变化方式、变速箱 4.0.0 也收进去过，4.1.1 放回来。
      */
     private static final List<String> ORDINARY = Arrays.asList(
             "screen_off_keep_recording", "auto_start_recording", "footage_lock",
             "footage_audio", "drive_sound", "drive_sound_volume",
             "drive_sound_style", "drive_sound_output",
+            "drive_sound_view", "drive_sound_rpm", "drive_sound_gearbox",
             "drive_sound_exterior_volume", "drive_sound_standard",
             "video_storage_limit_gb", "photo_storage_limit_gb", "custom_sd_card_path",
             "exposure_compensation", "awb_mode", "car_model", "side_view_enabled", "side_view_min_speed",

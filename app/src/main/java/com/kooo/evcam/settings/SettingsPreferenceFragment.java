@@ -2237,6 +2237,12 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         boolean many = SettingsRegistry.DRIVE_SOUND_STYLE.offeredTo(DeveloperMode.isUnlocked()).values().length > 4;
         show("pref_drive_sound_style", sound && !many);
         show("pref_drive_sound_style_all", sound && many);
+        // 按声音风格只留用得上的（项目所有者 2026-10-23：不同的模式，可以有各自适配的设置选项）：「听感」只有美式 V8 有；
+        // 「变速箱」只有两种 V8 有（别的固定 8 速，像参考车的 e-Shift）。设置值不动，换回去时还在
+        String style = appConfig.getDriveSoundStyle();
+        show("pref_drive_sound_view", sound && com.kooo.evcam.sound.DriveSound.styleHasViews(style));
+        show("pref_drive_sound_rpm", sound);
+        show("pref_drive_sound_gearbox", sound && com.kooo.evcam.sound.DriveSound.styleChoosesGearbox(style));
         show("pref_drive_sound_standard", sound);
         show("pref_drive_sound_volume", sound);
         show("pref_drive_sound_output", sound);
@@ -2450,13 +2456,15 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
 
     /**
      * 模拟声浪（试验性）：4.0 起在「通用」页里一组（原来是「系统」页的一行加一页九行，ui-spec §十六）。开关一行；开着时出现
-     * 声音风格、标准模式下播放、声浪音量、播放喇叭，都是分段选择，改了马上生效（{@code sound.DriveSound}）。
-     * 声音风格所有人两种、摆成分段；开发者选项开着时六种，换成单选框（同一个设置两种摆法，{@link #syncRows} 只留一行）。
-     * 车外音量单独一组「车外喇叭」，一直在：礼让语音也用它。
+     * 声音风格、听感、转速变化方式、变速箱、标准模式下播放、声浪音量、播放喇叭，都是分段选择，改了马上生效
+     * （{@code sound.DriveSound}）。声音风格所有人两种、摆成分段；开发者选项开着时六种，换成单选框（同一个设置两种摆法）。
+     * 哪几行此刻出现由 {@link #syncRows} 定（开关、声音风格）。车外音量单独一组「车外喇叭」，一直在：礼让语音也用它。
      *
-     * <p>听感、转速变化方式、变速箱、车外线路和录制声音的麦克风来源在开发者选项「声音」一组（项目所有者 2026-11-12：
-     * 对所有人固定为车内、连续、8 速自动、BUS12、原始，另一种只在那里选得到；{@code AppConfig.DEVELOPER_KEYS}）。
-     * 那一组的几行不在这一页时 {@code findPreference} 是 null，跳过。</p>
+     * <p>听感、转速变化方式、变速箱 4.0.0 收进过开发者选项（对所有人固定为车内、连续、8 速自动），项目所有者 2026-11-13
+     * 上车后要回来，4.1.1 起又在这一组，所有人都能选；听感的默认值留在那次改成的车内。</p>
+     *
+     * <p>车外线路和录制声音的麦克风来源在开发者选项「声音」一组（项目所有者 2026-11-12：对所有人固定为 BUS12、原始，
+     * 另一种只在那里选得到；{@code AppConfig.DEVELOPER_KEYS}）。那一组的两行不在这一页时 {@code findPreference} 是 null，跳过。</p>
      */
     private void bindDriveSound() {
         bindSwitch("pref_drive_sound", appConfig.isDriveSoundEnabled(), value -> {
@@ -2471,6 +2479,21 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 this::setDriveSoundStyle);
         bindEnum("pref_drive_sound_style_all", SettingsRegistry.DRIVE_SOUND_STYLE, appConfig.getDriveSoundStyle(),
                 this::setDriveSoundStyle);
+        bindSegmented("pref_drive_sound_view", SettingsRegistry.DRIVE_SOUND_VIEW, appConfig.getDriveSoundView(),
+                value -> {
+                    appConfig.setDriveSoundView(value);
+                    refreshDriveSound();
+                });
+        bindSegmented("pref_drive_sound_rpm", SettingsRegistry.DRIVE_SOUND_RPM, appConfig.getDriveSoundRpm(),
+                value -> {
+                    appConfig.setDriveSoundRpm(value);
+                    refreshDriveSound();
+                });
+        bindSegmented("pref_drive_sound_gearbox", SettingsRegistry.DRIVE_SOUND_GEARBOX, appConfig.getDriveSoundGearbox(),
+                value -> {
+                    appConfig.setDriveSoundGearbox(value);
+                    refreshDriveSound();
+                });
         bindSegmented("pref_drive_sound_volume", SettingsRegistry.DRIVE_SOUND_VOLUME, appConfig.getDriveSoundVolume(),
                 value -> {
                     appConfig.setDriveSoundVolume(value);
@@ -2490,49 +2513,20 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         // 开发者选项「声音」一组
         bindEnum("pref_footage_audio_source", SettingsRegistry.FOOTAGE_AUDIO_SOURCE, appConfig.getFootageAudioSource(),
                 value -> appConfig.setFootageAudioSource(value));
-        bindEnum("pref_drive_sound_view", SettingsRegistry.DRIVE_SOUND_VIEW, appConfig.getDriveSoundView(),
-                value -> {
-                    appConfig.setDriveSoundView(value);
-                    refreshDriveSound();
-                });
-        bindEnum("pref_drive_sound_rpm", SettingsRegistry.DRIVE_SOUND_RPM, appConfig.getDriveSoundRpm(),
-                value -> {
-                    appConfig.setDriveSoundRpm(value);
-                    refreshDriveSound();
-                });
-        bindEnum("pref_drive_sound_gearbox", SettingsRegistry.DRIVE_SOUND_GEARBOX, appConfig.getDriveSoundGearbox(),
-                value -> {
-                    appConfig.setDriveSoundGearbox(value);
-                    refreshDriveSound();
-                });
         bindEnum("pref_drive_sound_exterior_route", SettingsRegistry.DRIVE_SOUND_EXTERIOR_ROUTE,
                 appConfig.getDriveSoundExteriorRoute(), value -> {
                     appConfig.setDriveSoundExteriorRoute(value);
                     refreshDriveSound();
                 });
-        showDriveSoundRows(appConfig.getDriveSoundStyle());
     }
 
+    /** 换了声音风格：听感、变速箱两行跟着出现或收起（{@link #syncRows}）；单选框那一种摆法自己不会叫，这里叫一次。 */
     private void setDriveSoundStyle(String value) {
         appConfig.setDriveSoundStyle(value);
-        showDriveSoundRows(value);
         refreshDriveSound();
+        requestSync();
     }
 
-    /**
-     * 按声音风格只显示用得上的几行（项目所有者 2026-10-23：不同的模式，可以有各自适配的设置选项）：「听感」只有美式 V8 有；
-     * 「变速箱」两种超音速没有（固定 8 速，像参考车的 e-Shift）。设置值不动，换回去时还在。
-     */
-    private void showDriveSoundRows(String style) {
-        Preference view = findPreference("pref_drive_sound_view");
-        if (view != null) {
-            view.setVisible(com.kooo.evcam.sound.DriveSound.styleHasViews(style));
-        }
-        Preference gearbox = findPreference("pref_drive_sound_gearbox");
-        if (gearbox != null) {
-            gearbox.setVisible(com.kooo.evcam.sound.DriveSound.styleChoosesGearbox(style));
-        }
-    }
 
 
 

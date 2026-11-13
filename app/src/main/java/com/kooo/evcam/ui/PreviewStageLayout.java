@@ -15,6 +15,7 @@ import android.view.ViewGroup;
 import android.widget.FrameLayout;
 
 import com.kooo.evcam.R;
+import com.kooo.evcam.zeekr.FourLaneContainer;
 
 /**
  * 多路布局里画面区怎么分：环视那一块（{@code composite_wrapper}）和座舱那一列（{@code cabin_column}）各占哪里，
@@ -34,8 +35,8 @@ import com.kooo.evcam.R;
  * （实车 2026-11-13，应用区 1600 × 848 dp）。三列两行把六格排满：环视四格各占一格（接近它本来的 1 : 1），
  * 座舱占右上两格、铺满，四边和别的格子对齐（项目所有者 2026-11-13）。</p>
  *
- * <p>三列两行时环视那一块占满整块画面区，座舱那一列盖在它的右上两格上；环视四格摆在哪由 {@link #threeByTwoCell}
- * 说，主界面照它交给四宫格容器。放大一格时别的都藏起来，剩下的那一样占满（{@link Arrangement#SINGLE}）。</p>
+ * <p>三列两行时环视那一块占满整块画面区，座舱那一列盖在它的右上两格上；环视四格摆在哪、怎么放进格子由
+ * {@link #placeThreeByTwo} 说（六格都铺满），主界面照它交给四宫格容器。放大一格时别的都藏起来，剩下的那一样占满（{@link Arrangement#SINGLE}）。</p>
  */
 public class PreviewStageLayout extends FrameLayout {
 
@@ -136,6 +137,27 @@ public class PreviewStageLayout extends FrameLayout {
             default:
                 return null;
         }
+    }
+
+    /**
+     * 把环视的一格照三列两行摆好：位置照 {@link #threeByTwoCell}，画面铺满这一格。不是那四路的不动，返回 false。
+     *
+     * <p>为什么铺满：环视每一路的画面接近正方形，这里的格子略扁（实车 387 × 400 dp）。照配置里默认的「适应」，
+     * 画面上下各留一条黑边，和铺满两格的座舱画面对不齐（实车 2026-11-13）。铺满只在左右各裁掉约 2%。
+     * 旋转、镜像、裁切、缩放平移照旧听配置。</p>
+     */
+    public static boolean placeThreeByTwo(FourLaneContainer.Cell cell) {
+        float[] place = threeByTwoCell(cell.laneIndex);
+        if (place == null) {
+            return false;
+        }
+        cell.x = place[0];
+        cell.y = place[1];
+        cell.width = place[2];
+        cell.height = place[3];
+        cell.fit = FourLaneContainer.ScaleMode.FILL;
+        cell.fitCorrected = FourLaneContainer.ScaleMode.FILL;
+        return true;
     }
 
     private static boolean shown(View view) {
