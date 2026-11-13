@@ -61,6 +61,117 @@ public class MainScreenShotsTest {
         shoot(Shots.DAY, "day-on", true);
     }
 
+    /**
+     * 录着、只差哨兵模式：录制键右边切一块给「开启哨兵模式」（项目所有者 2026-11-13）。那个键照字的宽（中文约 82 dp），
+     * 最宽这一行的四分之一（92 dp）；录制键让出它和一道缝，字那一块窄了，三行都要放得下、不被省略。收回之后一切照旧。
+     */
+    @Test
+    public void theSentryKeyTakesTheRightQuarterOfTheRecordKey() {
+        sentryKey(Shots.DAY, "day", true);
+        sentryKey(Shots.NIGHT, "night", true);
+        // 英文、马来文的字长：第一行缩小到放得下，第三行的小字两行里写完（项目所有者 2026-11-13：英文原来写不下）
+        sentryKey(Shots.DAY.replace("zh-rCN", "en"), "en", false);
+        sentryKey(Shots.DAY.replace("zh-rCN", "ms"), "ms", false);
+    }
+
+    private void sentryKey(String qualifiers, String tag, boolean chinese) {
+        RuntimeEnvironment.setQualifiers(qualifiers);
+        ShotActivity activity = Robolectric.buildActivity(ShotActivity.class).setup().get();
+        Shots.stillFrames(activity);
+        ViewGroup frame = activity.findViewById(activity.container);
+        activity.getLayoutInflater().inflate(R.layout.activity_main_zeekr_7x, frame, true);
+        Shots.settle();
+        float density = activity.getResources().getDisplayMetrics().density;
+
+        View rail = frame.findViewById(R.id.action_rail);
+        ViewGroup row = rail.findViewById(R.id.record_key_row);
+        View card = rail.findViewById(R.id.btn_start_record);
+        View key = rail.findViewById(R.id.btn_sentry_on);
+        TextView title = card.findViewById(R.id.record_title);
+        TextView detail = card.findViewById(R.id.record_detail);
+        TextView hint = card.findViewById(R.id.record_hint);
+        assertNotNull("录制键不在它那一行里", row);
+        assertNotNull("这一行里没有「开启哨兵模式」那个键", key);
+        float titleSize = title.getTextSize();
+
+        RecordButtonUi record = new RecordButtonUi(card);
+        StatusLine.fill(frame);
+        Shots.save(activity, "main-sentry-scratch");
+        assertEquals("没在录时没有那个键", View.GONE, key.getVisibility());
+        assertEquals("没在录时录制键占满这一行", row.getWidth(), card.getWidth());
+
+        record.setState(RecordButtonUi.State.RECORDING);
+        record.setSegmentProgress(42_000, 60_000);
+        record.setRecordedTime(754_000);
+        assertEquals("第二行写「录制中」和这一次已经录了多久",
+                activity.getString(R.string.record_recording_detail, "12:34"), detail.getText().toString());
+        hint.setText(R.string.record_screen_off_pause);
+        hint.setVisibility(View.VISIBLE);
+        record.setSentryOffered(true);
+        Shots.save(activity, "main-sentry-scratch");
+        File file = Shots.save(activity, "main-sentry-" + tag);
+        assertTrue(file + " 是空的", file.length() > 10_000);
+
+        int gutter = activity.getResources().getDimensionPixelSize(R.dimen.gutter);
+        int quarter = Math.round((row.getWidth() - gutter) / 4f);
+        int keyWidth = key.getWidth();
+        TextView label = key.findViewById(R.id.sentry_key_label);
+        assertEquals("动作栏照实车是 380 dp 宽", Math.round(380 * density), row.getWidth());
+        assertEquals(View.VISIBLE, key.getVisibility());
+        assertTrue("那个键最宽四分之一（" + quarter + "），量出来 " + keyWidth, keyWidth <= quarter);
+        assertTrue("那个键最窄 72 dp", keyWidth >= Math.round(72 * density));
+        assertTrue("那个键照字的宽：字 " + label.getWidth() + "，键 " + keyWidth,
+                keyWidth == Math.max(Math.round(72 * density), label.getWidth() + Math.round(16 * density)));
+        assertEquals("那个键贴着这一行的右边", row.getWidth(), key.getRight());
+        assertEquals("那个键滑到位了", 0f, key.getTranslationX(), 0f);
+        assertEquals("完全显出来了", 1f, key.getAlpha(), 0f);
+        assertEquals("录制键让出四分之一和一道缝", row.getWidth() - keyWidth - gutter, card.getWidth());
+        assertTrue("那个键能点", key.isClickable());
+        assertFits("第一行", title);
+        assertFits("第二行", detail);
+        android.graphics.Rect inside = new android.graphics.Rect();
+        assertTrue("熄屏提示不在屏幕里", hint.getGlobalVisibleRect(inside));
+        assertEquals("熄屏提示在录制键里被裁掉了一截", hint.getHeight(), inside.height());
+        assertTrue("那个键上的字被裁掉了", label.getLayout().getEllipsisCount(label.getLineCount() - 1) == 0);
+        assertTrue("熄屏提示最多两行", hint.getLineCount() <= 2);
+        assertEquals("熄屏提示被省略了：" + hint.getText(), 0,
+                hint.getLayout().getEllipsisCount(hint.getLineCount() - 1));
+        if (chinese) {
+            assertEquals("中文四个字放得下，不缩小", titleSize, title.getTextSize(), 0.5f);
+            assertEquals("熄屏提示一行写完", 1, hint.getLineCount());
+            assertEquals("那个键上的字两行：开启 / 哨兵模式", 2, label.getLineCount());
+            assertTrue("中文的那个键约 82 dp，比四分之一（92 dp）窄；量出来 " + keyWidth / density,
+                    keyWidth <= Math.round(84 * density));
+        } else {
+            assertEquals("那个键上的字三行", 3, label.getLineCount());
+        }
+
+        // 收回：那个键没了，录制键回到原来的宽，字也回到原来的大小和写法
+        record.setSentryOffered(false);
+        Shots.save(activity, "main-sentry-scratch");
+        Shots.save(activity, "main-sentry-scratch");
+        assertEquals(View.GONE, key.getVisibility());
+        assertEquals(row.getWidth(), card.getWidth());
+        assertEquals(titleSize, title.getTextSize(), 0.5f);
+        assertEquals(activity.getString(R.string.record_recording_detail, "12:34"), detail.getText().toString());
+        // 停录：也没有
+        record.setSentryOffered(true);
+        record.setState(RecordButtonUi.State.IDLE);
+        Shots.save(activity, "main-sentry-scratch");
+        assertEquals("不写「停止录制」时没有那个键", View.GONE, key.getVisibility());
+        new File("build/outputs/screenshots/main-sentry-scratch.png").delete();
+    }
+
+    /** 一行的字没被裁掉、没被省略。 */
+    private static void assertFits(String what, TextView view) {
+        assertNotNull(what + "还没排", view.getLayout());
+        assertEquals(what + "折行了", 1, view.getLineCount());
+        assertEquals(what + "被省略了", 0, view.getLayout().getEllipsisCount(0));
+        assertTrue(what + "放不下：字宽 " + view.getLayout().getLineWidth(0) + "，能用 "
+                        + (view.getWidth() - view.getPaddingLeft() - view.getPaddingRight()),
+                view.getLayout().getLineWidth(0) <= view.getWidth() - view.getPaddingLeft() - view.getPaddingRight() + 0.5f);
+    }
+
     private void shoot(String qualifiers, String tag, boolean recording) {
         RuntimeEnvironment.setQualifiers(qualifiers);
         ShotActivity activity = Robolectric.buildActivity(ShotActivity.class).setup().get();
@@ -81,6 +192,7 @@ public class MainScreenShotsTest {
 
         RecordButtonUi record = new RecordButtonUi(rail.findViewById(R.id.btn_start_record));
         record.setState(recording ? RecordButtonUi.State.RECORDING : RecordButtonUi.State.IDLE);
+        record.setRecordedTime(754_000);
         StatusLine.fill(frame);
         if (recording && hint instanceof TextView && ((TextView) hint).length() == 0) {
             // 电脑上读不到熄屏那几项的实际情况时，这一行是空的：放一句进去看排布

@@ -487,6 +487,15 @@ public final class CameraKeeper {
     }
 
     /**
+     * 只差哨兵模式就能熄屏接着录（{@link ChannelRules#onlySentryMissing}）：录制键旁「开启哨兵模式」那个键照它出现，
+     * 和那行小字同一刻、照同一份事实判。主线程。
+     */
+    public boolean onlySentryMissing() {
+        return ChannelScheduler.onlySentryMissing(appConfig.isScreenOffKeepRecording(), surroundPlanned(),
+                appConfig.isAutoStartRecording());
+    }
+
+    /**
      * 退出的记号清掉了（人点开了主界面、车机真正开机，{@link UserExit#clear}）：调度照常开 —— 退出以后它只关、不开。
      * 调度还没装上就不用叫。哪里都能调，不建管家。
      */

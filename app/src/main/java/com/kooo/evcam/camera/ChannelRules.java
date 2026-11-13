@@ -1673,6 +1673,18 @@ public final class ChannelRules {
     }
 
     /**
+     * 只差哨兵模式（录制键旁「开启哨兵模式」那个键，项目所有者 2026-11-13）：现在熄屏的话录像会停，而哨兵模式一开就变成接着录 ——
+     * {@link #darkOutlook} 里别的条件（熄屏持续录制、计划里有环视）都满足，停着车，只有哨兵模式关着。只认读得到的关：
+     * 读不到时车辆接口也写不了。和小字同一套规矩推出来的：键在的时候小字写的一定不是「继续录制」，哨兵模式一开两样一起变。
+     */
+    public static boolean onlySentryMissing(boolean keepWhenDark, boolean surroundPlanned, boolean driving, Integer sentry,
+                                            boolean autoStart) {
+        return sentry != null && sentry == 0
+                && darkOutlook(keepWhenDark, surroundPlanned, driving, sentry, autoStart) != DarkOutlook.CONTINUE
+                && darkOutlook(keepWhenDark, surroundPlanned, driving, 1, autoStart) == DarkOutlook.CONTINUE;
+    }
+
+    /**
      * 环视这一段熄屏留不留（项目所有者 2026-10-27 定，为了车机稳定：不再追求环视录到最后一刻，也不为中间不明原因的启动、亮屏去试着录），
      * 每一轮最先判（{@link #settle}），只在这里改 {@link World#surroundInDark}、{@link World#lastSentry}：
      *

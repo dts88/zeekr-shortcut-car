@@ -1813,6 +1813,13 @@ public final class ChannelScheduler {
                 s == null ? null : s.facts.sentry(), autoStart);
     }
 
+    /** 录制键旁「开启哨兵模式」那个键该不该在（{@link ChannelRules#onlySentryMissing}）：读的事实同 {@link #darkOutlook}。主线程。 */
+    static boolean onlySentryMissing(boolean keepWhenDark, boolean surroundPlanned, boolean autoStart) {
+        ChannelScheduler s = app;
+        return s != null && ChannelRules.onlySentryMissing(keepWhenDark, surroundPlanned, s.facts.driving(),
+                s.facts.sentry(), autoStart);
+    }
+
     /**
      * 决定变了叫它（只许 post）：相机管家建起来时挂一次（{@link #setVerdictListener}；它先经 ChannelFacts.install 装上调度）。
      * 环视留不留（{@link #surroundVerdict}）、熄屏录像（{@link #recordInDark}）有一个变了就叫。

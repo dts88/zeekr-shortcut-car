@@ -243,7 +243,7 @@ public class MainActivity extends AppCompatActivity implements com.kooo.evcam.se
     /** 上一次画录制键时录像的样子（renderRecordState）：等待摄像头之后又有一路在录时，本段从接回那一刻重新算。 */
     private CameraKeeper.View renderedRecordView;
     private long segmentLengthMs = com.kooo.evcam.profile.RecordSpecs.segmentMs(com.kooo.evcam.profile.RecordSpecs.DEFAULT_SEGMENT_MINUTES);
-    private boolean isRecordingStatsEnabled = true;  // 录制状态显示开关
+    private boolean isRecordingStatsEnabled;  // 录制状态显示开关（默认关，建界面时照设置读）
     private long lastStatsClickTime = 0;  // 上次点击录制状态显示的时间
     private static final long DOUBLE_CLICK_INTERVAL = 500;  // 双击判定间隔（毫秒）
 
@@ -981,12 +981,15 @@ public class MainActivity extends AppCompatActivity implements com.kooo.evcam.se
      */
     private void updateRecordingStatsDisplay() {
         updateSegmentProgress();
+        // 计算录制时长：录制键第二行写它（项目所有者 2026-11-13），角标开着的话也写
+        long elapsedMs = System.currentTimeMillis() - recordingStartTime;
+        if (recordButtonUi != null) {
+            recordButtonUi.setRecordedTime(elapsedMs);
+        }
         if (tvRecordingStats == null) {
             return;
         }
         
-        // 计算录制时长
-        long elapsedMs = System.currentTimeMillis() - recordingStartTime;
         long totalSeconds = elapsedMs / 1000;
         long minutes = totalSeconds / 60;
         long seconds = totalSeconds % 60;

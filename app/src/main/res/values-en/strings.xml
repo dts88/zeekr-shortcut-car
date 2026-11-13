@@ -729,9 +729,11 @@
     <string name="record_stop">Stop recording</string>
     <string name="record_preparing">Starting…</string>
     <string name="record_idle_detail">%1$d-min clips</string>
-    <string name="record_segment_detail">This clip %1$s / %2$d min</string>
+    <string name="record_recording_detail">Recording %1$s</string>
+    <string name="record_sentry_on">Turn on Sentry Mode</string>
+    <string name="record_sentry_on_label">Turn on\nSentry\nMode</string>
     <string name="record_screen_off_continue">Keeps recording surround view with screen off</string>
-    <string name="record_screen_off_pause">Pauses with screen off, resumes when the screen turns on</string>
+    <string name="record_screen_off_pause">Pauses when screen is off, resumes when on</string>
     <string name="record_screen_off_stop">Stops when screen turns off</string>
     <string name="recording_chip">Recording %1$s · clip %2$d</string>
     <string name="rail_photo">Take photo</string>
