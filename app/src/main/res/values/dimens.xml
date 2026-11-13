@@ -21,6 +21,11 @@
       第三行）、拍照 84、回放 92、「开关」36、四块开关 136、设置 84，合起来 620（MainScreenShotsTest 看着）
     -->
     <dimen name="rail_tile_height">80dp</dimen>
+    <!--
+      录制键旁「开启哨兵模式」那个键的宽：三种语言一样宽，照最宽的那一种定（项目所有者 2026-11-14；原来照各自的字，
+      中文约 53dp、英文和马来文约 70dp）。字的宽加两边各 10dp 不能超过它，MainScreenShotsTest 看着
+    -->
+    <dimen name="sentry_key_width">72dp</dimen>
     <dimen name="rail_small_height">72dp</dimen>
     <dimen name="rail_switch_height">64dp</dimen>
     <!-- 初始设置（fragment_setup）右边内容那一列的宽度：和设置页的一列差不多宽，字不会拉成一长行 -->

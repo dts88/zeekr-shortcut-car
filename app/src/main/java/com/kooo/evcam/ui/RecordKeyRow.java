@@ -30,9 +30,8 @@ import com.kooo.evcam.R;
  *
  * <h3>那个键多宽</h3>
  *
- * <p>照它自己的内容（图标和字里宽的那个，加两边留白），最宽不超过这一行去掉一道缝之后的四分之一。项目所有者起初说
- * 「右侧四分之一」，看过样子后说那只是估的、能窄就窄（2026-11-13），又让中文也折成两行、图标缩小（2026-11-14）：中文约 53 dp，
- * 四分之一是 92 dp。</p>
+ * <p>布局里写着多宽就多宽（三种语言一样宽，{@code @dimen/sentry_key_width}，项目所有者 2026-11-14）；没写死的照它自己的
+ * 内容。最宽不超过这一行去掉一道缝之后的四分之一：项目所有者起初说「右侧四分之一」，看过样子后说那只是估的、能窄就窄。</p>
  *
  * <h3>为什么自己量、自己摆</h3>
  *
@@ -194,8 +193,11 @@ public class RecordKeyRow extends ViewGroup {
         int exactHeight = MeasureSpec.makeMeasureSpec(height, MeasureSpec.EXACTLY);
         keyWidth = 0;
         if (key != null && key.getVisibility() != GONE) {
-            // 照它自己的内容量，封顶四分之一
-            key.measure(MeasureSpec.makeMeasureSpec(widestKey(width, gutter), MeasureSpec.AT_MOST), exactHeight);
+            // 布局里写了宽的照那个宽，没写的照它自己的内容量；封顶四分之一
+            int cap = widestKey(width, gutter);
+            int wanted = key.getLayoutParams().width;
+            key.measure(wanted > 0 ? MeasureSpec.makeMeasureSpec(Math.min(wanted, cap), MeasureSpec.EXACTLY)
+                    : MeasureSpec.makeMeasureSpec(cap, MeasureSpec.AT_MOST), exactHeight);
             keyWidth = key.getMeasuredWidth();
         }
         if (record != null) {

@@ -161,11 +161,11 @@
           从没开变成开着（灯芯像警灯一样红白转几圈后定成红的，三道光长成红的），再滑出去，录制键回到原来的宽；
           滑出去一半之前再点一下是反悔，关掉哨兵模式。键上只写「哨兵 / 模式」两行（项目所有者 2026-11-14：
           删掉「开启」，中文也折行，省宽度）。和「拍照」一样的灰底（项目所有者 2026-11-13：不要橙色实底）。宽照字来
-          （图标和字里宽的那个，加两边各 10dp，最宽这一行的四分之一）：项目所有者说四分之一只是估的，能窄就窄
+          （@dimen/sentry_key_width，三种语言一样宽，照字最宽的那一种定）：项目所有者说四分之一只是估的，能窄就窄
         -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/btn_sentry_on"
-            android:layout_width="wrap_content"
+            android:layout_width="@dimen/sentry_key_width"
             android:layout_height="match_parent"
             android:clickable="true"
             android:contentDescription="@string/record_sentry_on"
