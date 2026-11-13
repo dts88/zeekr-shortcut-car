@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [4.2.1-alpha] - 2026-11-14
+
+- Sentry Mode key: new beacon icon. When Sentry Mode turns on, the icon lights up before the key slides away, and the key slides away more slowly.
+- Sentry Mode key: tapping the lit key before it is gone turns Sentry Mode back off.
+- Sentry Mode key: the label is now just "Sentry Mode" and the key is narrower.
+
 ## [4.2.0-alpha] - 2026-11-14
 
 - Main screen: while recording, when only the car's Sentry Mode is missing for recording to continue with the screen off, a Turn on Sentry Mode key appears beside the record key. It turns Sentry Mode on and slides away.
