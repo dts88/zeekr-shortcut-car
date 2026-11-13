@@ -62,7 +62,7 @@ public class MainScreenShotsTest {
     }
 
     /**
-     * 录着、只差哨兵模式：录制键右边切一块给「开启哨兵模式」（项目所有者 2026-11-13）。那个键照字的宽（中文约 82 dp），
+     * 录着、只差哨兵模式：录制键右边切一块给「开启哨兵模式」（项目所有者 2026-11-13）。那个键照图标和字的宽（中文约 53 dp），
      * 最宽这一行的四分之一（92 dp）；录制键让出它和一道缝，字那一块窄了，三行都要放得下、不被省略。收回之后一切照旧。
      */
     @Test
@@ -107,7 +107,7 @@ public class MainScreenShotsTest {
                 activity.getString(R.string.record_recording_detail, "12:34"), detail.getText().toString());
         hint.setText(R.string.record_screen_off_pause);
         hint.setVisibility(View.VISIBLE);
-        record.setSentryOffered(true);
+        record.setSentryKey(true, false);
         Shots.save(activity, "main-sentry-scratch");
         File file = Shots.save(activity, "main-sentry-" + tag);
         assertTrue(file + " 是空的", file.length() > 10_000);
@@ -119,9 +119,11 @@ public class MainScreenShotsTest {
         assertEquals("动作栏照实车是 380 dp 宽", Math.round(380 * density), row.getWidth());
         assertEquals(View.VISIBLE, key.getVisibility());
         assertTrue("那个键最宽四分之一（" + quarter + "），量出来 " + keyWidth, keyWidth <= quarter);
-        assertTrue("那个键最窄 72 dp", keyWidth >= Math.round(72 * density));
-        assertTrue("那个键照字的宽：字 " + label.getWidth() + "，键 " + keyWidth,
-                keyWidth == Math.max(Math.round(72 * density), label.getWidth() + Math.round(16 * density)));
+        View icon = key.findViewById(R.id.sentry_key_icon);
+        assertEquals("图标宽 30 dp（项目所有者 2026-11-14：比 44 dp 小三成）", Math.round(30 * density), icon.getWidth());
+        assertEquals("图标高 33 dp（再高一些）", Math.round(33 * density), icon.getHeight());
+        assertEquals("那个键照图标和字里宽的那个，两边各 10 dp：图标 " + icon.getWidth() + "，字 " + label.getWidth(),
+                Math.max(icon.getWidth(), label.getWidth()) + Math.round(20 * density), keyWidth);
         assertEquals("那个键贴着这一行的右边", row.getWidth(), key.getRight());
         assertEquals("那个键滑到位了", 0f, key.getTranslationX(), 0f);
         assertEquals("完全显出来了", 1f, key.getAlpha(), 0f);
@@ -139,15 +141,65 @@ public class MainScreenShotsTest {
         if (chinese) {
             assertEquals("中文四个字放得下，不缩小", titleSize, title.getTextSize(), 0.5f);
             assertEquals("熄屏提示一行写完", 1, hint.getLineCount());
-            assertEquals("那个键上的字两行：开启 / 哨兵模式", 2, label.getLineCount());
-            assertTrue("中文的那个键约 82 dp，比四分之一（92 dp）窄；量出来 " + keyWidth / density,
-                    keyWidth <= Math.round(84 * density));
+            assertEquals("那个键上的字两行：哨兵 / 模式（项目所有者 2026-11-14 删了「开启」、中文也折行）", 2,
+                    label.getLineCount());
+            assertTrue("中文的那个键约 53 dp（四分之一是 92 dp）；量出来 " + keyWidth / density,
+                    keyWidth <= Math.round(56 * density));
         } else {
-            assertEquals("那个键上的字三行", 3, label.getLineCount());
+            assertEquals("那个键上的字两行", 2, label.getLineCount());
         }
 
-        // 收回：那个键没了，录制键回到原来的宽，字也回到原来的大小和写法
-        record.setSentryOffered(false);
+        // 图标五层：三道光、灯罩和底座、灯芯是正文色；灯芯、三道光各另有一份红的，没开时不露
+        android.widget.ImageView lampOn = key.findViewById(R.id.sentry_key_lamp_on);
+        android.widget.ImageView raysOn = key.findViewById(R.id.sentry_key_rays_on);
+        int base = activity.getColor(R.color.text_primary);
+        int red = activity.getColor(R.color.recording);
+        for (int id : new int[] {R.id.sentry_key_rays, R.id.sentry_key_body, R.id.sentry_key_lamp}) {
+            assertEquals(base, tintOf(key.findViewById(id)));
+        }
+        assertEquals(red, tintOf(lampOn));
+        assertEquals(red, tintOf(raysOn));
+        assertEquals("没开时红的灯芯不露", View.INVISIBLE, lampOn.getVisibility());
+        assertEquals("没开时红的光不露", View.INVISIBLE, raysOn.getVisibility());
+
+        // 哨兵模式开上了（项目所有者 2026-11-14）：图标先从没开变成开着 —— 红的灯芯、红的三道光整个露出来；
+        // 键还在、还点得到（再点一下是反悔）。让人看清之后才收起
+        // （测试里系统动画是关的，过渡一步到位；点亮后还要停 600 ms 才收，这里不往后拨钟）
+        record.setSentryKey(false, true);
+        Shots.save(activity, "main-sentry-scratch");
+        assertEquals("点亮的时候键还在", View.VISIBLE, key.getVisibility());
+        assertTrue("亮着的时候还点得到：反悔", key.isClickable());
+        assertEquals("开着时红的灯芯露着", View.VISIBLE, lampOn.getVisibility());
+        assertEquals("开着时红的光露着", View.VISIBLE, raysOn.getVisibility());
+        android.graphics.Rect window = new android.graphics.Rect();
+        assertTrue(lampOn.getClipBounds(window));
+        float unit = lampOn.getWidth() / 24f;
+        assertTrue("红的灯芯整颗露出来：窗口 " + window, window.left <= Math.round(9.1f * unit)
+                && window.right >= Math.round(14.9f * unit) && window.top == 0 && window.bottom == lampOn.getHeight());
+        assertTrue(raysOn.getClipBounds(window));
+        assertTrue("红的光整个露出来：窗口 " + window, window.left <= Math.round(1.8f * unit)
+                && window.top <= Math.round(1.0f * unit) && window.right >= Math.round(22.2f * unit));
+        assertEquals("鼓的那一下收回来了", 1f, key.findViewById(R.id.sentry_key_icon).getScaleX(), 0.001f);
+        File lit = Shots.save(activity, "main-sentry-lit-" + tag);
+        assertTrue(lit + " 是空的", lit.length() > 10_000);
+        record.setSentryKey(false, true);
+        Shots.settle();
+        assertEquals("同一件事再说一遍不会提前收起", View.VISIBLE, key.getVisibility());
+        org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(3));
+        Shots.save(activity, "main-sentry-scratch");
+        Shots.save(activity, "main-sentry-scratch");
+        assertEquals("看清之后收起", View.GONE, key.getVisibility());
+        assertFalse("收起之后点不到", key.isClickable());
+        assertEquals(row.getWidth(), card.getWidth());
+
+        // 别的原因不该在了（开走了、设置改了）：不点亮，直接收回。那个键没了，录制键回到原来的宽，字也回到原来的大小和写法
+        record.setSentryKey(true, false);
+        Shots.save(activity, "main-sentry-scratch");
+        assertEquals(View.VISIBLE, key.getVisibility());
+        assertEquals("再出现时回到没开的样子", View.INVISIBLE, lampOn.getVisibility());
+        assertEquals(View.INVISIBLE, raysOn.getVisibility());
+        assertTrue(key.isClickable());
+        record.setSentryKey(false, false);
         Shots.save(activity, "main-sentry-scratch");
         Shots.save(activity, "main-sentry-scratch");
         assertEquals(View.GONE, key.getVisibility());
@@ -155,17 +207,70 @@ public class MainScreenShotsTest {
         assertEquals(titleSize, title.getTextSize(), 0.5f);
         assertEquals(activity.getString(R.string.record_recording_detail, "12:34"), detail.getText().toString());
         // 停录：也没有
-        record.setSentryOffered(true);
+        record.setSentryKey(true, false);
         record.setState(RecordButtonUi.State.IDLE);
         Shots.save(activity, "main-sentry-scratch");
         assertEquals("不写「停止录制」时没有那个键", View.GONE, key.getVisibility());
         new File("build/outputs/screenshots/main-sentry-scratch.png").delete();
     }
 
+    /**
+     * 点亮的过渡在车上是 1.5 秒，电脑上一步到位、看不到中间：把过渡停在几处各出一张，拼起来给项目所有者看先后
+     * （红的灯芯转三圈、定住，三道光长出去，图标鼓一下）。只为出图：直接叫录制键里那个不公开的 applyLit。
+     */
+    @Test
+    public void lightingFilmStrip() throws Exception {
+        RuntimeEnvironment.setQualifiers(Shots.NIGHT);
+        ShotActivity activity = Robolectric.buildActivity(ShotActivity.class).setup().get();
+        Shots.stillFrames(activity);
+        ViewGroup frame = activity.findViewById(activity.container);
+        activity.getLayoutInflater().inflate(R.layout.activity_main_zeekr_7x, frame, true);
+        Shots.settle();
+        View rail = frame.findViewById(R.id.action_rail);
+        RecordButtonUi record = new RecordButtonUi(rail.findViewById(R.id.btn_start_record));
+        StatusLine.fill(frame);
+        record.setState(RecordButtonUi.State.RECORDING);
+        record.setSentryKey(true, false);
+        Shots.save(activity, "main-sentry-scratch");
+        java.lang.reflect.Method applyLit = RecordButtonUi.class.getDeclaredMethod("applyLit", float.class);
+        applyLit.setAccessible(true);
+        int[] percents = {0, 6, 12, 24, 30, 42, 48, 60, 68, 76, 86, 100};
+        for (int percent : percents) {
+            applyLit.invoke(record, percent / 100f);
+            File file = Shots.save(activity, "main-sentry-light-" + percent);
+            assertTrue(file + " 是空的", file.length() > 10_000);
+        }
+        View lampOn = rail.findViewById(R.id.sentry_key_lamp_on);
+        View raysOn = rail.findViewById(R.id.sentry_key_rays_on);
+        android.graphics.Rect window = new android.graphics.Rect();
+        float unit = lampOn.getWidth() / 24f;
+        applyLit.invoke(record, 0.09f);
+        assertEquals("转圈时红的灯芯露着一条", View.VISIBLE, lampOn.getVisibility());
+        assertTrue(lampOn.getClipBounds(window));
+        assertTrue("那一条比整颗窄：" + window, window.width() < Math.round(5.8f * unit));
+        assertEquals("转圈时三道光还没动", View.INVISIBLE, raysOn.getVisibility());
+        applyLit.invoke(record, 0.54f);
+        assertEquals("转完三圈那一刻红的转出去了", View.INVISIBLE, lampOn.getVisibility());
+        applyLit.invoke(record, 0.8f);
+        assertTrue(lampOn.getClipBounds(window));
+        assertTrue("定住之后整颗是红的：" + window, window.width() >= Math.round(5.8f * unit) - 1);
+        assertEquals("三道光在往外长", View.VISIBLE, raysOn.getVisibility());
+        assertTrue(raysOn.getClipBounds(window));
+        assertTrue("还没长到头：" + window, window.top > Math.round(1.0f * unit));
+        assertTrue("图标鼓着", rail.findViewById(R.id.sentry_key_icon).getScaleX() > 1.05f);
+        new File("build/outputs/screenshots/main-sentry-scratch.png").delete();
+    }
+
+    private static int tintOf(android.widget.ImageView view) {
+        return androidx.core.widget.ImageViewCompat.getImageTintList(view).getDefaultColor();
+    }
+
     /** 一行的字没被裁掉、没被省略。 */
     private static void assertFits(String what, TextView view) {
         assertNotNull(what + "还没排", view.getLayout());
-        assertEquals(what + "折行了", 1, view.getLineCount());
+        assertEquals(what + "折行了：「" + view.getText() + "」字号 " + view.getTextSize() + "，第一行宽 "
+                + view.getLayout().getLineWidth(0) + "，视图宽 " + view.getWidth()
+                + "，整句宽 " + view.getPaint().measureText(view.getText(), 0, view.length()), 1, view.getLineCount());
         assertEquals(what + "被省略了", 0, view.getLayout().getEllipsisCount(0));
         assertTrue(what + "放不下：字宽 " + view.getLayout().getLineWidth(0) + "，能用 "
                         + (view.getWidth() - view.getPaddingLeft() - view.getPaddingRight()),

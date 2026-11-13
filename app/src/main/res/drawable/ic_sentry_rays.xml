@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  哨兵模式的图标（警灯）里的三道光：正上方一道，两肩各一道，朝着灯。也用两份：一份是图标的本色；一份是红的、盖在上面，
+  点亮时从靠灯的一头往外露出来（长出去）。着色由使用方决定。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="26.4dp"
+    android:viewportWidth="24"
+    android:viewportHeight="26.4">
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="@color/text_primary"
+        android:strokeWidth="2.0"
+        android:strokeLineCap="round"
+        android:pathData="M12,2.0V3.3 M2.8,7.75L4.0,8.35 M21.2,7.75L20.0,8.35" />
+</vector>

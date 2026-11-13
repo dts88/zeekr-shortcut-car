@@ -649,6 +649,8 @@
 - 2026-11-13 项目所有者批准（主界面录制键旁的键）：record_sentry_on「开启哨兵模式」/ Turn on Sentry Mode / Hidupkan Mod Sentry，
   键上分行写（record_sentry_on_label「开启 / 哨兵模式」，英文、马来文各三行）。没做成的提示用已有的 msg_car_action_unavailable、
   msg_car_action_no_change，名字填已有的「哨兵模式」。
+  2026-11-14 项目所有者定：键上的字删掉「开启」，只写 record_sentry_on_label「哨兵模式」/ Sentry Mode / Mod Sentry，三种语言都
+  折成两行（中文「哨兵 / 模式」，省宽度）；record_sentry_on「开启哨兵模式」留着，是这个键读给读屏的说明。
 - 2026-11-13 项目所有者定（录制键里的字要简化，英文原来连小字都写不下）：第二行 record_segment_detail「本段 %1$s / %2$d 分钟」
   删掉，换成 record_recording_detail「录制中 %1$s」/ Recording %1$s / Merakam %1$s（%1$s 是这一次已经录了多久）。
   第三行的小字中文不动；英文、马来文的「熄屏暂停，亮屏后恢复」缩短到两行里写得完：Pauses when screen is off, resumes when on /

@@ -30,8 +30,9 @@ import com.kooo.evcam.R;
  *
  * <h3>那个键多宽</h3>
  *
- * <p>照它自己的内容（字的宽加两边留白，布局里写着最窄多少），最宽不超过这一行去掉一道缝之后的四分之一。项目所有者起初说
- * 「右侧四分之一」，看过样子后说那只是估的、能窄就窄（2026-11-13）：中文两行字约 82 dp，四分之一是 92 dp。</p>
+ * <p>照它自己的内容（图标和字里宽的那个，加两边留白），最宽不超过这一行去掉一道缝之后的四分之一。项目所有者起初说
+ * 「右侧四分之一」，看过样子后说那只是估的、能窄就窄（2026-11-13），又让中文也折成两行、图标缩小（2026-11-14）：中文约 53 dp，
+ * 四分之一是 92 dp。</p>
  *
  * <h3>为什么自己量、自己摆</h3>
  *
@@ -50,9 +51,12 @@ public class RecordKeyRow extends ViewGroup {
 
     /** 出现之前先等这么久：录制键自己的变形（圆变方、底色）先走完，主界面刚打开时也等画面出来。 */
     static final long ENTER_DELAY_MS = Motion.SLOW;
-    /** 时长照 ui-spec §十四 的三档：出来 300 ms，收回 250 ms；挪位置用标准曲线。 */
+    /**
+     * 出来 300 ms（ui-spec §十四 的一档）；收回 500 ms —— 原来是 250 ms，项目所有者 2026-11-14 定放慢一倍：
+     * 那个键往外滑的前一半还点得到，留给人反悔。挪位置用标准曲线。走到一半折回去的，时长照剩下的路程算。
+     */
     static final long ENTER_MS = Motion.SLOW;
-    static final long LEAVE_MS = Motion.MEDIUM;
+    static final long LEAVE_MS = 2 * Motion.MEDIUM;
 
     private View record;
     private View key;
@@ -116,8 +120,9 @@ public class RecordKeyRow extends ViewGroup {
             return;
         }
         ValueAnimator a = ValueAnimator.ofFloat(split, target);
-        a.setDuration(open ? ENTER_MS : LEAVE_MS);
-        a.setStartDelay(open ? ENTER_DELAY_MS : 0);
+        a.setDuration(Math.max(1, Math.round((open ? ENTER_MS : LEAVE_MS) * Math.abs(target - split))));
+        // 从没分的样子出来才先等一下；往外滑到一半被拉回来的马上回
+        a.setStartDelay(open && split == 0f ? ENTER_DELAY_MS : 0);
         a.setInterpolator(Motion.standard());
         a.addUpdateListener(v -> applySplit((float) v.getAnimatedValue()));
         a.addListener(new AnimatorListenerAdapter() {

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  哨兵模式的图标（警灯）里的灯芯：拱里的一颗，底下坐在托着它的那一块上。叠在 ic_sentry_body 上面，用两份：
+  一份是图标的本色，一份是红的、盖在上面按一个窗口露出来（点亮时那个窗口像警灯一样转几圈，最后整颗都露出来）。
+  着色由使用方决定。横向占 9.1–14.9（RecordButtonUi 里那个窗口照这两个数算）。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="26.4dp"
+    android:viewportWidth="24"
+    android:viewportHeight="26.4">
+    <path
+        android:fillColor="@color/text_primary"
+        android:pathData="M9.1,19.6V12.5a2.9,2.9 0 0,1 5.8,0V19.6z" />
+</vector>

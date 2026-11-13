@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  哨兵模式的图标（警灯）里不变色的那一层：灯罩（一道拱）、拱里托着灯的那一块、底座。
+  和 ic_sentry_lamp（灯芯）、ic_sentry_rays（三道光）叠着用（项目所有者 2026-11-14 给的图样；同一天定再高一些：
+  拱的两脚加长，圆弧不变，画布 24 × 26.4）。着色由使用方决定。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="26.4dp"
+    android:viewportWidth="24"
+    android:viewportHeight="26.4">
+    <!-- 灯罩：拱，两脚落在底座上 -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="@color/text_primary"
+        android:strokeWidth="2.3"
+        android:pathData="M6.35,22.6V12.75a5.65,5.65 0 0,1 11.3,0V22.6" />
+    <!-- 拱里托着灯的那一块，和底座。那一块两边伸进拱的两脚里、中间往上垫到灯芯底下一点：同色的两块只是挨着的话，接缝会露一道细线 -->
+    <path
+        android:fillColor="@color/text_primary"
+        android:pathData="M6.9,22.6V21.2q0,-1.6 2.2,-1.6h5.8q2.2,0 2.2,1.6V22.6z M9.5,19.0h5v1h-5z M3.4,22.4h17.2a0.8,0.8 0 0,1 0.8,0.8v1.2a0.8,0.8 0 0,1 -0.8,0.8H3.4a0.8,0.8 0 0,1 -0.8,-0.8v-1.2a0.8,0.8 0 0,1 0.8,-0.8z" />
+</vector>

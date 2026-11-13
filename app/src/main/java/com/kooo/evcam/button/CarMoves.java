@@ -353,6 +353,30 @@ final class CarMoves {
         };
     }
 
+    /**
+     * 哨兵模式只关不开（主界面那个键亮着时再点一下：反悔）：读到关着（0）不写、算做成；开着（1）写 0、读回；
+     * 读到别的（锁车后布防的那个值、读不到）不写，同 {@link #toggle}。
+     */
+    static Job sentryOff() {
+        return c -> {
+            Integer id = c.function(SENTRY_FIELD, SENTRY_IFACE);
+            if (id == null) {
+                return Result.UNAVAILABLE;
+            }
+            int zone = c.zone(CarNames.ALL);
+            Integer cur = c.read(id, zone);
+            if (cur != null && cur == 0) {
+                c.note("already " + hex(cur));
+                return Result.DONE;
+            }
+            if (cur == null || cur != 1) {
+                c.note(SENTRY_FIELD + " read " + hex(cur) + ", not 0/1");
+                return Result.UNAVAILABLE;
+            }
+            return c.set(id, zone, 0);
+        };
+    }
+
     /** 没做成时提示哪一句（做成了是 null：车上看得到）。灵动贴的写车动作、主界面的「开启哨兵模式」共用。 */
     static String failureText(Context app, String label, Result result) {
         switch (result) {
