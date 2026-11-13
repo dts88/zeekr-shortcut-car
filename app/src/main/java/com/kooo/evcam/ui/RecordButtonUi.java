@@ -47,7 +47,8 @@ import java.util.Locale;
  *       （{@code StorageHelper.isRecordingStorageAvailable}），按钮不会说一套、做一套。</li>
  *   <li><b>准备中</b>：点已经收成方块、一明一暗地呼吸，环在转 —— 录制器还没起来。</li>
  *   <li><b>录制中</b>：方块，环按本段已录的比例走，走满一圈换下一段；
- *       换段的那一下，点淡一下再回来。</li>
+ *       换段的那一下，点淡一下再回来。第二行写「录制中」和这一次已经录了多久（项目所有者 2026-11-13：原来是
+ *       「本段 mm:ss / N 分钟」，字多，英文里连下面的小字都挤得放不下；本段走到哪了环上本来就有）。</li>
  *   <li><b>等待摄像头</b>：录像开着、一路都没在录（都被占用、在救，2.11 确认文档 §三）—— 录像不算停。
  *       灰色方块慢慢地一明一暗，环不转、不走，不显示本段时长；按下去仍然是停止录制。红色只标「正在录」。</li>
  * </ul>
@@ -59,15 +60,15 @@ import java.util.Locale;
  * {@link ValueAnimator}，跟随系统的「动画时长缩放」设置，关了动画就直接跳到终态。
  * 这些都是状态本身，不算装饰，录制时也照常动（见 {@link MotionPolicy}）。</p>
  *
- * <h3>右边四分之一有时是另一个键：「开启哨兵模式」（项目所有者 2026-11-13）</h3>
+ * <h3>右边有时切出另一个键：「开启哨兵模式」（项目所有者 2026-11-13）</h3>
  *
- * <p>录着（写着「停止录制」）、别的条件都满足、只差车的哨兵模式没开就能熄屏接着录的时候，录制键的右边四分之一切出来
+ * <p>录着（写着「停止录制」）、别的条件都满足、只差车的哨兵模式没开就能熄屏接着录的时候，录制键的右边切出来
  * 一个键，点了打开哨兵模式；开上之后它变成对勾、滑出去，录制键回到原来的宽。什么时候算「只差哨兵模式」由相机管家说
  * （{@link CameraKeeper#onlySentryMissing}），和第三行小字同一刻、照同一份事实判（{@link ScreenOffHintView#setOnJudged}）：
  * 键在的时候小字写的一定是「熄屏暂停」或「熄屏后停止」，哨兵模式一开两样一起变。怎么分、怎么滑是 {@link RecordKeyRow} 的事，
  * 打开哨兵模式走灵动贴那条写车的路（{@link SentrySwitch}）。</p>
  *
- * <p>分出去之后字那一块只剩一半多宽：留白收一点，第二行去掉「本段」两个字，第一行放不下的语言把字缩小。</p>
+ * <p>分出去之后字那一块窄了：留白收一点，第一行放不下的语言把字缩小。</p>
  */
 public final class RecordButtonUi {
 
@@ -119,10 +120,10 @@ public final class RecordButtonUi {
     private final float titlePx;
     private final TextPaint fitPaint = new TextPaint();
     private SentryKey sentry = SentryKey.HIDDEN;
-    /** 右边分出去了（哪怕只分了一点）：第二行用短的写法、第一行可以缩小。 */
+    /** 右边分出去了（哪怕只分了一点）：第一行可以缩小。 */
     private boolean compact;
-    /** 第二行此刻写的本段已录多久。 */
-    private long shownElapsedMs;
+    /** 这一次录像已经录了多久（第二行写的）。 */
+    private long recordedMs;
     private final Runnable sentryUnconfirmed = () -> {
         if (sentry == SentryKey.DONE) {
             showSentry(SentryKey.OFFERED);
@@ -184,7 +185,7 @@ public final class RecordButtonUi {
         render(State.IDLE, false);
     }
 
-    /** 分段时长（分钟），用于「每段 N 分钟」和「本段 mm:ss / N 分钟」。 */
+    /** 分段时长（分钟），用于待机时的「每段 N 分钟」。 */
     public void setSegmentMinutes(int minutes) {
         segmentMinutes = Math.max(1, minutes);
         if (state == State.IDLE) {
@@ -203,7 +204,7 @@ public final class RecordButtonUi {
     }
 
     /**
-     * 本段已录多久。只在录制中生效。
+     * 本段已录多久：外圈的环照它走。只在录制中生效。
      *
      * @param elapsedMs 本段开始到现在
      * @param segmentMs 一段有多长
@@ -216,14 +217,21 @@ public final class RecordButtonUi {
         if (ring != null && !ring.isIndeterminate()) {
             ring.setProgressCompat((int) (clamped * 1000 / segmentMs), true);
         }
-        shownElapsedMs = clamped;
-        showSegmentDetail();
     }
 
-    /** 第二行「本段 mm:ss / N 分钟」；右边分出去时放不下，去掉「本段」。 */
-    private void showSegmentDetail() {
-        setDetail(context.getString(compact ? R.string.record_segment_detail_short : R.string.record_segment_detail,
-                mmss(shownElapsedMs), segmentMinutes));
+    /**
+     * 这一次录像已经录了多久（从开录算，跨分段）：第二行「录制中 mm:ss」，满一小时写成「h:mm:ss」。
+     * 录制中才写；等待摄像头时记着，回到录制中接着写。
+     */
+    public void setRecordedTime(long totalMs) {
+        recordedMs = Math.max(0, totalMs);
+        if (state == State.RECORDING) {
+            showRecorded();
+        }
+    }
+
+    private void showRecorded() {
+        setDetail(context.getString(R.string.record_recording_detail, clock(recordedMs)));
     }
 
     /** 换段的一瞬：点淡下去再回来，环从零开始。 */
@@ -247,6 +255,9 @@ public final class RecordButtonUi {
 
     private void render(State next, boolean animate) {
         state = next;
+        if (next == State.IDLE || next == State.UNAVAILABLE || next == State.PREPARING) {
+            recordedMs = 0;  // 下一次录像从头数
+        }
         if (hint != null) {
             // 等待摄像头时录像也开着：熄屏的话这段录像会怎样，照常说
             hint.setVisibility(next == State.RECORDING || next == State.WAITING ? View.VISIBLE : View.GONE);
@@ -277,8 +288,7 @@ public final class RecordButtonUi {
                 morphTo(1f, animate);
                 backgroundTo(R.color.recording_quiet, animate);
                 setTitle(R.string.record_stop);
-                shownElapsedMs = 0;
-                showSegmentDetail();
+                showRecorded();
                 break;
             case WAITING:
                 setIndeterminate(false);
@@ -384,9 +394,9 @@ public final class RecordButtonUi {
         float dim = next == SentryKey.BUSY ? 0.5f : 1f;
         if (sentryIcon != null) {
             sentryIcon.setImageResource(done ? R.drawable.ic_check : R.drawable.ic_sentry);
-            // 两个图标自带的线色不一样（盾是正文色、勾是能量色），在能量色的底上都着成底上的字色
-            ImageViewCompat.setImageTintList(sentryIcon,
-                    android.content.res.ColorStateList.valueOf(color(R.color.on_energy)));
+            // 灰底上：盾是正文色（和旁边「拍照」的图标一样），开上了的对勾是能量色
+            ImageViewCompat.setImageTintList(sentryIcon, android.content.res.ColorStateList.valueOf(
+                    color(done ? R.color.energy : R.color.text_primary)));
             sentryIcon.setAlpha(dim);
         }
         if (sentryLabel != null) {
@@ -396,7 +406,7 @@ public final class RecordButtonUi {
         }
     }
 
-    /** 右边分出去多少变了（{@link RecordKeyRow}，0–1）：留白跟着收，一分出去第二行就换短的写法、第一行可以缩小（{@link #fitTitle}）。 */
+    /** 右边分出去多少变了（{@link RecordKeyRow}，0–1）：留白跟着收，一分出去第一行就可以缩小（{@link #fitTitle}）。 */
     private void onSplit(float split) {
         if (content != null) {
             content.setPaddingRelative(padStart - Math.round(SPLIT_PAD_START_DP * density * split),
@@ -417,9 +427,6 @@ public final class RecordButtonUi {
         }
         compact = narrow;
         fitTitle();
-        if (state == State.RECORDING) {
-            showSegmentDetail();
-        }
     }
 
     private void showIdleDetail() {
@@ -565,8 +572,12 @@ public final class RecordButtonUi {
         return ContextCompat.getColor(context, res);
     }
 
-    private static String mmss(long ms) {
+    /** 「mm:ss」，满一小时「h:mm:ss」。 */
+    static String clock(long ms) {
         long seconds = ms / 1000;
-        return String.format(Locale.US, "%02d:%02d", seconds / 60, seconds % 60);
+        long hours = seconds / 3600;
+        return hours > 0
+                ? String.format(Locale.US, "%d:%02d:%02d", hours, seconds / 60 % 60, seconds % 60)
+                : String.format(Locale.US, "%02d:%02d", seconds / 60, seconds % 60);
     }
 }

@@ -646,10 +646,14 @@
     「设置 → 更新与关于 → 关于与致谢」；set_vehicle_status_summary「在主界面的开关下方…」。
   - 不用了、已删：msg_language_hint、msg_rail_side_hint、dlg_rail_side_lhd / _rhd、guide_3（菜单键、超级镜子手势那一段：手势在超级镜子的
     使用指南里）、action_got_it_guide；设置左栏的「返回主界面」「退出应用」；锁定影像的「鸣笛」附加项不摆（读得到喇叭信号再放出来）。
-- 2026-11-13 主界面录制键旁的键（项目所有者提的功能，文字待确认）：record_sentry_on「开启哨兵模式」/ Turn on Sentry Mode /
-  Hidupkan Mod Sentry，键上分两行写（record_sentry_on_label「开启 / 哨兵模式」）；record_segment_detail_short「%1$s / %2$d 分钟」
-  （record_segment_detail 去掉「本段」，只在那个键切出来、字那一块变窄时用）。没做成的提示用已有的 msg_car_action_unavailable、
+- 2026-11-13 项目所有者批准（主界面录制键旁的键）：record_sentry_on「开启哨兵模式」/ Turn on Sentry Mode / Hidupkan Mod Sentry，
+  键上分行写（record_sentry_on_label「开启 / 哨兵模式」，英文、马来文各三行）。没做成的提示用已有的 msg_car_action_unavailable、
   msg_car_action_no_change，名字填已有的「哨兵模式」。
+- 2026-11-13 项目所有者定（录制键里的字要简化，英文原来连小字都写不下）：第二行 record_segment_detail「本段 %1$s / %2$d 分钟」
+  删掉，换成 record_recording_detail「录制中 %1$s」/ Recording %1$s / Merakam %1$s（%1$s 是这一次已经录了多久）。
+  第三行的小字中文不动；英文、马来文的「熄屏暂停，亮屏后恢复」缩短到两行里写得完：Pauses when screen is off, resumes when on /
+  Jeda bila skrin padam, sambung bila hidup（原来是 Pauses with screen off, resumes when the screen turns on /
+  Dijeda ketika skrin padam, disambung apabila skrin hidup）。
 - vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
 - 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
 

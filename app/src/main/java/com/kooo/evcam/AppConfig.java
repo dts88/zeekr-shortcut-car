@@ -1959,8 +1959,8 @@ public class AppConfig {
      * @return true 表示显示录制时间和分段数
      */
     public boolean isRecordingStatsEnabled() {
-        // 默认开启录制状态显示
-        return prefs.getBoolean(KEY_RECORDING_STATS_ENABLED, true);
+        // 默认关（项目所有者 2026-11-13）：已录多久写在录制键第二行了，画面角落不用再压一块。以前默认开
+        return prefs.getBoolean(KEY_RECORDING_STATS_ENABLED, false);
     }
     
     // ==================== 时间角标配置相关方法 ====================

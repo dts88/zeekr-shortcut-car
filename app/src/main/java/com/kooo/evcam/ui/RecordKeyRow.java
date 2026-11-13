@@ -20,13 +20,18 @@ import androidx.annotation.Nullable;
 import com.kooo.evcam.R;
 
 /**
- * 录制键那一行：录制键，加上只在需要时从它右边四分之一切出来的那个键（「开启哨兵模式」，项目所有者 2026-11-13）。
+ * 录制键那一行：录制键，加上只在需要时从它右边切出来的那个键（「开启哨兵模式」，项目所有者 2026-11-13）。
  *
  * <h3>只管怎么分</h3>
  *
  * <p>这一行不知道那个键是干什么的、什么时候该在 —— 那由 {@link RecordButtonUi} 说（{@link #splitTo}）。这里只有一个数
- * {@link #split}：0 是录制键占满整行，1 是右边四分之一让给那个键、中间一道缝（{@code @dimen/gutter}）。两头之间是过渡：
+ * {@link #split}：0 是录制键占满整行，1 是右边让给那个键、中间一道缝（{@code @dimen/gutter}）。两头之间是过渡：
  * 录制键的右边往左收，那个键贴着它从这一行的右边滑进来、同时由淡到实；收起时反过来，滑出去、录制键回到原来的大小。</p>
+ *
+ * <h3>那个键多宽</h3>
+ *
+ * <p>照它自己的内容（字的宽加两边留白，布局里写着最窄多少），最宽不超过这一行去掉一道缝之后的四分之一。项目所有者起初说
+ * 「右侧四分之一」，看过样子后说那只是估的、能窄就窄（2026-11-13）：中文两行字约 82 dp，四分之一是 92 dp。</p>
  *
  * <h3>为什么自己量、自己摆</h3>
  *
@@ -38,7 +43,7 @@ import com.kooo.evcam.R;
  */
 public class RecordKeyRow extends ViewGroup {
 
-    /** 分出去多少变了（0–1）：录制键里面的留白、字的写法跟着它调（{@link RecordButtonUi}）。 */
+    /** 分出去多少变了（0–1）：录制键里面的留白、字的大小跟着它调（{@link RecordButtonUi}）。 */
     public interface OnSplitListener {
         void onSplit(float split);
     }
@@ -52,10 +57,12 @@ public class RecordKeyRow extends ViewGroup {
     private View record;
     private View key;
     private final int gutter;
-    /** 0 = 录制键占满；1 = 右边四分之一是那个键。 */
+    /** 0 = 录制键占满；1 = 右边是那个键。 */
     private float split;
     /** 过渡要去的那一头。 */
     private boolean open;
+    /** 那个键这一次量出来多宽（看不见时是 0）。 */
+    private int keyWidth;
     @Nullable
     private ValueAnimator animator;
     @Nullable
@@ -93,7 +100,7 @@ public class RecordKeyRow extends ViewGroup {
     }
 
     /**
-     * 把右边四分之一分给那个键，或者收回来。已经在那一头（或者正往那一头去）就不动。
+     * 把右边分给那个键，或者收回来。已经在那一头（或者正往那一头去）就不动。
      *
      * @param animate false 直接到位；true 也要看 {@link MotionPolicy} 让不让放
      */
@@ -165,14 +172,14 @@ public class RecordKeyRow extends ViewGroup {
 
     // ------------------------------------------------------------------ 量和摆
 
-    /** 那个键的宽：整行去掉一道缝之后的四分之一。 */
-    static int keyWidth(int rowWidth, int gutter) {
+    /** 那个键最宽多少：整行去掉一道缝之后的四分之一。 */
+    static int widestKey(int rowWidth, int gutter) {
         return Math.max(0, Math.round((rowWidth - gutter) / 4f));
     }
 
     /** 录制键此刻的宽：分出去多少，就让出多少（那个键的宽加一道缝）。 */
-    static int recordWidth(int rowWidth, int gutter, float split) {
-        return rowWidth - Math.round(split * (keyWidth(rowWidth, gutter) + gutter));
+    static int recordWidth(int rowWidth, int gutter, int keyWidth, float split) {
+        return rowWidth - Math.round(split * (keyWidth + gutter));
     }
 
     @Override
@@ -180,12 +187,15 @@ public class RecordKeyRow extends ViewGroup {
         int width = MeasureSpec.getSize(widthMeasureSpec);
         int height = MeasureSpec.getSize(heightMeasureSpec);
         int exactHeight = MeasureSpec.makeMeasureSpec(height, MeasureSpec.EXACTLY);
-        if (record != null) {
-            record.measure(MeasureSpec.makeMeasureSpec(recordWidth(width, gutter, split), MeasureSpec.EXACTLY),
-                    exactHeight);
-        }
+        keyWidth = 0;
         if (key != null && key.getVisibility() != GONE) {
-            key.measure(MeasureSpec.makeMeasureSpec(keyWidth(width, gutter), MeasureSpec.EXACTLY), exactHeight);
+            // 照它自己的内容量，封顶四分之一
+            key.measure(MeasureSpec.makeMeasureSpec(widestKey(width, gutter), MeasureSpec.AT_MOST), exactHeight);
+            keyWidth = key.getMeasuredWidth();
+        }
+        if (record != null) {
+            record.measure(MeasureSpec.makeMeasureSpec(recordWidth(width, gutter, keyWidth, split), MeasureSpec.EXACTLY),
+                    exactHeight);
         }
         setMeasuredDimension(width, height);
     }
@@ -195,19 +205,18 @@ public class RecordKeyRow extends ViewGroup {
         int width = r - l;
         int height = b - t;
         if (record != null) {
-            record.layout(0, 0, recordWidth(width, gutter, split), height);
+            record.layout(0, 0, recordWidth(width, gutter, keyWidth, split), height);
         }
         if (key != null && key.getVisibility() != GONE) {
-            key.layout(width - keyWidth(width, gutter), 0, width, height);
+            key.layout(width - keyWidth, 0, width, height);
             placeKey();
         }
     }
 
-    /** 那个键贴着录制键的右边走：没分时整个在这一行右边外面（被这一行裁掉），分完正好在右边四分之一。 */
+    /** 那个键贴着录制键的右边走：没分时整个在这一行右边外面（被这一行裁掉），分完正好贴着这一行的右边。 */
     private void placeKey() {
-        int width = getWidth();
-        if (key != null && width > 0) {
-            key.setTranslationX((1f - split) * (keyWidth(width, gutter) + gutter));
+        if (key != null && keyWidth > 0) {
+            key.setTranslationX((1f - split) * (keyWidth + gutter));
         }
     }
 }
