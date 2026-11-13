@@ -2,7 +2,8 @@
 <!--
   「极氪7X（环视 + 前后座舱）」布局。统一骨架：① 标题区 · ③ 内容区 · ④ 动作栏 · ⑤ 状态条。
 
-  内容区三列：环视合成流四宫格 · 两路座舱上下叠放 · 动作栏。
+  内容区：画面区（环视合成流四宫格、座舱那一列）· 动作栏。画面区里那两块各占哪里由 PreviewStageLayout 照看得见的
+  是哪几样定：环视 + 两路座舱左右并排，环视 + 一路座舱三列两行（ui-spec §一「主界面画面区怎么分」）。
   动作栏和只有环视的布局一样宽（rail_width）。原来收窄到 300dp，把宽度让给座舱列，
   但英文界面里录制键和两块回看键的字放不下（0.61 实车），宽度还给动作栏。
 -->
@@ -54,16 +55,15 @@
                         android:layout_height="match_parent"
                         android:layout_weight="1">
 
-                        <LinearLayout
+                        <com.kooo.evcam.ui.PreviewStageLayout
+                            android:id="@+id/preview_panes"
                             android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:orientation="horizontal">
-                            <!-- 环视合成流四宫格 -->
+                            android:layout_height="match_parent">
+                            <!-- 环视合成流四宫格。位置和大小由 PreviewStageLayout 定 -->
                             <FrameLayout
                                 android:id="@+id/composite_wrapper"
-                                android:layout_width="0dp"
+                                android:layout_width="match_parent"
                                 android:layout_height="match_parent"
-                                android:layout_weight="22"
                                 android:background="@drawable/bg_preview_frame">
 
                                 <com.kooo.evcam.zeekr.FourLaneContainer
@@ -94,13 +94,14 @@
                                     android:textAppearance="@style/TextAppearance.Cam.Body" />
                             </FrameLayout>
 
-                            <!-- 两路座舱，上下叠放。放大环视的一格时整列让出来 -->
+                            <!--
+                              两路座舱，上下叠放。放大环视的一格时整列让出来。位置和大小由 PreviewStageLayout 定：
+                              只有一路时这一列盖在环视那一块的右上两格上，所以它要排在环视后面
+                            -->
                             <LinearLayout
                                 android:id="@+id/cabin_column"
-                                android:layout_width="0dp"
+                                android:layout_width="match_parent"
                                 android:layout_height="match_parent"
-                                android:layout_marginStart="@dimen/gutter"
-                                android:layout_weight="14"
                                 android:orientation="vertical">
 
                                 <FrameLayout
@@ -162,7 +163,7 @@
                                         android:textAppearance="@style/TextAppearance.Cam.Body" />
                                 </FrameLayout>
                             </LinearLayout>
-                        </LinearLayout>
+                        </com.kooo.evcam.ui.PreviewStageLayout>
 
                         <!--
                           菜单键。其他界面的 ① 里它是「左 10dp、在 64dp 里垂直居中」

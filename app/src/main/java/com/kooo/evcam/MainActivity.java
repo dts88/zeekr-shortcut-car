@@ -95,6 +95,13 @@ public class MainActivity extends AppCompatActivity implements com.kooo.evcam.se
     private AutoFitTextureView textureFront, textureBack, textureLeft;
     /** 极氪合成流四宫格容器；非该车型时为 null。 */
     private com.kooo.evcam.zeekr.FourLaneContainer compositeContainer;
+    /** 多路布局里分画面区的那一层（环视那一块、座舱那一列各占哪里）；只开环视的布局里没有。 */
+    private com.kooo.evcam.ui.PreviewStageLayout previewPanes;
+    /**
+     * 画面区是不是照「三列两行」摆着（环视 + 一路座舱，{@link #applyStageArrangement} 摆的那一次）。放大一格期间不变：
+     * 那时别的格子藏着，现算出来的不是收回以后的样子。
+     */
+    private boolean threeByTwo;
     private TextView tvCompositeInfo;
 
     // 调试信息覆盖层（连点5下空白处显示）
@@ -471,6 +478,11 @@ public class MainActivity extends AppCompatActivity implements com.kooo.evcam.se
 
         // 极氪合成流：texture_front 是容器里那个普通的 TextureView，
         // 四宫格由父容器 FourLaneContainer 重画子视图实现
+        previewPanes = findViewById(R.id.preview_panes);
+        if (previewPanes == null) {
+            // 这一份布局里画面区不分（只开环视）：上一份布局记下的摆法作废
+            threeByTwo = false;
+        }
         compositeContainer = findViewById(R.id.composite_container);
         if (compositeContainer != null) {
             tvCompositeInfo = recordingLayout.findViewById(R.id.tv_composite_info);
@@ -1625,6 +1637,15 @@ public class MainActivity extends AppCompatActivity implements com.kooo.evcam.se
             cell.translateY = lane.translateY;
             cell.fit = scaleModeOf(lane.fit);
             cell.fitCorrected = scaleModeOf(lane.fitCorrected);
+            // 三列两行（环视 + 一路座舱）：这一格摆在哪由那套摆法定，旋转、镜像、缩放平移照旧听配置
+            float[] place = threeByTwo
+                    ? com.kooo.evcam.ui.PreviewStageLayout.threeByTwoCell(cell.laneIndex) : null;
+            if (place != null) {
+                cell.x = place[0];
+                cell.y = place[1];
+                cell.width = place[2];
+                cell.height = place[3];
+            }
             cells[i] = cell;
         }
         compositeContainer.setCells(cells);
@@ -1636,8 +1657,9 @@ public class MainActivity extends AppCompatActivity implements com.kooo.evcam.se
     /**
      * 多路布局里各格显不显示：没启用的那一路整格藏起来 —— 一块黑方块下面写着「前座舱」，比空着更像出了故障。
      *
-     * <p>藏起来之后剩下的格子占满：环视那块藏了，座舱那一列占满整块预览区；前座舱藏了，后座舱占满这一列。
-     * 让出来的间距一并去掉，不留一道缝。只开环视的布局里没有这几格，调了也不会有事。</p>
+     * <p>藏起来之后画面区怎么分由 {@code PreviewStageLayout} 照看得见的是哪几样定（环视 + 两路座舱左右并排，
+     * 环视 + 一路座舱三列两行，只剩一样时它占满）；座舱那一列里，前座舱藏了，后座舱占满这一列、中间那道缝去掉。
+     * 只开环视的布局里没有这几格，调了也不会有事。</p>
      *
      * <p>布局每次重建（initViews）都回到默认的显示状态，在那里照启用的几路摆一次。管线建好后再照建出来没有摆启用的座舱
      * （{@link #showBuiltCabins}）。</p>
@@ -1650,21 +1672,45 @@ public class MainActivity extends AppCompatActivity implements com.kooo.evcam.se
         showPane(R.id.composite_wrapper, surround);
         showPane(R.id.pane_cabin_front, cabinFront);
         showPane(R.id.pane_cabin_rear, shown.contains("left"));
-        // 间距照这一次摆：旁边那一格在就留（布局里的 gutter），藏了就不留 —— 两个方向都摆，同一个界面上再摆一次时能还回去
+        // 两路座舱之间那道缝照这一次摆：前座舱在就留（布局里的 gutter），藏了就不留 —— 两个方向都摆，同一个界面上再摆一次时能还回去
         int gutter = getResources().getDimensionPixelSize(R.dimen.gutter);
-        View column = findViewById(R.id.cabin_column);
-        if (column != null && column.getLayoutParams() instanceof android.view.ViewGroup.MarginLayoutParams) {
-            android.view.ViewGroup.MarginLayoutParams params =
-                    (android.view.ViewGroup.MarginLayoutParams) column.getLayoutParams();
-            params.setMarginStart(surround ? gutter : 0);
-            column.setLayoutParams(params);
-        }
         View rear = findViewById(R.id.pane_cabin_rear);
         if (rear != null && rear.getLayoutParams() instanceof android.view.ViewGroup.MarginLayoutParams) {
             android.view.ViewGroup.MarginLayoutParams params =
                     (android.view.ViewGroup.MarginLayoutParams) rear.getLayoutParams();
             params.topMargin = cabinFront ? gutter : 0;
             rear.setLayoutParams(params);
+        }
+        applyStageArrangement();
+    }
+
+    /**
+     * 看得见的格子变了（照启用的几路摆、照建出来的管线摆）之后叫一次：画面区现在是不是「三列两行」
+     * （{@code PreviewStageLayout}，环视 + 一路座舱），是的话环视四格照它摆、座舱那一路铺满它的两格、「环视」角标收起；
+     * 不是了就都还回去。两块各占哪里是那一层自己摆的，这里只管跟着它变的这三样。
+     *
+     * <p>正放大着一格时不动：那时别的格子藏着，收回以后才是要照着摆的样子（管线在放大中建好的，收回后会再叫）。</p>
+     */
+    private void applyStageArrangement() {
+        if (expandedPreview != null) {
+            return;
+        }
+        boolean wide = previewPanes != null && previewPanes.arrangement()
+                == com.kooo.evcam.ui.PreviewStageLayout.Arrangement.THREE_BY_TWO;
+        boolean changed = wide != threeByTwo;
+        threeByTwo = wide;
+        if (changed) {
+            AppLog.i(TAG, "画面区摆法：" + (wide ? "三列两行（环视 + 一路座舱）" : "不是三列两行了"));
+            applyProfileCells();
+            updateCompositeLabels();
+        }
+        if (wide || changed) {
+            // 三列两行时每次都摆：管线换过的话相机是新的，「铺满」要再交给它一次
+            for (String key : new String[]{"back", "left"}) {
+                if (enabledLanes.contains(key)) {
+                    setCabinFill(key, wide);
+                }
+            }
         }
     }
 
@@ -1683,6 +1729,7 @@ public class MainActivity extends AppCompatActivity implements com.kooo.evcam.se
         cabinPanesAfterCollapse = null;
         showBuiltCabin(pipeline, "back", R.id.pane_cabin_front);
         showBuiltCabin(pipeline, "left", R.id.pane_cabin_rear);
+        applyStageArrangement();
     }
 
     private void showBuiltCabin(MultiCameraManager pipeline, String key, int paneId) {
@@ -1978,8 +2025,9 @@ public class MainActivity extends AppCompatActivity implements com.kooo.evcam.se
             // 只改矩阵是不够的：「适应」模式下 AutoFitTextureView 会先把视图缩成
             // 画面的形状，转 90° 之后画面再怎么铺也只能铺满那个已经缩过的视图 ——
             // 报上来的「选了填充还是顶不满」就是卡在这一层。
-            // 主界面点开放大的那一路一律铺满（见 setupCompositeControls）
-            boolean fill = cameraKey.equals(expandedCameraKey)
+            // 主界面点开放大的那一路一律铺满（见 setupCompositeControls）；三列两行时座舱那一路铺满它的两格
+            // （applyStageArrangement）
+            boolean fill = cameraKey.equals(expandedCameraKey) || threeByTwo
                     || com.kooo.evcam.profile.LaneLayout.FILL.equals(
                     com.kooo.evcam.profile.LaneLayout.normaliseFit(ownLane.fit));
             if (fill) {
@@ -3098,7 +3146,8 @@ public class MainActivity extends AppCompatActivity implements com.kooo.evcam.se
                 params.topMargin = expandedTopMargin;
                 expanded.setLayoutParams(params);
             }
-            setCabinFill(cameraKey, false);
+            // 三列两行时座舱那一路本来就铺满它的两格：收回以后还是铺满
+            setCabinFill(cameraKey, threeByTwo);
         } else if (compositeContainer != null) {
             compositeContainer.showGrid(gridAnimates);
             updateCompositeLabels();
@@ -3113,7 +3162,7 @@ public class MainActivity extends AppCompatActivity implements com.kooo.evcam.se
     }
 
     /**
-     * 座舱那一路放大时铺满，还原时回到配置里的摆法。
+     * 座舱那一路放大时铺满，还原时回到配置里的摆法；三列两行时它占两格，也铺满（{@link #applyStageArrangement}）。
      *
      * <p>要动两层：视图的形状（AutoFitTextureView 会先把自己缩成画面的形状）和
      * 矩阵（SingleCamera 按「适应 / 填充」算）。只改矩阵是顶不满的 ——
@@ -3159,8 +3208,9 @@ public class MainActivity extends AppCompatActivity implements com.kooo.evcam.se
             }
             // 三路布局里的「环视」在放大某一格时收起：那时这一块占满画面，
             // 它的右上角正好是录制角标的位置
-            boolean visible = grid
-                    || (order[cell] == focused && findViewById(R.id.cabin_column) == null);
+            // 三列两行时不挂「环视」：这一块的右上角是座舱
+            boolean visible = !threeByTwo && (grid
+                    || (order[cell] == focused && findViewById(R.id.cabin_column) == null));
             labels[cell].setVisibility(visible ? View.VISIBLE : View.GONE);
         }
     }
