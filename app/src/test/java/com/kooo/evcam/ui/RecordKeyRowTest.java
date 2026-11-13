@@ -30,7 +30,7 @@ public class RecordKeyRowTest {
     /** 没分时录制键占满；分完让出那个键的宽加一道缝；过渡中按比例。 */
     @Test
     public void theRecordKeyGivesUpTheKeyAndAGutter() {
-        int key = 106;  // 中文的那个键：53 dp
+        int key = 144;  // 那个键：72 dp
         assertEquals(ROW, RecordKeyRow.recordWidth(ROW, GUTTER, key, 0f));
         assertEquals(ROW - key - GUTTER, RecordKeyRow.recordWidth(ROW, GUTTER, key, 1f));
         assertEquals(ROW - (key + GUTTER) / 2, RecordKeyRow.recordWidth(ROW, GUTTER, key, 0.5f));

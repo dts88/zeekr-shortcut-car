@@ -62,7 +62,7 @@ public class MainScreenShotsTest {
     }
 
     /**
-     * 录着、只差哨兵模式：录制键右边切一块给「开启哨兵模式」（项目所有者 2026-11-13）。那个键照图标和字的宽（中文约 53 dp），
+     * 录着、只差哨兵模式：录制键右边切一块给「开启哨兵模式」（项目所有者 2026-11-13）。那个键三种语言一样宽（72 dp），
      * 最宽这一行的四分之一（92 dp）；录制键让出它和一道缝，字那一块窄了，三行都要放得下、不被省略。收回之后一切照旧。
      */
     @Test
@@ -122,8 +122,10 @@ public class MainScreenShotsTest {
         View icon = key.findViewById(R.id.sentry_key_icon);
         assertEquals("图标宽 30 dp（项目所有者 2026-11-14：比 44 dp 小三成）", Math.round(30 * density), icon.getWidth());
         assertEquals("图标高 33 dp（再高一些）", Math.round(33 * density), icon.getHeight());
-        assertEquals("那个键照图标和字里宽的那个，两边各 10 dp：图标 " + icon.getWidth() + "，字 " + label.getWidth(),
-                Math.max(icon.getWidth(), label.getWidth()) + Math.round(20 * density), keyWidth);
+        assertEquals("那个键三种语言一样宽（项目所有者 2026-11-14：向最宽的对齐）",
+                activity.getResources().getDimensionPixelSize(R.dimen.sentry_key_width), keyWidth);
+        assertTrue("字加两边各 10 dp 要放得进那个宽：字 " + label.getWidth() + "，键 " + keyWidth,
+                Math.max(icon.getWidth(), label.getWidth()) + Math.round(20 * density) <= keyWidth);
         assertEquals("那个键贴着这一行的右边", row.getWidth(), key.getRight());
         assertEquals("那个键滑到位了", 0f, key.getTranslationX(), 0f);
         assertEquals("完全显出来了", 1f, key.getAlpha(), 0f);
@@ -143,8 +145,6 @@ public class MainScreenShotsTest {
             assertEquals("熄屏提示一行写完", 1, hint.getLineCount());
             assertEquals("那个键上的字两行：哨兵 / 模式（项目所有者 2026-11-14 删了「开启」、中文也折行）", 2,
                     label.getLineCount());
-            assertTrue("中文的那个键约 53 dp（四分之一是 92 dp）；量出来 " + keyWidth / density,
-                    keyWidth <= Math.round(56 * density));
         } else {
             assertEquals("那个键上的字两行", 2, label.getLineCount());
         }
@@ -192,12 +192,47 @@ public class MainScreenShotsTest {
         assertFalse("收起之后点不到", key.isClickable());
         assertEquals(row.getWidth(), card.getWidth());
 
-        // 别的原因不该在了（开走了、设置改了）：不点亮，直接收回。那个键没了，录制键回到原来的宽，字也回到原来的大小和写法
+        // 键只跟着车的读数走（实车 2026-11-14：连点几下，键和车对不上了 —— 原来自己计时、有 5 秒不认读数）：
+        // 开、关、开、关接连读到，每一下键都照那一下的读数摆，不留上一下的尾巴
+        android.os.Looper main = android.os.Looper.getMainLooper();
         record.setSentryKey(true, false);
         Shots.save(activity, "main-sentry-scratch");
         assertEquals(View.VISIBLE, key.getVisibility());
         assertEquals("再出现时回到没开的样子", View.INVISIBLE, lampOn.getVisibility());
         assertEquals(View.INVISIBLE, raysOn.getVisibility());
+        assertTrue(key.isClickable());
+        for (int round = 0; round < 3; round++) {
+            record.setSentryKey(false, true);   // 读到开着
+            Shots.settle();
+            assertEquals("第 " + (round + 1) + " 回读到开着：亮", View.VISIBLE, lampOn.getVisibility());
+            assertEquals(View.VISIBLE, key.getVisibility());
+            record.setSentryKey(true, false);   // 马上又读到关着（反悔关掉了，或者别处关的）
+            Shots.settle();
+            assertEquals("第 " + (round + 1) + " 回读到关着：没开的样子", View.INVISIBLE, lampOn.getVisibility());
+            assertEquals(View.INVISIBLE, raysOn.getVisibility());
+            assertTrue("可以再点", key.isClickable());
+            // 上一下「开着」排的收起不能留到现在才生效
+            org.robolectric.Shadows.shadowOf(main).idleFor(java.time.Duration.ofSeconds(3));
+            Shots.save(activity, "main-sentry-scratch");
+            assertEquals("读数是关着：键留着，不收", View.VISIBLE, key.getVisibility());
+            assertEquals(row.getWidth() - keyWidth - gutter, card.getWidth());
+        }
+        record.setSentryKey(false, true);       // 最后读到开着、不再变：亮，然后收起
+        Shots.settle();
+        assertEquals(View.VISIBLE, lampOn.getVisibility());
+        org.robolectric.Shadows.shadowOf(main).idleFor(java.time.Duration.ofSeconds(3));
+        Shots.save(activity, "main-sentry-scratch");
+        Shots.save(activity, "main-sentry-scratch");
+        assertEquals("开着不再变：收起", View.GONE, key.getVisibility());
+        record.setSentryKey(false, true);
+        Shots.save(activity, "main-sentry-scratch");
+        assertEquals("收起之后还读到开着：不再出来", View.GONE, key.getVisibility());
+
+        // 别的原因不该在了（开走了、设置改了）：不点亮，直接收回。那个键没了，录制键回到原来的宽，字也回到原来的大小和写法
+        record.setSentryKey(true, false);
+        Shots.save(activity, "main-sentry-scratch");
+        assertEquals(View.VISIBLE, key.getVisibility());
+        assertEquals(View.INVISIBLE, lampOn.getVisibility());
         assertTrue(key.isClickable());
         record.setSentryKey(false, false);
         Shots.save(activity, "main-sentry-scratch");

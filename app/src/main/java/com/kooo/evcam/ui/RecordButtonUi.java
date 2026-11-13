@@ -91,7 +91,7 @@ public final class RecordButtonUi {
 
     /**
      * 「开启哨兵模式」那个键的样子：没有；可以点（没开）；点了、在等车回话；开上了（图标点亮，再点是反悔）；
-     * 反悔了、在等车回话。
+     * 反悔了、在等车回话。没开、亮着两样只照车的读数定（{@link #setSentryKey}）。
      */
     private enum SentryKey { HIDDEN, OFFERED, TURNING_ON, LIT, TURNING_OFF }
 
@@ -133,11 +133,6 @@ public final class RecordButtonUi {
     /** 键往外滑的时候，滑出去不到一半（分出去的还剩这么多以上）还点得到：反悔。 */
     static final float SENTRY_CANCEL_UNTIL = 0.5f;
 
-    /**
-     * 读回是开着的之后，车辆信号那一份（哨兵模式要稳住 2 秒才算，{@code VehicleStateMapper}）最多等这么久跟上、键收起；
-     * 过了还没跟上（车又把它关了）键回到可以点。
-     */
-    private static final long SENTRY_CONFIRM_MS = 5_000;
     /** 分出去之后录制键里的留白各收多少 dp：左边、点和字之间、右边。 */
     private static final float SPLIT_PAD_START_DP = 4f;
     private static final float SPLIT_TEXT_GAP_DP = 4f;
@@ -181,12 +176,9 @@ public final class RecordButtonUi {
     private boolean compact;
     /** 这一次录像已经录了多久（第二行写的）。 */
     private long recordedMs;
-    private final Runnable sentryUnconfirmed = this::onSentryUnconfirmed;
     private ValueAnimator lightAnimator;
     /** 过渡正往哪个样子去（{@link #lightAnimator} 在走时才有意义）。 */
     private float lightTarget;
-    /** 这个时刻之前不认「哨兵模式开着」的读数：刚反悔关掉，车辆信号那一份还没改口。 */
-    private long ignoreOnUntil;
     /** 图标此刻的样子：0 = 没开，1 = 开着。 */
     private float lit;
     /** 点亮的过渡走完的时刻（{@link SystemClock#uptimeMillis}）。 */
@@ -413,21 +405,37 @@ public final class RecordButtonUi {
 
     // ------------------------------------------------------------------ 「开启哨兵模式」
 
-    /** 小字每判一次就来一下：照同一刻的车和设置，看那个键该不该在；不该在了是不是因为哨兵模式开上了。 */
+    /**
+     * 小字每判一次就来一下，写车的那一下回话之后也来一下（{@link #settleSentry}）：照车此刻的读数和设置，看那个键该不该在；
+     * 不该在了是不是因为哨兵模式开着。哨兵模式的读数和相机管家用的是同一份（车辆接口没连着算读不到）。
+     */
     private void judgeSentry() {
         if (sentryKey == null) {
             return;
         }
         boolean recording = state == State.RECORDING;
-        Integer reading = Telemetry.get().latest().sentry;
+        Telemetry telemetry = Telemetry.get();
+        Integer reading = telemetry.carLinkConnected() ? telemetry.latest().sentry : null;
         setSentryKey(recording && CameraKeeper.get(context).onlySentryMissing(),
                 recording && reading != null && (reading == 1 || reading == 2));
     }
 
     /**
-     * 照这两样摆那个键。该在：还没有就从右边滑进来（主界面刚打开时这一行是收着的，也滑一次）。不该在了：哨兵模式开上了
-     * （点这个键开的、别处开的都算）就先把图标点亮、让人看清（也来得及反悔），再收起；别的原因（开走了、停录了、设置改了）
-     * 直接收起。平时由 {@link #judgeSentry} 叫；截图测试直接叫。
+     * 照这两样摆那个键。键的样子只跟着车的实际读数走，自己不猜、不计时 —— 2026-11-14 实车：原来点了之后自己记着
+     * 「读回开着、5 秒里车辆信号没跟上就退回没开」「刚关掉的 5 秒不认开着的读数」，是照「哨兵模式的读数要稳住 2 秒」
+     * 写的；实际读数一百毫秒内就到，连点几下，真的读数落进那 5 秒被丢掉，键就和车对不上了（车上开着、键是没开的样子）。
+     *
+     * <ul>
+     *   <li>该在（只差哨兵模式，也就是读到它关着）：没开的样子、可以点。还没有就从右边滑进来（主界面刚打开时这一行是
+     *       收着的，也滑一次）；亮着的变回没开，正往外滑的拉回来。</li>
+     *   <li>不该在了、哨兵模式开着（点这个键开的、别处开的都算）：点亮，让人看清（也来得及反悔），再收起。</li>
+     *   <li>不该在了、别的原因（开走了、停录了、设置改了、读不到了）：直接收起。</li>
+     * </ul>
+     *
+     * <p>点了之后等车回话的那一小会儿（{@link SentryKey#TURNING_ON}、{@link SentryKey#TURNING_OFF}）键是淡的、不能点：
+     * 这时来的读数已经是要的那个样子就照它定，还不是就接着等回话。</p>
+     *
+     * <p>平时由 {@link #judgeSentry} 叫；截图测试直接叫。</p>
      *
      * @param offered  只差哨兵模式（{@link CameraKeeper#onlySentryMissing}）
      * @param sentryOn 哨兵模式此刻读到是开着或布防
@@ -437,46 +445,39 @@ public final class RecordButtonUi {
             return;
         }
         if (offered) {
-            ignoreOnUntil = 0;
+            if (sentry == SentryKey.TURNING_ON) {
+                return;  // 写开的那一下还没回话，读数自然还是关着：等它
+            }
             cancelPendingLeave();
-            if (sentry == SentryKey.HIDDEN) {
+            if (sentry != SentryKey.OFFERED) {
                 showSentry(SentryKey.OFFERED);
             }
             row.splitTo(true, true);
             return;
         }
         if (sentryOn) {
-            if (sentry == SentryKey.HIDDEN || sentry == SentryKey.TURNING_OFF || pendingLeave
-                    || SystemClock.uptimeMillis() < ignoreOnUntil) {
-                // 没有这个键；正在关、等车回话；已经在等收起；刚关掉、车辆信号那一份（要稳住 2 秒）还没跟上
-                return;
+            if (sentry == SentryKey.HIDDEN || sentry == SentryKey.TURNING_OFF) {
+                return;  // 没有这个键；写关的那一下还没回话，读数自然还是开着：等它
             }
             if (sentry != SentryKey.LIT) {
                 showSentry(SentryKey.LIT);
             }
-            leaveAfterLit();
+            if (!pendingLeave) {
+                leaveAfterLit();
+            }
             return;
         }
         cancelPendingLeave();
         if (sentry != SentryKey.HIDDEN) {
             sentry = SentryKey.HIDDEN;
-            sentryKey.removeCallbacks(sentryUnconfirmed);
             sentryKey.setClickable(false);
         }
         row.splitTo(false, true);
     }
 
-    /** 读回是开着的，车辆信号那一份却一直没跟上（车又把它关了）：回到没开的样子。已经在收的不管。 */
-    private void onSentryUnconfirmed() {
-        if (sentry == SentryKey.LIT && !pendingLeave && row.isOpen()) {
-            showSentry(SentryKey.OFFERED);
-        }
-    }
-
     /** 点亮放完、再让人看一会儿（{@link #SENTRY_LIT_HOLD_MS}）才收起。这期间键还亮着、还点得到（反悔）。 */
     private void leaveAfterLit() {
         pendingLeave = true;
-        sentryKey.removeCallbacks(sentryUnconfirmed);
         sentryKey.removeCallbacks(sentryLeave);
         if (lightAnimator != null) {
             return;  // 过渡还在走：走完那一下再排（lightTo 里的收尾）
@@ -504,63 +505,38 @@ public final class RecordButtonUi {
     /** 点了那个键：没开的时候是打开；亮着的时候（开上了、还没收起）是反悔，关掉。等车回话时点了不算。 */
     private void onSentryKeyTapped() {
         if (sentry == SentryKey.OFFERED) {
-            turnSentryOn();
+            showSentry(SentryKey.TURNING_ON);
+            SentrySwitch.turn(context, true, done -> settleSentry(SentryKey.TURNING_ON));
         } else if (sentry == SentryKey.LIT) {
-            turnSentryOff();
+            // 反悔（项目所有者 2026-11-14）：键亮着、还没滑出去一半时再点一下，把哨兵模式关掉。正在往外滑的拉回来
+            cancelPendingLeave();
+            row.splitTo(true, true);
+            showSentry(SentryKey.TURNING_OFF);
+            SentrySwitch.turn(context, false, done -> settleSentry(SentryKey.TURNING_OFF));
         }
     }
 
-    /** 写车、读回（{@link SentrySwitch}）。没做成它自己提示一句，键回到可以点。 */
-    private void turnSentryOn() {
-        showSentry(SentryKey.TURNING_ON);
-        SentrySwitch.turn(context, true, on -> {
-            if (sentry != SentryKey.TURNING_ON) {
-                return;  // 等车回话的工夫键已经收起了（开走了、停录了），或者车辆信号先一步说开上了
-            }
-            if (!row.isOpen()) {
-                sentry = SentryKey.HIDDEN;  // 这工夫主界面离开过，这一行已经收回去了：键不在眼前，下次该在时从头来
-                return;
-            }
-            if (on) {
-                showSentry(SentryKey.LIT);
-                sentryKey.postDelayed(sentryUnconfirmed, SENTRY_CONFIRM_MS);
-            } else {
-                showSentry(SentryKey.OFFERED);
-            }
-        });
-    }
-
     /**
-     * 反悔（项目所有者 2026-11-14）：键亮着、还没滑出去一半时再点一下，把哨兵模式关掉。正在往外滑的拉回来；
-     * 关上了，图标回到没开的样子、键留着（又是只差哨兵模式了）；没关上（它自己提示一句），哨兵模式还开着，照旧亮着、接着收起。
+     * 写车的那一下回话了（{@link SentrySwitch}，没做成它自己提示一句）：键先回到写之前的样子，再照车此刻的读数定 ——
+     * 当场对一次账（{@link Telemetry#reconcileNow}，读到的是新的），再判（{@link #judgeSentry}）。做成了，读数就是要的
+     * 那个样子：开上了点亮、收起，关上了变回没开、键留着。没做成，读数没变，键就是原样、可以再点。
+     * 回话之前车辆信号已经先到、键已经照它定了的，这里什么都不用做。
      */
-    private void turnSentryOff() {
-        cancelPendingLeave();
-        row.splitTo(true, true);
-        showSentry(SentryKey.TURNING_OFF);
-        SentrySwitch.turn(context, false, off -> {
-            if (sentry != SentryKey.TURNING_OFF) {
-                return;  // 等车回话的工夫键已经收起了
-            }
-            if (!row.isOpen()) {
-                sentry = SentryKey.HIDDEN;  // 同上：这一行已经收回去了
-                return;
-            }
-            if (off) {
-                // 车辆信号那一份要稳住 2 秒才改口：这期间它还说开着，不能照它又点亮、收起
-                ignoreOnUntil = SystemClock.uptimeMillis() + SENTRY_CONFIRM_MS;
-                showSentry(SentryKey.OFFERED);
-            } else {
-                showSentry(SentryKey.LIT);
-                leaveAfterLit();
-            }
-        });
+    private void settleSentry(SentryKey waited) {
+        if (sentry != waited) {
+            return;
+        }
+        if (!row.isOpen()) {
+            sentry = SentryKey.HIDDEN;  // 这工夫主界面离开过，这一行已经收回去了：键不在眼前，下次该在时从头来
+            return;
+        }
+        showSentry(waited == SentryKey.TURNING_ON ? SentryKey.OFFERED : SentryKey.LIT);
+        Telemetry.get().reconcileNow(false, this::judgeSentry);
     }
 
     private void showSentry(SentryKey next) {
         boolean fresh = sentry == SentryKey.HIDDEN;
         sentry = next;
-        sentryKey.removeCallbacks(sentryUnconfirmed);
         sentryKey.setClickable(next == SentryKey.OFFERED || next == SentryKey.LIT);
         float dim = next == SentryKey.TURNING_ON || next == SentryKey.TURNING_OFF ? 0.5f : 1f;
         sentryIcon.setAlpha(dim);
@@ -575,7 +551,7 @@ public final class RecordButtonUi {
                 }
                 applyLit(0f);
             } else {
-                // 眼前从亮着回到没开（反悔关掉了；或者读回开着、车辆信号却一直没跟上）：变回去
+                // 眼前从亮着回到没开（反悔关掉了，或者别处把哨兵模式关了）：变回去
                 lightTo(0f);
             }
         }
