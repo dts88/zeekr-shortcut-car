@@ -195,6 +195,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         boundUnlocked = DeveloperMode.isUnlocked();
 
         bindRecording();
+        bindAlerts();
         bindStorage();
         bindRearView();
         bindSideView();
@@ -845,6 +846,175 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     //     }
     //     return String.format(java.util.Locale.US, "%.1f", minutes / 60.0);
     // }
+
+    /**
+     * 停车警报（{@code screen_alerts}）：一个开关，加上把 Telegram 那头配好的四行。
+     *
+     * <h3>为什么令牌要在这辆车上敲</h3>
+     *
+     * <p>谁的车谁自己配，不靠重编一次 APK：令牌从 @BotFather 拿来已是随手可得的，
+     * 会话号用「找会话号」从 {@code getUpdates} 自动取 —— 车主只需先在手机上给机器人说一句话。
+     * 令牌存进 {@link AppConfig} 的另一个文件（{@code app_config_secrets}），
+     * 不进设置导出、不进诊断报告；设置页只显示末四位。</p>
+     */
+    private void bindAlerts() {
+        SwitchPreferenceCompat on = findPreference("pref_alerts");
+        if (on == null) {
+            return;
+        }
+        on.setPersistent(false);
+        on.setChecked(appConfig.isAlertsEnabled());
+        on.setOnPreferenceChangeListener((preference, newValue) -> {
+            boolean enabled = Boolean.TRUE.equals(newValue);
+            appConfig.setAlertsEnabled(enabled);
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("开关变更: pref_alerts → "
+                    + (enabled ? "开" : "关"));
+            com.kooo.evcam.alarm.SentryAlerts.get(requireContext()).refresh();
+            showAlertsRows();
+            return true;
+        });
+
+        Preference token = findPreference("pref_alerts_token");
+        if (token != null) {
+            token.setPersistent(false);
+            token.setOnPreferenceClickListener(preference -> {
+                editAlertsToken();
+                return true;
+            });
+        }
+
+        Preference chat = findPreference("pref_alerts_chat");
+        if (chat != null) {
+            chat.setPersistent(false);
+            chat.setOnPreferenceClickListener(preference -> {
+                editAlertsChat();
+                return true;
+            });
+        }
+
+        Preference find = findPreference("pref_alerts_find_chat");
+        if (find != null) {
+            find.setPersistent(false);
+            find.setOnPreferenceClickListener(preference -> {
+                findAlertsChat();
+                return true;
+            });
+        }
+
+        Preference test = findPreference("pref_alerts_test");
+        if (test != null) {
+            test.setPersistent(false);
+            test.setOnPreferenceClickListener(preference -> {
+                sendAlertsTest();
+                return true;
+            });
+        }
+
+        showAlertsRows();
+    }
+
+    /** 两行的行尾写当前填了什么；令牌只说末四位。 */
+    private void showAlertsRows() {
+        Preference token = findPreference("pref_alerts_token");
+        if (token != null) {
+            String value = appConfig.getAlertsTelegramToken();
+            if (value.isEmpty()) {
+                token.setSummary(R.string.set_alerts_token_empty);
+            } else if (!com.kooo.evcam.alarm.TelegramRequest.looksLikeToken(value)) {
+                token.setSummary(R.string.set_alerts_token_bad);
+            } else {
+                String tail = value.length() <= 4 ? value : value.substring(value.length() - 4);
+                token.setSummary(getString(R.string.set_alerts_token_set, tail));
+            }
+        }
+        Preference chat = findPreference("pref_alerts_chat");
+        if (chat != null) {
+            String value = appConfig.getAlertsTelegramChatId();
+            chat.setSummary(value.isEmpty() ? getString(R.string.set_alerts_chat_empty)
+                    : getString(R.string.set_alerts_chat_set, value));
+        }
+    }
+
+    private void editAlertsToken() {
+        showTextDialog("pref_alerts_token", getString(R.string.set_alerts_token_title),
+                getString(R.string.set_alerts_token_summary),
+                appConfig.getAlertsTelegramToken(), value -> {
+                    appConfig.setAlertsTelegramToken(value);
+                    com.kooo.evcam.blackbox.BlackBox.noteImportant("设置变更: pref_alerts_token → "
+                            + (value.isEmpty() ? "（空）" : "已填写"));
+                    com.kooo.evcam.alarm.SentryAlerts.get(requireContext()).refreshConfig();
+                    showAlertsRows();
+                });
+    }
+
+    private void editAlertsChat() {
+        showTextDialog("pref_alerts_chat", getString(R.string.set_alerts_chat_title),
+                getString(R.string.set_alerts_find_summary),
+                appConfig.getAlertsTelegramChatId(), value -> {
+                    appConfig.setAlertsTelegramChatId(value);
+                    com.kooo.evcam.blackbox.BlackBox.noteImportant("设置变更: pref_alerts_chat → "
+                            + (value.isEmpty() ? "（空）" : value));
+                    com.kooo.evcam.alarm.SentryAlerts.get(requireContext()).refreshConfig();
+                    showAlertsRows();
+                });
+    }
+
+    /** 用已填的令牌去问 Telegram，把会话号自动填上。 */
+    private void findAlertsChat() {
+        toast(getString(R.string.set_alerts_find_summary));
+        com.kooo.evcam.alarm.SentryAlerts.get(requireContext()).findChats(
+                new com.kooo.evcam.alarm.SentryAlerts.ChatListCallback() {
+                    @Override
+                    public void onChats(java.util.List<com.kooo.evcam.alarm.TelegramSender.Chat> chats) {
+                        if (!isAdded()) {
+                            return;
+                        }
+                        if (chats.isEmpty()) {
+                            toast(getString(R.string.set_alerts_chat_none));
+                            return;
+                        }
+                        if (chats.size() == 1) {
+                            applyAlertsChat(chats.get(0).id);
+                            return;
+                        }
+                        CharSequence[] labels = new CharSequence[chats.size()];
+                        for (int i = 0; i < chats.size(); i++) {
+                            labels[i] = chats.get(i).toString();
+                        }
+                        new MaterialAlertDialogBuilder(requireContext(),
+                                R.style.Theme_Cam_MaterialAlertDialog)
+                                .setTitle(R.string.set_alerts_pick_one)
+                                .setItems(labels, (dialog, which) -> applyAlertsChat(chats.get(which).id))
+                                .setNegativeButton(R.string.action_cancel, null)
+                                .show();
+                    }
+
+                    @Override
+                    public void onFailed(String message) {
+                        if (isAdded()) {
+                            toast(getString(R.string.set_alerts_failed, message));
+                        }
+                    }
+                });
+    }
+
+    private void applyAlertsChat(String chatId) {
+        appConfig.setAlertsTelegramChatId(chatId);
+        com.kooo.evcam.blackbox.BlackBox.noteImportant("设置变更: pref_alerts_chat → " + chatId);
+        com.kooo.evcam.alarm.SentryAlerts.get(requireContext()).refreshConfig();
+        showAlertsRows();
+        toast(getString(R.string.set_alerts_chat_found, chatId));
+    }
+
+    /** 拍一张、发出去：和真警报走同一条路，所以它能通，警报就能通。 */
+    private void sendAlertsTest() {
+        toast(getString(R.string.set_alerts_test_summary));
+        com.kooo.evcam.alarm.SentryAlerts.get(requireContext()).sendTestPicture((ok, message) -> {
+            if (isAdded()) {
+                toast(message);
+            }
+        });
+    }
 
     /**
      * 车牌号水印（开关加下一层，ui-spec §三，项目所有者 2026-10-23）：开关管录像和照片上显不显示车牌号；
@@ -2128,6 +2298,34 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                     | InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS);
             input.setFilters(new android.text.InputFilter[]{
                     new android.text.InputFilter.LengthFilter(LicensePlate.MAX_LENGTH)});
+            return;
+        }
+        if ("pref_alerts_token".equals(key)) {
+            // 令牌是“数字:一串字母数字下划线横线”，不能有空格
+            input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
+            input.setFilters(new android.text.InputFilter[]{
+                    new android.text.InputFilter.LengthFilter(64),
+                    new android.text.InputFilter() {
+                        @Override
+                        public CharSequence filter(CharSequence source, int start, int end,
+                                                   android.text.Spanned dest, int dstart, int dend) {
+                            StringBuilder kept = new StringBuilder(end - start);
+                            for (int i = start; i < end; i++) {
+                                char c = source.charAt(i);
+                                if (!Character.isWhitespace(c)) {
+                                    kept.append(c);
+                                }
+                            }
+                            return kept;
+                        }
+                    }});
+            return;
+        }
+        if ("pref_alerts_chat".equals(key)) {
+            // 群组的会话号是负数，所以允许一个前导减号
+            input.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_SIGNED);
+            input.setFilters(new android.text.InputFilter[]{
+                    new android.text.InputFilter.LengthFilter(20)});
             return;
         }
         // 熄屏录制的时长框（2026-11-02 停用，要恢复时放回）：

@@ -25,7 +25,9 @@ import com.kooo.evcam.settings.SettingsRegistry;
 public class AppConfig {
     private static final String TAG = "AppConfig";
     /** 设置存在这个文件里（导出、导入设置时也读写它，{@code settings.SettingsBackup}）。 */
-    public static final String PREF_NAME = "app_config";
+    public static final String PREF_NAME = "app_config";  // 设置与运行状态
+    /** 只放凭据（现在是 Telegram 令牌）：不进设置导出、不进诊断报告、不进黑匣子。 */
+    public static final String SECRETS_PREF_NAME = "app_config_secrets";
     
     // 配置项键名
     private static final String KEY_FIRST_LAUNCH = "first_launch";  // 首次启动标记
@@ -128,6 +130,10 @@ public class AppConfig {
     private static final String KEY_FORCE_H264_ENCODING = "force_h264_encoding";  // 拍照走相机 JPEG 通道
     private static final String KEY_LICENSE_PLATE = "license_plate";  // 车牌号（可选）
     private static final String KEY_LICENSE_PLATE_ENABLED = "license_plate_enabled";
+    // 停车警报（Telegram）：开关、机器人令牌、会话号
+    private static final String KEY_ALERTS_ENABLED = "alerts_enabled";
+    private static final String KEY_ALERTS_TELEGRAM_TOKEN = "alerts_telegram_token";
+    private static final String KEY_ALERTS_TELEGRAM_CHAT = "alerts_telegram_chat";
 
     // 亮度/降噪调节配置
     private static final String KEY_IMAGE_ADJUST_ENABLED = "image_adjust_enabled";  // 是否启用亮度/降噪调节
@@ -2011,6 +2017,72 @@ public class AppConfig {
         String clean = LicensePlate.sanitize(value);
         prefs.edit().putString(KEY_LICENSE_PLATE, clean).apply();
         AppLog.i(TAG, "车牌号设为 " + (clean.isEmpty() ? "（空）" : clean));
+    }
+
+    // ------------------------------------------------------------------ 停车警报（Telegram）
+
+    /**
+     * 令牌单独存一个文件，和设置分开。
+     *
+     * <h3>为什么不用上面那个 prefs</h3>
+     *
+     * <p>设置会整个导出去（{@code SettingsBackup} 把 {@code app_config} 里的每一个键都写进备份文件），
+     * 诊断报告和黑匣子也都从那一份读。令牌进了那里，就等于随着“导出设置”和“发一份报告”一起出门了。
+     * 存另一个文件之后，导出、诊断、黑匣子都不经过它 —— 这份秘密只在这辆车上。</p>
+     */
+    private android.content.SharedPreferences secrets() {
+        return this.context.getSharedPreferences(SECRETS_PREF_NAME, Context.MODE_PRIVATE);
+    }
+
+    /**
+     * 停车警报开着没有。默认关：这是要联网、要填令牌的功能，不该在没答应它的车上跑。
+     *
+     * <p>开着也未必发得出去 —— 令牌或会话号缺一个就不发，判断在
+     * {@link com.kooo.evcam.alarm.AlertPolicy}，那一条规则有单测。</p>
+     */
+    public boolean isAlertsEnabled() {
+        return prefs.getBoolean(KEY_ALERTS_ENABLED, false);
+    }
+
+    public void setAlertsEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_ALERTS_ENABLED, enabled).apply();
+        AppLog.i(TAG, "停车警报设为 " + (enabled ? "开" : "关"));
+    }
+
+    /**
+     * Telegram 机器人令牌。
+     *
+     * <p><b>这个值不进日志、不进故障报告。</b>写进来的第一个动作就是夹掉首尾空白；
+     * 外形不像令牌（{@code 数字:一串字符}）时原样存着，让设置界面去说“填得不对”，
+     * 而不是偷偷把用户敲的东西改掉。</p>
+     */
+    public String getAlertsTelegramToken() {
+        String raw = secrets().getString(KEY_ALERTS_TELEGRAM_TOKEN, "");
+        return raw == null ? "" : raw.trim();
+    }
+
+    public void setAlertsTelegramToken(String value) {
+        String clean = value == null ? "" : value.trim();
+        secrets().edit().putString(KEY_ALERTS_TELEGRAM_TOKEN, clean).apply();
+        // 只记“填了还是清空了”：令牌本身绝不落进日志。
+        AppLog.i(TAG, "Telegram 令牌" + (clean.isEmpty() ? "已清空" : "已填写"));
+    }
+
+    /** 消息发到哪个会话。群组是负数，所以这里只去空白，不要求是正数。 */
+    public String getAlertsTelegramChatId() {
+        String raw = prefs.getString(KEY_ALERTS_TELEGRAM_CHAT, "");
+        return raw == null ? "" : raw.trim();
+    }
+
+    public void setAlertsTelegramChatId(String value) {
+        String clean = value == null ? "" : value.trim();
+        prefs.edit().putString(KEY_ALERTS_TELEGRAM_CHAT, clean).apply();
+        AppLog.i(TAG, "Telegram 会话号设为 " + (clean.isEmpty() ? "（空）" : clean));
+    }
+
+    /** 令牌和会话号都填了：可以试着发一条。 */
+    public boolean hasAlertsTelegramConfig() {
+        return !getAlertsTelegramToken().isEmpty() && !getAlertsTelegramChatId().isEmpty();
     }
 
     /**

@@ -88,6 +88,43 @@
         </PreferenceCategory>
     </PreferenceScreen>
 
+    <!--
+      ==================== 停车警报 ====================
+
+      这一栏默认关，和录制无关：它要联网、要手机那头有一个 Telegram 机器人，所以得车主自己打开、自己填令牌。
+      填令牌、找会话号、发一张测试照片都在这里做完，不需要重编一次 APK —— 谁的车谁自己配。
+    -->
+    <PreferenceScreen
+        android:key="screen_alerts"
+        android:title="@string/set_section_alerts">
+
+        <PreferenceCategory android:title="@string/set_group_alerts_telegram">
+
+            <SwitchPreferenceCompat
+                android:key="pref_alerts"
+                android:title="@string/set_alerts_on_title"
+                android:summary="@string/set_alerts_on_summary" />
+
+            <Preference
+                android:key="pref_alerts_token"
+                android:title="@string/set_alerts_token_title" />
+
+            <Preference
+                android:key="pref_alerts_chat"
+                android:title="@string/set_alerts_chat_title" />
+
+            <Preference
+                android:key="pref_alerts_find_chat"
+                android:title="@string/set_alerts_find_title"
+                android:summary="@string/set_alerts_find_summary" />
+
+            <Preference
+                android:key="pref_alerts_test"
+                android:title="@string/set_alerts_test_title"
+                android:summary="@string/set_alerts_test_summary" />
+        </PreferenceCategory>
+    </PreferenceScreen>
+
     <!-- ==================== 存储 ==================== -->
     <PreferenceScreen
         android:key="screen_storage"
