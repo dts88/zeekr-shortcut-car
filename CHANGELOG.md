@@ -11,6 +11,10 @@ commit message, not here.
 
 Nothing yet.
 
+## [4.4.1-alpha] - 2026-11-14
+
+- Video playback: clips are grouped into recordings by file name and file time instead of opening each one, so the list appears much sooner. Opening each clip to read its length remains as a developer option.
+
 ## [4.4.0-alpha] - 2026-11-14
 
 - Video playback: the newest recording opens as soon as it has been read; older recordings are added to the list while the scan continues. Delete and multi-select wait until the scan has finished.
