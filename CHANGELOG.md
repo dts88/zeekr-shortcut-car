@@ -11,6 +11,10 @@ commit message, not here.
 
 Nothing yet.
 
+## [4.4.0-alpha] - 2026-11-14
+
+- Video playback: the newest recording opens as soon as it has been read; older recordings are added to the list while the scan continues. Delete and multi-select wait until the scan has finished.
+
 ## [4.3.0-alpha] - 2026-11-14
 
 - Smart buttons: each paired button can be given a name or location (up to 20 characters) in Settings → Buttons.
