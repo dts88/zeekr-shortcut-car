@@ -116,6 +116,7 @@ public final class TelegramPoller {
         while (running) {
             String token = config.getAlertsTelegramToken();
             String chatId = config.getAlertsTelegramChatId();
+            String ownerId = config.getAlertsOwnerId();
             if (!TelegramRequest.looksLikeToken(token) || !TelegramRequest.looksLikeChatId(chatId)) {
                 // 令牌填得不对时不能就这么退出：running 会一直是真的，改好令牌也不会再起来。
                 // 什么都不问，隔一会儿再看一眼设置。
@@ -126,7 +127,12 @@ public final class TelegramPoller {
                 JSONObject reply = TelegramSender.getUpdates(token,
                         config.getAlertsCommandOffset(), POLL_SECONDS);
                 retryMs = 0;
-                dispatch(reply, token, chatId);
+                int before = (int) config.getAlertsCommandOffset();
+                dispatch(reply, token, chatId, ownerId);
+                int after = (int) config.getAlertsCommandOffset();
+                if (after != before) {
+                    BlackBox.note("停车警报：问到了新消息（处理到 " + after + "）");
+                }
             } catch (TelegramSender.ChatListException e) {
                 String message = e.getMessage() == null ? "" : e.getMessage();
                 boolean conflict = message.contains("409") || message.contains("Conflict");
@@ -146,7 +152,7 @@ public final class TelegramPoller {
     }
 
     /** 一条一批更新：先推 offset（不管认不认，处理过就算过），再按命令干活。 */
-    private void dispatch(JSONObject reply, String token, String chatId) {
+    private void dispatch(JSONObject reply, String token, String chatId, String ownerId) {
         if (!running) {
             return;
         }
@@ -175,7 +181,7 @@ public final class TelegramPoller {
             TelegramCommand command = TelegramCommand.parseText(message.optString("text", ""));
             long sentAt = message.optLong("date", 0L) * 1000L;
             PollerGate.Verdict verdict = PollerGate.verdict(chatType, fromChat, fromUserId,
-                    chatId, sentAt, System.currentTimeMillis(), command);
+                    chatId, ownerId, sentAt, System.currentTimeMillis(), command);
             // 先把这一条记成「处理过了」再动手：命令半路把进程弄崩了，重启后也不会把同一张照片再发一遍。
             offset = Math.max(offset, updateId + 1);
             config.setAlertsCommandOffset(offset);

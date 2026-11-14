@@ -46,6 +46,13 @@
     <string name="set_alerts_chat_none">机器人还没收到任何消息：先在手机上给它发一句话</string>
     <string name="set_alerts_find_title">找会话号</string>
     <string name="set_alerts_find_summary">用已填的令牌去问 Telegram，把最近给机器人发过话的会话填上</string>
+    <string name="set_alerts_probe_title">检查警报链路</string>
+    <string name="set_alerts_probe_summary">不发消息，只把现在的状态报一遍：监听在不在、哨兵开没开、轮询跑没跑、处理到哪一条</string>
+    <string name="set_alerts_probe_watch">监听车辆信号：%1$s</string>
+    <string name="set_alerts_probe_poller">轮询命令：%1$s</string>
+    <string name="set_alerts_probe_sentry">%1$s</string>
+    <string name="set_alerts_probe_gear">挡位：%1$s</string>
+    <string name="set_alerts_probe_offset">已处理到：%1$s</string>
     <string name="set_alerts_test_title">发一张测试照片</string>
     <string name="set_alerts_picture_title">发几张</string>
     <string name="set_alerts_picture_summary">一张四宫格看全，或者每一路各一张、在手机上更大</string>
@@ -75,7 +82,7 @@
     <string name="alert_cmd_too_soon">等一下：%1$d 秒后再要</string>
     <string name="alert_status_gear">挡位：%1$s</string>
     <string name="set_alerts_commands_title">回应 Telegram 命令</string>
-    <string name="set_alerts_commands_summary">给机器人发 pic 要一张照片，发 status 要一句状态。只在哨兵模式开着时回应（那时车机是醒的），而且只认你配好的那个会话</string>
+    <string name="set_alerts_commands_summary">给机器人发 pic 要一张照片，发 status 要一句状态。只在哨兵模式开着时回应（那时车机是醒的），且只认你自己——机器人拉进群也行，群里别人发不算</string>
     <string name="alert_sentry_on">哨兵模式：开</string>
     <string name="alert_sentry_armed">哨兵模式：已布防（锁车）</string>
     <string name="alert_sentry_off">哨兵模式：关</string>

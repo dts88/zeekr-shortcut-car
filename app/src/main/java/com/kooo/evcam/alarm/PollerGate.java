@@ -48,19 +48,31 @@ public final class PollerGate {
     /**
      * @param chatType          Telegram 的 {@code chat.type}
      * @param chatId            消息所在会话
-     * @param fromUserId        发消息的人（私聊里应与 {@code chatId} 相同）
+     * @param fromUserId        发消息的人
      * @param configuredChatId  设置里配的会话号
+     * @param ownerUserId       车主自己的用户号；空串表示还没记下来
      * @param messageDateMs     消息时间（{@code date} × 1000）；0 表示不知道
      * @param nowMs             现在
      */
     public static Verdict verdict(String chatType, String chatId, String fromUserId,
-                                  String configuredChatId, long messageDateMs, long nowMs,
+                                  String configuredChatId, String ownerUserId,
+                                  long messageDateMs, long nowMs,
                                   TelegramCommand command) {
-        if (!"private".equals(chatType)) {
-            return Verdict.NOT_PRIVATE;
+        if (!TelegramCommand.fromOwner(chatId, configuredChatId)) {
+            return Verdict.NOT_OWNER;
         }
-        if (!TelegramCommand.fromOwner(chatId, configuredChatId)
-                || !TelegramCommand.fromOwner(fromUserId, configuredChatId)) {
+        boolean privateChat = "private".equals(chatType);
+        if (ownerUserId != null && !ownerUserId.isEmpty()) {
+            // 记下了车主的用户号：私聊、群聊都行，但只有他本人算数
+            if (!TelegramCommand.fromOwner(fromUserId, ownerUserId)) {
+                return Verdict.NOT_OWNER;
+            }
+        } else if (!privateChat || !TelegramCommand.fromOwner(fromUserId, configuredChatId)) {
+            // 还不知道车主是谁时，只认私聊里的本人（那时会话号 == 用户号）
+            return Verdict.NOT_OWNER;
+        }
+        if (privateChat && !TelegramCommand.fromOwner(fromUserId, configuredChatId)
+                && (ownerUserId == null || ownerUserId.isEmpty())) {
             return Verdict.NOT_OWNER;
         }
         if (messageDateMs > 0 && nowMs - messageDateMs > MAX_AGE_MS) {

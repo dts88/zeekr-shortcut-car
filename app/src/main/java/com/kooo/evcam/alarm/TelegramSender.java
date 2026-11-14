@@ -84,10 +84,13 @@ public final class TelegramSender {
     public static final class Chat {
         public final String id;
         public final String title;
+        /** 最后给机器人发话的那个人（群聊里就是里面的人）；没有为空串。 */
+        public final String userId;
 
-        Chat(String id, String title) {
+        Chat(String id, String title, String userId) {
             this.id = id;
             this.title = title;
+            this.userId = userId;
         }
 
         @Override
@@ -361,7 +364,8 @@ public final class TelegramSender {
             if (title.isEmpty()) {
                 title = chat.optString("username", "");
             }
-            chats.add(new Chat(id, title));
+            JSONObject from = message.optJSONObject("from");
+            chats.add(new Chat(id, title, from == null ? "" : from.optString("id", "")));
         }
         return chats;
     }

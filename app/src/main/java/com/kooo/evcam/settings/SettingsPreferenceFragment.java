@@ -941,6 +941,20 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             });
         }
 
+        Preference probeRow = findPreference("pref_alerts_probe");
+        if (probeRow != null) {
+            probeRow.setPersistent(false);
+            probeRow.setOnPreferenceClickListener(preference -> {
+                com.kooo.evcam.alarm.SentryAlerts.get(requireContext()).probe((ok, text) -> {
+                    if (isAdded()) {
+                        probeRow.setSummary(text);
+                        toast(text.replace('\n', ' '));
+                    }
+                });
+                return true;
+            });
+        }
+
         Preference test = findPreference("pref_alerts_test");
         if (test != null) {
             test.setPersistent(false);
@@ -1094,7 +1108,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                             return;
                         }
                         if (chats.size() == 1) {
-                            applyAlertsChat(chats.get(0).id);
+                            applyAlertsChat(chats.get(0));
                             return;
                         }
                         CharSequence[] labels = new CharSequence[chats.size()];
@@ -1104,7 +1118,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                         new MaterialAlertDialogBuilder(requireContext(),
                                 R.style.Theme_Cam_MaterialAlertDialog)
                                 .setTitle(R.string.set_alerts_pick_one)
-                                .setItems(labels, (dialog, which) -> applyAlertsChat(chats.get(which).id))
+                                .setItems(labels, (dialog, which) -> applyAlertsChat(chats.get(which)))
                                 .setNegativeButton(R.string.action_cancel, null)
                                 .show();
                     }
@@ -1118,8 +1132,13 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 });
     }
 
-    private void applyAlertsChat(String chatId) {
+    private void applyAlertsChat(com.kooo.evcam.alarm.TelegramSender.Chat chat) {
+        String chatId = chat.id;
         appConfig.setAlertsTelegramChatId(chatId);
+        // 记下发话的那个人：群聊里靠它才分得出是不是车主本人
+        if (chat.userId != null && !chat.userId.isEmpty()) {
+            appConfig.setAlertsOwnerId(chat.userId);
+        }
         com.kooo.evcam.blackbox.BlackBox.noteImportant("设置变更: pref_alerts_chat → " + maskChat(chatId));
         com.kooo.evcam.alarm.SentryAlerts.get(requireContext()).refreshConfig();
         showAlertsRows();
@@ -2448,22 +2467,10 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             // 免得常亮的屏幕上留着一整串凭据
             input.setInputType(InputType.TYPE_CLASS_TEXT
                     | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+            // 不要自己过滤输入：车机的输入法碰上自带的过滤器会把字母再插一遍，
+            // 现场就是“敲一个字母出现两个”。去空白、去怪字符在保存那一步做（AppConfig）。
             input.setFilters(new android.text.InputFilter[]{
-                    new android.text.InputFilter.LengthFilter(64),
-                    new android.text.InputFilter() {
-                        @Override
-                        public CharSequence filter(CharSequence source, int start, int end,
-                                                   android.text.Spanned dest, int dstart, int dend) {
-                            StringBuilder kept = new StringBuilder(end - start);
-                            for (int i = start; i < end; i++) {
-                                char c = source.charAt(i);
-                                if (!Character.isWhitespace(c)) {
-                                    kept.append(c);
-                                }
-                            }
-                            return kept;
-                        }
-                    }});
+                    new android.text.InputFilter.LengthFilter(64)});
             return;
         }
         if ("pref_alerts_chat".equals(key)) {

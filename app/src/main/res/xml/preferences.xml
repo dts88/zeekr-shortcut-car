@@ -138,6 +138,11 @@
                 android:summary="@string/set_alerts_straighten_summary" />
 
             <Preference
+                android:key="pref_alerts_probe"
+                android:title="@string/set_alerts_probe_title"
+                android:summary="@string/set_alerts_probe_summary" />
+
+            <Preference
                 android:key="pref_alerts_test"
                 android:title="@string/set_alerts_test_title"
                 android:summary="@string/set_alerts_test_summary" />

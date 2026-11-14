@@ -363,6 +363,27 @@ public final class SentryAlerts implements Telemetry.Listener {
     }
 
     /**
+     * 把这条链路现在的样子报一遍 —— 设置里那一行用它。
+     *
+     * <p>只读状态，不发消息。回答在主线程，一行一项，不含令牌。</p>
+     */
+    public void probe(Callback callback) {
+        StringBuilder out = new StringBuilder();
+        boolean watchingNow = watching;
+        out.append(app.getString(R.string.set_alerts_probe_watch, watchingNow ? "✓" : "✗")).append('\n');
+        out.append(app.getString(R.string.set_alerts_probe_poller,
+                poller != null && poller.isRunning() ? "✓" : "✗")).append('\n');
+        out.append(app.getString(R.string.set_alerts_probe_sentry,
+                sentryLine(sentryValue()))).append('\n');
+        VehicleState state = Telemetry.get().latest();
+        out.append(app.getString(R.string.set_alerts_probe_gear,
+                state == null || state.gear == null ? "?" : state.gear)).append('\n');
+        out.append(app.getString(R.string.set_alerts_probe_offset,
+                String.valueOf(config.getAlertsCommandOffset())));
+        callback.onResult(watchingNow, out.toString());
+    }
+
+    /**
      * 这个会话 Telegram 认不认（{@code getChat}）。回在主线程。
      *
      * <p>手打错一位数字时，形状照样是数字、照样能填进去，照片就发给别人了。</p>
@@ -424,11 +445,10 @@ public final class SentryAlerts implements Telemetry.Listener {
         boolean armed = SentryFacts.armed(sentry);
         policy.setParked(parked);
         policy.setArmed(armed);
-        // 哨兵模式开 / 关是这条轮询线程的开关：车机醒着才问，睡了就不问
-        if (sentryOn() != pollerOn) {
-            pollerOn = sentryOn();
-            syncPoller();
-        }
+        // 轮询线程的开关照四件事实重算（开着警报、填了令牌与会话号、允许回应命令、哨兵开着）。
+        // 不只在哨兵位翻转时看：进程刚起来时哨兵还没读到，读到了就得把线程带起来。
+        pollerOn = sentryOn();
+        syncPoller();
 
         Boolean hazard = hazardOn(readings);
         boolean hazardRising = SentryFacts.rising(hazard, lastHazard);

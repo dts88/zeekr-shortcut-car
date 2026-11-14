@@ -134,6 +134,7 @@ public class AppConfig {
     private static final String KEY_ALERTS_ENABLED = "alerts_enabled";
     private static final String KEY_ALERTS_TELEGRAM_TOKEN = "alerts_telegram_token";
     private static final String KEY_ALERTS_TELEGRAM_CHAT = "alerts_telegram_chat";
+    private static final String KEY_ALERTS_OWNER_ID = "alerts_owner_id";  // 谁能发命令（私聊里就是会话号）
     private static final String KEY_ALERTS_LAYOUT = "alerts_layout";       // 一张四宫格 / 每路一张
     private static final String KEY_ALERTS_CAMERAS = "alerts_cameras";     // 分开发时要哪几路（"0,1,2,3"）
     private static final String KEY_ALERTS_STRAIGHTEN = "alerts_straighten";  // 发之前掰直
@@ -2160,6 +2161,31 @@ public class AppConfig {
      */
     public void setAlertsCommandOffset(long offset) {
         prefs.edit().putLong(KEY_ALERTS_COMMAND_OFFSET, Math.max(0L, offset)).commit();
+    }
+
+    /**
+     * 谁能发命令 —— 车主自己的 Telegram 用户号。
+     *
+     * <p>为什么不只看会话号：会话可以是一个群，群里不只有车主。
+     * 配了这个号，群聊里只有车主自己能要照片，别人按一下那排按钮不算数。</p>
+     *
+     * <p>私聊里它和会话号是同一个数；「找会话号」会顺手把它一起记下来。</p>
+     */
+    public String getAlertsOwnerId() {
+        String raw = secrets().getString(KEY_ALERTS_OWNER_ID, "");
+        return raw == null ? "" : raw.trim();
+    }
+
+    public void setAlertsOwnerId(String value) {
+        String clean = value == null ? "" : value.trim();
+        secrets().edit().putString(KEY_ALERTS_OWNER_ID, clean).apply();
+        AppLog.i(TAG, "Telegram 车主号" + (clean.isEmpty() ? "已清空"
+                : "已填写（末四位 " + clean.substring(Math.max(0, clean.length() - 4)) + "）"));
+    }
+
+    /** 会话号与车主号都有；群聊里要靠后者才能分出是谁。 */
+    public boolean hasAlertsOwner() {
+        return !getAlertsOwnerId().isEmpty();
     }
 
     /** 令牌和会话号都填了：可以试着发一条。 */

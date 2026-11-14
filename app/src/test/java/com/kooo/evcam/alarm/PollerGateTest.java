@@ -28,7 +28,13 @@ public class PollerGateTest {
 
     private static PollerGate.Verdict verdict(String type, String chatId, String fromId,
                                               long sentAt, TelegramCommand command) {
-        return PollerGate.verdict(type, chatId, fromId, OWNER, sentAt, NOW, command);
+        // 没记下车主号时：只认私聊里的本人（会话号 == 用户号）
+        return PollerGate.verdict(type, chatId, fromId, OWNER, "", sentAt, NOW, command);
+    }
+
+    private static PollerGate.Verdict verdictWithOwner(String type, String chatId, String fromId,
+                                                       long sentAt, TelegramCommand command) {
+        return PollerGate.verdict(type, chatId, fromId, OWNER, OWNER, sentAt, NOW, command);
     }
 
     @Test
@@ -37,11 +43,20 @@ public class PollerGateTest {
     }
 
     @Test
-    public void aGroupChatIsRefusedEvenWhenItsIdIsTheConfiguredOne() {
-        assertEquals("群里任何人按一下就会把照片发到群里",
-                PollerGate.Verdict.NOT_PRIVATE, verdict("group", OWNER, "42", NOW, pic()));
-        assertEquals(PollerGate.Verdict.NOT_PRIVATE, verdict("supergroup", OWNER, OWNER, NOW, pic()));
-        assertEquals(PollerGate.Verdict.NOT_PRIVATE, verdict("channel", OWNER, OWNER, NOW, pic()));
+    public void aGroupIsAllowedOnceTheOwnerIdIsKnown() {
+        assertEquals("记下了车主号：群里只有他自己算数",
+                PollerGate.Verdict.ACCEPT, verdictWithOwner("group", OWNER, OWNER, NOW, pic()));
+        assertEquals("群里别人不算数",
+                PollerGate.Verdict.NOT_OWNER, verdictWithOwner("group", OWNER, "42", NOW, pic()));
+    }
+
+    @Test
+    public void aGroupIsRefusedUntilTheOwnerIdIsKnown() {
+        // 还不知道车主是谁时，群聊一律不认：否则群里任何人按一下就能拿走车周围的照片。
+        assertEquals(PollerGate.Verdict.NOT_OWNER, verdict("group", OWNER, "42", NOW, pic()));
+        assertEquals(PollerGate.Verdict.NOT_OWNER, verdict("group", OWNER, OWNER, NOW, pic()));
+        assertEquals(PollerGate.Verdict.NOT_OWNER, verdict("supergroup", OWNER, OWNER, NOW, pic()));
+        assertEquals(PollerGate.Verdict.NOT_OWNER, verdict("channel", OWNER, OWNER, NOW, pic()));
     }
 
     @Test

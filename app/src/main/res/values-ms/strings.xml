@@ -32,6 +32,13 @@
     <string name="set_alerts_chat_none">Bot belum menerima mesej. Hantar satu dari telefon dahulu</string>
     <string name="set_alerts_find_title">Cari id sembang</string>
     <string name="set_alerts_find_summary">Tanya Telegram dengan token di atas dan isi sembang yang terakhir menghantar mesej kepada bot</string>
+    <string name="set_alerts_probe_title">Periksa pautan makluman</string>
+    <string name="set_alerts_probe_summary">Tidak menghantar apa-apa. Laporkan keadaan sebenar: pemantauan, Mod Sentri, pengundi arahan, dan sejauh mana ia sudah baca</string>
+    <string name="set_alerts_probe_watch">Memantau isyarat kereta: %1$s</string>
+    <string name="set_alerts_probe_poller">Pengundi arahan: %1$s</string>
+    <string name="set_alerts_probe_sentry">%1$s</string>
+    <string name="set_alerts_probe_gear">Gear: %1$s</string>
+    <string name="set_alerts_probe_offset">Diproses hingga: %1$s</string>
     <string name="set_alerts_test_title">Hantar gambar ujian</string>
     <string name="set_alerts_picture_title">Berapa gambar</string>
     <string name="set_alerts_picture_summary">Satu gambar 2×2 untuk lihat semua, atau satu gambar setiap kamera supaya lebih besar di telefon</string>
@@ -61,7 +68,7 @@
     <string name="alert_cmd_too_soon">Tunggu %1$d saat sebelum minta lagi</string>
     <string name="alert_status_gear">Gear: %1$s</string>
     <string name="set_alerts_commands_title">Jawab arahan di Telegram</string>
-    <string name="set_alerts_commands_summary">Hantar pic kepada bot untuk gambar, status untuk satu baris. Dijawab hanya semasa Mod Sentri hidup, kerana ketika itu kepala unit kekal jaga, dan hanya untuk sembang yang anda tetapkan</string>
+    <string name="set_alerts_commands_summary">Hantar pic kepada bot untuk gambar, status untuk satu baris. Dijawab hanya semasa Mod Sentri hidup, kerana ketika itu kepala unit kekal jaga, dan hanya oleh anda — bot boleh berada dalam kumpulan, tetapi orang lain tidak boleh meminta</string>
     <string name="alert_sentry_on">Mod Sentri: hidup</string>
     <string name="alert_sentry_armed">Mod Sentri: berjaga (berkunci)</string>
     <string name="alert_sentry_off">Mod Sentri: mati</string>
