@@ -131,8 +131,23 @@ public class TimelinePlayerActivity extends AppCompatActivity {
     private View actionGroup;
     private View selectionGroup;
     private TextView selectedCountText;
-    /** 界面重建（切黑白模式这类）之前看的是哪一条；-1 表示没有，开最新的那条。 */
-    private int pendingSessionIndex = -1;
+    /**
+     * 界面重建（切黑白模式这类）、重扫之前看的是哪一条：它的开录时刻；-1 表示没有，开最新的那条。
+     * 记时刻不记第几条：分阶段扫描时更早的录制是后补进来的，第几条会变。
+     */
+    private long pendingSessionStart = -1;
+    /** 第几轮扫描（{@link #loadTimelines}）：扫描线程也看，换了轮次它就停。 */
+    private volatile int scanRound;
+    /** 这一轮还在扫更早的录像（{@link #busyScanning}）。 */
+    private boolean scanning;
+    /** 这一轮已经打开过一条录制了：后面交来的结果只往前补，不再自己换条。 */
+    private boolean scanShown;
+    /** 别的几路的文件，开头离一条录制这么远之内的跟着它先读：盖住最长的分段（10 分钟）再宽一点。 */
+    private static final long SCAN_REACH_MS = 11 * 60_000L;
+    /** 第一条出来之后，更早的录制隔这么久往列表里补一次。 */
+    private static final long SCAN_BATCH_MS = 500L;
+    /** 拿修改时间估的时长超过这么多就不算数（{@link ScanCheck}）。 */
+    private static final long GUESS_LIMIT_MS = 15 * 60_000L;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private List<RecordingTimeline.Session> sessions = new ArrayList<>();
@@ -260,7 +275,7 @@ public class TimelinePlayerActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_timeline_player);
         if (savedInstanceState != null) {
-            pendingSessionIndex = savedInstanceState.getInt(STATE_SESSION_INDEX, -1);
+            pendingSessionStart = savedInstanceState.getLong(STATE_SESSION_START, -1);
         }
 
         seekBar = findViewById(R.id.timeline_seek);
@@ -352,7 +367,11 @@ public class TimelinePlayerActivity extends AppCompatActivity {
         }
         View multiSelect = findViewById(R.id.pb_multi_select);
         if (multiSelect != null) {
-            multiSelect.setOnClickListener(v -> setSelecting(true));
+            multiSelect.setOnClickListener(v -> {
+                if (!busyScanning()) {
+                    setSelecting(true);
+                }
+            });
         }
         View selectAll = findViewById(R.id.pb_select_all);
         if (selectAll != null) {
@@ -474,15 +493,27 @@ public class TimelinePlayerActivity extends AppCompatActivity {
         });
     }
 
-    /** 扫描录像目录，按时间轴分组。可能有 I/O，放后台线程。 */
+    /**
+     * 扫描录像目录，按时间轴分组；分阶段显示（项目所有者 2026-11-14，{@link TimelineScan}）：最新的那一条录制先出来、
+     * 马上开播，更早的在后台接着扫，一批一批补到列表下面。慢的是读每个文件的时长，放后台线程。
+     *
+     * <p>每次叫都是新的一轮（{@link #scanRound}）：上一轮还没扫完的自己停下，它后面交来的结果不要。</p>
+     */
     private void loadTimelines() {
+        final int round = ++scanRound;
+        scanning = true;
+        scanShown = false;
         infoText.setText(R.string.msg_scanning);
         if (listSummaryText != null) {
             listSummaryText.setText(R.string.msg_scanning_short);
         }
         new Thread(() -> {
-            List<RecordingTimeline.Source> sources = new ArrayList<>();
-            Map<String, List<RecordingTimeline.Source>> others = new HashMap<>();
+            // 第一条出来之后它和播放同时在读盘：让着播放
+            android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_BACKGROUND);
+            final long began = SystemClock.elapsedRealtime();
+            final List<TimelineScan.Named> composite = new ArrayList<>();
+            final Map<String, List<TimelineScan.Named>> others = new HashMap<>();
+            final ScanCheck check = new ScanCheck();
             try {
                 File dir = StorageHelper.getVideoDir(getApplicationContext());
                 File[] files = dir != null ? dir.listFiles() : null;
@@ -496,90 +527,227 @@ public class TimelinePlayerActivity extends AppCompatActivity {
                         if (slot == null || start < 0) {
                             continue;
                         }
-                        long duration = ClipDurations.of(f);
-                        if (duration <= 0) {
-                            continue;
-                        }
-                        RecordingTimeline.Source source = new RecordingTimeline.Source(
-                                f.getAbsolutePath(), start, duration, f.length());
+                        TimelineScan.Named named = new TimelineScan.Named(f.getAbsolutePath(), start, f.length());
+                        check.listed(named.path, start, f.lastModified());
                         // 时间轴只按环视那一路排。三路录制时同一分段会写出三个文件，
                         // 时间戳前缀一模一样 —— 全收进时间轴就会被当成前后相接的三段。
                         // 其余几路另外收着，播放时按真实时刻跟着环视走
                         if (RecordingTimeline.isSlot(f.getName(), COMPOSITE_SLOT)) {
-                            sources.add(source);
+                            composite.add(named);
                         } else {
                             String key = CameraSlots.canonical(slot.toLowerCase(Locale.US));
-                            List<RecordingTimeline.Source> list = others.get(key);
+                            List<TimelineScan.Named> list = others.get(key);
                             if (list == null) {
                                 list = new ArrayList<>();
                                 others.put(key, list);
                             }
-                            list.add(source);
+                            list.add(named);
                         }
                     }
                 }
             } catch (Exception e) {
                 AppLog.e(TAG, "扫描录像失败", e);
             }
-
-            final List<RecordingTimeline.Session> built = RecordingTimeline.build(sources);
-            // 其余几路的文件各归哪一条，在这里一次分好（见 LaneTrack#belongingTo）
-            final Map<String, List<LaneTrack>> owned = new HashMap<>();
-            for (Map.Entry<String, List<RecordingTimeline.Source>> entry : others.entrySet()) {
-                owned.put(entry.getKey(), LaneTrack.of(entry.getValue())
-                        .byRecording(built, segmentMsOf(entry.getKey())));
-            }
             final boolean locksOn = com.kooo.evcam.storage.FootageLocks.enabled(getApplicationContext());
             final java.util.Set<String> locked = com.kooo.evcam.storage.FootageLocks.shown(
                     getApplicationContext(), StorageHelper.getVideoDir(getApplicationContext()));
-            runOnUiThread(() -> {
-                sessions = built;
-                laneSources.clear();
-                laneSources.putAll(others);
-                laneOwned.clear();
-                laneOwned.putAll(owned);
-                lockEnabled = locksOn;
-                lockedVideos.clear();
-                lockedVideos.addAll(locked);
-                sessionBytes = new long[sessions.size()];
-                for (int i = 0; i < sessions.size(); i++) {
-                    sessionBytes[i] = bytesOf(filesOf(i));
-                }
-                sessionAdapter.setLocked(lockedFlags());
-                sessionAdapter.setSessions(sessions, sessionBytes);
-                updateListSummary();
-                refreshLockViews();
-                if (sessions.isEmpty()) {
-                    // 全删光了：画面区也清掉，别留着已经不存在的文件
-                    for (Lane lane : lanes) {
-                        resetLane(lane);
-                        lane.track = LaneTrack.EMPTY;
-                        lane.owned = LaneTrack.EMPTY;
-                    }
-                    expanded = null;
-                    zoomedCell = PlaybackViewport.NO_CELL;
-                    applyViewMode(0L);
-                    positionText.setText("");
-                    infoText.setText(R.string.msg_no_surround_clips);
-                    Toast.makeText(this, R.string.msg_no_surround_clips_long,
-                            Toast.LENGTH_LONG).show();
-                    return;
-                }
-                // 默认打开最近的一条；界面刚重建过就回到原来那一条
-                int target = pendingSessionIndex >= 0 && pendingSessionIndex < sessions.size()
-                        ? pendingSessionIndex : sessions.size() - 1;
-                pendingSessionIndex = -1;
-                switchSession(target);
-                handler.removeCallbacks(ticker);
-                handler.post(ticker);
-            });
+            final long[] firstAt = {-1L};
+            final int[] recordings = {0};
+            try {
+                TimelineScan.run(composite, others, RecordingTimeline.DEFAULT_MAX_GAP_MS, SCAN_REACH_MS, SCAN_BATCH_MS,
+                        p -> check.measured(p, ClipDurations.of(new File(p))), SystemClock::elapsedRealtime,
+                        () -> round != scanRound || isDestroyed(),
+                        batch -> {
+                            final List<RecordingTimeline.Session> built = RecordingTimeline.build(batch.composite);
+                            // 其余几路的文件各归哪一条，每一批照这一批读到的分一次（见 LaneTrack#belongingTo）
+                            final Map<String, List<LaneTrack>> owned = new HashMap<>();
+                            for (Map.Entry<String, List<RecordingTimeline.Source>> entry : batch.others.entrySet()) {
+                                owned.put(entry.getKey(), LaneTrack.of(entry.getValue())
+                                        .byRecording(built, segmentMsOf(entry.getKey())));
+                            }
+                            if (firstAt[0] < 0 && !built.isEmpty()) {
+                                firstAt[0] = SystemClock.elapsedRealtime() - began;
+                            }
+                            recordings[0] = built.size();
+                            runOnUiThread(() -> showScan(round, built, batch.others, owned, locksOn, locked, batch.done));
+                        });
+            } catch (Exception e) {
+                AppLog.e(TAG, "扫描录像失败", e);
+                runOnUiThread(() -> showScan(round, new ArrayList<>(), new HashMap<>(), new HashMap<>(),
+                        locksOn, locked, true));
+            }
+            if (round == scanRound) {
+                com.kooo.evcam.blackbox.BlackBox.note("回放扫描：环视 " + composite.size() + " 个文件、别的几路 "
+                        + count(others) + " 个，" + recordings[0] + " 条录制；最新一条 " + firstAt[0] + " ms 出来，全部 "
+                        + (SystemClock.elapsedRealtime() - began) + " ms；" + check.summary());
+            }
         }).start();
+    }
+
+    private static int count(Map<String, List<TimelineScan.Named>> lists) {
+        int total = 0;
+        for (List<TimelineScan.Named> list : lists.values()) {
+            total += list.size();
+        }
+        return total;
+    }
+
+    /**
+     * 扫描交来一次结果（主线程）。这一轮头一次有东西可看时照旧：摆列表、打开最新的那一条（界面重建过的回到原来那一条）；
+     * 之后的每一次只是在前面补了更早的录制 —— 正在看的那一条不动，它在 {@link #sessions} 里的位置往后挪了几个。
+     */
+    private void showScan(int round, List<RecordingTimeline.Session> built,
+                          Map<String, List<RecordingTimeline.Source>> others, Map<String, List<LaneTrack>> owned,
+                          boolean locksOn, java.util.Set<String> locked, boolean done) {
+        if (round != scanRound || isDestroyed()) {
+            return;
+        }
+        int added = scanShown ? built.size() - sessions.size() : 0;
+        sessions = built;
+        laneSources.clear();
+        laneSources.putAll(others);
+        laneOwned.clear();
+        laneOwned.putAll(owned);
+        lockEnabled = locksOn;
+        lockedVideos.clear();
+        lockedVideos.addAll(locked);
+        sessionBytes = new long[sessions.size()];
+        for (int i = 0; i < sessions.size(); i++) {
+            sessionBytes[i] = bytesOf(filesOf(i));
+        }
+        scanning = !done;
+        sessionAdapter.setLocked(lockedFlags());
+        sessionAdapter.setSessions(sessions, sessionBytes);
+        updateListSummary();
+        if (scanShown) {
+            // 正在看的那一条照旧放着：只把它的位置、它名下别的几路的文件对上新的一份
+            sessionIndex = Math.max(0, Math.min(sessionIndex + added, sessions.size() - 1));
+            for (Lane lane : lanes) {
+                if (lane != surround) {
+                    lane.owned = ownedBy(lane.slot, sessionIndex);
+                }
+            }
+            sessionAdapter.setSelectedIndex(sessionIndex);
+            prevSessionButton.setEnabled(sessionIndex > 0);
+            nextSessionButton.setEnabled(sessionIndex < sessions.size() - 1);
+            refreshLockViews();
+            int back = indexOfStart(pendingSessionStart);
+            if (back >= 0) {
+                pendingSessionStart = -1;
+                if (back != sessionIndex) {
+                    switchSession(back);
+                }
+            } else if (done) {
+                pendingSessionStart = -1;
+            }
+            return;
+        }
+        refreshLockViews();
+        if (sessions.isEmpty()) {
+            if (!done) {
+                return;  // 还在扫：先不说「暂无」
+            }
+            // 全删光了：画面区也清掉，别留着已经不存在的文件
+            for (Lane lane : lanes) {
+                resetLane(lane);
+                lane.track = LaneTrack.EMPTY;
+                lane.owned = LaneTrack.EMPTY;
+            }
+            expanded = null;
+            zoomedCell = PlaybackViewport.NO_CELL;
+            applyViewMode(0L);
+            positionText.setText("");
+            infoText.setText(R.string.msg_no_surround_clips);
+            Toast.makeText(this, R.string.msg_no_surround_clips_long,
+                    Toast.LENGTH_LONG).show();
+            return;
+        }
+        // 默认打开最近的一条；界面刚重建过就回到原来那一条 —— 它还没扫到就等一等（时长多半还记着，很快）
+        int target = sessions.size() - 1;
+        if (pendingSessionStart >= 0) {
+            int back = indexOfStart(pendingSessionStart);
+            if (back >= 0) {
+                target = back;
+            } else if (!done) {
+                return;
+            }
+            pendingSessionStart = -1;
+        }
+        switchSession(target);
+        handler.removeCallbacks(ticker);
+        handler.post(ticker);
+    }
+
+    /** 开录时刻是这一刻的那一条录制是第几条；没有（或者传的是负数）返回 -1。 */
+    private int indexOfStart(long startEpochMs) {
+        if (startEpochMs >= 0) {
+            for (int i = 0; i < sessions.size(); i++) {
+                if (sessions.get(i).startEpochMs == startEpochMs) {
+                    return i;
+                }
+            }
+        }
+        return -1;
+    }
+
+    /** 还在扫更早的录像：列表还会变，照文件归属动手的事（删除、多选、一条录制的菜单）先不做，说一声。扫完了返回 false。 */
+    private boolean busyScanning() {
+        if (scanning) {
+            Toast.makeText(this, R.string.msg_scanning, Toast.LENGTH_SHORT).show();
+        }
+        return scanning;
+    }
+
+    /**
+     * 顺手量一件事，只记不用（项目所有者 2026-11-14 问：能不能只看文件名分组、不读时长）：文件名里只有开录时刻，
+     * 结束时刻可以拿文件的修改时间估。这里把「修改时间 − 开录时刻」和真读出来的时长比一比，结果写进黑匣子；
+     * 实车上对得上的话，以后分组可以不打开文件。
+     */
+    private static final class ScanCheck {
+        private final Map<String, long[]> listed = new HashMap<>();
+        private final List<Long> off = new ArrayList<>();
+        private int unusable;
+
+        void listed(String path, long startEpochMs, long modifiedMs) {
+            listed.put(path, new long[] {startEpochMs, modifiedMs});
+        }
+
+        synchronized long measured(String path, long durationMs) {
+            long[] times = listed.get(path);
+            if (durationMs > 0 && times != null) {
+                long guessed = times[1] - times[0];
+                if (times[1] <= 0 || guessed <= 0 || guessed > GUESS_LIMIT_MS) {
+                    unusable++;
+                } else {
+                    off.add(Math.abs(guessed - durationMs));
+                }
+            }
+            return durationMs;
+        }
+
+        synchronized String summary() {
+            if (off.isEmpty()) {
+                return "拿修改时间估时长：没有可比的（估不出 " + unusable + " 个）";
+            }
+            List<Long> sorted = new ArrayList<>(off);
+            java.util.Collections.sort(sorted);
+            int far = 0;
+            for (long d : sorted) {
+                if (d > 3_000L) {
+                    far++;
+                }
+            }
+            return "拿修改时间估时长，和读出来的差：中位 " + sorted.get(sorted.size() / 2) + " ms、最大 "
+                    + sorted.get(sorted.size() - 1) + " ms，差 3 秒以上 " + far + " 个 / " + sorted.size()
+                    + " 个，估不出 " + unusable + " 个";
+        }
     }
 
     private void switchSession(int index) {
         if (sessions.isEmpty()) {
             return;
         }
+        scanShown = true;
         sessionIndex = Math.max(0, Math.min(index, sessions.size() - 1));
         RecordingTimeline.Session session = sessions.get(sessionIndex);
         consecutiveErrors = 0;
@@ -644,7 +812,7 @@ public class TimelinePlayerActivity extends AppCompatActivity {
             return;
         }
         if (sessions.isEmpty()) {
-            listSummaryText.setText(R.string.msg_no_clips);
+            listSummaryText.setText(scanning ? R.string.msg_scanning_short : R.string.msg_no_clips);
             return;
         }
         long totalMs = 0L;
@@ -653,10 +821,12 @@ public class TimelinePlayerActivity extends AppCompatActivity {
             totalMs += sessions.get(i).totalDurationMs;
             totalBytes += sessionBytes[i];
         }
-        listSummaryText.setText(getResources().getQuantityString(R.plurals.info_clip_count,
+        String summary = getResources().getQuantityString(R.plurals.info_clip_count,
                 sessions.size(), sessions.size(),
                 TimelineFormat.duration(totalMs) + "　·　"
-                        + TimelineFormat.size(totalBytes)));
+                        + TimelineFormat.size(totalBytes));
+        // 还在扫更早的：数字是到这一刻为止的，后面写着还在扫
+        listSummaryText.setText(scanning ? summary + "　·　" + getString(R.string.msg_scanning_short) : summary);
     }
 
     // ================================================================ 看哪几路
@@ -1283,7 +1453,7 @@ public class TimelinePlayerActivity extends AppCompatActivity {
      * （比如回来时「锁定影像」拨过），再按下标去取就成了另一条录制的文件。</p>
      */
     private void showSessionActions(int index) {
-        if (index < 0 || index >= sessions.size()) {
+        if (index < 0 || index >= sessions.size() || busyScanning()) {
             return;
         }
         RecordingTimeline.Session session = sessions.get(index);
@@ -1405,6 +1575,9 @@ public class TimelinePlayerActivity extends AppCompatActivity {
     }
 
     private void confirmDeleteChosen() {
+        if (busyScanning()) {
+            return;
+        }
         List<Integer> indexes = sessionAdapter.chosenIndexes();
         if (indexes.isEmpty()) {
             Toast.makeText(this, R.string.msg_selected_none, Toast.LENGTH_SHORT).show();
@@ -1430,6 +1603,9 @@ public class TimelinePlayerActivity extends AppCompatActivity {
     }
 
     private void confirmDeleteSession(int index, List<LaneTrack.Clip> files) {
+        if (busyScanning()) {
+            return;
+        }
         com.kooo.evcam.ui.CamDialogs.showDestructive(new MaterialAlertDialogBuilder(this, R.style.Theme_Cam_MaterialAlertDialog)
                 .setTitle(R.string.player_delete_title)
                 .setMessage(getResources().getQuantityString(R.plurals.player_delete_msg,
@@ -1673,12 +1849,13 @@ public class TimelinePlayerActivity extends AppCompatActivity {
         return flags;
     }
 
-    private static final String STATE_SESSION_INDEX = "sessionIndex";
+    private static final String STATE_SESSION_START = "sessionStart";
 
     @Override
     protected void onSaveInstanceState(@NonNull Bundle outState) {
         super.onSaveInstanceState(outState);
-        outState.putInt(STATE_SESSION_INDEX, sessionIndex);
+        outState.putLong(STATE_SESSION_START, sessions.isEmpty() ? pendingSessionStart
+                : sessions.get(Math.max(0, Math.min(sessionIndex, sessions.size() - 1))).startEpochMs);
     }
 
     /**
@@ -1763,13 +1940,14 @@ public class TimelinePlayerActivity extends AppCompatActivity {
         }
         if (!sessions.isEmpty() && com.kooo.evcam.storage.FootageLocks.enabled(this) != lockEnabled) {
             // 设置里刚拨过「锁定影像」：重新扫一遍，清单、按钮、细条都跟着
-            pendingSessionIndex = sessionIndex;
+            pendingSessionStart = sessions.get(sessionIndex).startEpochMs;
             loadTimelines();
         }
     }
 
     @Override
     protected void onDestroy() {
+        scanRound++;  // 还在扫的那一轮停下
         handler.removeCallbacksAndMessages(null);
         if (lanes != null) {
             for (Lane lane : lanes) {
