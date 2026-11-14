@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [4.4.2-beta] - 2026-11-14
+
+Apart from X knob support, everything is essentially ready. This is a milestone release, and the last beta before X knob support.
+
+Support for the facelift 7X will be attempted later, if time allows. Support for the EVA robot will not be released publicly for now.
+
 ## [4.4.1-alpha] - 2026-11-14
 
 - Video playback: clips are grouped into recordings by file name and file time instead of opening each one, so the list appears much sooner. Opening each clip to read its length remains as a developer option.
