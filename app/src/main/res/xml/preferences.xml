@@ -98,30 +98,30 @@
         android:key="screen_alerts"
         android:title="@string/set_section_alerts">
 
-        <PreferenceCategory android:title="@string/set_group_alerts_telegram">
+        <SwitchPreferenceCompat
+            android:key="pref_alerts"
+            android:title="@string/set_alerts_on_title"
+            android:summary="@string/set_alerts_on_summary" />
 
-            <SwitchPreferenceCompat
-                android:key="pref_alerts"
-                android:title="@string/set_alerts_on_title"
-                android:summary="@string/set_alerts_on_summary" />
-
-            <Preference
-                android:key="pref_alerts_token"
-                android:title="@string/set_alerts_token_title" />
+        <PreferenceCategory
+            android:key="cat_alerts_when"
+            android:title="@string/set_group_alerts_when">
 
             <Preference
-                android:key="pref_alerts_chat"
-                android:title="@string/set_alerts_chat_title" />
+                android:key="pref_alerts_triggers"
+                android:title="@string/set_alerts_triggers_title" />
 
-            <SwitchPreferenceCompat
-                android:key="pref_alerts_commands"
-                android:title="@string/set_alerts_commands_title"
-                android:summary="@string/set_alerts_commands_summary" />
+            <SeekBarPreference
+                android:key="pref_alerts_motion_sensitivity"
+                android:title="@string/set_alerts_motion_sensitivity_title"
+                android:summary="@string/set_alerts_motion_sensitivity_summary"
+                app:min="1"
+                android:max="10" />
+        </PreferenceCategory>
 
-            <Preference
-                android:key="pref_alerts_find_chat"
-                android:title="@string/set_alerts_find_title"
-                android:summary="@string/set_alerts_find_summary" />
+        <PreferenceCategory
+            android:key="cat_alerts_picture"
+            android:title="@string/set_group_alerts_picture">
 
             <ListPreference
                 android:key="pref_alerts_picture"
@@ -136,15 +136,16 @@
                 android:key="pref_alerts_straighten"
                 android:title="@string/set_alerts_straighten_title"
                 android:summary="@string/set_alerts_straighten_summary" />
+        </PreferenceCategory>
 
-            <Preference
-                android:key="pref_alerts_triggers"
-                android:title="@string/set_alerts_triggers_title" />
+        <PreferenceCategory
+            android:key="cat_alerts_clip"
+            android:title="@string/set_group_alerts_clip">
 
             <ListPreference
                 android:key="pref_alerts_clip"
                 android:title="@string/set_alerts_clip_title"
-                android:summary="@string/set_alerts_clip_summary" />
+                android:summary="%s" />
 
             <SwitchPreferenceCompat
                 android:key="pref_alerts_clip_audio"
@@ -155,18 +156,39 @@
                 android:key="pref_alerts_clip_data"
                 android:selectable="false"
                 android:summary="@string/set_alerts_clip_data_note" />
+        </PreferenceCategory>
 
-            <SeekBarPreference
-                android:key="pref_alerts_motion_sensitivity"
-                android:title="@string/set_alerts_motion_sensitivity_title"
-                android:summary="@string/set_alerts_motion_sensitivity_summary"
-                app:min="1"
-                android:max="10" />
+        <PreferenceCategory
+            android:key="cat_alerts_telegram"
+            android:title="@string/set_group_alerts_telegram">
 
             <Preference
-                android:key="pref_alerts_diagnostics"
-                android:title="@string/set_diagnostics_title"
-                android:summary="@string/set_diagnostics_summary" />
+                android:key="pref_alerts_token"
+                android:title="@string/set_alerts_token_title" />
+
+            <Preference
+                android:key="pref_alerts_chat"
+                android:title="@string/set_alerts_chat_title" />
+
+            <Preference
+                android:key="pref_alerts_find_chat"
+                android:title="@string/set_alerts_find_title"
+                android:summary="@string/set_alerts_find_summary" />
+
+            <SwitchPreferenceCompat
+                android:key="pref_alerts_commands"
+                android:title="@string/set_alerts_commands_title"
+                android:summary="@string/set_alerts_commands_summary" />
+
+            <Preference
+                android:key="pref_alerts_test"
+                android:title="@string/set_alerts_test_title"
+                android:summary="@string/set_alerts_test_summary" />
+        </PreferenceCategory>
+
+        <PreferenceCategory
+            android:key="cat_alerts_checks"
+            android:title="@string/set_group_alerts_checks">
 
             <Preference
                 android:key="pref_alerts_probe"
@@ -174,9 +196,9 @@
                 android:summary="@string/set_alerts_probe_summary" />
 
             <Preference
-                android:key="pref_alerts_test"
-                android:title="@string/set_alerts_test_title"
-                android:summary="@string/set_alerts_test_summary" />
+                android:key="pref_alerts_diagnostics"
+                android:title="@string/set_diagnostics_title"
+                android:summary="@string/set_diagnostics_summary" />
         </PreferenceCategory>
     </PreferenceScreen>
 

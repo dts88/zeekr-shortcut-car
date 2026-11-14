@@ -235,6 +235,11 @@ public final class SentryAlerts implements Telemetry.Listener {
             lastLamps = null;
             lastScreenOn = null;
             seedEdges(Readings.empty());
+            // 关掉时把取样也停了：下面那段取样逻辑在“不在监听”时直接 return，
+            // 不会再把 wanted 置假 —— 编码器就会一直往离屏缓存里画。
+            sampling = false;
+            motion.setWanted(false);
+            motion.forget();
             BlackBox.note("alerts: no longer watching car signals");
         }
         syncPoller();
@@ -1081,14 +1086,18 @@ public final class SentryAlerts implements Telemetry.Listener {
         if (seconds <= 0) {
             return;
         }
-        java.io.File file = new java.io.File(app.getCacheDir(), "alert_clip.mp4");
+        // 名字带时间戳：两条警报挨得近时不会互相覆盖
+        java.io.File file = new java.io.File(app.getCacheDir(),
+                "alert_clip_" + System.currentTimeMillis() + ".mp4");
         CameraKeeper.get(app).writeClip(file, seconds, config.isAlertsClipAudio(), ok -> {
             if (!ok || !file.isFile() || file.length() == 0) {
                 BlackBox.note("alerts: no clip (ring holds too little video)");
                 return;
             }
+            String clipCaption = caption + "'+bs+'n"
+                    + app.getString(seconds == 5 ? R.string.opt_alerts_clip_5 : R.string.opt_alerts_clip_10);
             sender.execute(() -> {
-                TelegramSender.Result result = TelegramSender.sendVideo(token, chatId, file, caption, markup);
+                TelegramSender.Result result = TelegramSender.sendVideo(token, chatId, file, clipCaption, markup);
                 if (!result.ok) {
                     BlackBox.note("alerts: clip send failed (" + result.display() + ")");
                 }

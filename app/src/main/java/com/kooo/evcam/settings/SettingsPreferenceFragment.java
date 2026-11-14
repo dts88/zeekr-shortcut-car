@@ -941,6 +941,26 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             });
         }
 
+        // 这一栏的显示规则全写在这里（ui-spec §三：可见性只在一处）。
+        // 总开关关着时，下面那些设置没有意义；下层的选项只在它自己的上一层选中时才出现。
+        boolean alertsOn = appConfig.isAlertsEnabled();
+        com.kooo.evcam.alarm.TriggerSet shownTriggers =
+                com.kooo.evcam.alarm.TriggerSet.parse(appConfig.getAlertsTriggers());
+        boolean perCamera = com.kooo.evcam.alarm.AlertPicture.layout(appConfig.getAlertsLayout())
+                == com.kooo.evcam.alarm.AlertPicture.Layout.SEPARATE;
+        boolean clipOn = appConfig.getAlertsClipSeconds() > 0;
+        // 总开关关着时整组收起来：只留总开关和「检查」，
+        // 不要留下一排空的分组标题。
+        for (String key : new String[] {"cat_alerts_when", "cat_alerts_picture",
+                "cat_alerts_clip", "cat_alerts_telegram"}) {
+            show(key, alertsOn);
+        }
+        show("pref_alerts_motion_sensitivity", alertsOn && shownTriggers.has(
+                com.kooo.evcam.alarm.TriggerSet.MOTION));
+        show("pref_alerts_cameras", alertsOn && perCamera);
+        show("pref_alerts_clip_audio", alertsOn && clipOn);
+        show("pref_alerts_clip_data", alertsOn && clipOn);
+
         Preference triggersRow = findPreference("pref_alerts_triggers");
         if (triggersRow != null) {
             triggersRow.setPersistent(false);
@@ -1158,7 +1178,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                     }
                     if (count == 0) {
                         // 一路都不勾等于没有图可发：按「全部」算，别让警报静悄悄地变成哑巴
-                        toast(getString(R.string.set_alerts_cameras_all));
+                        toast(getString(R.string.set_alerts_cameras_none));
                         appConfig.setAlertsCameras("0,1,2,3");
                     } else {
                         StringBuilder value = new StringBuilder();

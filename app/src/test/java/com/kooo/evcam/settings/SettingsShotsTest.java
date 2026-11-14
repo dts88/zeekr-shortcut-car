@@ -57,6 +57,11 @@ public class SettingsShotsTest {
         config.setRearViewEnabled(true);
         config.setSideViewEnabled(true);
         config.setDriveSoundEnabled(true);
+        // 停车警报开着时下面四组才出现：这张图就是用来看那一屏的
+        config.setAlertsEnabled(true);
+        config.setAlertsTelegramToken("123456789:AAHexampleTOKENvalue0123456789");
+        config.setAlertsTelegramChatId("123456789");
+        config.setAlertsClipSeconds(5);
         shoot(Shots.DAY, "day-on");
     }
 
