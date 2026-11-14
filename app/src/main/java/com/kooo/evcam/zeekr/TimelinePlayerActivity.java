@@ -495,7 +495,11 @@ public class TimelinePlayerActivity extends AppCompatActivity {
 
     /**
      * 扫描录像目录，按时间轴分组；分阶段显示（项目所有者 2026-11-14，{@link TimelineScan}）：最新的那一条录制先出来、
-     * 马上开播，更早的在后台接着扫，一批一批补到列表下面。慢的是读每个文件的时长，放后台线程。
+     * 马上开播，更早的在后台接着扫，一批一批补到列表下面。
+     *
+     * <p>时长照文件名里的开录时刻和文件的修改时间算，不打开文件（{@link ClipSpans}；项目所有者 2026-11-14）。
+     * 打开文件读时长（{@link ClipDurations}，慢）是后备：{@code ClipSpans} 算不了的那几个（每一路最新的那个可能还在录、
+     * 文件时间用不上的）才读；开发者选项「录像回放：逐个读取片段时长」开着时全部读，和 4.4.0 一样。</p>
      *
      * <p>每次叫都是新的一轮（{@link #scanRound}）：上一轮还没扫完的自己停下，它后面交来的结果不要。</p>
      */
@@ -507,6 +511,7 @@ public class TimelinePlayerActivity extends AppCompatActivity {
         if (listSummaryText != null) {
             listSummaryText.setText(R.string.msg_scanning_short);
         }
+        final boolean readEvery = new AppConfig(this).isPlaybackReadDurations();
         new Thread(() -> {
             // 第一条出来之后它和播放同时在读盘：让着播放
             android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_BACKGROUND);
@@ -514,6 +519,8 @@ public class TimelinePlayerActivity extends AppCompatActivity {
             final List<TimelineScan.Named> composite = new ArrayList<>();
             final Map<String, List<TimelineScan.Named>> others = new HashMap<>();
             final ScanCheck check = new ScanCheck();
+            // 每一路的文件各自排着看（环视也算一路）：哪些不用打开就知道时长
+            final Map<String, List<ClipSpans.Timed>> timed = new HashMap<>();
             try {
                 File dir = StorageHelper.getVideoDir(getApplicationContext());
                 File[] files = dir != null ? dir.listFiles() : null;
@@ -528,7 +535,15 @@ public class TimelinePlayerActivity extends AppCompatActivity {
                             continue;
                         }
                         TimelineScan.Named named = new TimelineScan.Named(f.getAbsolutePath(), start, f.length());
-                        check.listed(named.path, start, f.lastModified());
+                        long modified = f.lastModified();
+                        check.listed(named.path, start, modified);
+                        String laneKey = slot.toLowerCase(Locale.US);
+                        List<ClipSpans.Timed> laneFiles = timed.get(laneKey);
+                        if (laneFiles == null) {
+                            laneFiles = new ArrayList<>();
+                            timed.put(laneKey, laneFiles);
+                        }
+                        laneFiles.add(new ClipSpans.Timed(named.path, start, modified));
                         // 时间轴只按环视那一路排。三路录制时同一分段会写出三个文件，
                         // 时间戳前缀一模一样 —— 全收进时间轴就会被当成前后相接的三段。
                         // 其余几路另外收着，播放时按真实时刻跟着环视走
@@ -548,6 +563,13 @@ public class TimelinePlayerActivity extends AppCompatActivity {
             } catch (Exception e) {
                 AppLog.e(TAG, "扫描录像失败", e);
             }
+            final Map<String, Long> known = new HashMap<>();
+            if (!readEvery) {
+                for (List<ClipSpans.Timed> laneFiles : timed.values()) {
+                    known.putAll(ClipSpans.known(laneFiles));
+                }
+            }
+            final long listedMs = SystemClock.elapsedRealtime() - began;
             final boolean locksOn = com.kooo.evcam.storage.FootageLocks.enabled(getApplicationContext());
             final java.util.Set<String> locked = com.kooo.evcam.storage.FootageLocks.shown(
                     getApplicationContext(), StorageHelper.getVideoDir(getApplicationContext()));
@@ -555,7 +577,10 @@ public class TimelinePlayerActivity extends AppCompatActivity {
             final int[] recordings = {0};
             try {
                 TimelineScan.run(composite, others, RecordingTimeline.DEFAULT_MAX_GAP_MS, SCAN_REACH_MS, SCAN_BATCH_MS,
-                        p -> check.measured(p, ClipDurations.of(new File(p))), SystemClock::elapsedRealtime,
+                        p -> {
+                            Long span = known.get(p);
+                            return span != null ? check.worked(span) : check.measured(p, ClipDurations.of(new File(p)));
+                        }, SystemClock::elapsedRealtime,
                         () -> round != scanRound || isDestroyed(),
                         batch -> {
                             final List<RecordingTimeline.Session> built = RecordingTimeline.build(batch.composite);
@@ -578,9 +603,13 @@ public class TimelinePlayerActivity extends AppCompatActivity {
             }
             if (round == scanRound) {
                 long[] off = check.numbers();
-                com.kooo.evcam.blackbox.BlackBox.note("回放扫描：环视 " + composite.size() + " 个文件、别的几路 "
-                        + count(others) + " 个，" + recordings[0] + " 条录制；最新一条 " + firstAt[0] + " ms 出来，全部 "
-                        + (SystemClock.elapsedRealtime() - began) + " ms；拿修改时间估时长，和读出来的差：中位 "
+                com.kooo.evcam.blackbox.BlackBox.note("回放扫描（"
+                        + (readEvery ? "开发者选项：逐个读取片段时长" : "照文件名和文件时间") + "）：环视 "
+                        + composite.size() + " 个文件、别的几路 "
+                        + count(others) + " 个，" + recordings[0] + " 条录制；列目录 " + listedMs + " ms，最新一条 "
+                        + firstAt[0] + " ms 出来，全部 "
+                        + (SystemClock.elapsedRealtime() - began) + " ms；时长照文件名和修改时间算出来的 " + off[5]
+                        + " 个、打开读的 " + off[6] + " 个；读的那些里拿修改时间估的和读出来的差：中位 "
                         + off[0] + " ms、最大 " + off[1] + " ms，差 3 秒以上 " + off[2] + " 个 / 比了 " + off[3]
                         + " 个，估不出 " + off[4] + " 个");
             }
@@ -702,20 +731,29 @@ public class TimelinePlayerActivity extends AppCompatActivity {
     }
 
     /**
-     * 顺手量一件事，只记不用（项目所有者 2026-11-14 问：能不能只看文件名分组、不读时长）：文件名里只有开录时刻，
-     * 结束时刻可以拿文件的修改时间估。这里把「修改时间 − 开录时刻」和真读出来的时长比一比，结果写进黑匣子；
-     * 实车上对得上的话，以后分组可以不打开文件。
+     * 扫描的账，只记不用（进黑匣子的那一行）：多少个文件的时长是照文件名和修改时间算出来的（{@link ClipSpans}）、
+     * 多少个是打开读的；打开读的那些里，「修改时间 − 开录时刻」和读出来的时长差多少 —— 4.4.0 在实车上量过全部文件
+     * （中位 0.37 秒，777 个里 1 个差得多），才改成不打开；这一项留着，开发者选项里改回逐个读时能再量一遍。
      */
     private static final class ScanCheck {
         private final Map<String, long[]> listed = new HashMap<>();
         private final List<Long> off = new ArrayList<>();
         private int unusable;
+        private int worked;
+        private int read;
+
+        /** 这一个的时长是算出来的，没打开。 */
+        synchronized long worked(long durationMs) {
+            worked++;
+            return durationMs;
+        }
 
         void listed(String path, long startEpochMs, long modifiedMs) {
             listed.put(path, new long[] {startEpochMs, modifiedMs});
         }
 
         synchronized long measured(String path, long durationMs) {
+            read++;
             long[] times = listed.get(path);
             if (durationMs > 0 && times != null) {
                 long guessed = times[1] - times[0];
@@ -728,10 +766,13 @@ public class TimelinePlayerActivity extends AppCompatActivity {
             return durationMs;
         }
 
-        /** 差的中位数、最大值（毫秒；没有可比的是 -1），差 3 秒以上的个数，比了多少个，估不出的个数。 */
+        /**
+         * 差的中位数、最大值（毫秒；没有可比的是 -1），差 3 秒以上的个数，比了多少个，估不出的个数；
+         * 算出来的个数、打开读的个数。
+         */
         synchronized long[] numbers() {
             if (off.isEmpty()) {
-                return new long[] {-1, -1, 0, 0, unusable};
+                return new long[] {-1, -1, 0, 0, unusable, worked, read};
             }
             List<Long> sorted = new ArrayList<>(off);
             java.util.Collections.sort(sorted);
@@ -742,7 +783,7 @@ public class TimelinePlayerActivity extends AppCompatActivity {
                 }
             }
             return new long[] {sorted.get(sorted.size() / 2), sorted.get(sorted.size() - 1), far, sorted.size(),
-                    unusable};
+                    unusable, worked, read};
         }
     }
 

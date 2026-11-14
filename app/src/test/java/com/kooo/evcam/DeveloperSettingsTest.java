@@ -70,6 +70,8 @@ public class DeveloperSettingsTest {
         ROWS.put("pref_camera_holder_suspects", Arrays.asList("camera_holder_suspects"));
         // 盲区画面标定：三根拖动条 2026-10-23 合成一行（一个框里拖）
         ROWS.put("pref_side_view_calibration", Arrays.asList("side_view_back", "side_view_up", "side_view_fov"));
+        // 录像回放分条的后备做法（项目所有者 2026-11-14）：默认照文件名和文件时间，开着时逐个打开读时长
+        ROWS.put("pref_playback_read_durations", Arrays.asList("playback_read_durations"));
         ROWS.put("pref_repair_mp4", NONE);
         ROWS.put("pref_archive", NONE);
         ROWS.put("pref_developer_note", NONE);

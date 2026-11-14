@@ -1080,6 +1080,8 @@
     <string name="dev_side_view_fov_summary">转动角度较大时自动收窄，画面不出现黑块</string>
     <string name="dev_side_view_calibration_title">盲区画面标定</string>
     <string name="dev_side_view_calibration_value">朝后 %1$d° · 朝外 %2$d° · 视野 %3$d°</string>
+    <string name="dev_playback_read_durations_title">录像回放：逐个读取片段时长</string>
+    <string name="dev_playback_read_durations_summary">逐个打开片段读取时长后再分组，较慢；分组有误时开启。</string>
     <string name="dev_repair_mp4_title">修复缺少索引的录像</string>
     <string name="dev_repair_mp4_summary">录制意外中断（如断电）的片段缺少索引，无法播放。参照同一摄像头的完好片段重建索引，文件名不变。</string>
     <string name="dev_repair_refuse_recording">录制时无法修复：正在录制的片段同样没有索引，无法与意外中断的片段区分。请先停止录制。</string>

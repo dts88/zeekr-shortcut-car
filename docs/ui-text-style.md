@@ -658,6 +658,13 @@
   第三行的小字中文不动；英文、马来文的「熄屏暂停，亮屏后恢复」缩短到两行里写得完：Pauses when screen is off, resumes when on /
   Jeda bila skrin padam, sambung bila hidup（原来是 Pauses with screen off, resumes when the screen turns on /
   Dijeda ketika skrin padam, disambung apabila skrin hidup）。
+- 2026-11-14 批准（开发者选项「文件维护」一组第一行的开关；项目所有者：打开文件读时长作后备，放进开发者选项。
+  看过截图后定：名称、位置照旧，说明缩成一句）：dev_playback_read_durations_title「录像回放：逐个读取片段时长」/
+  Video playback: read each clip's length / Main semula video: baca tempoh setiap klip；
+  dev_playback_read_durations_summary「逐个打开片段读取时长后再分组，较慢；分组有误时开启。」/ Opens every clip to read
+  its length before grouping, which is slower. Turn on if the grouping is wrong. / Setiap klip dibuka untuk membaca
+  tempohnya sebelum dikumpulkan, lebih lambat. Hidupkan jika pengumpulan salah.
+  「分组」是项目所有者说这件事时的原话，只在这一句里当动词用；界面上一次从开始到停止的录制仍叫「录像」。
 - vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
 - 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
 

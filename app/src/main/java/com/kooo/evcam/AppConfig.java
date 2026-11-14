@@ -78,6 +78,7 @@ public class AppConfig {
     private static final String KEY_DRIVE_SOUND_STANDARD = "drive_sound_standard"; // 模拟声浪：标准模式下播放（默认关）
     private static final String KEY_GPU_FISHEYE_PREVIEW = "gpu_fisheye_preview";  // 预览鱼眼校正走 GPU 逐像素（开发者选项）
     private static final String KEY_GPU_FISHEYE_VIDEO = "gpu_fisheye_video";      // 视频回看鱼眼校正走 GPU 逐像素（开发者选项）
+    private static final String KEY_PLAYBACK_READ_DURATIONS = "playback_read_durations";  // 录像回放逐个读取片段时长（开发者选项）
     private static final String KEY_CAMERA_HOLDER_SUSPECTS = "camera_holder_suspects";  // 记录可能占用摄像头的应用（开发者选项）
     private static final String KEY_PHOTO_FISHEYE_FOV = "photo_fisheye_fov";      // 图片回看的校正视野
     private static final String KEY_REARVIEW_FOV = "rearview_fov";                // 目标视野（度）
@@ -719,6 +720,7 @@ public class AppConfig {
                 KEY_RAW_FRAME_DUMP,                   // 拍照另存原始整帧 → 关
                 KEY_GPU_FISHEYE_PREVIEW,              // 预览鱼眼校正走 GPU → 关
                 KEY_GPU_FISHEYE_VIDEO,                // 视频回看鱼眼校正走 GPU → 关
+                KEY_PLAYBACK_READ_DURATIONS,          // 录像回放逐个读取片段时长 → 关（照文件名和文件时间算）
                 KEY_CAMERA_HOLDER_SUSPECTS,           // 记录可能占用摄像头的应用 → 关
                 KEY_PHOTO_VIA_JPEG,                   // 拍照使用 JPEG 输出 → 开（关着时主界面在后台拍不到画面）
                 KEY_STORAGE_LOCATION,                 // 存储位置 → U 盘（内置存储只有开发者选得了）
@@ -1268,6 +1270,19 @@ public class AppConfig {
 
     public void setGpuFisheyeVideo(boolean on) {
         prefs.edit().putBoolean(KEY_GPU_FISHEYE_VIDEO, on).apply();
+    }
+
+    /**
+     * 录像回放把片段分成一条条录制时，逐个打开文件读时长（4.4.0 的做法，慢）。默认关：照文件名里的开录时刻和
+     * 文件的修改时间算，不打开文件（{@code zeekr/ClipSpans}）。项目所有者 2026-11-14：读时长作后备，放进开发者选项
+     * —— 哪块盘上的文件时间不对、分出来的条不对时用。归开发者选项管；下次打开录像回放时生效。
+     */
+    public boolean isPlaybackReadDurations() {
+        return readBoolean(KEY_PLAYBACK_READ_DURATIONS, false);
+    }
+
+    public void setPlaybackReadDurations(boolean on) {
+        prefs.edit().putBoolean(KEY_PLAYBACK_READ_DURATIONS, on).apply();
     }
 
     /**

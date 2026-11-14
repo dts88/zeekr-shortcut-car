@@ -154,6 +154,45 @@ public class SettingsShotsTest {
         assertTrue(shown(section, "pref_drive_sound_rpm"));
     }
 
+    /**
+     * 开发者选项「文件维护」一组里的「录像回放：逐个读取片段时长」（项目所有者 2026-11-14：打开文件读时长作后备，
+     * 放进开发者选项）：默认关。开发者选项在这里直接拨开（不走密码），看完拨回去。
+     */
+    @Test
+    public void developerFileRows() throws Exception {
+        java.lang.reflect.Field unlocked = DeveloperMode.class.getDeclaredField("unlocked");
+        unlocked.setAccessible(true);
+        unlocked.setBoolean(null, true);
+        try {
+            assertFalse("默认关", new AppConfig(RuntimeEnvironment.getApplication()).isPlaybackReadDurations());
+            RuntimeEnvironment.setQualifiers(Shots.DAY);
+            ShotActivity activity = Robolectric.buildActivity(ShotActivity.class).setup().get();
+            Shots.stillFrames(activity);
+            SettingsShellFragment shell = new SettingsShellFragment();
+            activity.getSupportFragmentManager().beginTransaction().replace(activity.container, shell).commitNow();
+            Shots.settle();
+            shell.showSection(SettingsShellFragment.DEVELOPER_SECTION);
+            Shots.settle();
+            SettingsPreferenceFragment section = (SettingsPreferenceFragment)
+                    shell.getChildFragmentManager().findFragmentById(R.id.settings_detail);
+            assertNotNull(section);
+            androidx.preference.SwitchPreferenceCompat row = section.findPreference("pref_playback_read_durations");
+            assertNotNull(row);
+            assertTrue(row.isVisible());
+            assertFalse(row.isChecked());
+            section.scrollToPreference("pref_archive");
+            File file = Shots.save(activity, "settings-developer-day-files");
+            assertTrue(file + " 是空的", file.length() > 10_000);
+
+            assertTrue(row.callChangeListener(true));
+            assertTrue("拨开就存下了", new AppConfig(RuntimeEnvironment.getApplication()).isPlaybackReadDurations());
+        } finally {
+            unlocked.setBoolean(null, false);
+        }
+        assertFalse("开发者选项关着时按关算，存着的值不动",
+                new AppConfig(RuntimeEnvironment.getApplication()).isPlaybackReadDurations());
+    }
+
     private static boolean shown(SettingsPreferenceFragment section, String key) {
         Preference row = section.findPreference(key);
         assertNotNull("少了 " + key, row);
