@@ -20,8 +20,8 @@ import java.util.Map;
 import java.util.Random;
 
 /**
- * 不打开文件就知道时长的那些分段（{@link ClipSpans}，项目所有者 2026-11-14）：同一路里，修改时间和下一段的开录时刻
- * 对得上的，时长算到下一段开头；对不上的不给，照旧打开读。时刻都是编的。
+ * 不打开文件就知道时长的那些分段（{@link ClipSpans}，项目所有者 2026-11-14）：照文件名里的开录时刻和文件的修改时间算；
+ * 算不了的不给，调用方打开读。时刻都是编的。
  */
 public class ClipSpansTest {
 
@@ -31,9 +31,9 @@ public class ClipSpansTest {
         return new ClipSpans.Timed(path, start, modified);
     }
 
-    /** 连着录的三段：前两段的修改时间挨着下一段的开头，时长就是两段开头的差；最后一段后面没有了，不给。 */
+    /** 连着录的三段：前两段封好的那一下挨着下一段的开头，时长就是两段开头的差；最新的那一段可能还在录，不给。 */
     @Test
-    public void aClipThatRunsIntoTheNextOneIsKnown() {
+    public void aClipThatRunsIntoTheNextOneLastsUntilItStarts() {
         long t = 1_000_000_000L;
         List<ClipSpans.Timed> lane = new ArrayList<>();
         lane.add(clip("a", t, t + MINUTE + 100));               // 封好比下一段开录晚 0.1 秒
@@ -42,7 +42,23 @@ public class ClipSpansTest {
         Map<String, Long> known = ClipSpans.known(lane);
         assertEquals(Long.valueOf(MINUTE), known.get("a"));
         assertEquals(Long.valueOf(MINUTE), known.get("b"));
-        assertFalse("最后一段要打开读", known.containsKey("c"));
+        assertFalse("最新的那一段要打开看", known.containsKey("c"));
+    }
+
+    /** 自己停的那一段（后面隔了一阵才又开录）：时长是修改时间 − 开录时刻。 */
+    @Test
+    public void aClipThatStoppedOnItsOwnLastsUntilItWasSealed() {
+        long t = 1_500_000_000L;
+        List<ClipSpans.Timed> lane = new ArrayList<>();
+        lane.add(clip("full", t, t + MINUTE + 200));
+        lane.add(clip("stopped", t + MINUTE, t + MINUTE + 20_400));   // 录了 20 秒停了
+        lane.add(clip("later", t + 30 * MINUTE, t + 31 * MINUTE));    // 半小时以后的另一条
+        lane.add(clip("newest", t + 31 * MINUTE, t + 31 * MINUTE + 5_000));
+        Map<String, Long> known = ClipSpans.known(lane);
+        assertEquals(Long.valueOf(MINUTE), known.get("full"));
+        assertEquals(Long.valueOf(20_400L), known.get("stopped"));
+        assertEquals(Long.valueOf(MINUTE), known.get("later"));
+        assertFalse(known.containsKey("newest"));
     }
 
     /** 次序随便给：自己按开录时刻排。 */
@@ -60,42 +76,47 @@ public class ClipSpansTest {
     }
 
     /**
-     * 对不上的不给：中间停过（修改时间比下一段的开头早得多）、文件后来被动过（晚得多）、没有修改时间、
-     * 两段隔得比一个分段还长、两个文件同一刻开录。
+     * 文件时间用不上的不给：没有修改时间、比开录时刻还早、离开录时刻比一个分段还长、下一段都开录了它才封好
+     * （后来被动过）、两个文件同一刻开录。挨着下一段开头的那条线：差正好 2 秒算录到了下一段，晚过 2 秒的不给。
      */
     @Test
-    public void anythingThatDoesNotLineUpIsLeftToBeRead() {
+    public void aFileWhoseTimeCannotBeRightIsLeftToBeRead() {
         long t = 3_000_000_000L;
         List<ClipSpans.Timed> lane = new ArrayList<>();
-        lane.add(clip("stopped", t, t + 20_000));                              // 录了 20 秒就停了，40 秒后才又开录
-        lane.add(clip("touched", t + MINUTE, t + 2 * MINUTE + 25_000));        // 修改时间晚了 25 秒
-        lane.add(clip("no-time", t + 2 * MINUTE, 0));
-        lane.add(clip("long-gap", t + 3 * MINUTE, t + 4 * MINUTE));            // 下一段在半小时以后
-        lane.add(clip("twin-1", t + 33 * MINUTE, t + 34 * MINUTE));
-        lane.add(clip("twin-2", t + 33 * MINUTE, t + 34 * MINUTE));
-        lane.add(clip("edge-in", t + 34 * MINUTE, t + 35 * MINUTE + ClipSpans.TOLERANCE_MS));
-        lane.add(clip("edge-out", t + 35 * MINUTE, t + 36 * MINUTE + ClipSpans.TOLERANCE_MS + 1));
-        lane.add(clip("last", t + 36 * MINUTE, t + 37 * MINUTE));
+        lane.add(clip("no-time", t, 0));
+        lane.add(clip("before-start", t + MINUTE, t + MINUTE - 5_000));
+        lane.add(clip("too-long", t + 2 * MINUTE, t + 2 * MINUTE + ClipSpans.LIMIT_MS + 1));
+        lane.add(clip("touched", t + 60 * MINUTE, t + 61 * MINUTE + 25_000));   // 下一段开录 25 秒后才「封好」
+        lane.add(clip("twin-1", t + 61 * MINUTE, t + 62 * MINUTE));
+        lane.add(clip("twin-2", t + 61 * MINUTE, t + 62 * MINUTE));
+        lane.add(clip("edge-early", t + 62 * MINUTE, t + 63 * MINUTE - ClipSpans.TOLERANCE_MS));
+        lane.add(clip("edge-late", t + 63 * MINUTE, t + 64 * MINUTE + ClipSpans.TOLERANCE_MS));
+        lane.add(clip("edge-out", t + 64 * MINUTE, t + 65 * MINUTE + ClipSpans.TOLERANCE_MS + 1));
+        lane.add(clip("own-end", t + 65 * MINUTE, t + 66 * MINUTE - ClipSpans.TOLERANCE_MS - 1));
+        lane.add(clip("newest", t + 66 * MINUTE, t + 67 * MINUTE));
         Map<String, Long> known = ClipSpans.known(lane);
-        assertFalse(known.containsKey("stopped"));
-        assertFalse(known.containsKey("touched"));
         assertFalse(known.containsKey("no-time"));
-        assertFalse(known.containsKey("long-gap"));
-        assertFalse("同一刻开录的两个：前一个到后一个的差是 0", known.containsKey("twin-1"));
-        assertEquals("差正好在线上：算", Long.valueOf(MINUTE), known.get("edge-in"));
-        assertFalse("过线一毫秒：不算", known.containsKey("edge-out"));
-        assertFalse(known.containsKey("last"));
+        assertFalse(known.containsKey("before-start"));
+        assertFalse(known.containsKey("too-long"));
+        assertFalse(known.containsKey("touched"));
+        assertFalse("同一刻开录的两个：名字说不清谁先谁后", known.containsKey("twin-1"));
+        assertEquals("早 2 秒封好：算录到了下一段", Long.valueOf(MINUTE), known.get("edge-early"));
+        assertEquals("晚 2 秒封好：算录到了下一段", Long.valueOf(MINUTE), known.get("edge-late"));
+        assertFalse("晚过 2 秒：不给", known.containsKey("edge-out"));
+        assertEquals("早过 2 秒：它自己停的", Long.valueOf(MINUTE - ClipSpans.TOLERANCE_MS - 1), known.get("own-end"));
+        assertFalse(known.containsKey("newest"));
         assertTrue(ClipSpans.known(new ArrayList<>()).isEmpty());
-        assertTrue(ClipSpans.known(Collections.singletonList(clip("only", t, t + MINUTE))).isEmpty());
+        assertTrue("只有一个文件：它就是最新的", ClipSpans.known(
+                Collections.singletonList(clip("only", t, t + MINUTE))).isEmpty());
     }
 
     /**
-     * 照这个办法定时长（对得上的算到下一段开头，对不上的用读出来的），分出来的条和全部打开读一遍分出来的一样：
-     * 一样的几条、每条一样多段。照实车的样子编：换段空零点几秒，封文件晚零点几秒，录制之间隔几秒到几小时，
-     * 偶尔有个文件的修改时间不对。
+     * 文件时间对的时候，照这个办法分出来的条和全部打开读一遍分出来的一样：一样的几条、每条一样多段，每段只长出
+     * 换段的空或者封文件的那点工夫；要打开的只有最新的那一个。照实车的样子编：换段空零点几秒，封文件晚零点几秒，
+     * 录制之间隔几秒到几小时。
      */
     @Test
-    public void groupingMatchesReadingEveryFile() {
+    public void groupingMatchesReadingEveryFileWhenTheTimesAreRight() {
         Random random = new Random(20261114);
         for (int round = 0; round < 300; round++) {
             List<ClipSpans.Timed> lane = new ArrayList<>();
@@ -111,9 +132,6 @@ public class ClipSpansTest {
                     long real = lastOne ? 5_000 + random.nextInt((int) segment - 6_000)
                             : segment - (100 + random.nextInt(400));
                     long modified = at + real + 100 + random.nextInt(700);
-                    if (random.nextInt(200) == 0) {
-                        modified += 25_000;  // 偶尔一个不对的
-                    }
                     String path = "clip" + lane.size();
                     lane.add(clip(path, at, modified));
                     exact.add(new RecordingTimeline.Source(path, at, real));
@@ -140,11 +158,35 @@ public class ClipSpansTest {
                 assertEquals(byReading.get(i).startEpochMs, byNames.get(i).startEpochMs);
                 assertEquals(byReading.get(i).segmentCount(), byNames.get(i).segmentCount());
                 long longer = byNames.get(i).totalDurationMs - byReading.get(i).totalDurationMs;
-                assertTrue("每条只比读出来的长出换段的那点空：" + longer,
-                        longer >= 0 && longer <= 500L * byReading.get(i).segmentCount());
+                assertTrue("每段只比读出来的长零点几秒：" + longer,
+                        longer >= 0 && longer <= 800L * byReading.get(i).segmentCount());
             }
-            assertTrue("要打开读的只有每条的最后一段和个别对不上的：" + read + " / " + exact.size(),
-                    read <= recordings + exact.size() / 50 + 2);
+            assertEquals("要打开的只有最新的那一个", 1, read);
         }
+    }
+
+    /**
+     * 文件时间不对时会算错，记在这里（所以开发者选项里留着「逐个读取片段时长」）：一条录制的最后一段录了 20 秒，
+     * 修改时间却晚了 27 秒，离 30 秒后开录的下一条只有 3 秒 —— 照文件时间算，两条并成了一条；打开读是两条。
+     */
+    @Test
+    public void aWrongFileTimeCanJoinTwoRecordings() {
+        long t = 5_000_000_000L;
+        List<ClipSpans.Timed> lane = new ArrayList<>();
+        lane.add(clip("first", t, t + 20_000 + 27_000));
+        lane.add(clip("second", t + 50_000, t + 50_000 + MINUTE));
+        lane.add(clip("newest", t + 50_000 + MINUTE, t + 50_000 + 2 * MINUTE));
+        Map<String, Long> known = ClipSpans.known(lane);
+        assertEquals(Long.valueOf(47_000L), known.get("first"));
+
+        List<RecordingTimeline.Source> byTime = new ArrayList<>();
+        byTime.add(new RecordingTimeline.Source("first", t, known.get("first")));
+        byTime.add(new RecordingTimeline.Source("second", t + 50_000, known.get("second")));
+        assertEquals(1, RecordingTimeline.build(byTime).size());
+
+        List<RecordingTimeline.Source> byReading = new ArrayList<>();
+        byReading.add(new RecordingTimeline.Source("first", t, 20_000));
+        byReading.add(new RecordingTimeline.Source("second", t + 50_000, MINUTE));
+        assertEquals(2, RecordingTimeline.build(byReading).size());
     }
 }

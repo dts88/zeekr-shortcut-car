@@ -495,8 +495,11 @@ public class TimelinePlayerActivity extends AppCompatActivity {
 
     /**
      * 扫描录像目录，按时间轴分组；分阶段显示（项目所有者 2026-11-14，{@link TimelineScan}）：最新的那一条录制先出来、
-     * 马上开播，更早的在后台接着扫，一批一批补到列表下面。慢的是打开文件读时长，放后台线程 —— 而且大多数文件不用打开：
-     * 文件名里的开录时刻、文件的修改时间和下一段对得上的，时长直接算出来（{@link ClipSpans}），只有对不上的才读。
+     * 马上开播，更早的在后台接着扫，一批一批补到列表下面。
+     *
+     * <p>时长照文件名里的开录时刻和文件的修改时间算，不打开文件（{@link ClipSpans}；项目所有者 2026-11-14）。
+     * 打开文件读时长（{@link ClipDurations}，慢）是后备：{@code ClipSpans} 算不了的那几个（每一路最新的那个可能还在录、
+     * 文件时间用不上的）才读；开发者选项「录像回放：逐个读取片段时长」开着时全部读，和 4.4.0 一样。</p>
      *
      * <p>每次叫都是新的一轮（{@link #scanRound}）：上一轮还没扫完的自己停下，它后面交来的结果不要。</p>
      */
@@ -508,6 +511,7 @@ public class TimelinePlayerActivity extends AppCompatActivity {
         if (listSummaryText != null) {
             listSummaryText.setText(R.string.msg_scanning_short);
         }
+        final boolean readEvery = new AppConfig(this).isPlaybackReadDurations();
         new Thread(() -> {
             // 第一条出来之后它和播放同时在读盘：让着播放
             android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_BACKGROUND);
@@ -560,9 +564,12 @@ public class TimelinePlayerActivity extends AppCompatActivity {
                 AppLog.e(TAG, "扫描录像失败", e);
             }
             final Map<String, Long> known = new HashMap<>();
-            for (List<ClipSpans.Timed> laneFiles : timed.values()) {
-                known.putAll(ClipSpans.known(laneFiles));
+            if (!readEvery) {
+                for (List<ClipSpans.Timed> laneFiles : timed.values()) {
+                    known.putAll(ClipSpans.known(laneFiles));
+                }
             }
+            final long listedMs = SystemClock.elapsedRealtime() - began;
             final boolean locksOn = com.kooo.evcam.storage.FootageLocks.enabled(getApplicationContext());
             final java.util.Set<String> locked = com.kooo.evcam.storage.FootageLocks.shown(
                     getApplicationContext(), StorageHelper.getVideoDir(getApplicationContext()));
@@ -596,8 +603,11 @@ public class TimelinePlayerActivity extends AppCompatActivity {
             }
             if (round == scanRound) {
                 long[] off = check.numbers();
-                com.kooo.evcam.blackbox.BlackBox.note("回放扫描：环视 " + composite.size() + " 个文件、别的几路 "
-                        + count(others) + " 个，" + recordings[0] + " 条录制；最新一条 " + firstAt[0] + " ms 出来，全部 "
+                com.kooo.evcam.blackbox.BlackBox.note("回放扫描（"
+                        + (readEvery ? "开发者选项：逐个读取片段时长" : "照文件名和文件时间") + "）：环视 "
+                        + composite.size() + " 个文件、别的几路 "
+                        + count(others) + " 个，" + recordings[0] + " 条录制；列目录 " + listedMs + " ms，最新一条 "
+                        + firstAt[0] + " ms 出来，全部 "
                         + (SystemClock.elapsedRealtime() - began) + " ms；时长照文件名和修改时间算出来的 " + off[5]
                         + " 个、打开读的 " + off[6] + " 个；读的那些里拿修改时间估的和读出来的差：中位 "
                         + off[0] + " ms、最大 " + off[1] + " ms，差 3 秒以上 " + off[2] + " 个 / 比了 " + off[3]
@@ -723,7 +733,7 @@ public class TimelinePlayerActivity extends AppCompatActivity {
     /**
      * 扫描的账，只记不用（进黑匣子的那一行）：多少个文件的时长是照文件名和修改时间算出来的（{@link ClipSpans}）、
      * 多少个是打开读的；打开读的那些里，「修改时间 − 开录时刻」和读出来的时长差多少 —— 4.4.0 在实车上量过全部文件
-     * （中位 0.37 秒，777 个里 1 个差得多），才改成大多数不打开；这一项留着看以后还准不准。
+     * （中位 0.37 秒，777 个里 1 个差得多），才改成不打开；这一项留着，开发者选项里改回逐个读时能再量一遍。
      */
     private static final class ScanCheck {
         private final Map<String, long[]> listed = new HashMap<>();

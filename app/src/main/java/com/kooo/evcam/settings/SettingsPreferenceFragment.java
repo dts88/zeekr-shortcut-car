@@ -1961,6 +1961,9 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             });
         }
 
+        bindSwitch("pref_playback_read_durations", appConfig.isPlaybackReadDurations(),
+                appConfig::setPlaybackReadDurations);
+
         onClick("pref_repair_mp4", pref -> {
             if (getActivity() == null) {
                 return;

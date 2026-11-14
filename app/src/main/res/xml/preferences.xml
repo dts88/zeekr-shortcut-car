@@ -517,6 +517,12 @@
 
         <PreferenceCategory android:title="@string/set_group_files">
 
+            <!-- 录像回放分条的后备做法（项目所有者 2026-11-14）：默认照文件名和文件时间，开着时逐个打开读时长 -->
+            <SwitchPreferenceCompat
+                android:key="pref_playback_read_durations"
+                android:title="@string/dev_playback_read_durations_title"
+                android:summary="@string/dev_playback_read_durations_summary" />
+
             <Preference
                 android:key="pref_repair_mp4"
                 android:title="@string/dev_repair_mp4_title"
