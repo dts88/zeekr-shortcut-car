@@ -101,6 +101,7 @@
     <string name="header_alerts_on">开</string>
     <string name="header_alerts_off">关</string>
     <string name="set_alerts_test_summary">现在拍一张四个摄像头的照片发过去，确认整条路都通</string>
+    <string name="set_alerts_test_switch_off">注意：「停车时发警报」还是关的，这张照片发得出去，但真有事时不会发</string>
     <string name="set_alerts_need_token">先填机器人令牌</string>
     <string name="set_alerts_need_chat">先填会话号（或者先用「找会话号」）</string>
     <string name="set_alerts_sent">已发出</string>

@@ -130,8 +130,23 @@ public final class SentryAlerts implements Telemetry.Listener {
                 return thread;
             });
 
-    /** 去问「有人找我吗」的那条线程；关着时是 null。 */
-    private TelegramPoller poller;
+    /** 去问「有人找我吗」的那条线程；关着时是 null。从主线程之外写，所以 volatile。 */
+    private volatile TelegramPoller poller;
+    /**
+     * 开 / 关轮询线程的活在这条线程上做。
+     *
+     * <p>{@link TelegramPoller#stop()} 要打断并等待那条长轮询起来（最多 3 秒），
+     * 而 {@code syncPoller} 是从车辆信号的回调里调的 —— 那是主线程。
+     * 诊断里那条“main has not run a queued task for 1006 ms”就是这么来的。</p>
+     */
+    private final java.util.concurrent.ExecutorService pollerLifecycle =
+            java.util.concurrent.Executors.newSingleThreadExecutor(runnable -> {
+                Thread thread = new Thread(runnable, "alert-poller-lifecycle");
+                thread.setDaemon(true);
+                return thread;
+            });
+    /** 上一次要求的状态：不变就不往那条线程上排活。 */
+    private volatile boolean pollerWanted;
     /** 上一次看到的「哨兵模式开着」：变了就重看一次要不要轮询。 */
     private boolean pollerOn;
     /** 现在有没有在取画面移动的样（只用来记一次“开始 / 停下”）。 */
@@ -197,13 +212,21 @@ public final class SentryAlerts implements Telemetry.Listener {
             return;
         }
         watching = want;
+        // 每个进程一行：开关、令牌、会话号到底有没有。
+        // “什么都没发生”要能从这一行看出是哪一项缺着。
+        BlackBox.noteImportant("alerts: enabled=" + enabled
+                + " 令牌=" + (config.getAlertsTelegramToken().isEmpty() ? "无" : "有")
+                + " 会话号=" + (config.getAlertsTelegramChatId().isEmpty() ? "无"
+                        : "…" + config.getAlertsTelegramChatId()
+                                .substring(Math.max(0, config.getAlertsTelegramChatId().length() - 4)))
+                + " 监听=" + want + " 命令=" + config.isAlertsCommands());
         Telemetry telemetry = Telemetry.get();
         if (want) {
             Readings now = telemetry.readings();
             seedEdges(now);
             telemetry.addListener(this);
             telemetry.acquire(app, USER);
-            BlackBox.note("停车警报：开始看双闪、远光、车门的信号");
+            BlackBox.note("alerts: watching hazard, high beam, doors, lamps, screen");
         } else {
             telemetry.removeListener(this);
             telemetry.release(USER);
@@ -212,7 +235,7 @@ public final class SentryAlerts implements Telemetry.Listener {
             lastLamps = null;
             lastScreenOn = null;
             seedEdges(Readings.empty());
-            BlackBox.note("停车警报：不再看车辆信号");
+            BlackBox.note("alerts: no longer watching car signals");
         }
         syncPoller();
     }
@@ -244,36 +267,47 @@ public final class SentryAlerts implements Telemetry.Listener {
     private void syncPoller() {
         boolean want = config.isAlertsEnabled() && config.hasAlertsTelegramConfig()
                 && config.isAlertsCommands();
-        if (want == (poller != null)) {
+        if (want == pollerWanted) {
             return;
         }
-        if (want) {
-            poller = new TelegramPoller(config, new TelegramPoller.Handler() {
-                @Override
-                public void onPicture(int lane, long requestedAt) {
-                    requestPicture(lane, requestedAt);
+        pollerWanted = want;
+        // 开关的动作（尤其是 stop 里的 join）不能占着主线程
+        pollerLifecycle.execute(() -> {
+            if (!pollerWanted) {
+                TelegramPoller stopping = poller;
+                poller = null;
+                if (stopping != null) {
+                    stopping.stop();
                 }
-
-                @Override
-                public void onStatus(long requestedAt) {
-                    requestStatus();
-                }
-
-                @Override
-                public void onHelp() {
-                    String token = config.getAlertsTelegramToken();
-                    String chatId = config.getAlertsTelegramChatId();
-                    if (TelegramRequest.looksLikeToken(token) && TelegramRequest.looksLikeChatId(chatId)) {
-                        deliverText(token, chatId, app.getString(R.string.alert_cmd_help));
+                return;
+            }
+            if (poller == null) {
+                poller = new TelegramPoller(config, new TelegramPoller.Handler() {
+                    @Override
+                    public void onPicture(int lane, long requestedAt) {
+                        requestPicture(lane, requestedAt);
                     }
-                }
-            });
-            poller.start();
-        } else {
-            poller.stop();
-            poller = null;
-        }
+
+                    @Override
+                    public void onStatus(long requestedAt) {
+                        requestStatus();
+                    }
+
+                    @Override
+                    public void onHelp() {
+                        String token = config.getAlertsTelegramToken();
+                        String chatId = config.getAlertsTelegramChatId();
+                        if (TelegramRequest.looksLikeToken(token)
+                                && TelegramRequest.looksLikeChatId(chatId)) {
+                            deliverText(token, chatId, app.getString(R.string.alert_cmd_help));
+                        }
+                    }
+                });
+                poller.start();
+            }
+        });
     }
+
 
     /**
      * 车主在 Telegram 里要一张照片。
@@ -286,8 +320,8 @@ public final class SentryAlerts implements Telemetry.Listener {
             requestPictureInner(lane, requestedAt);
         } catch (RuntimeException | OutOfMemoryError e) {
             // 已经发过「处理命令时出错」了，这里只保证不把进程带走
-            BlackBox.noteImportant("停车警报：要照片时出错（"
-                    + TelegramRequest.redact(String.valueOf(e)) + "）");
+            BlackBox.noteImportant("alerts: picture request failed ("
+                    + TelegramRequest.redact(String.valueOf(e)) + ")");
         }
     }
 
@@ -309,7 +343,7 @@ public final class SentryAlerts implements Telemetry.Listener {
             return;
         }
         requests.noteSent(now);
-        BlackBox.note("停车警报：车主在 Telegram 里要了一张照片"
+        BlackBox.note("alerts: picture requested from Telegram"
                 + (lane == TelegramCommand.ANY_LANE ? "" : "（第 " + lane + " 路）"));
         String caption = TelegramRequest.caption(app.getString(R.string.alert_headline_request),
                 lateNote(requestedAt), sentryLine(sentryValue()), time());
@@ -337,7 +371,7 @@ public final class SentryAlerts implements Telemetry.Listener {
             requestStatusInner(token, chatId);
         } catch (RuntimeException | OutOfMemoryError e) {
             // 不要报一句“状态”就没了下文：把原因回过去（已擦令牌）
-            BlackBox.note("停车警报：回状态时出错（" + TelegramRequest.redact(String.valueOf(e)) + "）");
+            BlackBox.note("alerts: status reply failed (" + TelegramRequest.redact(String.valueOf(e)) + ")");
             deliverText(token, chatId, app.getString(R.string.set_alerts_failed,
                     TelegramRequest.redact(String.valueOf(e))));
         }
@@ -566,7 +600,7 @@ public final class SentryAlerts implements Telemetry.Listener {
         }
         lastHeartbeatAt = now;
         VehicleState state = Telemetry.get().latest();
-        BlackBox.note("停车警报：还在看着（哨兵 " + (state == null ? "?" : state.sentry)
+        BlackBox.note("alerts: alive (sentry " + (state == null ? "?" : state.sentry)
                 + "，挡位 " + (state == null || state.gear == null ? "?" : state.gear) + "）");
     }
 
@@ -608,7 +642,20 @@ public final class SentryAlerts implements Telemetry.Listener {
         sender.execute(() -> {
             try {
                 List<TelegramSender.Chat> chats = TelegramSender.recentChats(token);
-                app.getMainExecutor().execute(() -> callback.onChats(chats));
+                if (chats.isEmpty()) {
+                    // 历史空了不等于没配好：轮询线程会把消息一条条吃掉（getUpdates 带 offset）。
+                    // 那时去问一句已配的会话还认不认，比“机器人没收到消息”有用得多。
+                    String configured = config.getAlertsTelegramChatId();
+                    if (!configured.isEmpty()) {
+                        String title = TelegramSender.chatTitle(token, configured);
+                        if (!title.isEmpty()) {
+                            chats = java.util.Collections.singletonList(
+                                    new TelegramSender.Chat(configured, title, config.getAlertsOwnerId()));
+                        }
+                    }
+                }
+                List<TelegramSender.Chat> found = chats;
+                app.getMainExecutor().execute(() -> callback.onChats(found));
             } catch (TelegramSender.ChatListException e) {
                 String message = e.getMessage() == null ? "" : e.getMessage();
                 app.getMainExecutor().execute(() -> callback.onFailed(message));
@@ -663,9 +710,9 @@ public final class SentryAlerts implements Telemetry.Listener {
         if (wantSample != sampling) {
             sampling = wantSample;
             if (wantSample) {
-                BlackBox.note("停车警报：开始看画面移动");
+                BlackBox.note("alerts: motion sampling on");
             } else {
-                BlackBox.note("停车警报：不看画面了（"
+                BlackBox.note("alerts: motion sampling off ("
                         + (!watching ? "警报未开" : !parked ? "车在走"
                         : "移动不在勾选里") + "）");
             }
@@ -706,10 +753,10 @@ public final class SentryAlerts implements Telemetry.Listener {
 
         AlertPolicy.Decision decision = policy.decide(now);
         if (decision != AlertPolicy.Decision.ALLOW) {
-            BlackBox.note("停车警报：" + headline + "，但这一条不发（" + decision + "）");
+            BlackBox.note("alerts: " + headline + " seen, not sent (" + decision + ")");
             return;
         }
-        BlackBox.note("停车警报：" + headline);
+        BlackBox.note("alerts: " + headline);
         // 冷却和每小时上限只在真的发出去之后才算数：发失败不该把这一小时的话都堵死
         fire(headline, () -> policy.noteSent(SystemClock.elapsedRealtime()));
     }
@@ -737,7 +784,7 @@ public final class SentryAlerts implements Telemetry.Listener {
             return;
         }
         lastWatchNoteAt = now;
-        BlackBox.note("停车警报：看到信号变化 " + changed);
+        BlackBox.note("alerts: signal change " + changed);
     }
 
     private static void appendChange(StringBuilder out, String name, Boolean before, Boolean after) {
@@ -768,10 +815,10 @@ public final class SentryAlerts implements Telemetry.Listener {
         AlertPolicy.Decision decision = policy.decide(now);
         String headline = app.getString(R.string.alert_headline_motion);
         if (decision != AlertPolicy.Decision.ALLOW) {
-            BlackBox.note("停车警报：画面在动，但这一条不发（" + decision + "）");
+            BlackBox.note("alerts: motion seen, not sent (" + decision + ")");
             return;
         }
-        BlackBox.note("停车警报：" + headline + "（" + Math.round(score * 100) + "%）");
+        BlackBox.note("alerts: " + headline + " (" + Math.round(score * 100) + "%)");
         fire(headline, () -> policy.noteSent(SystemClock.elapsedRealtime()));
     }
 
@@ -845,7 +892,7 @@ public final class SentryAlerts implements Telemetry.Listener {
             @Override
             public void onFailed(String reason) {
                 // 照片没拍成，文字照样发：车主至少要知道「刚才有人碰了车」。
-                BlackBox.note("停车警报：照片没拍成（" + reason + "），只发文字");
+                BlackBox.note("alerts: no picture (" + reason + "), text only");
                 notifyFailure(app.getString(R.string.alert_no_storage));
                 deliverText(token, chatId, caption + "\n" + app.getString(R.string.alert_no_storage));
             }
@@ -910,7 +957,7 @@ public final class SentryAlerts implements Telemetry.Listener {
             }
             // 开工之后设置可能已经关掉、哨兵也可能刚退出：那就不发了，别送出一张没人要的照片
             if (!config.isAlertsEnabled() || !sentryOn()) {
-                BlackBox.note("停车警报：这一张不发了（功能已关或哨兵已退）");
+                BlackBox.note("alerts: dropped (feature off or sentry gone)");
                 if (callback != null) {
                     app.getMainExecutor().execute(() -> callback.onResult(false,
                             app.getString(R.string.set_alerts_failed, "alerts off")));
@@ -934,19 +981,24 @@ public final class SentryAlerts implements Telemetry.Listener {
                 sendClip(token, chatId, caption, markup);
             }
             if (!outcome.ok) {
-                BlackBox.note("停车警报：发不出去（" + outcome.display() + "）");
+                BlackBox.note("alerts: send failed (" + outcome.display() + ")");
                 notifyFailure(outcome.display());
             }
             if (callback != null) {
                 String message;
                 if (outcome.ok) {
                     message = app.getString(R.string.set_alerts_sent);
+                    if (!config.isAlertsEnabled()) {
+                        // 发得出去不等于警报开着
+                        message = message + "\n" + app.getString(R.string.set_alerts_test_switch_off);
+                    }
                 } else if (outcome.rejected) {
                     message = app.getString(R.string.set_alerts_token_rejected);
                 } else {
                     message = app.getString(R.string.set_alerts_failed, outcome.display());
                 }
-                app.getMainExecutor().execute(() -> callback.onResult(outcome.ok, message));
+                final String reply = message;
+                app.getMainExecutor().execute(() -> callback.onResult(outcome.ok, reply));
             }
         });
     }
@@ -967,7 +1019,7 @@ public final class SentryAlerts implements Telemetry.Listener {
             TelegramSender.Result result = TelegramSender.sendMessage(token, chatId, text,
                     TelegramRequest.keyboardMarkup());
             if (!result.ok) {
-                BlackBox.note("停车警报：文字也发不出去（" + result.display() + "）");
+                BlackBox.note("alerts: text send failed (" + result.display() + ")");
                 notifyFailure(result.display());
             }
         });
@@ -1032,16 +1084,16 @@ public final class SentryAlerts implements Telemetry.Listener {
         java.io.File file = new java.io.File(app.getCacheDir(), "alert_clip.mp4");
         CameraKeeper.get(app).writeClip(file, seconds, config.isAlertsClipAudio(), ok -> {
             if (!ok || !file.isFile() || file.length() == 0) {
-                BlackBox.note("停车警报：短视频没写成（环里没有足够的画面）");
+                BlackBox.note("alerts: no clip (ring holds too little video)");
                 return;
             }
             sender.execute(() -> {
                 TelegramSender.Result result = TelegramSender.sendVideo(token, chatId, file, caption, markup);
                 if (!result.ok) {
-                    BlackBox.note("停车警报：短视频发不出去（" + result.display() + "）");
+                    BlackBox.note("alerts: clip send failed (" + result.display() + ")");
                 }
                 if (!file.delete()) {
-                    BlackBox.note("停车警报：临时视频删不掉");
+                    BlackBox.note("alerts: temp clip could not be deleted");
                 }
             });
         });

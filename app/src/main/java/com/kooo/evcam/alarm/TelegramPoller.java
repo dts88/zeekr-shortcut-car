@@ -111,7 +111,7 @@ public final class TelegramPoller {
         running = true;
         thread = new Thread(this::loop, "telegram-poll");
         thread.start();
-        BlackBox.note("停车警报：开始回应 Telegram 命令");
+        BlackBox.note("alerts: command poller started");
     }
 
     /**
@@ -133,7 +133,7 @@ public final class TelegramPoller {
                 Thread.currentThread().interrupt();
             }
         }
-        BlackBox.note("停车警报：不再回应 Telegram 命令");
+        BlackBox.note("alerts: command poller stopped");
     }
 
     private void loop() {
@@ -155,14 +155,14 @@ public final class TelegramPoller {
                 lastOkAt = System.currentTimeMillis();
                 if (!lastError.isEmpty()) {
                     // 恢复了：这一行是线索 —— “远处不回应、回家就好”就是这样看出来的
-                    BlackBox.note("停车警报：问 Telegram 恢复了");
+                    BlackBox.note("alerts: Telegram polling recovered");
                     lastError = "";
                 }
                 int before = (int) config.getAlertsCommandOffset();
                 dispatch(reply, token, chatId, ownerId);
                 int after = (int) config.getAlertsCommandOffset();
                 if (after != before) {
-                    BlackBox.note("停车警报：问到了新消息（处理到 " + after + "）");
+                    BlackBox.note("alerts: new messages, offset now " + after);
                 }
             } catch (TelegramSender.ChatListException e) {
                 String message = e.getMessage() == null ? "" : e.getMessage();
@@ -176,7 +176,7 @@ public final class TelegramPoller {
                 lastErrorAt = System.currentTimeMillis();
                 if (first) {
                     // 只记头一次：没网的时候每半分钟一条会把黑匣子刷满
-                    BlackBox.note("停车警报：问 Telegram 失败，"
+                    BlackBox.note("alerts: Telegram poll failed, "
                             + (conflict ? "别处也在轮询同一个机器人" : lastError)
                             + "；" + (retryMs / 1000) + " 秒后再问");
                 }
@@ -231,13 +231,13 @@ public final class TelegramPoller {
                 continue;
             }
             if (verdict == PollerGate.Verdict.STALE) {
-                BlackBox.note("停车警报：跳过一条太旧的命令（发在 " + (sentAt / 1000L) + "）");
+                BlackBox.note("alerts: skipped a command older than 6 h (" + (sentAt / 1000L) + ")");
                 continue;
             }
             if (verdict == PollerGate.Verdict.NOT_A_COMMAND) {
                 continue;
             }
-            BlackBox.note("停车警报：收到命令 " + command.verb
+            BlackBox.note("alerts: command " + command.verb
                     + (command.lane == TelegramCommand.ANY_LANE ? "" : "#" + command.lane));
             try {
                 switch (command.verb) {
@@ -256,7 +256,7 @@ public final class TelegramPoller {
             } catch (RuntimeException | OutOfMemoryError e) {
                 // 一条命令出错不能把整辆车带走：记下来，线程接着问下一条。
                 AppLog.w(TAG, "command failed: " + TelegramRequest.redact(String.valueOf(e)));
-                BlackBox.noteImportant("停车警报：处理命令时出错（"
+                BlackBox.noteImportant("alerts: command failed ("
                         + TelegramRequest.redact(String.valueOf(e)) + "）");
             }
         }
@@ -272,7 +272,7 @@ public final class TelegramPoller {
         }
         lastForeignChat = masked;
         lastForeignAt = now;
-        BlackBox.note("停车警报：忽略一个不是你的命令（会话 " + masked
+        BlackBox.note("alerts: ignored a command from another chat (" + masked
                 + (type.isEmpty() ? "" : "，" + type) + "）");
     }
 

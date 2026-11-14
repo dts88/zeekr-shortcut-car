@@ -87,6 +87,7 @@
     <string name="header_alerts_on">Hidup</string>
     <string name="header_alerts_off">Mati</string>
     <string name="set_alerts_test_summary">Ambil gambar empat kamera sekarang dan hantar, untuk pastikan semuanya berfungsi</string>
+    <string name="set_alerts_test_switch_off">Nota: “Maklumkan semasa letak kereta” masih MATI — gambar ini dihantar, tetapi kejadian sebenar tidak akan menghantar</string>
     <string name="set_alerts_need_token">Isi token bot dahulu</string>
     <string name="set_alerts_need_chat">Isi id sembang dahulu (atau guna Cari id sembang)</string>
     <string name="set_alerts_sent">Telah dihantar</string>

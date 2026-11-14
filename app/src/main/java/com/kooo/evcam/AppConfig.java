@@ -2095,6 +2095,18 @@ public class AppConfig {
     /** 消息发到哪个会话。群组是负数，所以这里只去空白，不要求是正数。 */
     public String getAlertsTelegramChatId() {
         String raw = secrets().getString(KEY_ALERTS_TELEGRAM_CHAT, "");
+        if (raw == null || raw.trim().isEmpty()) {
+            // 会话号一度存在普通设置里，后来挪到了凭据文件。升级上来的那一份还在老地方，
+            // 不搬过来就是“令牌填了、会话号没了” —— 警报与命令都不会开始。
+            String legacy = prefs.getString(KEY_ALERTS_TELEGRAM_CHAT, "");
+            if (legacy != null && !legacy.trim().isEmpty()) {
+                String clean = legacy.trim();
+                secrets().edit().putString(KEY_ALERTS_TELEGRAM_CHAT, clean).apply();
+                prefs.edit().remove(KEY_ALERTS_TELEGRAM_CHAT).apply();
+                AppLog.i(TAG, "Telegram 会话号已从设置挪到凭据文件");
+                return clean;
+            }
+        }
         return raw == null ? "" : raw.trim();
     }
 

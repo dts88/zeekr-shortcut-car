@@ -87,6 +87,7 @@
     <string name="header_alerts_on">On</string>
     <string name="header_alerts_off">Off</string>
     <string name="set_alerts_test_summary">Take a picture of all four cameras now and send it, to prove the whole path works</string>
+    <string name="set_alerts_test_switch_off">Note: “Alert while parked” is still OFF — this picture goes through, but a real event will not send one</string>
     <string name="set_alerts_need_token">Fill in the bot token first</string>
     <string name="set_alerts_need_chat">Fill in a chat id first (or use Find chat id)</string>
     <string name="set_alerts_sent">Sent</string>

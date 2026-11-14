@@ -324,11 +324,13 @@ public final class TelegramSender {
         if (!TelegramRequest.looksLikeChatId(chatId)) {
             return Result.fail("bad chat id", 0);
         }
-        String body = "chat_id=" + java.net.URLEncoder.encode(chatId, StandardCharsets.UTF_8)
-                + "&text=" + java.net.URLEncoder.encode(text == null ? "" : text,
-                StandardCharsets.UTF_8);
+        // URLEncoder.encode(String, Charset) 是 Java 10 的 API，Android 上要 API 33 才有 ——
+        // 车机上直接 NoSuchMethodError，而且是在发送线程上崩，整个进程跟着没。
+        // 用接受字符串名的那个重载（API 1）。
+        String body = "chat_id=" + formEncode(chatId)
+                + "&text=" + formEncode(text == null ? "" : text);
         if (replyMarkup != null && !replyMarkup.isEmpty()) {
-            body += "&reply_markup=" + java.net.URLEncoder.encode(replyMarkup, StandardCharsets.UTF_8);
+            body += "&reply_markup=" + formEncode(replyMarkup);
         }
         byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
         HttpURLConnection connection = null;
@@ -478,6 +480,20 @@ public final class TelegramSender {
             if (connection != null) {
                 connection.disconnect();
             }
+        }
+    }
+
+    /**
+     * 表单里的一个值。
+     *
+     * <p>用 {@code URLEncoder.encode(String, String)}（API 1），不用带 {@code Charset} 的那个重载：
+     * 后者是 Java 10 才加的，Android 上 API 33 才有，车机上直接 {@code NoSuchMethodError}。</p>
+     */
+    static String formEncode(String value) {
+        try {
+            return java.net.URLEncoder.encode(value == null ? "" : value, "UTF-8");
+        } catch (java.io.UnsupportedEncodingException e) {
+            return "";
         }
     }
 
