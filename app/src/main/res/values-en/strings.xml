@@ -59,6 +59,11 @@
     <string name="set_alerts_probe_sentry">%1$s</string>
     <string name="set_alerts_probe_gear">Gear: %1$s</string>
     <string name="set_alerts_probe_offset">Handled up to: %1$s</string>
+    <string name="set_alerts_arm_delay_title">Start after locking</string>
+    <string name="set_alerts_arm_delay_summary">Locking the car and walking away is you, not a stranger; wait a moment so you do not get a picture of yourself</string>
+    <string name="opt_alerts_arm_now">Right away</string>
+    <string name="opt_alerts_arm_1">1 minute</string>
+    <string name="opt_alerts_arm_3">3 minutes</string>
     <string name="set_alerts_quiet_title">Quiet hours</string>
     <string name="set_alerts_quiet_summary">No alerts during this window. With the car at home, a passer-by at night stays silent</string>
     <string name="set_alerts_quiet_start_title">From</string>

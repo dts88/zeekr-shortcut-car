@@ -170,6 +170,10 @@ public final class SentryAlerts implements Telemetry.Listener {
     private boolean lastArmedForWatch;
     /** 上一次读到的哨兵原值（锁上车后总线寝下去时还能用它判）。 */
     private Integer lastSentryReading;
+    /** 这一次布防是从什么时候开始的（elapsedRealtime）；-1 = 不知道。 */
+    private long armedAtMs = -1;
+    /** 上一次看到的“已布防”；null = 还没看到过。 */
+    private Boolean lastArmed;
 
     /**
      * 车睡了一阵才醒过来时，配文里写上这张照片是几点要的。
@@ -701,6 +705,21 @@ public final class SentryAlerts implements Telemetry.Listener {
         policy.setParked(parked);
         policy.setArmed(armed);
         lastArmedForWatch = armed && parked;
+        if (Boolean.TRUE.equals(lastArmed) && !armed) {
+            armedAtMs = -1;
+        } else if (!armed) {
+            armedAtMs = -1;
+        } else if (lastArmed == null) {
+            // 进程团刚起来，车本来就锁着：不知道锁了多久。看信号变化的记录（进程内没变过就是 -1）
+            armedAtMs = com.kooo.evcam.telemetry.SignalAges.ageMs(
+                    com.kooo.evcam.telemetry.Signal.SENTRY_MODE, SystemClock.elapsedRealtime()) >= 0
+                    ? SystemClock.elapsedRealtime() - com.kooo.evcam.telemetry.SignalAges.ageMs(
+                            com.kooo.evcam.telemetry.Signal.SENTRY_MODE, SystemClock.elapsedRealtime())
+                    : -1;
+        } else if (!lastArmed && armed) {
+            armedAtMs = SystemClock.elapsedRealtime();
+        }
+        lastArmed = armed;
         // 轮询线程的开关照四件事实重算（开着警报、填了令牌与会话号、允许回应命令、哨兵开着）。
         // 不只在哨兵位翻转时看：进程刚起来时哨兵还没读到，读到了就得把线程带起来。
         pollerOn = sentryOn();
@@ -767,6 +786,9 @@ public final class SentryAlerts implements Telemetry.Listener {
             headline = app.getString(R.string.alert_headline_screen);
         }
 
+        if (!armDelayPassed()) {
+            return;
+        }
         if (quietNow()) {
             BlackBox.note("alerts: " + headline + " seen, quiet hours");
             return;
@@ -823,6 +845,25 @@ public final class SentryAlerts implements Telemetry.Listener {
      * <p>车停在家里、小区里的夜晚，有人走过、猫踏过都会响；那不是车主要知道的事。
      * 发不发由 {@link QuietHours} 算（跨午夜也算得对）。</p>
      */
+    /**
+     * 锁车之后的“走开”时间。
+     *
+     * <p>锁车、关车门、往外走那一分钟，车会亮灯、屏幕会亮、画面里一直有人在动 ——
+     * 都是车主自己。等一下再开始报，就不会收到一张自己的照片。</p>
+     */
+    private boolean armDelayPassed() {
+        int wait = config.getAlertsArmDelayMinutes();
+        if (wait == 0) {
+            return true;
+        }
+        long since = armedAtMs < 0 ? -1 : SystemClock.elapsedRealtime() - armedAtMs;
+        if (ArmDelay.allows(wait, since)) {
+            return true;
+        }
+        BlackBox.note("alerts: armed " + (since / 1000) + " s ago, waiting for " + wait + " min");
+        return false;
+    }
+
     private boolean quietNow() {
         if (!config.isAlertsQuietEnabled()) {
             return false;
@@ -848,7 +889,7 @@ public final class SentryAlerts implements Telemetry.Listener {
         policy.setParked(parkedNow(state));
         policy.setArmed(SentryFacts.armed(sentry != null ? sentry : lastSentryReading));
         String headline = app.getString(R.string.alert_headline_motion);
-        if (quietNow()) {
+        if (!armDelayPassed() || quietNow()) {
             BlackBox.note("alerts: motion seen, quiet hours");
             return;
         }

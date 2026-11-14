@@ -958,6 +958,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         show("pref_alerts_motion_sensitivity", alertsOn && shownTriggers.has(
                 com.kooo.evcam.alarm.TriggerSet.MOTION));
         boolean quietOn = appConfig.isAlertsQuietEnabled();
+        show("pref_alerts_arm_delay", alertsOn);
         show("pref_alerts_quiet_start", alertsOn && quietOn);
         show("pref_alerts_quiet_end", alertsOn && quietOn);
         show("pref_alerts_cameras", alertsOn && perCamera);
@@ -1011,6 +1012,27 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             clipAudio.setOnPreferenceChangeListener((preference, newValue) -> {
                 boolean withSound = Boolean.TRUE.equals(newValue);
                 appConfig.setAlertsClipAudio(withSound);
+                return true;
+            });
+        }
+
+        ListPreference armDelay = findPreference("pref_alerts_arm_delay");
+        if (armDelay != null) {
+            armDelay.setPersistent(false);
+            armDelay.setEntries(new CharSequence[] {
+                    getString(R.string.opt_alerts_arm_now),
+                    getString(R.string.opt_alerts_arm_1),
+                    getString(R.string.opt_alerts_arm_3)});
+            armDelay.setEntryValues(new CharSequence[] {"0", "1", "3"});
+            armDelay.setValue(String.valueOf(appConfig.getAlertsArmDelayMinutes()));
+            armDelay.setOnPreferenceChangeListener((preference, newValue) -> {
+                try {
+                    appConfig.setAlertsArmDelayMinutes(Integer.parseInt(String.valueOf(newValue)));
+                } catch (NumberFormatException e) {
+                    appConfig.setAlertsArmDelayMinutes(com.kooo.evcam.alarm.ArmDelay.DEFAULT_MIN);
+                }
+                com.kooo.evcam.blackbox.BlackBox.noteImportant(
+                        "设置变更: pref_alerts_arm_delay → " + newValue);
                 return true;
             });
         }

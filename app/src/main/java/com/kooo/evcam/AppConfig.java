@@ -136,6 +136,7 @@ public class AppConfig {
     private static final String KEY_ALERTS_MOTION_SENSITIVITY = "alerts_motion_sensitivity";
     private static final String KEY_ALERTS_CLIP_SECONDS = "alerts_clip_seconds";  // 0 关 / 5 / 10
     private static final String KEY_ALERTS_CLIP_AUDIO = "alerts_clip_audio";
+    private static final String KEY_ALERTS_ARM_DELAY = "alerts_arm_delay_minutes";  // 0 / 1 / 3
     private static final String KEY_ALERTS_QUIET_ENABLED = "alerts_quiet_enabled";
     private static final String KEY_ALERTS_QUIET_START = "alerts_quiet_start";
     private static final String KEY_ALERTS_QUIET_END = "alerts_quiet_end";  // 哪些事情算「有事」
@@ -2291,6 +2292,17 @@ public class AppConfig {
     public void setAlertsQuietEnd(int minute) {
         prefs.edit().putInt(KEY_ALERTS_QUIET_END,
                 com.kooo.evcam.alarm.QuietHours.clampMinute(minute)).apply();
+    }
+
+    /** 锁车之后等几分钟才开始发警报（0 / 1 / 3）。 */
+    public int getAlertsArmDelayMinutes() {
+        return com.kooo.evcam.alarm.ArmDelay.clamp(
+                prefs.getInt(KEY_ALERTS_ARM_DELAY, com.kooo.evcam.alarm.ArmDelay.DEFAULT_MIN));
+    }
+
+    public void setAlertsArmDelayMinutes(int minutes) {
+        prefs.edit().putInt(KEY_ALERTS_ARM_DELAY,
+                com.kooo.evcam.alarm.ArmDelay.clamp(minutes)).apply();
     }
 
     /** 令牌和会话号都填了：可以试着发一条。 */

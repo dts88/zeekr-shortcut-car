@@ -59,6 +59,11 @@
     <string name="set_alerts_probe_sentry">%1$s</string>
     <string name="set_alerts_probe_gear">Gear: %1$s</string>
     <string name="set_alerts_probe_offset">Diproses hingga: %1$s</string>
+    <string name="set_alerts_arm_delay_title">Mula selepas berkunci</string>
+    <string name="set_alerts_arm_delay_summary">Mengunci kereta dan berjalan pergi itu anda, bukan orang asing; tunggu sebentar supaya tidak dapat gambar diri sendiri</string>
+    <string name="opt_alerts_arm_now">Serta-merta</string>
+    <string name="opt_alerts_arm_1">1 minit</string>
+    <string name="opt_alerts_arm_3">3 minit</string>
     <string name="set_alerts_quiet_title">Waktu tenang</string>
     <string name="set_alerts_quiet_summary">Tiada makluman dalam tempoh ini. Bila kereta di rumah, orang lalu pada waktu malam tidak berbunyi</string>
     <string name="set_alerts_quiet_start_title">Dari</string>

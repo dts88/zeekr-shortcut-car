@@ -133,6 +133,8 @@ Optional, in the same section:
 - **Answer commands**: send the bot `pic` for a fresh picture, `pic front|rear|left|right` for one
   camera, `status` for one line. Only the chat you configured is answered, and only while Sentry Mode is
   on — that is what keeps the head unit awake.
+- **Start after locking**: right away, 1 minute or 3 minutes after the car locks, so walking away
+  does not send you a picture of yourself.
 - **Quiet hours**: no alerts between two times, for the nights the car is at home.
 
 **What it cannot see.** The car reports no impact, horn or tamper signal, so a knock that lights nothing

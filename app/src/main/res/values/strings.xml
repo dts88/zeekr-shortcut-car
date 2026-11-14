@@ -73,6 +73,11 @@
     <string name="set_alerts_probe_sentry">%1$s</string>
     <string name="set_alerts_probe_gear">挡位：%1$s</string>
     <string name="set_alerts_probe_offset">已处理到：%1$s</string>
+    <string name="set_alerts_arm_delay_title">锁车后等多久</string>
+    <string name="set_alerts_arm_delay_summary">锁车、走开那一会儿都是自己人；等一下再开始报，就不会收到一张自己的照片</string>
+    <string name="opt_alerts_arm_now">立刻</string>
+    <string name="opt_alerts_arm_1">1 分钟</string>
+    <string name="opt_alerts_arm_3">3 分钟</string>
     <string name="set_alerts_quiet_title">安静时段</string>
     <string name="set_alerts_quiet_summary">这个时间段里不发警报。车停在自己家里时，夜里有人走过也不响</string>
     <string name="set_alerts_quiet_start_title">从</string>
