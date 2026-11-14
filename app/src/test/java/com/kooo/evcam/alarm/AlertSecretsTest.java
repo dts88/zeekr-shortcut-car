@@ -48,8 +48,8 @@ public class AlertSecretsTest {
 
         JSONObject snapshot = new JSONObject(SettingsBackup.snapshot(context).toString());
         assertFalse("导出的设置里不能有令牌", holds(snapshot, TOKEN));
-        // 会话号不是凭据，是设置的一部分：它应该在导出里，方便换一台车机接着用
-        assertTrue("会话号是设置，应当导出", holds(snapshot, "123456789"));
+        // 会话号也是身份：跟着令牌一起放在单独的文件里，同样不进导出
+        assertFalse("导出的设置里不能有会话号", holds(snapshot, "123456789"));
     }
 
     @Test
@@ -63,6 +63,9 @@ public class AlertSecretsTest {
                         .contains("alerts_telegram_token"));
         assertTrue(context.getSharedPreferences(AppConfig.SECRETS_PREF_NAME, Context.MODE_PRIVATE)
                 .contains("alerts_telegram_token"));
+        assertFalse("会话号也不许落进普通设置那个文件",
+                context.getSharedPreferences(AppConfig.PREF_NAME, Context.MODE_PRIVATE)
+                        .contains("alerts_telegram_chat"));
     }
 
     @Test

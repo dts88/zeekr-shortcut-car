@@ -46,16 +46,13 @@ public final class SnapshotTaker {
     /** 发出去的照片长边上限：1280 够看清人和车，也稳在 Telegram 的尺寸里。 */
     private static final int MAX_WIDTH = 1280;
 
-    private static final int JPEG_QUALITY = 80;
-
-    /** 发出去的字节上限：超过就降一档质量重压。4G 上传越小越不容易被掐断。 */
-    private static final int MAX_BYTES = 900 * 1024;
-
-    /** 降档次序。到最后一张还大的话就那样发，Telegram 的 10 MB 还远。 */
-    private static final int[] FALLBACK_QUALITIES = {80, 70, 60, 50};
-
-    /** 拍照写盘和我们的回调之间允许的时间差（毫秒）：找文件时往前多看一点。 */
-    private static final long FILE_SLACK_MS = 5_000L;
+    /**
+     * 拍照写盘和我们的回调之间允许的时间差（毫秒）。
+     *
+     * <p>2 秒就够了（一张 JPEG 120–200 ms，加写盘）；窗口开得越大，
+     * 附近恰好又有一张别人拍的照片时越容易拿错。</p>
+     */
+    private static final long FILE_SLACK_MS = 2_000L;
 
     /** 结果。给的是四宫格位图：怎么切、要不要掰直、压多大由 {@link AlertPicture} 决定。 */
     public interface Callback {
@@ -86,7 +83,7 @@ public final class SnapshotTaker {
         final long startedAt = System.currentTimeMillis();
         final File photoDir = StorageHelper.getPhotoDir(app);
         if (photoDir == null) {
-            callback.onFailed("no storage");
+            fail(callback, "no storage");
             return;
         }
         MAIN.post(() -> {
@@ -95,19 +92,19 @@ public final class SnapshotTaker {
                 pipeline = CameraKeeper.get(app).pipeline();
             } catch (RuntimeException e) {
                 AppLog.w(TAG, "no camera pipeline: " + e);
-                callback.onFailed("cameras not ready");
+                fail(callback, "cameras not ready");
                 return;
             }
             if (pipeline == null) {
                 // 熄屏停录、管线被放掉的时候就是这样：不是崩溃，是这会儿没有相机
-                callback.onFailed("cameras not ready");
+                fail(callback, "cameras not ready");
                 return;
             }
-            pipeline.takePhoto(new MultiCameraManager.PhotoCallback() {
+            boolean accepted = pipeline.takePhoto(new MultiCameraManager.PhotoCallback() {
                 @Override
                 public void onPhotoResult(int saved, int pressed, int expected) {
                     if (saved <= 0) {
-                        callback.onFailed("no picture (0 of " + expected + " saved)");
+                        fail(callback, "no picture (0 of " + expected + " saved)");
                         return;
                     }
                     new Thread(() -> finish(photoDir, startedAt, callback), "alert-snapshot").start();
@@ -120,21 +117,30 @@ public final class SnapshotTaker {
 
                 @Override
                 public void onNoCameraEnabled() {
-                    callback.onFailed("no camera enabled");
+                    fail(callback, "no camera enabled");
                 }
             });
+            if (!accepted) {
+                // 上一张还在拍：这一次没人会回调，必须自己说一声，否则警报会静悄悄地没有照片
+                fail(callback, "camera busy");
+            }
         });
+    }
+
+    /** 所有失败都排到主线程：调用方（设置里的提示、Toast）只能在主线程上收尾。 */
+    private static void fail(Callback callback, String reason) {
+        MAIN.post(() -> callback.onFailed(reason));
     }
 
     private static void finish(File photoDir, long startedAt, Callback callback) {
         File file = newestSurroundPhoto(photoDir, startedAt);
         if (file == null) {
-            callback.onFailed("picture not found");
+            fail(callback, "picture not found");
             return;
         }
         Bitmap grid = decode(file);
         if (grid == null) {
-            callback.onFailed("picture unreadable");
+            fail(callback, "picture unreadable");
             return;
         }
         MAIN.post(() -> callback.onPicture(grid));

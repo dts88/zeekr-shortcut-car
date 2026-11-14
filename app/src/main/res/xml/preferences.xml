@@ -130,8 +130,7 @@
 
             <Preference
                 android:key="pref_alerts_cameras"
-                android:title="@string/set_alerts_cameras_title"
-                android:summary="@string/set_alerts_cameras_summary" />
+                android:title="@string/set_alerts_cameras_title" />
 
             <SwitchPreferenceCompat
                 android:key="pref_alerts_straighten"

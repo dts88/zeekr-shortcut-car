@@ -15,10 +15,9 @@
     <string name="set_section_alerts">Alerts</string>
     <string name="set_group_alerts_telegram">Telegram</string>
     <string name="set_alerts_on_title">Alert while parked</string>
-    <string name="set_alerts_on_summary">With the car parked and Sentry Mode on, send one picture of all four cameras to Telegram when something moves, the hazards come on, or a door opens</string>
+    <string name="set_alerts_on_summary">With the car parked and Sentry Mode on, sends the four cameras to Telegram when the hazards come on, the high beams flash, a door / frunk / trunk opens, the car lights come on by themselves, or the centre screen lights up</string>
     <string name="set_alerts_token_title">Bot token</string>
     <string name="set_alerts_token_empty">Not set</string>
-    <string name="set_alerts_token_set">Set (ends %1$s)</string>
     <string name="set_alerts_token_summary">The token from @BotFather. Kept on this car only, out of the settings export and the log</string>
     <string name="set_alerts_token_bad">Not a token: it should look like digits:letters</string>
     <string name="set_alerts_token_ok">Token works: @%1$s</string>
@@ -27,6 +26,8 @@
     <string name="set_alerts_chat_title">Chat id</string>
     <string name="set_alerts_chat_empty">Not yet. Send the bot a message, then use the row below</string>
     <string name="set_alerts_chat_set">Set: %1$s</string>
+        <string name="set_alerts_chat_ok">Chat works: %1$s</string>
+    <string name="set_alerts_chat_unknown">Telegram does not know this chat id. Send the bot a message first, then use Find chat id</string>
     <string name="set_alerts_chat_found">Found: %1$s</string>
     <string name="set_alerts_chat_none">The bot has no messages yet. Send it one from your phone first</string>
     <string name="set_alerts_find_title">Find chat id</string>
@@ -38,9 +39,8 @@
     <string name="opt_alerts_picture_separate">One per camera</string>
     <string name="set_alerts_cameras_title">Which cameras</string>
     <string name="set_alerts_cameras_all">All four</string>
-    <string name="set_alerts_cameras_summary">With one picture per camera, only the ones ticked are sent: front, rear, left, right</string>
     <string name="set_alerts_straighten_title">Straighten before sending</string>
-    <string name="set_alerts_straighten_summary">Applies the same fisheye correction as playback, with the same field of view</string>
+    <string name="set_alerts_straighten_summary">Applies the fisheye correction from playback, with the same field of view as the Super mirror</string>
     <string name="header_alerts_on">On</string>
     <string name="header_alerts_off">Off</string>
     <string name="set_alerts_test_summary">Take a picture of all four cameras now and send it, to prove the whole path works</string>
@@ -49,7 +49,6 @@
     <string name="set_alerts_sent">Sent</string>
     <string name="set_alerts_failed">Could not send: %1$s</string>
     <string name="set_alerts_pick_one">The bot has messages in more than one chat. Pick one</string>
-    <string name="alert_headline_motion">Movement while parked</string>
     <string name="alert_headline_hazard">Hazard lights came on while parked</string>
     <string name="alert_headline_flash">High beams flashed while parked</string>
     <string name="alert_headline_lights">Car lights came on while parked</string>
@@ -57,7 +56,7 @@
     <string name="alert_headline_door">A door opened while parked</string>
     <string name="alert_headline_test">Test</string>
     <string name="alert_headline_request">Picture taken on request</string>
-        <string name="alert_cmd_no_sentry">Sentry Mode is off, so the head unit is going to sleep and nothing can be taken</string>
+    <string name="alert_cmd_no_sentry">Sentry Mode is off, so the head unit is going to sleep and nothing can be taken</string>
     <string name="alert_cmd_not_parked">The car is not parked, so nothing was taken</string>
     <string name="alert_cmd_too_soon">Wait %1$d s before asking again</string>
     <string name="alert_status_gear">Gear: %1$s</string>

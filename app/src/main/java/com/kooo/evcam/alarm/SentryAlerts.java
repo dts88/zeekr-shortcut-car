@@ -110,9 +110,20 @@ public final class SentryAlerts implements Telemetry.Listener {
     private Boolean lastDoorTrunk;
     private Boolean lastLamps;
     private Boolean lastScreenOn;
-    private long failureNotifiedAt;
+    private volatile long failureNotifiedAt;
     /** 人从 Telegram 要照片时的频率上限（和警报那一套分开）。 */
     private final RequestPolicy requests = new RequestPolicy();
+    /**
+     * 发照片、发文字都排这一条线程：一条一条来，不并发（Telegram 有频率限制），
+     * 也不为每条消息各起一个没人管的线程。
+     */
+    private final java.util.concurrent.ExecutorService sender =
+            java.util.concurrent.Executors.newSingleThreadExecutor(runnable -> {
+                Thread thread = new Thread(runnable, "telegram-send");
+                thread.setDaemon(true);
+                return thread;
+            });
+
     /** 去问「有人找我吗」的那条线程；关着时是 null。 */
     private TelegramPoller poller;
     /** 上一次看到的「哨兵模式开着」：变了就重看一次要不要轮询。 */
@@ -231,7 +242,8 @@ public final class SentryAlerts implements Telemetry.Listener {
             requestPictureInner(lane);
         } catch (RuntimeException | OutOfMemoryError e) {
             // 已经发过「处理命令时出错」了，这里只保证不把进程带走
-            BlackBox.noteImportant("停车警报：要照片时出错（" + e + "）");
+            BlackBox.noteImportant("停车警报：要照片时出错（"
+                    + TelegramRequest.redact(String.valueOf(e)) + "）");
         }
     }
 
@@ -265,7 +277,7 @@ public final class SentryAlerts implements Telemetry.Listener {
         SnapshotTaker.take(app, new SnapshotTaker.Callback() {
             @Override
             public void onPicture(Bitmap grid) {
-                deliver(token, chatId, grid, caption, lane, null);
+                deliver(token, chatId, grid, caption, lane, null, null);
             }
 
             @Override
@@ -315,7 +327,7 @@ public final class SentryAlerts implements Telemetry.Listener {
         SnapshotTaker.take(app, new SnapshotTaker.Callback() {
             @Override
             public void onPicture(Bitmap grid) {
-                deliver(token, chatId, grid, caption, TelegramCommand.ANY_LANE, callback);
+                deliver(token, chatId, grid, caption, TelegramCommand.ANY_LANE, callback, null);
             }
 
             @Override
@@ -337,7 +349,7 @@ public final class SentryAlerts implements Telemetry.Listener {
             callback.onResult(false, app.getString(R.string.set_alerts_need_token));
             return;
         }
-        new Thread(() -> {
+        sender.execute(() -> {
             try {
                 String name = TelegramSender.botName(token);
                 String message = name.isEmpty() ? app.getString(R.string.set_alerts_token_ok_unnamed)
@@ -347,7 +359,35 @@ public final class SentryAlerts implements Telemetry.Listener {
                 app.getMainExecutor().execute(
                         () -> callback.onResult(false, app.getString(R.string.set_alerts_token_rejected)));
             }
-        }, "telegram-token").start();
+        });
+    }
+
+    /**
+     * 这个会话 Telegram 认不认（{@code getChat}）。回在主线程。
+     *
+     * <p>手打错一位数字时，形状照样是数字、照样能填进去，照片就发给别人了。</p>
+     */
+    public void checkChat(String chatId, Callback callback) {
+        String token = config.getAlertsTelegramToken();
+        if (!TelegramRequest.looksLikeToken(token)) {
+            callback.onResult(false, app.getString(R.string.set_alerts_need_token));
+            return;
+        }
+        sender.execute(() -> {
+            String title = "";
+            boolean ok;
+            try {
+                title = TelegramSender.chatTitle(token, chatId);
+                ok = !title.isEmpty();
+            } catch (TelegramSender.ChatListException e) {
+                ok = false;
+            }
+            final boolean works = ok;
+            final String name = title;
+            app.getMainExecutor().execute(() -> callback.onResult(works,
+                    works ? app.getString(R.string.set_alerts_chat_ok, name)
+                            : app.getString(R.string.set_alerts_chat_unknown)));
+        });
     }
 
     /** 用已填的令牌去问 Telegram：最近谁给机器人发过话。回在主线程。 */
@@ -357,7 +397,7 @@ public final class SentryAlerts implements Telemetry.Listener {
             callback.onFailed(app.getString(R.string.set_alerts_need_token));
             return;
         }
-        new Thread(() -> {
+        sender.execute(() -> {
             try {
                 List<TelegramSender.Chat> chats = TelegramSender.recentChats(token);
                 app.getMainExecutor().execute(() -> callback.onChats(chats));
@@ -365,7 +405,7 @@ public final class SentryAlerts implements Telemetry.Listener {
                 String message = e.getMessage() == null ? "" : e.getMessage();
                 app.getMainExecutor().execute(() -> callback.onFailed(message));
             }
-        }, "telegram-chats").start();
+        });
     }
 
     // ------------------------------------------------------------------ 信号
@@ -427,9 +467,9 @@ public final class SentryAlerts implements Telemetry.Listener {
             BlackBox.note("停车警报：" + headline + "，但这一条不发（" + decision + "）");
             return;
         }
-        policy.noteSent(now);
         BlackBox.note("停车警报：" + headline);
-        fire(headline);
+        // 冷却和每小时上限只在真的发出去之后才算数：发失败不该把这一小时的话都堵死
+        fire(headline, () -> policy.noteSent(SystemClock.elapsedRealtime()));
     }
 
     /** 双闪亮没亮：转向指示状态是 3（双闪）；没数据为 null。 */
@@ -485,7 +525,7 @@ public final class SentryAlerts implements Telemetry.Listener {
 
     // ------------------------------------------------------------------ 拍照与发送
 
-    private void fire(String headline) {
+    private void fire(String headline, Runnable onDelivered) {
         String token = config.getAlertsTelegramToken();
         String chatId = config.getAlertsTelegramChatId();
         if (!TelegramRequest.looksLikeToken(token) || !TelegramRequest.looksLikeChatId(chatId)) {
@@ -496,7 +536,7 @@ public final class SentryAlerts implements Telemetry.Listener {
         SnapshotTaker.take(app, new SnapshotTaker.Callback() {
             @Override
             public void onPicture(Bitmap grid) {
-                deliver(token, chatId, grid, caption, TelegramCommand.ANY_LANE, null);
+                deliver(token, chatId, grid, caption, TelegramCommand.ANY_LANE, null, onDelivered);
             }
 
             @Override
@@ -517,52 +557,64 @@ public final class SentryAlerts implements Telemetry.Listener {
      * 然后是回收位图 —— 这条路一晚上可能走好几次，不能漏内存。</p>
      */
     private void deliver(String token, String chatId, Bitmap grid, String caption, int onlyLane,
-                         Callback callback) {
-        Bitmap picture = AlertPicture.straighten(grid, config.isAlertsStraighten(),
-                fisheyeFov(), fisheyeProjection());
-        List<byte[]> photos = new ArrayList<>();
-        List<String> captions = new ArrayList<>();
-        try {
-            int[] lanes = onlyLane >= 0 ? new int[] {onlyLane}
-                    : AlertPicture.layout(config.getAlertsLayout()) == AlertPicture.Layout.SEPARATE
-                            ? AlertPicture.lanes(config.getAlertsCameras()) : null;
-            if (lanes != null) {
-                for (int lane : lanes) {
-                    Bitmap cell = AlertPicture.quadrant(picture, lane);
-                    if (cell == null) {
-                        continue;
+                         Callback callback, Runnable onDelivered) {
+        sender.execute(() -> {
+            // 掰直、切图、压缩都在这一条线程上：一张 2×2 的校正要翻一百六十万像素，
+            // 放在主线程上就是和相机、和设置界面抢那几十毫秒。
+            Bitmap picture = AlertPicture.straighten(grid, config.isAlertsStraighten(),
+                    fisheyeFov(), fisheyeProjection());
+            List<byte[]> photos = new ArrayList<>();
+            List<String> captions = new ArrayList<>();
+            try {
+                int[] lanes = onlyLane >= 0 ? new int[] {onlyLane}
+                        : AlertPicture.layout(config.getAlertsLayout()) == AlertPicture.Layout.SEPARATE
+                                ? AlertPicture.lanes(config.getAlertsCameras()) : null;
+                if (lanes != null) {
+                    for (int lane : lanes) {
+                        Bitmap cell = AlertPicture.quadrant(picture, lane);
+                        if (cell == null) {
+                            continue;
+                        }
+                        byte[] jpeg = AlertPicture.jpeg(cell);
+                        cell.recycle();
+                        if (jpeg != null && jpeg.length > 0) {
+                            photos.add(jpeg);
+                            captions.add(CameraNames.ofLane(app, lane) + "'+bs+'n" + caption);
+                        }
                     }
-                    byte[] jpeg = AlertPicture.jpeg(cell);
-                    cell.recycle();
+                } else {
+                    byte[] jpeg = AlertPicture.jpeg(picture);
                     if (jpeg != null && jpeg.length > 0) {
                         photos.add(jpeg);
-                        captions.add(CameraNames.ofLane(app, lane) + "\n" + caption);
+                        captions.add(caption);
                     }
                 }
-            } else {
-                byte[] jpeg = AlertPicture.jpeg(picture);
-                if (jpeg != null && jpeg.length > 0) {
-                    photos.add(jpeg);
-                    captions.add(caption);
+            } finally {
+                if (picture != null && picture != grid) {
+                    picture.recycle();
+                }
+                if (grid != null && !grid.isRecycled()) {
+                    grid.recycle();
                 }
             }
-        } finally {
-            if (picture != null && picture != grid) {
-                picture.recycle();
-            }
-            if (grid != null && !grid.isRecycled()) {
-                grid.recycle();
-            }
-        }
 
-        if (photos.isEmpty()) {
-            if (callback != null) {
-                callback.onResult(false, app.getString(R.string.set_alerts_failed, "no picture"));
+            if (photos.isEmpty()) {
+                if (callback != null) {
+                    app.getMainExecutor().execute(() -> callback.onResult(false,
+                            app.getString(R.string.set_alerts_failed, "no picture")));
+                }
+                return;
             }
-            return;
-        }
+            // 开工之后设置可能已经关掉、哨兵也可能刚退出：那就不发了，别送出一张没人要的照片
+            if (!config.isAlertsEnabled() || !sentryOn()) {
+                BlackBox.note("停车警报：这一张不发了（功能已关或哨兵已退）");
+                if (callback != null) {
+                    app.getMainExecutor().execute(() -> callback.onResult(false,
+                            app.getString(R.string.set_alerts_failed, "alerts off")));
+                }
+                return;
+            }
 
-        new Thread(() -> {
             TelegramSender.Result last = TelegramSender.Result.fail("nothing sent", 0);
             String markup = TelegramRequest.keyboardMarkup();
             for (int i = 0; i < photos.size(); i++) {
@@ -572,6 +624,9 @@ public final class SentryAlerts implements Telemetry.Listener {
                 }
             }
             final TelegramSender.Result outcome = last;
+            if (outcome.ok && onDelivered != null) {
+                onDelivered.run();
+            }
             if (!outcome.ok) {
                 BlackBox.note("停车警报：发不出去（" + outcome.display() + "）");
                 notifyFailure(outcome.display());
@@ -587,7 +642,7 @@ public final class SentryAlerts implements Telemetry.Listener {
                 }
                 app.getMainExecutor().execute(() -> callback.onResult(outcome.ok, message));
             }
-        }, "telegram-photo").start();
+        });
     }
 
     /** 掰直用的视野角度：和回看界面那一项同一个值。 */
@@ -602,14 +657,14 @@ public final class SentryAlerts implements Telemetry.Listener {
 
     /** 没有照片时只发一句话（Telegram 的 sendMessage）。 */
     private void deliverText(String token, String chatId, String text) {
-        new Thread(() -> {
+        sender.execute(() -> {
             TelegramSender.Result result = TelegramSender.sendMessage(token, chatId, text,
                     TelegramRequest.keyboardMarkup());
             if (!result.ok) {
                 BlackBox.note("停车警报：文字也发不出去（" + result.display() + "）");
                 notifyFailure(result.display());
             }
-        }, "telegram-text").start();
+        });
     }
 
     private Integer sentryValue() {

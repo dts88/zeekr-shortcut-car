@@ -98,8 +98,16 @@ public final class TelegramSender {
 
     /** 取会话列表失败。消息已擦过令牌。 */
     public static final class ChatListException extends Exception {
+        /** Telegram 说「等一下」时给的建议（429 的 retry_after），没有就是 0。 */
+        final long retryAfterMs;
+
         ChatListException(String message) {
+            this(message, 0L);
+        }
+
+        ChatListException(String message, long retryAfterMs) {
             super(message);
+            this.retryAfterMs = retryAfterMs;
         }
     }
 
@@ -252,6 +260,33 @@ public final class TelegramSender {
     }
 
     /**
+     * 这个会话的名字（{@code getChat}）。空串表示问到了但没有名字。
+     *
+     * <p>用来确认「填进去的会话号真的存在」 —— 形状对不代表它存在，错一位就是别人的会话。</p>
+     */
+    static String chatTitle(String token, String chatId) throws ChatListException {
+        if (!TelegramRequest.looksLikeToken(token)) {
+            throw new ChatListException("bad token");
+        }
+        if (!TelegramRequest.looksLikeChatId(chatId)) {
+            throw new ChatListException("bad chat id");
+        }
+        JSONObject reply = get(TelegramRequest.methodUrl(token, "getChat") + "?chat_id=" + chatId);
+        JSONObject result = reply.optJSONObject("result");
+        if (result == null) {
+            return "";
+        }
+        String title = result.optString("title", "");
+        if (title.isEmpty()) {
+            title = result.optString("first_name", "");
+        }
+        if (title.isEmpty()) {
+            title = result.optString("username", "");
+        }
+        return title;
+    }
+
+    /**
      * 长轮询：把 {@code offset} 之后的命令取回来，最多等 {@code timeoutSeconds} 秒。
      *
      * <p>长轮询是这套「反向命令」能穿过运营商 NAT 的全部原因：请求是车发出去的，
@@ -341,7 +376,7 @@ public final class TelegramSender {
             if (reply.ok()) {
                 return reply.json;
             }
-            throw new ChatListException(reply.failureText());
+            throw new ChatListException(reply.failureText(), reply.retryAfterMs());
         } catch (IOException e) {
             throw new ChatListException(TelegramRequest.redact(String.valueOf(e)));
         } finally {
@@ -361,7 +396,7 @@ public final class TelegramSender {
     }
 
     /** 一次回复：状态码、原文、解析出来的 JSON。读一次就够，谁也别再读第二次。 */
-    private static final class Reply {
+    static final class Reply {
         final int code;
         final JSONObject json;
 
@@ -374,8 +409,23 @@ public final class TelegramSender {
             return code == HttpURLConnection.HTTP_OK && json != null && json.optBoolean("ok", false);
         }
 
+        /** 401 / 404：令牌或会话号那头被拒（界面据此说人话）。 */
+        boolean rejected() {
+            return code == 401 || code == 404;
+        }
+
         String description() {
             return json == null ? "" : json.optString("description", "");
+        }
+
+        /** 429 时 Telegram 建议等多久（毫秒）；不是 429 就是 0。 */
+        long retryAfterMs() {
+            if (code != 429) {
+                return 0L;
+            }
+            JSONObject parameters = json == null ? null : json.optJSONObject("parameters");
+            long seconds = parameters == null ? 1L : parameters.optLong("retry_after", 1L);
+            return Math.max(1L, seconds) * 1000L;
         }
 
         /** 翻成车主看得懂的一句。已经擦过令牌。 */
@@ -403,10 +453,20 @@ public final class TelegramSender {
 
     private static Reply exchange(HttpURLConnection connection) throws IOException {
         int code = connection.getResponseCode();
-        String text = readText(connection);
+        // 只读一次：读完再读一次，Android 的实现会抛 IOException("closed")。
+        return parse(code, readText(connection));
+    }
+
+    /**
+     * 把一次回复的状态码和原文翻成 {@link Reply}。纯函数，单测直接调（{@code TelegramReplyTest}）。
+     *
+     * <p>这里不读网络：“只读一次”那个修复在 {@link #exchange} 里，
+     * 可测的是它交出来的结论 —— 这就是界面和重试看得到的那一份。</p>
+     */
+    static Reply parse(int code, String text) {
         JSONObject json = null;
         try {
-            json = text.isEmpty() ? null : new JSONObject(text);
+            json = text == null || text.isEmpty() ? null : new JSONObject(text);
         } catch (org.json.JSONException ignored) {
             // 不是 JSON：下面按状态码说
         }
@@ -438,7 +498,7 @@ public final class TelegramSender {
             int read;
             while ((read = in.read(chunk)) > 0) {
                 buffer.write(chunk, 0, read);
-                if (buffer.size() > 512 * 1024) {
+                if (buffer.size() > 4 * 1024 * 1024) {
                     break;
                 }
             }

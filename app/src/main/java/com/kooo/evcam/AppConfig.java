@@ -2089,14 +2089,16 @@ public class AppConfig {
 
     /** 消息发到哪个会话。群组是负数，所以这里只去空白，不要求是正数。 */
     public String getAlertsTelegramChatId() {
-        String raw = prefs.getString(KEY_ALERTS_TELEGRAM_CHAT, "");
+        String raw = secrets().getString(KEY_ALERTS_TELEGRAM_CHAT, "");
         return raw == null ? "" : raw.trim();
     }
 
     public void setAlertsTelegramChatId(String value) {
         String clean = value == null ? "" : value.trim();
-        prefs.edit().putString(KEY_ALERTS_TELEGRAM_CHAT, clean).apply();
-        AppLog.i(TAG, "Telegram 会话号设为 " + (clean.isEmpty() ? "（空）" : clean));
+        secrets().edit().putString(KEY_ALERTS_TELEGRAM_CHAT, clean).apply();
+        // 会话号也是身份：只记末四位，完整的不落日志
+        AppLog.i(TAG, "Telegram 会话号" + (clean.isEmpty() ? "已清空"
+                : "已填写（末四位 " + clean.substring(Math.max(0, clean.length() - 4)) + "）"));
     }
 
     /** 发一张 2×2，还是勾选的那几路各一张（{@link com.kooo.evcam.alarm.AlertPicture}）。 */
@@ -2151,8 +2153,13 @@ public class AppConfig {
         return prefs.getLong(KEY_ALERTS_COMMAND_OFFSET, 0L);
     }
 
+    /**
+     * 处理到哪一条。用 {@code commit()} 而不是 {@code apply()}：
+     * 这条命令接下来就要拍照发图，进程半路被杀时磁盘上必须已经写着「这条处理过了」，
+     * 否则重启会把同一张照片再发一遍。
+     */
     public void setAlertsCommandOffset(long offset) {
-        prefs.edit().putLong(KEY_ALERTS_COMMAND_OFFSET, Math.max(0L, offset)).apply();
+        prefs.edit().putLong(KEY_ALERTS_COMMAND_OFFSET, Math.max(0L, offset)).commit();
     }
 
     /** 令牌和会话号都填了：可以试着发一条。 */

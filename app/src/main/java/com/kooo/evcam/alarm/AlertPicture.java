@@ -179,7 +179,13 @@ public final class AlertPicture {
         int x = (lane % COLUMNS) * cellWidth;
         int y = (lane / COLUMNS) * cellHeight;
         try {
-            return Bitmap.createBitmap(grid, x, y, cellWidth, cellHeight);
+            // 画到一张新图上，不用 createBitmap(source,x,y,w,h)：那个返回的是「共用源像素」的不可变图，
+            // 回收它会把源图的像素一起放掉 —— 后面几路再读就是读已释放的内存。
+            Bitmap cell = Bitmap.createBitmap(cellWidth, cellHeight, Bitmap.Config.ARGB_8888);
+            new android.graphics.Canvas(cell).drawBitmap(grid,
+                    new android.graphics.Rect(x, y, x + cellWidth, y + cellHeight),
+                    new android.graphics.Rect(0, 0, cellWidth, cellHeight), null);
+            return cell;
         } catch (RuntimeException | OutOfMemoryError e) {
             AppLog.w(TAG, "could not cut lane " + lane + ": " + e);
             return null;

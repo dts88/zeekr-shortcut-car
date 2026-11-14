@@ -48,6 +48,12 @@ public final class TelegramPoller {
     /** 409（别处也在轮询）时歇久一点，别把 409 刷成日志海。 */
     private static final long CONFLICT_PAUSE_MS = 60_000L;
 
+    /** 超过这么久的命令不再执行：车睡了一夜醒来，不该突然拍一张几小时前要的照片。 */
+    private static final long MAX_COMMAND_AGE_MS = 10 * 60_000L;
+
+    /** 陌生会话的记事先去重：同一个会话一小时只记一行，免得刷爆黑匣子。 */
+    private static final long FOREIGN_NOTE_MIN_MS = 60 * 60_000L;
+
     /** 收到一条命令之后交给谁。 */
     public interface Handler {
         /** @param lane 0 前、1 后、2 左、3 右；{@link TelegramCommand#ANY_LANE} 表示按设置 */
@@ -60,6 +66,8 @@ public final class TelegramPoller {
     private final Handler handler;
     private Thread thread;
     private volatile boolean running;
+    private String lastForeignChat;
+    private long lastForeignAt;
 
     public TelegramPoller(AppConfig config, Handler handler) {
         this.config = config;
@@ -70,9 +78,9 @@ public final class TelegramPoller {
         return running;
     }
 
-    /** 开始问。已经在问就什么都不做。 */
+    /** 开始问。已经在问就什么都不做（旧线程还活着也一样：同一个机器人不能有两个轮询者）。 */
     public void start() {
-        if (running) {
+        if (running || (thread != null && thread.isAlive())) {
             return;
         }
         running = true;
@@ -81,10 +89,25 @@ public final class TelegramPoller {
         BlackBox.note("停车警报：开始回应 Telegram 命令");
     }
 
-    /** 停下。下一次网络请求回来之前就会退出，最多等一条长轮询的时间。 */
+    /**
+     * 停下，并等那条线程真的收手。
+     *
+     * <p>只把 {@code running} 置假是不够的：线程还挂在一条 25 秒的长轮询上，
+     * 这时候重新打开开关就会起第二条 —— 同一个机器人同时两个 {@code getUpdates}，
+     * Telegram 回 409，两条都拿不到消息。所以这里打断它、等它退出，最多等 3 秒。</p>
+     */
     public void stop() {
         running = false;
+        Thread stopping = thread;
         thread = null;
+        if (stopping != null) {
+            stopping.interrupt();
+            try {
+                stopping.join(3_000L);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
         BlackBox.note("停车警报：不再回应 Telegram 命令");
     }
 
@@ -94,7 +117,10 @@ public final class TelegramPoller {
             String token = config.getAlertsTelegramToken();
             String chatId = config.getAlertsTelegramChatId();
             if (!TelegramRequest.looksLikeToken(token) || !TelegramRequest.looksLikeChatId(chatId)) {
-                return;
+                // 令牌填得不对时不能就这么退出：running 会一直是真的，改好令牌也不会再起来。
+                // 什么都不问，隔一会儿再看一眼设置。
+                sleep(RETRY_MAX_MS);
+                continue;
             }
             try {
                 JSONObject reply = TelegramSender.getUpdates(token,
@@ -104,7 +130,9 @@ public final class TelegramPoller {
             } catch (TelegramSender.ChatListException e) {
                 String message = e.getMessage() == null ? "" : e.getMessage();
                 boolean conflict = message.contains("409") || message.contains("Conflict");
-                retryMs = conflict ? CONFLICT_PAUSE_MS
+                long suggested = e.retryAfterMs;
+                retryMs = suggested > 0 ? suggested
+                        : conflict ? CONFLICT_PAUSE_MS
                         : (retryMs == 0 ? RETRY_MIN_MS : Math.min(RETRY_MAX_MS, retryMs * 2));
                 BlackBox.note("停车警报：问 Telegram 失败，"
                         + (conflict ? "别处也在轮询同一个机器人" : message) + "；" + (retryMs / 1000) + " 秒后再问");
@@ -119,6 +147,9 @@ public final class TelegramPoller {
 
     /** 一条一批更新：先推 offset（不管认不认，处理过就算过），再按命令干活。 */
     private void dispatch(JSONObject reply, String token, String chatId) {
+        if (!running) {
+            return;
+        }
         JSONArray updates = reply.optJSONArray("result");
         if (updates == null || updates.length() == 0) {
             return;
@@ -137,16 +168,29 @@ public final class TelegramPoller {
                 continue;
             }
             JSONObject chat = message.optJSONObject("chat");
-            String from = chat == null ? "" : chat.optString("id", "");
-            if (!TelegramCommand.fromOwner(from, chatId)) {
-                BlackBox.note("停车警报：忽略一个来自别的会话的命令（" + from + "）");
-                offset = Math.max(offset, updateId + 1);
-                continue;
-            }
+            String fromChat = chat == null ? "" : chat.optString("id", "");
+            String chatType = chat == null ? "" : chat.optString("type", "");
+            JSONObject fromUser = message.optJSONObject("from");
+            String fromUserId = fromUser == null ? "" : fromUser.optString("id", "");
             TelegramCommand command = TelegramCommand.parseText(message.optString("text", ""));
+            long sentAt = message.optLong("date", 0L) * 1000L;
+            PollerGate.Verdict verdict = PollerGate.verdict(chatType, fromChat, fromUserId,
+                    chatId, sentAt, System.currentTimeMillis(), command);
             // 先把这一条记成「处理过了」再动手：命令半路把进程弄崩了，重启后也不会把同一张照片再发一遍。
             offset = Math.max(offset, updateId + 1);
             config.setAlertsCommandOffset(offset);
+            if (verdict == PollerGate.Verdict.NOT_PRIVATE
+                    || verdict == PollerGate.Verdict.NOT_OWNER) {
+                noteForeign(fromChat, chatType);
+                continue;
+            }
+            if (verdict == PollerGate.Verdict.STALE) {
+                BlackBox.note("停车警报：跳过一条过期的命令（发在 " + (sentAt / 1000L) + "）");
+                continue;
+            }
+            if (verdict == PollerGate.Verdict.NOT_A_COMMAND) {
+                continue;
+            }
             try {
                 switch (command.verb) {
                     case PICTURE:
@@ -162,10 +206,32 @@ public final class TelegramPoller {
             } catch (RuntimeException | OutOfMemoryError e) {
                 // 一条命令出错不能把整辆车带走：记下来，线程接着问下一条。
                 AppLog.w(TAG, "command failed: " + TelegramRequest.redact(String.valueOf(e)));
-                BlackBox.noteImportant("停车警报：处理命令时出错（" + e + "）");
+                BlackBox.noteImportant("停车警报：处理命令时出错（"
+                        + TelegramRequest.redact(String.valueOf(e)) + "）");
             }
         }
         config.setAlertsCommandOffset(offset);
+    }
+
+    /** 陌生会话只记一行：同一小时同一个会话不重复记。 */
+    private void noteForeign(String chatId, String type) {
+        long now = System.currentTimeMillis();
+        String masked = mask(chatId);
+        if (masked.equals(lastForeignChat) && now - lastForeignAt < FOREIGN_NOTE_MIN_MS) {
+            return;
+        }
+        lastForeignChat = masked;
+        lastForeignAt = now;
+        BlackBox.note("停车警报：忽略一个不是你的命令（会话 " + masked
+                + (type.isEmpty() ? "" : "，" + type) + "）");
+    }
+
+    /** 会话号只留末四位：黑匣子会随诊断报告出门，没必要带着完整的 id。 */
+    private static String mask(String chatId) {
+        if (chatId == null || chatId.length() <= 4) {
+            return "…";
+        }
+        return "…" + chatId.substring(chatId.length() - 4);
     }
 
     /** 可被打断的等待：{@link #stop()} 之后最迟一秒内就能退出。 */

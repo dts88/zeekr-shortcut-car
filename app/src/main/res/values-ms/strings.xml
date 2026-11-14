@@ -15,10 +15,9 @@
     <string name="set_section_alerts">Makluman</string>
     <string name="set_group_alerts_telegram">Telegram</string>
     <string name="set_alerts_on_title">Maklumkan semasa letak kereta</string>
-    <string name="set_alerts_on_summary">Bila kereta diletakkan dengan Mod Sentri hidup, hantar satu gambar empat kamera ke Telegram apabila ada pergerakan, lampu hazard menyala, atau pintu dibuka</string>
+    <string name="set_alerts_on_summary">Bila kereta diletakkan dengan Mod Sentri hidup, hantar empat kamera ke Telegram apabila lampu hazard menyala, lampu jauh berkelip, pintu / bonet depan / bagasi dibuka, lampu kereta menyala sendiri, atau skrin tengah menyala</string>
     <string name="set_alerts_token_title">Token bot</string>
     <string name="set_alerts_token_empty">Belum diisi</string>
-    <string name="set_alerts_token_set">Sudah diisi (hujung %1$s)</string>
     <string name="set_alerts_token_summary">Token daripada @BotFather. Disimpan dalam kereta ini sahaja, tidak masuk eksport tetapan atau log</string>
     <string name="set_alerts_token_bad">Bukan token: sepatutnya nombor:huruf</string>
     <string name="set_alerts_token_ok">Token berfungsi: @%1$s</string>
@@ -27,6 +26,8 @@
     <string name="set_alerts_chat_title">Id sembang</string>
     <string name="set_alerts_chat_empty">Belum ada. Hantar mesej kepada bot, kemudian guna baris di bawah</string>
     <string name="set_alerts_chat_set">Sudah diisi: %1$s</string>
+        <string name="set_alerts_chat_ok">Sembang berfungsi: %1$s</string>
+    <string name="set_alerts_chat_unknown">Telegram tidak mengenali id sembang ini. Hantar mesej kepada bot dahulu, kemudian guna Cari id sembang</string>
     <string name="set_alerts_chat_found">Dijumpai: %1$s</string>
     <string name="set_alerts_chat_none">Bot belum menerima mesej. Hantar satu dari telefon dahulu</string>
     <string name="set_alerts_find_title">Cari id sembang</string>
@@ -38,9 +39,8 @@
     <string name="opt_alerts_picture_separate">Satu setiap kamera</string>
     <string name="set_alerts_cameras_title">Kamera mana</string>
     <string name="set_alerts_cameras_all">Semua empat</string>
-    <string name="set_alerts_cameras_summary">Bila satu gambar setiap kamera, hanya yang ditanda dihantar: depan, belakang, kiri, kanan</string>
     <string name="set_alerts_straighten_title">Luruskan sebelum dihantar</string>
-    <string name="set_alerts_straighten_summary">Guna pembetulan fisheya yang sama seperti main balik, dengan sudut pandangan yang sama</string>
+    <string name="set_alerts_straighten_summary">Guna pembetulan fisheya daripada main balik, dengan sudut pandangan yang sama seperti cermin Super</string>
     <string name="header_alerts_on">Hidup</string>
     <string name="header_alerts_off">Mati</string>
     <string name="set_alerts_test_summary">Ambil gambar empat kamera sekarang dan hantar, untuk pastikan semuanya berfungsi</string>
@@ -49,7 +49,6 @@
     <string name="set_alerts_sent">Telah dihantar</string>
     <string name="set_alerts_failed">Tidak dapat dihantar: %1$s</string>
     <string name="set_alerts_pick_one">Bot ada mesej dalam beberapa sembang. Pilih satu</string>
-    <string name="alert_headline_motion">Pergerakan semasa letak kereta</string>
     <string name="alert_headline_hazard">Lampu hazard menyala semasa letak kereta</string>
     <string name="alert_headline_flash">Lampu jauh berkelip semasa letak kereta</string>
     <string name="alert_headline_lights">Lampu kereta menyala semasa letak kereta</string>
@@ -57,7 +56,7 @@
     <string name="alert_headline_door">Pintu dibuka semasa letak kereta</string>
     <string name="alert_headline_test">Ujian</string>
     <string name="alert_headline_request">Gambar diambil atas permintaan</string>
-        <string name="alert_cmd_no_sentry">Mod Sentri mati, jadi kepala unit akan tidur dan tiada gambar boleh diambil</string>
+    <string name="alert_cmd_no_sentry">Mod Sentri mati, jadi kepala unit akan tidur dan tiada gambar boleh diambil</string>
     <string name="alert_cmd_not_parked">Kereta tidak diletakkan, jadi tiada gambar diambil</string>
     <string name="alert_cmd_too_soon">Tunggu %1$d saat sebelum minta lagi</string>
     <string name="alert_status_gear">Gear: %1$s</string>

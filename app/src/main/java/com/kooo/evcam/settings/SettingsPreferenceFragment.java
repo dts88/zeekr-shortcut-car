@@ -901,22 +901,9 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             });
         }
 
-        // 发几张：一张四宫格，还是每一路各一张（AlertPicture）
-        ListPreference picture = findPreference("pref_alerts_picture");
-        if (picture != null) {
-            picture.setPersistent(false);
-            picture.setEntries(new CharSequence[] {getString(R.string.opt_alerts_picture_grid),
-                    getString(R.string.opt_alerts_picture_separate)});
-            picture.setEntryValues(new CharSequence[] {"grid", "separate"});
-            picture.setValue(appConfig.getAlertsLayout());
-            picture.setOnPreferenceChangeListener((preference, newValue) -> {
-                appConfig.setAlertsLayout(String.valueOf(newValue));
-                com.kooo.evcam.blackbox.BlackBox.noteImportant(
-                        "设置变更: pref_alerts_picture → " + newValue);
-                showAlertsRows();
-                return true;
-            });
-        }
+        // 发几张：一张四宫格，还是每一路各一张。合法取值在 SettingsRegistry.ALERTS_LAYOUT 一处
+        bindEnum("pref_alerts_picture", SettingsRegistry.ALERTS_LAYOUT, appConfig.getAlertsLayout(),
+                value -> appConfig.setAlertsLayout(value));
 
         // 要哪几路（只在「每一路各一张」时用得上）
         Preference cameras = findPreference("pref_alerts_cameras");
@@ -976,15 +963,15 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             } else if (!com.kooo.evcam.alarm.TelegramRequest.looksLikeToken(value)) {
                 token.setSummary(R.string.set_alerts_token_bad);
             } else {
-                String tail = value.length() <= 4 ? value : value.substring(value.length() - 4);
-                token.setSummary(getString(R.string.set_alerts_token_set, tail));
+                // 只写「填了」：令牌的末四位也不必留在常亮的屏幕上
+                token.setSummary(R.string.set_alerts_token_ok_unnamed);
             }
         }
         Preference chat = findPreference("pref_alerts_chat");
         if (chat != null) {
             String value = appConfig.getAlertsTelegramChatId();
             chat.setSummary(value.isEmpty() ? getString(R.string.set_alerts_chat_empty)
-                    : getString(R.string.set_alerts_chat_set, value));
+                    : getString(R.string.set_alerts_chat_set, maskChat(value)));
         }
         Preference cameras = findPreference("pref_alerts_cameras");
         if (cameras != null) {
@@ -1083,9 +1070,12 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 appConfig.getAlertsTelegramChatId(), value -> {
                     appConfig.setAlertsTelegramChatId(value);
                     com.kooo.evcam.blackbox.BlackBox.noteImportant("设置变更: pref_alerts_chat → "
-                            + (value.isEmpty() ? "（空）" : value));
+                            + (value.isEmpty() ? "（空）" : maskChat(value)));
                     com.kooo.evcam.alarm.SentryAlerts.get(requireContext()).refreshConfig();
                     showAlertsRows();
+                    if (!value.isEmpty()) {
+                        checkAlertsChat(value);
+                    }
                 });
     }
 
@@ -1130,10 +1120,32 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
 
     private void applyAlertsChat(String chatId) {
         appConfig.setAlertsTelegramChatId(chatId);
-        com.kooo.evcam.blackbox.BlackBox.noteImportant("设置变更: pref_alerts_chat → " + chatId);
+        com.kooo.evcam.blackbox.BlackBox.noteImportant("设置变更: pref_alerts_chat → " + maskChat(chatId));
         com.kooo.evcam.alarm.SentryAlerts.get(requireContext()).refreshConfig();
         showAlertsRows();
-        toast(getString(R.string.set_alerts_chat_found, chatId));
+        toast(getString(R.string.set_alerts_chat_found, maskChat(chatId)));
+        checkAlertsChat(chatId);
+    }
+
+    /** 会话号只露末四位：它会进黑匣子、进诊断报告，也会一直显示在设置页上。 */
+    private static String maskChat(String chatId) {
+        if (chatId == null || chatId.length() <= 4) {
+            return "…";
+        }
+        return "…" + chatId.substring(chatId.length() - 4);
+    }
+
+    /**
+     * 问一句 Telegram 认不认这个会话。
+     *
+     * <p>手打错一位数字，照片就会发给另一个人的会话 —— 形状对（都是数字）不代表它存在。</p>
+     */
+    private void checkAlertsChat(String chatId) {
+        com.kooo.evcam.alarm.SentryAlerts.get(requireContext()).checkChat(chatId, (ok, message) -> {
+            if (isAdded()) {
+                toast(message);
+            }
+        });
     }
 
     /** 拍一张、发出去：和真警报走同一条路，所以它能通，警报就能通。 */
@@ -2432,8 +2444,10 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             return;
         }
         if ("pref_alerts_token".equals(key)) {
-            // 令牌是“数字:一串字母数字下划线横线”，不能有空格
-            input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
+            // 令牌是“数字:一串字母数字下划线横线”，不能有空格；按密码显示，
+            // 免得常亮的屏幕上留着一整串凭据
+            input.setInputType(InputType.TYPE_CLASS_TEXT
+                    | InputType.TYPE_TEXT_VARIATION_PASSWORD);
             input.setFilters(new android.text.InputFilter[]{
                     new android.text.InputFilter.LengthFilter(64),
                     new android.text.InputFilter() {

@@ -196,8 +196,9 @@ public class SettingsHeadersFragment extends PreferenceFragmentCompat {
                 return on == 0 ? getString(R.string.header_none_enabled) : getString(R.string.header_enabled_count, on);
             }
             case "screen_alerts":
-                return getString(config.isAlertsEnabled() ? R.string.header_alerts_on
-                        : R.string.header_alerts_off);
+                // 开着但没填令牌 / 会话号等于发不出去，写「开」就是在骗人
+                return getString(config.isAlertsEnabled() && config.hasAlertsTelegramConfig()
+                        ? R.string.header_alerts_on : R.string.header_alerts_off);
             case "screen_update":
                 return com.kooo.evcam.update.UpdateFlow.currentVersion(context);
             default:

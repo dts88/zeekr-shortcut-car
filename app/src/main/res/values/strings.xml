@@ -29,10 +29,9 @@
     <string name="set_section_alerts">停车警报</string>
     <string name="set_group_alerts_telegram">Telegram</string>
     <string name="set_alerts_on_title">停车时发警报</string>
-    <string name="set_alerts_on_summary">车停着、哨兵模式开着时，画面里有东西动、双闪亮起或车门被打开，就把四个摄像头的一张照片发到 Telegram</string>
+    <string name="set_alerts_on_summary">\u8f66\u505c\u7740\u3001\u54e8\u5175\u6a21\u5f0f\u5f00\u7740\u65f6\uff0c\u53cc\u95ea\u4eae\u8d77\u3001\u8fdc\u5149\u95ea\u4e00\u4e0b\u3001\u8f66\u95e8 / \u524d\u5907\u7bb1 / \u540e\u5907\u7bb1\u88ab\u6253\u5f00\u3001\u8f66\u706f\u81ea\u5df1\u4eae\u8d77\u6216\u4e2d\u63a7\u5c4f\u4eae\u8d77\uff0c\u5c31\u628a\u56db\u4e2a\u6444\u50cf\u5934\u62cd\u4e0b\u6765\u53d1\u5230 Telegram</string>
     <string name="set_alerts_token_title">机器人令牌</string>
     <string name="set_alerts_token_empty">未填写</string>
-    <string name="set_alerts_token_set">已填写（末四位 %1$s）</string>
     <string name="set_alerts_token_summary">从 @BotFather 拿到的令牌。只存在这辆车上，不进设置导出，也不进日志</string>
     <string name="set_alerts_token_bad">不像令牌：应该是「数字:一串字符」</string>
     <string name="set_alerts_token_ok">令牌可用：@%1$s</string>
@@ -41,6 +40,8 @@
     <string name="set_alerts_chat_title">会话号</string>
     <string name="set_alerts_chat_empty">还没有：先给机器人发一句话，再用下面那一行自动取</string>
     <string name="set_alerts_chat_set">已填写：%1$s</string>
+        <string name="set_alerts_chat_ok">会话可用：%1$s</string>
+    <string name="set_alerts_chat_unknown">Telegram 认不辆这个会话号：先给机器人发一句话，再用「找会话号」</string>
     <string name="set_alerts_chat_found">已找到：%1$s</string>
     <string name="set_alerts_chat_none">机器人还没收到任何消息：先在手机上给它发一句话</string>
     <string name="set_alerts_find_title">找会话号</string>
@@ -52,9 +53,8 @@
     <string name="opt_alerts_picture_separate">每一路各一张</string>
     <string name="set_alerts_cameras_title">要哪几路</string>
     <string name="set_alerts_cameras_all">全部四路</string>
-    <string name="set_alerts_cameras_summary">每一路各一张时只发勾选的。环视四路：前、后、左、右</string>
-    <string name="set_alerts_straighten_title">发之前掰直</string>
-    <string name="set_alerts_straighten_summary">用回看界面那套鱼眼校正，直线看起来更直；视野和回看那一项一样</string>
+    <string name="set_alerts_straighten_title">\u53d1\u4e4b\u524d\u505a\u9c7c\u773c\u6821\u6b63</string>
+    <string name="set_alerts_straighten_summary">\u7528\u56de\u770b\u754c\u9762\u90a3\u5957\u9c7c\u773c\u6821\u6b63\uff0c\u76f4\u7ebf\u770b\u8d77\u6765\u66f4\u76f4\uff1b\u89c6\u91ce\u548c\u300c\u8d85\u7ea7\u955c\u5b50\u300d\u90a3\u4e00\u9879\u4e00\u6837</string>
     <string name="header_alerts_on">开</string>
     <string name="header_alerts_off">关</string>
     <string name="set_alerts_test_summary">现在拍一张四个摄像头的照片发过去，确认整条路都通</string>
@@ -63,7 +63,6 @@
     <string name="set_alerts_sent">已发出</string>
     <string name="set_alerts_failed">发不出去：%1$s</string>
     <string name="set_alerts_pick_one">机器人在好几个会话里都有消息：选一个</string>
-    <string name="alert_headline_motion">停车时侦测到移动</string>
     <string name="alert_headline_hazard">停车时双闪亮起</string>
     <string name="alert_headline_flash">停车时远光闪了一下</string>
     <string name="alert_headline_lights">停车时车灯自己亮起</string>
@@ -71,7 +70,7 @@
     <string name="alert_headline_door">停车时车门被打开</string>
     <string name="alert_headline_test">测试</string>
     <string name="alert_headline_request">按你的要求拍的</string>
-        <string name="alert_cmd_no_sentry">哨兵模式没开：车机要睡了，拍不了</string>
+    <string name="alert_cmd_no_sentry">哨兵模式没开：车机要睡了，拍不了</string>
     <string name="alert_cmd_not_parked">车没停着，这一张不拍</string>
     <string name="alert_cmd_too_soon">等一下：%1$d 秒后再要</string>
     <string name="alert_status_gear">挡位：%1$s</string>

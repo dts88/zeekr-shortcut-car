@@ -36,8 +36,8 @@ import java.io.File;
 public class SettingsShotsTest {
 
     private static final String[] SECTIONS = {
-            "screen_recording", "screen_storage", "screen_rearview", "screen_side_view", "screen_floating",
-            "screen_general", "screen_update",
+            "screen_recording", "screen_alerts", "screen_storage", "screen_rearview",
+            "screen_side_view", "screen_floating", "screen_general", "screen_update",
     };
 
     @Test
