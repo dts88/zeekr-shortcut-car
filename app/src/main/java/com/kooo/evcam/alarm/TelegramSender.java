@@ -193,6 +193,27 @@ public final class TelegramSender {
      *
      * @return 拿到状态码的结果；一次都没拿到时返回 {@code null}，让外面重试
      */
+    private static Result postMultipart(String token, String method, String boundary, byte[] body)
+            throws IOException {
+        HttpURLConnection connection = null;
+        try {
+            connection = open(TelegramRequest.methodUrl(token, method));
+            connection.setRequestMethod("POST");
+            connection.setDoOutput(true);
+            connection.setRequestProperty("Content-Type",
+                    "multipart/form-data; boundary=" + boundary);
+            connection.setRequestProperty("Connection", "close");
+            try (OutputStream out = connection.getOutputStream()) {
+                out.write(body);
+            }
+            return read(connection);
+        } finally {
+            if (connection != null) {
+                connection.disconnect();
+            }
+        }
+    }
+
     private static Result post(String token, String boundary, byte[] body) throws IOException {
         HttpURLConnection connection = null;
         try {
@@ -213,6 +234,76 @@ public final class TelegramSender {
                 connection.disconnect();
             }
         }
+    }
+
+    /**
+     * 发一段短视频（MP4）。
+     *
+     * <p>和照片一样是 multipart，只是字段叫 {@code video}、类型是 {@code video/mp4}。
+     * {@code supports_streaming} 让手机上点开就能看，不用等整段下完。</p>
+     *
+     * @return 和 {@link #sendPhoto} 一样的结果；文件读不了也算失败
+     */
+    public static Result sendVideo(String token, String chatId, java.io.File file, String caption,
+                                   String replyMarkup) {
+        if (!TelegramRequest.looksLikeToken(token)) {
+            return Result.fail("bad token", 0);
+        }
+        if (!TelegramRequest.looksLikeChatId(chatId)) {
+            return Result.fail("bad chat id", 0);
+        }
+        if (file == null || !file.isFile() || file.length() == 0) {
+            return Result.fail("no clip", 0);
+        }
+        if (file.length() > MAX_PHOTO_BYTES * 5L) {
+            // Telegram 的上限是 50 MB；9 MB 的五倍是我们自己的线
+            return Result.fail("clip too big", 413);
+        }
+        String text = caption == null ? "" : caption;
+        if (text.length() > 1000) {
+            text = text.substring(0, 1000);
+        }
+        String boundary = "zeekr" + Long.toHexString(System.nanoTime());
+        byte[] clip;
+        try {
+            clip = java.nio.file.Files.readAllBytes(file.toPath());
+        } catch (java.io.IOException e) {
+            return Result.fail("clip unreadable", 0);
+        }
+        java.util.Map<String, String> fields = TelegramRequest.fields(chatId, text);
+        fields.put("supports_streaming", "true");
+        if (replyMarkup != null && !replyMarkup.isEmpty()) {
+            fields.put("reply_markup", replyMarkup);
+        }
+        byte[] body;
+        try {
+            body = TelegramRequest.multipartBytes(boundary, fields,
+                    "video", "alert.mp4", clip, "video/mp4");
+        } catch (java.io.IOException e) {
+            return Result.fail("could not build request", 0);
+        }
+        IOException last = null;
+        for (int attempt = 0; attempt < 2; attempt++) {
+            if (attempt > 0) {
+                try {
+                    Thread.sleep(1200L);
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+            try {
+                Result result = postMultipart(token, "sendVideo", boundary, body);
+                if (result != null) {
+                    return result;
+                }
+            } catch (IOException e) {
+                last = e;
+                AppLog.w(TAG, "video upload attempt " + (attempt + 1) + " failed: "
+                        + TelegramRequest.redact(String.valueOf(e)));
+            }
+        }
+        return Result.fail("upload interrupted: " + TelegramRequest.redact(String.valueOf(last)), 0);
     }
 
     /**

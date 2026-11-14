@@ -22,6 +22,7 @@ import com.kooo.evcam.AppLog;
 import com.kooo.evcam.MainActivity;
 import com.kooo.evcam.R;
 import com.kooo.evcam.blackbox.BlackBox;
+import com.kooo.evcam.camera.CameraKeeper;
 import com.kooo.evcam.camera.CameraNames;
 import com.kooo.evcam.zeekr.FisheyeProjection;
 import com.kooo.evcam.telemetry.Readings;
@@ -929,6 +930,9 @@ public final class SentryAlerts implements Telemetry.Listener {
             if (outcome.ok && onDelivered != null) {
                 onDelivered.run();
             }
+            if (outcome.ok) {
+                sendClip(token, chatId, caption, markup);
+            }
             if (!outcome.ok) {
                 BlackBox.note("停车警报：发不出去（" + outcome.display() + "）");
                 notifyFailure(outcome.display());
@@ -1014,6 +1018,35 @@ public final class SentryAlerts implements Telemetry.Listener {
      * <p>一条警报发不出去是很要紧的事：车主以为有事会响，结果什么都没有。
      * 但也不能每 60 秒弹一次，所以这里自己再限一次频。</p>
      */
+    /**
+     * 警报的短视频：从环里切出最后 5 或 10 秒，发出去再删掉临时文件。
+     *
+     * <p>只在照片已经发出去之后才做：照片是那条一定会到的消息，视频是附加的。
+     * 写不出来、发不出去，都只记一行，不去打扰车主。</p>
+     */
+    private void sendClip(String token, String chatId, String caption, String markup) {
+        int seconds = config.getAlertsClipSeconds();
+        if (seconds <= 0) {
+            return;
+        }
+        java.io.File file = new java.io.File(app.getCacheDir(), "alert_clip.mp4");
+        CameraKeeper.get(app).writeClip(file, seconds, config.isAlertsClipAudio(), ok -> {
+            if (!ok || !file.isFile() || file.length() == 0) {
+                BlackBox.note("停车警报：短视频没写成（环里没有足够的画面）");
+                return;
+            }
+            sender.execute(() -> {
+                TelegramSender.Result result = TelegramSender.sendVideo(token, chatId, file, caption, markup);
+                if (!result.ok) {
+                    BlackBox.note("停车警报：短视频发不出去（" + result.display() + "）");
+                }
+                if (!file.delete()) {
+                    BlackBox.note("停车警报：临时视频删不掉");
+                }
+            });
+        });
+    }
+
     /**
      * 把一个异常式的理由压成一行能读的话。
      *

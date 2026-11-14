@@ -950,6 +950,37 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             });
         }
 
+        ListPreference clip = findPreference("pref_alerts_clip");
+        if (clip != null) {
+            clip.setPersistent(false);
+            clip.setEntries(new CharSequence[] {getString(R.string.opt_alerts_clip_off),
+                    getString(R.string.opt_alerts_clip_5), getString(R.string.opt_alerts_clip_10)});
+            clip.setEntryValues(new CharSequence[] {"0", "5", "10"});
+            clip.setValue(String.valueOf(appConfig.getAlertsClipSeconds()));
+            clip.setOnPreferenceChangeListener((preference, newValue) -> {
+                try {
+                    appConfig.setAlertsClipSeconds(Integer.parseInt(String.valueOf(newValue)));
+                } catch (NumberFormatException e) {
+                    appConfig.setAlertsClipSeconds(0);
+                }
+                com.kooo.evcam.blackbox.BlackBox.noteImportant(
+                        "设置变更: pref_alerts_clip → " + newValue);
+                showAlertsRows();
+                return true;
+            });
+        }
+
+        SwitchPreferenceCompat clipAudio = findPreference("pref_alerts_clip_audio");
+        if (clipAudio != null) {
+            clipAudio.setPersistent(false);
+            clipAudio.setChecked(appConfig.isAlertsClipAudio());
+            clipAudio.setOnPreferenceChangeListener((preference, newValue) -> {
+                boolean withSound = Boolean.TRUE.equals(newValue);
+                appConfig.setAlertsClipAudio(withSound);
+                return true;
+            });
+        }
+
         androidx.preference.SeekBarPreference sensitivity =
                 findPreference("pref_alerts_motion_sensitivity");
         if (sensitivity != null) {

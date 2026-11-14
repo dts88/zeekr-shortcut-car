@@ -137,6 +137,15 @@ Telegram Bot API，`api.telegram.org`，不需要自建服务器、不需要公�
 （要一个常驻的免费 Worker，已经有了雏形），或者拿住唤醒锁不让车机睡（12 V 电池的账要算，
 最多加时长上限）。哨兵模式开着时不需要任何一条 —— 车机本来就醒着。
 
+## 6.7 短视频：数据量
+
+`alerts_clip_seconds` 为 5 或 10 时，照片发出去之后再发一段同样长度的短视频，取的是环里已经编码好的样本
+（`ClipWindow` 选窗口、`CodecVideoRecorder.writeClipSeconds` 自己 mux），不重开相机、不重新编码、
+不碰正在写的文件。声音跟着画面走，`alerts_clip_audio` 关掉就是静音。
+
+每次警报的数据量：照片 < 1 MB；5 秒约 2–4 MB；10 秒约 5–8 MB。全部走车的 4G。Telegram 的上限是 50 MB，
+所以尺寸不是问题，**弱网才是**：所以照片永远是第一条，视频是附加的，上传失败只记一行、不重试到天亮。
+
 ## 7. 人为的悬崖
 
 - 环视那一路的 JPEG 出帧口在会话配置失败时是第一个被让出去的（`camera/ChannelRules.java`

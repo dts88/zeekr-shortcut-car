@@ -133,7 +133,9 @@ public class AppConfig {
     // 停车警报（Telegram）：开关、机器人令牌、会话号
     private static final String KEY_ALERTS_ENABLED = "alerts_enabled";
     private static final String KEY_ALERTS_TRIGGERS = "alerts_triggers";
-    private static final String KEY_ALERTS_MOTION_SENSITIVITY = "alerts_motion_sensitivity";  // 哪些事情算「有事」
+    private static final String KEY_ALERTS_MOTION_SENSITIVITY = "alerts_motion_sensitivity";
+    private static final String KEY_ALERTS_CLIP_SECONDS = "alerts_clip_seconds";  // 0 关 / 5 / 10
+    private static final String KEY_ALERTS_CLIP_AUDIO = "alerts_clip_audio";  // 哪些事情算「有事」
     private static final String KEY_ALERTS_TELEGRAM_TOKEN = "alerts_telegram_token";
     private static final String KEY_ALERTS_TELEGRAM_CHAT = "alerts_telegram_chat";
     private static final String KEY_ALERTS_OWNER_ID = "alerts_owner_id";  // 谁能发命令（私聊里就是会话号）
@@ -2225,6 +2227,26 @@ public class AppConfig {
     public void setAlertsMotionSensitivity(int level) {
         prefs.edit().putInt(KEY_ALERTS_MOTION_SENSITIVITY,
                 com.kooo.evcam.alarm.MotionSensitivity.clamp(level)).apply();
+    }
+
+    /** 警报时发一段短视频吗：0 关，5 或 10 秒。 */
+    public int getAlertsClipSeconds() {
+        int value = prefs.getInt(KEY_ALERTS_CLIP_SECONDS, 0);
+        return value == 5 || value == 10 ? value : 0;
+    }
+
+    public void setAlertsClipSeconds(int seconds) {
+        int clean = seconds == 5 || seconds == 10 ? seconds : 0;
+        prefs.edit().putInt(KEY_ALERTS_CLIP_SECONDS, clean).apply();
+    }
+
+    /** 短视频带不带声音（车上录着声音时才有）。 */
+    public boolean isAlertsClipAudio() {
+        return prefs.getBoolean(KEY_ALERTS_CLIP_AUDIO, true);
+    }
+
+    public void setAlertsClipAudio(boolean enabled) {
+        prefs.edit().putBoolean(KEY_ALERTS_CLIP_AUDIO, enabled).apply();
     }
 
     /** 令牌和会话号都填了：可以试着发一条。 */

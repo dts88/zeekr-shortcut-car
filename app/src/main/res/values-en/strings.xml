@@ -42,6 +42,14 @@
     <string name="set_alerts_probe_last_error">Last failure: %1$s</string>
     <string name="set_alerts_probe_reach_ok">Telegram reachable now: %1$s ms @%2$s</string>
     <string name="set_alerts_probe_reach_fail">Telegram unreachable now: %1$s</string>
+    <string name="set_alerts_clip_data_note">Data: one picture is under 1 MB; a 5 s video is about 2–4 MB, a 10 s video about 5–8 MB. All of it goes over the car’s own 4G and counts against your plan</string>
+    <string name="set_alerts_clip_title">Also send a short video</string>
+    <string name="set_alerts_clip_summary">After the picture, the last few seconds of the recording. Taken from what is already encoded, so the file being written is untouched</string>
+    <string name="opt_alerts_clip_off">Off</string>
+    <string name="opt_alerts_clip_5">5 seconds</string>
+    <string name="opt_alerts_clip_10">10 seconds</string>
+    <string name="set_alerts_clip_audio_title">Include sound</string>
+    <string name="set_alerts_clip_audio_summary">Only when the car records sound; off means a silent clip</string>
     <string name="set_alerts_motion_sensitivity_title">Motion sensitivity</string>
     <string name="set_alerts_motion_sensitivity_summary">1 is least sensitive, 10 the most. Raise it when it misses you; lower it when rain or insects set it off</string>
     <string name="set_alerts_probe_title">Check the alert link</string>

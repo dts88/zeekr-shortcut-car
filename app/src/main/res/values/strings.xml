@@ -56,6 +56,14 @@
     <string name="set_alerts_probe_last_error">上次失败：%1$s</string>
     <string name="set_alerts_probe_reach_ok">现在能连上 Telegram：%1$s 毫秒 @%2$s</string>
     <string name="set_alerts_probe_reach_fail">现在连不上 Telegram：%1$s</string>
+    <string name="set_alerts_clip_data_note">数据：一张照片不到 1 MB；5 秒视频约 2–4 MB，10 秒视频约 5–8 MB。都走车的 4G，每条警报都算在你的流量里</string>
+    <string name="set_alerts_clip_title">另外发一段短视频</string>
+    <string name="set_alerts_clip_summary">照片发出去之后，再发最后几秒的录像；不影响正在录的文件</string>
+    <string name="opt_alerts_clip_off">不发</string>
+    <string name="opt_alerts_clip_5">5 秒</string>
+    <string name="opt_alerts_clip_10">10 秒</string>
+    <string name="set_alerts_clip_audio_title">短视频带声音</string>
+    <string name="set_alerts_clip_audio_summary">车上录着声音时才有；不开就是静音的</string>
     <string name="set_alerts_motion_sensitivity_title">移动灵敏度</string>
     <string name="set_alerts_motion_sensitivity_summary">1 最不敏敏，10 最敏敏。它太少响就往右拉；雨、飞虫也响就往左拉</string>
     <string name="set_alerts_probe_title">检查警报链路</string>

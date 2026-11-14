@@ -3258,6 +3258,96 @@ public class CodecVideoRecorder {
      * 写不进就换盘：写过多留的那段先补写进新文件，这一个接着写进去；换不了，这个文件就算写不了
      * （{@link #failFile}），以前那样走编码器不健康 → 重建 → 写不进文件的裁判。</p>
      */
+    /**
+     * 把最后几秒写成一个单独的 MP4（停车警报的短视频）。
+     *
+     * <p>用的是环里已经编码好的样本：不重开相机、不重新编码，也不碰正在录的那个文件。
+     * 自己开一个 MediaMuxer、写到另一个文件里去，所以能在任何线程上调。</p>
+     *
+     * @param seconds      要多长（5、10）
+     * @param includeAudio 车上录着声音时，把声音也带上
+     * @return 写成了没有；没有可用的样本、参数不对、没地方写，都是 false
+     */
+    public boolean writeClipSeconds(java.io.File out, int seconds, boolean includeAudio) {
+        MediaFormat video = fileFormat;
+        if (out == null || seconds <= 0 || video == null) {
+            return false;
+        }
+        java.util.List<SampleRing.Sample> kept = ring.keptSnapshot();
+        if (kept.isEmpty()) {
+            return false;
+        }
+        long[] pts = new long[kept.size()];
+        boolean[] keyframe = new boolean[kept.size()];
+        boolean[] audio = new boolean[kept.size()];
+        long endUs = 0;
+        int videoCount = 0;
+        for (int i = 0; i < kept.size(); i++) {
+            SampleRing.Sample sample = kept.get(i);
+            pts[i] = sample.ptsUs;
+            keyframe[i] = sample.keyframe;
+            audio[i] = sample.audio;
+            if (!sample.audio) {
+                videoCount++;
+                endUs = Math.max(endUs, sample.ptsUs);
+            }
+        }
+        if (videoCount == 0) {
+            return false;
+        }
+        com.kooo.evcam.alarm.ClipWindow.Cut cut = com.kooo.evcam.alarm.ClipWindow.choose(
+                pts, keyframe, audio, endUs, seconds * 1_000_000L);
+        if (cut.isEmpty()) {
+            return false;
+        }
+        boolean withAudio = includeAudio && fileAudioFormat != null;
+        MediaMuxer clip = null;
+        try {
+            clip = new MediaMuxer(out.getAbsolutePath(), MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
+            int videoTrack = clip.addTrack(video);
+            int audioTrack = -1;
+            if (withAudio) {
+                audioTrack = clip.addTrack(fileAudioFormat);
+            }
+            clip.start();
+            MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
+            for (int i = cut.from; i < cut.to; i++) {
+                SampleRing.Sample sample = kept.get(i);
+                if (sample.audio && !withAudio) {
+                    continue;
+                }
+                if (sample.config) {
+                    // 参数集在 addTrack 的 format 里已经带上了；再写一遍会把时间轴搞乱
+                    continue;
+                }
+                long ptsUs = com.kooo.evcam.alarm.ClipWindow.relativeMs(sample.ptsUs, cut.baseUs) * 1000L;
+                info.set(0, sample.data.length, ptsUs, sample.flags);
+                clip.writeSampleData(sample.audio ? audioTrack : videoTrack,
+                        java.nio.ByteBuffer.wrap(sample.data), info);
+            }
+            return true;
+        } catch (java.io.IOException | RuntimeException e) {
+            AppLog.w(TAG, "clip write failed: " + e);
+            if (out.exists() && !out.delete()) {
+                AppLog.w(TAG, "clip file could not be deleted");
+            }
+            return false;
+        } finally {
+            if (clip != null) {
+                try {
+                    clip.stop();
+                } catch (RuntimeException ignored) {
+                    // 没 start 过或没写过任何东西：stop 会抛，不影响结论
+                }
+                try {
+                    clip.release();
+                } catch (RuntimeException ignored) {
+                    // 同上
+                }
+            }
+        }
+    }
+
     private void writeQueued(SampleRing.Sample sample) {
         if (fileFailed || muxer == null || !muxerStarted) {
             // 没有能写的文件：这个文件没开成、开轨失败、换盘也没换成。写不了的只能丢

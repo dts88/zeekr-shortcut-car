@@ -42,6 +42,14 @@
     <string name="set_alerts_probe_last_error">Kegagalan terakhir: %1$s</string>
     <string name="set_alerts_probe_reach_ok">Telegram boleh dicapai sekarang: %1$s ms @%2$s</string>
     <string name="set_alerts_probe_reach_fail">Telegram tidak dapat dicapai sekarang: %1$s</string>
+    <string name="set_alerts_clip_data_note">Data: satu gambar bawah 1 MB; video 5 saat kira-kira 2–4 MB, video 10 saat kira-kira 5–8 MB. Semuanya melalui 4G kereta dan dikira dalam pelan anda</string>
+    <string name="set_alerts_clip_title">Hantar juga video pendek</string>
+    <string name="set_alerts_clip_summary">Selepas gambar, beberapa saat terakhir rakaman. Diambil daripada yang sudah dikodkan, jadi fail yang sedang ditulis tidak disentuh</string>
+    <string name="opt_alerts_clip_off">Tidak</string>
+    <string name="opt_alerts_clip_5">5 saat</string>
+    <string name="opt_alerts_clip_10">10 saat</string>
+    <string name="set_alerts_clip_audio_title">Sertakan bunyi</string>
+    <string name="set_alerts_clip_audio_summary">Hanya apabila kereta merakam bunyi; mati bermakna video senyap</string>
     <string name="set_alerts_motion_sensitivity_title">Kepekaan gerakan</string>
     <string name="set_alerts_motion_sensitivity_summary">1 paling kurang peka, 10 paling peka. Naikkan jika ia terlepas pandang; turunkan jika hujan atau serangga mencetuskannya</string>
     <string name="set_alerts_probe_title">Periksa pautan makluman</string>

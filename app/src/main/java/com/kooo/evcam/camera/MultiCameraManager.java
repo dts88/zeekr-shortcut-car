@@ -5435,6 +5435,28 @@ public class MultiCameraManager {
      *
      * @return false：上一张还在拍，这一次不接
      */
+    /**
+     * 把环视那一路最后几秒写成一个 MP4（停车警报的短视频）。
+     *
+     * <p>先回到主线程拿到那一路的录制器（slot 表只在主线程上动），写文件放在后台线程。
+     * 取不到录制器、或者正在拍照那一刻没有用的样本，回 false。</p>
+     */
+    void writeClip(java.io.File out, int seconds, boolean includeAudio,
+                   java.util.function.Consumer<Boolean> done) {
+        mainHandler.post(() -> {
+            Slot slot = slots.get(com.kooo.evcam.camera.CameraSlots.KEY_SURROUND);
+            CodecVideoRecorder recorder = slot == null ? null : slot.recorder;
+            if (recorder == null) {
+                done.accept(false);
+                return;
+            }
+            new Thread(() -> {
+                boolean ok = recorder.writeClipSeconds(out, seconds, includeAudio);
+                done.accept(ok);
+            }, "alert-clip").start();
+        });
+    }
+
     public boolean takePhoto(PhotoCallback callback) {
         if (android.os.Looper.myLooper() != android.os.Looper.getMainLooper()) {
             mainHandler.post(() -> takePhoto(callback));
