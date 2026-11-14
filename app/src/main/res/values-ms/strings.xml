@@ -1065,7 +1065,7 @@
     <string name="dev_side_view_calibration_title">Kalibrasi paparan titik buta</string>
     <string name="dev_side_view_calibration_value">Belakang %1$d° · Luar %2$d° · Medan %3$d°</string>
     <string name="dev_playback_read_durations_title">Main semula video: baca tempoh setiap klip</string>
-    <string name="dev_playback_read_durations_summary">Setiap klip dibuka untuk membaca tempohnya sebelum klip dikumpulkan menjadi rakaman, jadi senarai muncul lebih lambat. Secara lalai klip dikumpulkan mengikut nama fail dan masa fail. Hidupkan jika pengumpulan salah. Berkuat kuasa apabila main semula video dibuka lagi.</string>
+    <string name="dev_playback_read_durations_summary">Setiap klip dibuka untuk membaca tempohnya sebelum dikumpulkan, lebih lambat. Hidupkan jika pengumpulan salah.</string>
     <string name="dev_repair_mp4_title">Baiki rakaman tanpa indeks</string>
     <string name="dev_repair_mp4_summary">Klip yang terputus secara tiba-tiba, contohnya kerana kuasa terputus, tiada indeks dan tidak boleh dimainkan. Indeks dibina semula daripada klip sihat kamera yang sama; nama fail kekal.</string>
     <string name="dev_repair_refuse_recording">Tidak dapat membaiki semasa merakam: klip yang sedang dirakam juga tiada indeks, jadi ia tidak dapat dibezakan daripada klip yang terputus. Hentikan rakaman dahulu.</string>
