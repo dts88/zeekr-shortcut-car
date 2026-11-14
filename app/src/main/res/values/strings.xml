@@ -47,6 +47,11 @@
     <string name="set_alerts_find_title">找会话号</string>
     <string name="set_alerts_find_summary">用已填的令牌去问 Telegram，把最近给机器人发过话的会话填上</string>
     <string name="alert_caption_requested">要求于 %1$s（那时车在睡）</string>
+    <string name="alert_word_hazard">双闪</string>
+    <string name="alert_word_lit">亮</string>
+    <string name="alert_word_dark">灭</string>
+    <string name="set_alerts_probe_signals">信号：%1$s，车灯 %2$s，屏幕 %3$s</string>
+    <string name="set_alerts_probe_motion">画面取样：%1$s，已取 %2$s 次，最近一次 %3$s（阈值 %4$s）</string>
     <string name="set_alerts_probe_last_ok">上次问成：%1$s</string>
     <string name="set_alerts_probe_last_error">上次失败：%1$s</string>
     <string name="set_alerts_probe_reach_ok">现在能连上 Telegram：%1$s 毫秒 @%2$s</string>

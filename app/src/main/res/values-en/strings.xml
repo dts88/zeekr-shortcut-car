@@ -33,6 +33,11 @@
     <string name="set_alerts_find_title">Find chat id</string>
     <string name="set_alerts_find_summary">Ask Telegram with the token above and fill in the chat that last messaged the bot</string>
     <string name="alert_caption_requested">Asked at %1$s (the car was asleep then)</string>
+    <string name="alert_word_hazard">hazards</string>
+    <string name="alert_word_lit">on</string>
+    <string name="alert_word_dark">off</string>
+    <string name="set_alerts_probe_signals">Signals: %1$s, lamps %2$s, screen %3$s</string>
+    <string name="set_alerts_probe_motion">Motion sampling: %1$s, %2$s samples, last %3$s (threshold %4$s)</string>
     <string name="set_alerts_probe_last_ok">Last successful poll: %1$s</string>
     <string name="set_alerts_probe_last_error">Last failure: %1$s</string>
     <string name="set_alerts_probe_reach_ok">Telegram reachable now: %1$s ms @%2$s</string>

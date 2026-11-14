@@ -40,6 +40,13 @@ public final class MotionTap {
     private volatile boolean wanted;
     private volatile Listener listener;
     private long lastSampleAt;
+    /**
+     * 取过几次样、最近一次的分数：不出警报时，这两个数字是唯一能看到
+     * “它到底看没看见”的东西。
+     */
+    private volatile int samples;
+    private volatile double lastScore;
+    private volatile long lastSampleWallClock;
     private int[] previous;
     private int[] current;
 
@@ -87,12 +94,30 @@ public final class MotionTap {
         int[] swap = previous;
         previous = current;
         current = swap;
+        samples++;
+        lastScore = score;
+        lastSampleWallClock = System.currentTimeMillis();
         if (score > 0) {
             Listener target = listener;
             if (target != null) {
                 target.onMotionScore(score);
             }
         }
+    }
+
+    /** 取过多少次样。 */
+    public int samples() {
+        return samples;
+    }
+
+    /** 最近一次的分数（过滤之后）；0 表示没动或者还没取过样。 */
+    public double lastScore() {
+        return lastScore;
+    }
+
+    /** 最近一次取样的时刻（壁钟）；0 表示没取过。 */
+    public long lastSampleWallClock() {
+        return lastSampleWallClock;
     }
 
     /** 下一次从头算（比如刚从开车变成停车）。 */

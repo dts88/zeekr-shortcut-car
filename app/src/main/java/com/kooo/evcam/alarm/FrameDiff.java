@@ -21,14 +21,20 @@ public final class FrameDiff {
     /** 整幅平均亮度跳这么多（0–1）就当曝光变了，直接不算。 */
     public static final double EXPOSURE_JUMP = 0.22;
 
-    /** 超过这个平均差（0–1）算「有东西」。10 fps 下走过的人大约 0.06–0.20。 */
-    public static final double DEFAULT_THRESHOLD = 0.03;
+    /**
+     * 超过这个平均差（0–1）算「有东西」。
+     *
+     * <p>128×72 的小图里，十几米外走过的人只占百分之一两的像素，
+     * 平均差只有 0.01–0.03。阈值定在 0.03 时它根本不会响——
+     * 测过了「人在车边走”却没警报”就是这个原因。</p>
+     */
+    public static final double DEFAULT_THRESHOLD = 0.012;
 
     /** 单像素差多少算「显著变化」（0–255）。低于它是噪声。 */
     public static final int SIGNIFICANT_DELTA = 24;
 
     /** 显著变化的像素至少占这么多（0–1）。 */
-    public static final double MIN_CHANGED_FRACTION = 0.02;
+    public static final double MIN_CHANGED_FRACTION = 0.008;
 
     private FrameDiff() {
     }

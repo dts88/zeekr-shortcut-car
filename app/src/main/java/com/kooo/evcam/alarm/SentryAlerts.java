@@ -133,6 +133,16 @@ public final class SentryAlerts implements Telemetry.Listener {
     private TelegramPoller poller;
     /** 上一次看到的「哨兵模式开着」：变了就重看一次要不要轮询。 */
     private boolean pollerOn;
+    /** 现在有没有在取画面移动的样（只用来记一次“开始 / 停下”）。 */
+    private boolean sampling;
+    /** 诊断：上一次把“看到的信号”写进黑匣子是什么时候（限流）。 */
+    private long lastWatchNoteAt;
+    /** 诊断：上一次写“还在看着”心跳的时候。 */
+    private long lastHeartbeatAt;
+    /** 上一次看到的“停着且布防”。 */
+    private boolean lastArmedForWatch;
+    /** 上一次读到的哨兵原值（锁上车后总线寝下去时还能用它判）。 */
+    private Integer lastSentryReading;
 
     /**
      * 车睡了一阵才醒过来时，配文里写上这张照片是几点要的。
@@ -222,14 +232,15 @@ public final class SentryAlerts implements Telemetry.Listener {
     /**
      * 照设置开或关那条轮询线程。
      *
-     * <p>四件事都成立才问：开着警报、令牌与会话号都填了、允许回应命令、<b>哨兵模式开着</b>。
-     * 最后一条不是可有可无的：哨兵模式开着时车机一直醒着（平台笔记 §3.6），这条线程才有意义；
-     * 哨兵关掉之后车机会在几分钟内下电、进程被结束，那时既问不到也没有照片可拍 ——
-     * 与其留一条必然要死的线程，不如当场停掉。</p>
+     * <p>三件事成立就问：开着警报、令牌与会话号都填了、允许回应命令。</p>
+     *
+     * <p>以前还要一条“哨兵模式开着”，那是错的：锁上车之后车辆总线容易寝下去，
+     * 哨兵读数读不到（null），于是轮询根本不起来 —— 现场就是“锁了就不回应，一解锁就好”。
+     * 进程还活着、设置也开着，就没有理由不问。</p>
      */
     private void syncPoller() {
         boolean want = config.isAlertsEnabled() && config.hasAlertsTelegramConfig()
-                && config.isAlertsCommands() && sentryOn();
+                && config.isAlertsCommands();
         if (want == (poller != null)) {
             return;
         }
@@ -276,12 +287,7 @@ public final class SentryAlerts implements Telemetry.Listener {
         }
         long now = SystemClock.elapsedRealtime();
         VehicleState state = Telemetry.get().latest();
-        if (!sentryOn()) {
-            // 哨兵关掉之后车机就要睡了：拍不了，也别假装拍
-            deliverText(token, chatId, app.getString(R.string.alert_cmd_no_sentry));
-            return;
-        }
-        if (state == null || !"P".equals(state.gear)) {
+        if (!parkedNow(state)) {
             deliverText(token, chatId, app.getString(R.string.alert_cmd_not_parked));
             return;
         }
@@ -402,6 +408,16 @@ public final class SentryAlerts implements Telemetry.Listener {
         out.append(app.getString(R.string.set_alerts_probe_offset,
                 String.valueOf(config.getAlertsCommandOffset()))).append('\n');
         long lastOk = poller == null ? 0 : poller.lastOkAt();
+        Readings now = Telemetry.get().readings();
+        out.append(app.getString(R.string.set_alerts_probe_signals,
+                hazardOn(now) == null ? "?" : (hazardOn(now) ? "\u53cc\u95ea" : "-"),
+                lampsOn(now) == null ? "?" : (lampsOn(now) ? "\u4eae" : "\u706d"),
+                screenLit(now.code(Signal.SCREEN_POWER_EVENT)) == null ? "?" : (screenLit(now.code(Signal.SCREEN_POWER_EVENT)) ? "\u4eae" : "\u9ed1"))).append('\n');
+        int samples = motion.samples();
+        out.append(app.getString(R.string.set_alerts_probe_motion,
+                (sampling ? "on" : "off"), String.valueOf(samples),
+                String.format(Locale.US, "%.3f", motion.lastScore()),
+                String.format(Locale.US, "%.3f", FrameDiff.DEFAULT_THRESHOLD))).append('\n');
         out.append(app.getString(R.string.set_alerts_probe_last_ok,
                 lastOk == 0 ? "never" : (System.currentTimeMillis() - lastOk) / 1000 + "s ago"));
         String lastError = poller == null ? "" : poller.lastError();
@@ -427,6 +443,25 @@ public final class SentryAlerts implements Telemetry.Listener {
                 app.getMainExecutor().execute(() -> callback.onResult(watchingNow, line));
             });
         }
+    }
+
+    /**
+     * 每十分钟说一句“还在看着”。
+     *
+     * <p>诊断报告里有没有这一行，直接回答一个问题：警报那一刻这个进程到底在不在。</p>
+     */
+    private void heartbeatIfDue() {
+        if (!watching) {
+            return;
+        }
+        long now = SystemClock.elapsedRealtime();
+        if (lastHeartbeatAt != 0 && now - lastHeartbeatAt < 10 * 60_000L) {
+            return;
+        }
+        lastHeartbeatAt = now;
+        VehicleState state = Telemetry.get().latest();
+        BlackBox.note("停车警报：还在看着（哨兵 " + (state == null ? "?" : state.sentry)
+                + "，挡位 " + (state == null || state.gear == null ? "?" : state.gear) + "）");
     }
 
     /**
@@ -485,12 +520,18 @@ public final class SentryAlerts implements Telemetry.Listener {
         long now = SystemClock.elapsedRealtime();
         Telemetry telemetry = Telemetry.get();
         VehicleState state = telemetry.latest();
-        boolean parked = state != null && "P".equals(state.gear);
+        boolean parked = parkedNow(state);
         Integer sentry = state == null ? null : state.sentry;
+        if (sentry != null) {
+            lastSentryReading = sentry;
+        }
         // 「布防 = 锁着」：解锁那一下哨兵就 2 → 1 了，车主回来之后的亮屏、亮灯都发不出去（SentryFacts）。
-        boolean armed = SentryFacts.armed(sentry);
+        // 锁上车之后总线可能寝下去、哨兵读成 null：那时用上一次真实读到的值，
+        // 否则“锁着、哨兵开着”这个最该发警报的场景反而永远不发。
+        boolean armed = SentryFacts.armed(sentry != null ? sentry : lastSentryReading);
         policy.setParked(parked);
         policy.setArmed(armed);
+        lastArmedForWatch = armed && parked;
         // 轮询线程的开关照四件事实重算（开着警报、填了令牌与会话号、允许回应命令、哨兵开着）。
         // 不只在哨兵位翻转时看：进程刚起来时哨兵还没读到，读到了就得把线程带起来。
         pollerOn = sentryOn();
@@ -506,8 +547,28 @@ public final class SentryAlerts implements Telemetry.Listener {
         Boolean screenOn = screenLit(readings.code(Signal.SCREEN_POWER_EVENT));
         boolean screenRising = SentryFacts.rising(screenOn, lastScreenOn);
 
-        // 画面移动只在停着、布防、录着的时候取样：开车时画面本来就在动
-        motion.setWanted(watching && parked && armed && triggers.has(TriggerSet.MOTION));
+        heartbeatIfDue();
+
+        // 取样的条件比“发警报”宽一点：停着、哨兵开着就取。
+        // 为什么不要求已布防：车主拿着钥匙走过去时车会解锁，哨兵从 2 退到 1，
+        // 要求布防就会把“正好有人走过”这一刻也关掉，根本验不了。
+        // 发不发警报仍然由 {@link AlertPolicy}（要布防）决定。
+        boolean wantSample = watching && parked && triggers.has(TriggerSet.MOTION);
+        if (wantSample != sampling) {
+            sampling = wantSample;
+            if (wantSample) {
+                BlackBox.note("停车警报：开始看画面移动");
+            } else {
+                BlackBox.note("停车警报：不看画面了（"
+                        + (!watching ? "警报未开" : !parked ? "车在走"
+                        : "移动不在勾选里") + "）");
+            }
+            motion.setWanted(wantSample);
+        }
+
+        // 诊断：车上真正响了一次、而我们没发消息时，要能从诊断报告里看出
+        // “那一刻哪些信号动了”。只在假车、布防时记，每 3 秒最多一行。
+        watchSignals(hazard, flash, lamps, screenOn);
 
         lastHazard = hazard;
         lastFlash = flash;
@@ -548,6 +609,42 @@ public final class SentryAlerts implements Telemetry.Listener {
     }
 
     /**
+     * 假车、布防时，把“看到的信号”写一行进黑匣子。
+     *
+     * <p>这不是警报，是证据：车自己响了、我们却没发消息时，诊断报告里就能看出
+     * 当时哪一项真的变了、哪一项根本没动。没变化就不写。</p>
+     */
+    private void watchSignals(Boolean hazard, Boolean flash, Boolean lamps, Boolean screenOn) {
+        if (!watching || !lastArmedForWatch) {
+            return;
+        }
+        StringBuilder changed = new StringBuilder();
+        appendChange(changed, "hazard", lastHazard, hazard);
+        appendChange(changed, "flash", lastFlash, flash);
+        appendChange(changed, "lamps", lastLamps, lamps);
+        appendChange(changed, "screen", lastScreenOn, screenOn);
+        if (changed.length() == 0) {
+            return;
+        }
+        long now = SystemClock.elapsedRealtime();
+        if (lastWatchNoteAt != 0 && now - lastWatchNoteAt < 3_000L) {
+            return;
+        }
+        lastWatchNoteAt = now;
+        BlackBox.note("停车警报：看到信号变化 " + changed);
+    }
+
+    private static void appendChange(StringBuilder out, String name, Boolean before, Boolean after) {
+        if (after == null || after.equals(before)) {
+            return;
+        }
+        if (out.length() > 0) {
+            out.append('、');
+        }
+        out.append(name).append(after ? "=on" : "=off");
+    }
+
+    /**
      * 画面里有东西在动（编码器线程送来的分数）。
      *
      * <p>分数已经过了 {@link FrameDiff} 的三道过滤；这里只看车是不是该报。</p>
@@ -559,10 +656,9 @@ public final class SentryAlerts implements Telemetry.Listener {
         }
         long now = SystemClock.elapsedRealtime();
         VehicleState state = Telemetry.get().latest();
-        boolean parked = state != null && "P".equals(state.gear);
         Integer sentry = state == null ? null : state.sentry;
-        policy.setParked(parked);
-        policy.setArmed(SentryFacts.armed(sentry));
+        policy.setParked(parkedNow(state));
+        policy.setArmed(SentryFacts.armed(sentry != null ? sentry : lastSentryReading));
         AlertPolicy.Decision decision = policy.decide(now);
         String headline = app.getString(R.string.alert_headline_motion);
         if (decision != AlertPolicy.Decision.ALLOW) {
@@ -771,6 +867,20 @@ public final class SentryAlerts implements Telemetry.Listener {
     private Integer sentryValue() {
         VehicleState state = Telemetry.get().latest();
         return state == null ? null : state.sentry;
+    }
+
+    /**
+     * 车现在停着吗。
+     *
+     * <p>不能只认挡位是 "P"：车锁上、车机就寝时，挡位读不到（null），
+     * 而那正是哨兵要发挥作用的时候。认 null 为“没在开车” = 停着，
+     * 跟录像那边判“在开车”用的是同一条规则。</p>
+     */
+    private static boolean parkedNow(VehicleState state) {
+        if (state == null) {
+            return true;
+        }
+        return !com.kooo.evcam.camera.ChannelRules.driving(state.gear, state.speedKmh);
     }
 
     /**

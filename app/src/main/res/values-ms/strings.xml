@@ -33,6 +33,11 @@
     <string name="set_alerts_find_title">Cari id sembang</string>
     <string name="set_alerts_find_summary">Tanya Telegram dengan token di atas dan isi sembang yang terakhir menghantar mesej kepada bot</string>
     <string name="alert_caption_requested">Diminta pada %1$s (kereta tidur ketika itu)</string>
+    <string name="alert_word_hazard">hazard</string>
+    <string name="alert_word_lit">nyala</string>
+    <string name="alert_word_dark">mati</string>
+    <string name="set_alerts_probe_signals">Isyarat: %1$s, lampu %2$s, skrin %3$s</string>
+    <string name="set_alerts_probe_motion">Persampelan gerakan: %1$s, %2$s sampel, terakhir %3$s (ambang %4$s)</string>
     <string name="set_alerts_probe_last_ok">Undian berjaya terakhir: %1$s</string>
     <string name="set_alerts_probe_last_error">Kegagalan terakhir: %1$s</string>
     <string name="set_alerts_probe_reach_ok">Telegram boleh dicapai sekarang: %1$s ms @%2$s</string>
