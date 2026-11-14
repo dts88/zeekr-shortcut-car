@@ -1,6 +1,7 @@
 /*
  * Zeekr Shortcut - https://github.com/dts88/zeekr-shortcut-car
  * Copyright (C) 2026 dts88
+ * Portions Copyright (C) 2026 Fab (Fabbbrrr) - https://github.com/Fabbbrrr
  * Portions Copyright (C) suyunkai and the EVCam contributors - https://github.com/suyunkai/EVCam
  * Portions Copyright (C) 2026 wysie - https://github.com/wysie
  * SPDX-License-Identifier: GPL-3.0-only
