@@ -135,7 +135,10 @@ public class AppConfig {
     private static final String KEY_ALERTS_TRIGGERS = "alerts_triggers";
     private static final String KEY_ALERTS_MOTION_SENSITIVITY = "alerts_motion_sensitivity";
     private static final String KEY_ALERTS_CLIP_SECONDS = "alerts_clip_seconds";  // 0 关 / 5 / 10
-    private static final String KEY_ALERTS_CLIP_AUDIO = "alerts_clip_audio";  // 哪些事情算「有事」
+    private static final String KEY_ALERTS_CLIP_AUDIO = "alerts_clip_audio";
+    private static final String KEY_ALERTS_QUIET_ENABLED = "alerts_quiet_enabled";
+    private static final String KEY_ALERTS_QUIET_START = "alerts_quiet_start";
+    private static final String KEY_ALERTS_QUIET_END = "alerts_quiet_end";  // 哪些事情算「有事」
     private static final String KEY_ALERTS_TELEGRAM_TOKEN = "alerts_telegram_token";
     private static final String KEY_ALERTS_TELEGRAM_CHAT = "alerts_telegram_chat";
     private static final String KEY_ALERTS_OWNER_ID = "alerts_owner_id";  // 谁能发命令（私聊里就是会话号）
@@ -2259,6 +2262,35 @@ public class AppConfig {
 
     public void setAlertsClipAudio(boolean enabled) {
         prefs.edit().putBoolean(KEY_ALERTS_CLIP_AUDIO, enabled).apply();
+    }
+
+    /** 安静时段开不开。默认关。 */
+    public boolean isAlertsQuietEnabled() {
+        return prefs.getBoolean(KEY_ALERTS_QUIET_ENABLED, false);
+    }
+
+    public void setAlertsQuietEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_ALERTS_QUIET_ENABLED, enabled).apply();
+    }
+
+    public int getAlertsQuietStart() {
+        return com.kooo.evcam.alarm.QuietHours.clampMinute(
+                prefs.getInt(KEY_ALERTS_QUIET_START, com.kooo.evcam.alarm.QuietHours.DEFAULT_START_MIN));
+    }
+
+    public void setAlertsQuietStart(int minute) {
+        prefs.edit().putInt(KEY_ALERTS_QUIET_START,
+                com.kooo.evcam.alarm.QuietHours.clampMinute(minute)).apply();
+    }
+
+    public int getAlertsQuietEnd() {
+        return com.kooo.evcam.alarm.QuietHours.clampMinute(
+                prefs.getInt(KEY_ALERTS_QUIET_END, com.kooo.evcam.alarm.QuietHours.DEFAULT_END_MIN));
+    }
+
+    public void setAlertsQuietEnd(int minute) {
+        prefs.edit().putInt(KEY_ALERTS_QUIET_END,
+                com.kooo.evcam.alarm.QuietHours.clampMinute(minute)).apply();
     }
 
     /** 令牌和会话号都填了：可以试着发一条。 */

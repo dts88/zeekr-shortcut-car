@@ -33,8 +33,16 @@ public final class TriggerSet {
     /** 设置里列出来的顺序。 */
     public static final String[] ALL = {MOTION, HAZARD, FLASH, DOORS, LAMPS, SCREEN};
 
-    /** 默认全开：这些都是“车上真的会发生”的事，嫁默认关了等于没做。 */
-    public static final String DEFAULT = MOTION + "," + HAZARD + "," + FLASH + ","
+    /**
+     * 默认只开车自己会做的那几项：它觉得有事时间亮灯、闪双闪、亮屏。
+     *
+     * <p>其余三项（画面移动、远光闪、车门）默认关：它们可能比车自己的判断更敏敏或更钝，
+     * 留给车主自己决定 —— 一个默认值不该替他们挑。</p>
+     */
+    public static final String DEFAULT = HAZARD + "," + LAMPS + "," + SCREEN;
+
+    /** “全开”：设置界面上一键勾全部时用的就是它自己。 */
+    public static final String ALL_ON = MOTION + "," + HAZARD + "," + FLASH + ","
             + DOORS + "," + LAMPS + "," + SCREEN;
 
     private final Set<String> enabled;

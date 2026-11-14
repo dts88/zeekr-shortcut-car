@@ -59,6 +59,12 @@
     <string name="set_alerts_probe_sentry">%1$s</string>
     <string name="set_alerts_probe_gear">Gear: %1$s</string>
     <string name="set_alerts_probe_offset">Handled up to: %1$s</string>
+    <string name="set_alerts_quiet_title">Quiet hours</string>
+    <string name="set_alerts_quiet_summary">No alerts during this window. With the car at home, a passer-by at night stays silent</string>
+    <string name="set_alerts_quiet_start_title">From</string>
+    <string name="set_alerts_quiet_end_title">Until</string>
+    <string name="set_alerts_quiet_hint">HH:mm, for example 22:00</string>
+    <string name="set_alerts_quiet_bad_time">That is not a time. Try HH:mm, for example 22:00</string>
     <string name="set_alerts_triggers_title">What counts as something</string>
     <string name="set_alerts_triggers_none">Nothing selected, so no alert will be sent</string>
     <string name="alert_trigger_motion">Something moves in view</string>

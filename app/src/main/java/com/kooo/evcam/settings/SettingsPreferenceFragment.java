@@ -957,9 +957,23 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         }
         show("pref_alerts_motion_sensitivity", alertsOn && shownTriggers.has(
                 com.kooo.evcam.alarm.TriggerSet.MOTION));
+        boolean quietOn = appConfig.isAlertsQuietEnabled();
+        show("pref_alerts_quiet_start", alertsOn && quietOn);
+        show("pref_alerts_quiet_end", alertsOn && quietOn);
         show("pref_alerts_cameras", alertsOn && perCamera);
         show("pref_alerts_clip_audio", alertsOn && clipOn);
         show("pref_alerts_clip_data", alertsOn && clipOn);
+
+        Preference quietStart = findPreference("pref_alerts_quiet_start");
+        if (quietStart != null) {
+            quietStart.setSummary(com.kooo.evcam.alarm.QuietHours.format(
+                    appConfig.getAlertsQuietStart()));
+        }
+        Preference quietEnd = findPreference("pref_alerts_quiet_end");
+        if (quietEnd != null) {
+            quietEnd.setSummary(com.kooo.evcam.alarm.QuietHours.format(
+                    appConfig.getAlertsQuietEnd()));
+        }
 
         Preference triggersRow = findPreference("pref_alerts_triggers");
         if (triggersRow != null) {
@@ -1000,6 +1014,22 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 return true;
             });
         }
+
+        SwitchPreferenceCompat quiet = findPreference("pref_alerts_quiet");
+        if (quiet != null) {
+            quiet.setPersistent(false);
+            quiet.setChecked(appConfig.isAlertsQuietEnabled());
+            quiet.setOnPreferenceChangeListener((preference, newValue) -> {
+                boolean quietWanted = Boolean.TRUE.equals(newValue);
+                appConfig.setAlertsQuietEnabled(quietWanted);
+                com.kooo.evcam.blackbox.BlackBox.noteImportant("设置变更: pref_alerts_quiet → "
+                        + (quietWanted ? "开" : "关"));
+                showAlertsRows();
+                return true;
+            });
+        }
+        bindAlertsQuietRow("pref_alerts_quiet_start", true);
+        bindAlertsQuietRow("pref_alerts_quiet_end", false);
 
         androidx.preference.SeekBarPreference sensitivity =
                 findPreference("pref_alerts_motion_sensitivity");
@@ -1155,6 +1185,35 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             default:
                 return getString(R.string.alert_trigger_screen);
         }
+    }
+
+    /** 安静时段的一头（{@code HH:mm}）。 */
+    private void bindAlertsQuietRow(String key, boolean start) {
+        Preference row = findPreference(key);
+        if (row == null) {
+            return;
+        }
+        row.setPersistent(false);
+        row.setOnPreferenceClickListener(preference -> {
+            int current = start ? appConfig.getAlertsQuietStart() : appConfig.getAlertsQuietEnd();
+            showTextDialog(key, getString(start ? R.string.set_alerts_quiet_start_title
+                            : R.string.set_alerts_quiet_end_title),
+                    getString(R.string.set_alerts_quiet_hint),
+                    com.kooo.evcam.alarm.QuietHours.format(current), value -> {
+                        int minute = com.kooo.evcam.alarm.QuietHours.parse(value);
+                        if (minute < 0) {
+                            toast(getString(R.string.set_alerts_quiet_bad_time));
+                            return;
+                        }
+                        if (start) {
+                            appConfig.setAlertsQuietStart(minute);
+                        } else {
+                            appConfig.setAlertsQuietEnd(minute);
+                        }
+                        showAlertsRows();
+                    });
+            return true;
+        });
     }
 
     /** 勾要哪几路。四路都勾就等于「全部」。 */

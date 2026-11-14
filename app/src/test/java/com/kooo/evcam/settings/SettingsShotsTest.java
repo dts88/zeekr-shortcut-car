@@ -65,6 +65,22 @@ public class SettingsShotsTest {
         shoot(Shots.DAY, "day-on");
     }
 
+    /** 同一张开关全开的图，英文：PR 里要用的那一张方便讨论。 */
+    @Test
+    public void englishSectionsWithEverythingOn() {
+        AppConfig config = new AppConfig(RuntimeEnvironment.getApplication());
+        config.setRearViewEnabled(true);
+        config.setSideViewEnabled(true);
+        config.setDriveSoundEnabled(true);
+        config.setAlertsEnabled(true);
+        config.setAlertsTelegramToken("123456789:AAHexampleTOKENvalue0123456789");
+        config.setAlertsTelegramChatId("123456789");
+        config.setAlertsOwnerId("123456789");
+        config.setAlertsClipSeconds(10);
+        config.setAlertsQuietEnabled(true);
+        shoot(Shots.DAY_EN, "en-on");
+    }
+
     /**
      * 「按键」页里绑定的灵动贴（项目所有者 2026-11-14「名称 / 位置」）：起了名字的显示名字、默认名（带短编号）挪到下面那一行；
      * 没起的照旧是默认名。存着的名字再怪（这里直接往存储里塞一段带标签、格式符、换行、方向控制符的长字，像是从改过的

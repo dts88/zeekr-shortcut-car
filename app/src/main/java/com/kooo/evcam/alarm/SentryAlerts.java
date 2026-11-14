@@ -123,6 +123,17 @@ public final class SentryAlerts implements Telemetry.Listener {
      * 发照片、发文字都排这一条线程：一条一条来，不并发（Telegram 有频率限制），
      * 也不为每条消息各起一个没人管的线程。
      */
+    /**
+     * 延后一半时长再切短视频用的。和发送那条线程分开，
+     * 否则等这几秒会把后面的照片也堵在后面。
+     */
+    private final java.util.concurrent.ScheduledExecutorService clipDelay =
+            java.util.concurrent.Executors.newSingleThreadScheduledExecutor(runnable -> {
+                Thread thread = new Thread(runnable, "alert-clip-delay");
+                thread.setDaemon(true);
+                return thread;
+            });
+
     private final java.util.concurrent.ExecutorService sender =
             java.util.concurrent.Executors.newSingleThreadExecutor(runnable -> {
                 Thread thread = new Thread(runnable, "telegram-send");
@@ -756,6 +767,10 @@ public final class SentryAlerts implements Telemetry.Listener {
             headline = app.getString(R.string.alert_headline_screen);
         }
 
+        if (quietNow()) {
+            BlackBox.note("alerts: " + headline + " seen, quiet hours");
+            return;
+        }
         AlertPolicy.Decision decision = policy.decide(now);
         if (decision != AlertPolicy.Decision.ALLOW) {
             BlackBox.note("alerts: " + headline + " seen, not sent (" + decision + ")");
@@ -803,6 +818,21 @@ public final class SentryAlerts implements Telemetry.Listener {
     }
 
     /**
+     * 现在是不是安静时段。
+     *
+     * <p>车停在家里、小区里的夜晚，有人走过、猫踏过都会响；那不是车主要知道的事。
+     * 发不发由 {@link QuietHours} 算（跨午夜也算得对）。</p>
+     */
+    private boolean quietNow() {
+        if (!config.isAlertsQuietEnabled()) {
+            return false;
+        }
+        java.util.Calendar now = java.util.Calendar.getInstance();
+        int minute = now.get(java.util.Calendar.HOUR_OF_DAY) * 60 + now.get(java.util.Calendar.MINUTE);
+        return QuietHours.active(true, config.getAlertsQuietStart(), config.getAlertsQuietEnd(), minute);
+    }
+
+    /**
      * 画面里有东西在动（编码器线程送来的分数）。
      *
      * <p>分数已经过了 {@link FrameDiff} 的三道过滤；这里只看车是不是该报。</p>
@@ -817,8 +847,12 @@ public final class SentryAlerts implements Telemetry.Listener {
         Integer sentry = state == null ? null : state.sentry;
         policy.setParked(parkedNow(state));
         policy.setArmed(SentryFacts.armed(sentry != null ? sentry : lastSentryReading));
-        AlertPolicy.Decision decision = policy.decide(now);
         String headline = app.getString(R.string.alert_headline_motion);
+        if (quietNow()) {
+            BlackBox.note("alerts: motion seen, quiet hours");
+            return;
+        }
+        AlertPolicy.Decision decision = policy.decide(now);
         if (decision != AlertPolicy.Decision.ALLOW) {
             BlackBox.note("alerts: motion seen, not sent (" + decision + ")");
             return;
@@ -1089,7 +1123,11 @@ public final class SentryAlerts implements Telemetry.Listener {
         // 名字带时间戳：两条警报挨得近时不会互相覆盖
         java.io.File file = new java.io.File(app.getCacheDir(),
                 "alert_clip_" + System.currentTimeMillis() + ".mp4");
-        CameraKeeper.get(app).writeClip(file, seconds, config.isAlertsClipAudio(), ok -> {
+        // 要的是“那一刻”：环里只有已经录过的画面，所以等一半时长再切，
+        // 切出来的那段就是一半在事情之前、一半在之后。
+        long waitMs = seconds * 1000L / 2L;
+        clipDelay.schedule(() -> CameraKeeper.get(app).writeClip(file, seconds,
+                config.isAlertsClipAudio(), ok -> {
             if (!ok || !file.isFile() || file.length() == 0) {
                 BlackBox.note("alerts: no clip (ring holds too little video)");
                 return;
@@ -1105,7 +1143,7 @@ public final class SentryAlerts implements Telemetry.Listener {
                     BlackBox.note("alerts: temp clip could not be deleted");
                 }
             });
-        });
+        }), waitMs, java.util.concurrent.TimeUnit.MILLISECONDS);
     }
 
     /**

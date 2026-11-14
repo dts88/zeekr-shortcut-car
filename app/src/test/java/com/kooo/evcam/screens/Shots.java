@@ -38,6 +38,8 @@ public final class Shots {
     public static final String DAY = "zh-rCN-w1600dp-h848dp-land-notnight-xhdpi";
     /** 车机应用区域，中文，夜间。 */
     public static final String NIGHT = "zh-rCN-w1600dp-h848dp-land-night-xhdpi";
+    /** 同一尺寸、白天，英文：给上游的 PR 和不读中文的人看。 */
+    public static final String DAY_EN = "en-rUS-w1600dp-h848dp-land-notnight-xhdpi";
 
     private static final File FOLDER = new File("build/outputs/screenshots");
 

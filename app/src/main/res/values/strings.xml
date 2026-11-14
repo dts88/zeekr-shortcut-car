@@ -73,6 +73,12 @@
     <string name="set_alerts_probe_sentry">%1$s</string>
     <string name="set_alerts_probe_gear">挡位：%1$s</string>
     <string name="set_alerts_probe_offset">已处理到：%1$s</string>
+    <string name="set_alerts_quiet_title">安静时段</string>
+    <string name="set_alerts_quiet_summary">这个时间段里不发警报。车停在自己家里时，夜里有人走过也不响</string>
+    <string name="set_alerts_quiet_start_title">从</string>
+    <string name="set_alerts_quiet_end_title">到</string>
+    <string name="set_alerts_quiet_hint">格式 HH:mm，例如 22:00</string>
+    <string name="set_alerts_quiet_bad_time">格式不对：请填 HH:mm，例如 22:00</string>
     <string name="set_alerts_triggers_title">哪些事算「有事」</string>
     <string name="set_alerts_triggers_none">一项都没选：这样不会发警报</string>
     <string name="alert_trigger_motion">画面里有东西在动</string>

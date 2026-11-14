@@ -21,12 +21,19 @@ import java.util.LinkedHashSet;
 public class TriggerSetTest {
 
     @Test
-    public void everythingIsOnByDefault() {
-        TriggerSet set = TriggerSet.parse(null);
-        for (String name : TriggerSet.ALL) {
-            assertTrue(name, set.has(name));
-        }
-        assertEquals(TriggerSet.ALL.length, set.size());
+    public void theDefaultIsWhatTheCarItselfDoes() {
+        // 默认只开车自己会做的：闪双闪、亮灯、亮屏。
+        // 移动 / 远光 / 车门默认关，留给车主自己选。
+        TriggerSet set = TriggerSet.parse(TriggerSet.DEFAULT);
+        assertTrue(set.has(TriggerSet.HAZARD));
+        assertTrue(set.has(TriggerSet.LAMPS));
+        assertTrue(set.has(TriggerSet.SCREEN));
+        assertFalse(set.has(TriggerSet.MOTION));
+        assertFalse(set.has(TriggerSet.FLASH));
+        assertFalse(set.has(TriggerSet.DOORS));
+        assertEquals(3, set.size());
+        // 存坏了（空串 / 认不出来的名字）仍然按全开算 —— 那是安全网，不是默认值
+        assertEquals(TriggerSet.ALL.length, TriggerSet.parse(null).size());
     }
 
     @Test

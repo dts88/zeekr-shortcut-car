@@ -59,6 +59,12 @@
     <string name="set_alerts_probe_sentry">%1$s</string>
     <string name="set_alerts_probe_gear">Gear: %1$s</string>
     <string name="set_alerts_probe_offset">Diproses hingga: %1$s</string>
+    <string name="set_alerts_quiet_title">Waktu tenang</string>
+    <string name="set_alerts_quiet_summary">Tiada makluman dalam tempoh ini. Bila kereta di rumah, orang lalu pada waktu malam tidak berbunyi</string>
+    <string name="set_alerts_quiet_start_title">Dari</string>
+    <string name="set_alerts_quiet_end_title">Hingga</string>
+    <string name="set_alerts_quiet_hint">HH:mm, contohnya 22:00</string>
+    <string name="set_alerts_quiet_bad_time">Itu bukan masa. Cuba HH:mm, contohnya 22:00</string>
     <string name="set_alerts_triggers_title">Apa yang dikira</string>
     <string name="set_alerts_triggers_none">Tiada apa dipilih, jadi tiada makluman dihantar</string>
     <string name="alert_trigger_motion">Ada pergerakan dalam pandangan</string>
