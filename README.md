@@ -6,12 +6,6 @@ dash cam and shows them where they help while driving.
 **[Download](../../releases/latest)** · [Features (wiki)](../../wiki) · [Discussions](../../discussions) ·
 [中文说明](README.zh-CN.md) · [Credits](NOTICE.md)
 
-> [!WARNING]
-> Experimental, unofficial software. Not affiliated with, approved by, or endorsed by ZEEKR,
-> and not certified for any vehicle safety function. It does **not** replace the factory dash cam,
-> reversing camera, or blind-spot monitor. Do not operate it while driving.
-> Full safety notice: [安全须知](README.zh-CN.md#安全须知).
-
 ---
 
 ## What it is
@@ -53,6 +47,14 @@ a report from Settings → General → Diagnostics.
 **[CarPiano](https://github.com/jlunnn/CarPiano)** plays sound through the car's exterior speaker at any speed — no longer limited to Park like the factory feature. It's still early in development, but very promising.
 
 Check your local rules before using the exterior speaker on public roads.
+
+---
+
+> [!WARNING]
+> Experimental, unofficial software. Not affiliated with, approved by, or endorsed by ZEEKR,
+> and not certified for any vehicle safety function. It does **not** replace the factory dash cam,
+> reversing camera, or blind-spot monitor. Do not operate it while driving.
+> Full safety notice: [安全须知](README.zh-CN.md#安全须知).
 
 ---
 
