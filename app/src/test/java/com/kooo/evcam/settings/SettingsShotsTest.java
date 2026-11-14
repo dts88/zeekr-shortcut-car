@@ -46,6 +46,11 @@ public class SettingsShotsTest {
     }
 
     @Test
+    public void everySectionByDayInEnglish() {
+        shoot(Shots.DAY_EN, "day-en");
+    }
+
+    @Test
     public void everySectionByNight() {
         shoot(Shots.NIGHT, "night");
     }
@@ -60,6 +65,15 @@ public class SettingsShotsTest {
         shoot(Shots.DAY, "day-on");
     }
 
+    @Test
+    public void everySectionWithEverythingOnInEnglish() {
+        AppConfig config = new AppConfig(RuntimeEnvironment.getApplication());
+        config.setRearViewEnabled(true);
+        config.setSideViewEnabled(true);
+        config.setDriveSoundEnabled(true);
+        shoot(Shots.DAY_EN, "day-on-en");
+    }
+
     /**
      * 「按键」页里绑定的灵动贴（项目所有者 2026-11-14「名称 / 位置」）：起了名字的显示名字、默认名（带短编号）挪到下面那一行；
      * 没起的照旧是默认名。存着的名字再怪（这里直接往存储里塞一段带标签、格式符、换行、方向控制符的长字，像是从改过的
@@ -67,6 +81,15 @@ public class SettingsShotsTest {
      */
     @Test
     public void namedSmartButtons() {
+        namedSmartButtons(Shots.DAY, "");
+    }
+
+    @Test
+    public void namedSmartButtonsInEnglish() {
+        namedSmartButtons(Shots.DAY_EN, "-en");
+    }
+
+    private void namedSmartButtons(String qualifiers, String suffix) {
         android.content.Context app = RuntimeEnvironment.getApplication();
         AppConfig config = new AppConfig(app);
         String first = "00:11:22:33:44:55";
@@ -79,7 +102,7 @@ public class SettingsShotsTest {
         app.getSharedPreferences(AppConfig.PREF_NAME, android.content.Context.MODE_PRIVATE).edit()
                 .putString("smart_button_name." + second, "<b>%s</b>\n\n\u202E" + "很长的名字".repeat(30)).commit();
 
-        RuntimeEnvironment.setQualifiers(Shots.DAY);
+        RuntimeEnvironment.setQualifiers(qualifiers);
         ShotActivity activity = Robolectric.buildActivity(ShotActivity.class).setup().get();
         Shots.stillFrames(activity);
         SettingsShellFragment shell = new SettingsShellFragment();
@@ -112,7 +135,7 @@ public class SettingsShotsTest {
                 com.kooo.evcam.button.SmartButtonAd.shortId(third)), String.valueOf(plain.getTitle()));
 
         section.scrollToPreference("smart_button." + third);
-        File file = Shots.save(activity, "settings-floating-day-names");
+        File file = Shots.save(activity, "settings-floating-day-names" + suffix);
         assertTrue(file + " 是空的", file.length() > 10_000);
     }
 
@@ -122,9 +145,18 @@ public class SettingsShotsTest {
      */
     @Test
     public void driveSoundRowsAreThereForEveryone() {
+        driveSoundRows(Shots.DAY, "");
+    }
+
+    @Test
+    public void driveSoundRowsInEnglish() {
+        driveSoundRows(Shots.DAY_EN, "-en");
+    }
+
+    private void driveSoundRows(String qualifiers, String suffix) {
         assertFalse("这一条看的是开发者选项关着时", DeveloperMode.isUnlocked());
         new AppConfig(RuntimeEnvironment.getApplication()).setDriveSoundEnabled(true);
-        RuntimeEnvironment.setQualifiers(Shots.DAY);
+        RuntimeEnvironment.setQualifiers(qualifiers);
         ShotActivity activity = Robolectric.buildActivity(ShotActivity.class).setup().get();
         Shots.stillFrames(activity);
         SettingsShellFragment shell = new SettingsShellFragment();
@@ -141,7 +173,7 @@ public class SettingsShotsTest {
             assertTrue("美式 V8 时该有 " + key, shown(section, key));
         }
         section.scrollToPreference("pref_drive_sound_output");
-        File file = Shots.save(activity, "settings-general-day-sound");
+        File file = Shots.save(activity, "settings-general-day-sound" + suffix);
         assertTrue(file + " 是空的", file.length() > 10_000);
 
         // 超音速（旧版）：没有听感（只有美式 V8 分车内车外）、没有变速箱（固定 8 速）

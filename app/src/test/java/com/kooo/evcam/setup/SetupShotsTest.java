@@ -46,6 +46,11 @@ public class SetupShotsTest {
     }
 
     @Test
+    public void everyStepByDayInEnglish() {
+        shoot(Shots.DAY_EN, "day-en");
+    }
+
+    @Test
     public void everyStepByNight() {
         shoot(Shots.NIGHT, "night");
     }
