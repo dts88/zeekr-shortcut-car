@@ -115,6 +115,19 @@ public final class TelegramRequest {
     }
 
     /**
+     * 聊天里那排按钮（Telegram 的 reply keyboard）。
+     *
+     * <p>按钮不回调、不发请求：按下去就是把这段文字当成一条普通消息发出去，
+     * 所以车那边照 {@link TelegramCommand} 解析就行，不用另做一套回调查询。
+     * {@code is_persistent} 让它在聊天里常驻，而不是每次发完消息就被收起。</p>
+     */
+    public static String keyboardMarkup() {
+        return "{\"keyboard\":[[{\"text\":\"pic\"},{\"text\":\"status\"}]],"
+                + "\"resize_keyboard\":true,\"is_persistent\":true,"
+                + "\"input_field_placeholder\":\"pic / status\"}";
+    }
+
+    /**
      * 表单里的普通字段。
      *
      * <p>顺序固定（{@link LinkedHashMap}），写出来的字节才可预期，测试也才对得上。</p>

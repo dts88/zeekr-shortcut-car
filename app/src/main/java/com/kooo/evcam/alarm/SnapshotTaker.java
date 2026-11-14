@@ -48,13 +48,19 @@ public final class SnapshotTaker {
 
     private static final int JPEG_QUALITY = 80;
 
+    /** 发出去的字节上限：超过就降一档质量重压。4G 上传越小越不容易被掐断。 */
+    private static final int MAX_BYTES = 900 * 1024;
+
+    /** 降档次序。到最后一张还大的话就那样发，Telegram 的 10 MB 还远。 */
+    private static final int[] FALLBACK_QUALITIES = {80, 70, 60, 50};
+
     /** 拍照写盘和我们的回调之间允许的时间差（毫秒）：找文件时往前多看一点。 */
     private static final long FILE_SLACK_MS = 5_000L;
 
-    /** 结果。拿到的字节已经能直接发。 */
+    /** 结果。给的是四宫格位图：怎么切、要不要掰直、压多大由 {@link AlertPicture} 决定。 */
     public interface Callback {
-        /** @param jpeg 压好的 JPEG；不会为空 */
-        void onPicture(byte[] jpeg);
+        /** @param grid 2×2 四宫格（已经缩到长边上限）；不会为空 */
+        void onPicture(Bitmap grid);
 
         /** @param reason 一句短话，可以显示给车主 */
         void onFailed(String reason);
@@ -84,7 +90,20 @@ public final class SnapshotTaker {
             return;
         }
         MAIN.post(() -> {
-            CameraKeeper.get(app).takePhoto(new MultiCameraManager.PhotoCallback() {
+            com.kooo.evcam.camera.MultiCameraManager pipeline;
+            try {
+                pipeline = CameraKeeper.get(app).pipeline();
+            } catch (RuntimeException e) {
+                AppLog.w(TAG, "no camera pipeline: " + e);
+                callback.onFailed("cameras not ready");
+                return;
+            }
+            if (pipeline == null) {
+                // 熄屏停录、管线被放掉的时候就是这样：不是崩溃，是这会儿没有相机
+                callback.onFailed("cameras not ready");
+                return;
+            }
+            pipeline.takePhoto(new MultiCameraManager.PhotoCallback() {
                 @Override
                 public void onPhotoResult(int saved, int pressed, int expected) {
                     if (saved <= 0) {
@@ -113,12 +132,12 @@ public final class SnapshotTaker {
             callback.onFailed("picture not found");
             return;
         }
-        byte[] jpeg = compress(file);
-        if (jpeg == null || jpeg.length == 0) {
+        Bitmap grid = decode(file);
+        if (grid == null) {
             callback.onFailed("picture unreadable");
             return;
         }
-        MAIN.post(() -> callback.onPicture(jpeg));
+        MAIN.post(() -> callback.onPicture(grid));
     }
 
     /** 这一趟新写下的环视图。名字里带时间戳，按名字取最大的那张就是最新的。 */
@@ -143,8 +162,8 @@ public final class SnapshotTaker {
         return newest;
     }
 
-    /** 解码到合适大小再压：先按 2 的幂降采样，避免整张大图进内存。 */
-    private static byte[] compress(File file) {
+    /** 解码到合适大小：先按 2 的幂降采样，避免整张大图进内存；宽了再缩到长边上限。 */
+    private static Bitmap decode(File file) {
         BitmapFactory.Options bounds = new BitmapFactory.Options();
         bounds.inJustDecodeBounds = true;
         BitmapFactory.decodeFile(file.getAbsolutePath(), bounds);
@@ -158,32 +177,25 @@ public final class SnapshotTaker {
         BitmapFactory.Options options = new BitmapFactory.Options();
         options.inSampleSize = sample;
         Bitmap bitmap = null;
-        Bitmap scaled = null;
         try {
             bitmap = BitmapFactory.decodeFile(file.getAbsolutePath(), options);
             if (bitmap == null) {
                 return null;
             }
             int width = bitmap.getWidth();
+            if (width <= MAX_WIDTH) {
+                return bitmap;
+            }
             int height = bitmap.getHeight();
-            if (width > MAX_WIDTH) {
-                int targetHeight = Math.max(1, Math.round(height * (MAX_WIDTH / (float) width)));
-                scaled = Bitmap.createScaledBitmap(bitmap, MAX_WIDTH, targetHeight, true);
-            }
-            Bitmap out = scaled != null ? scaled : bitmap;
-            ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-            out.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, bytes);
-            return bytes.toByteArray();
-        } catch (RuntimeException | OutOfMemoryError e) {
-            AppLog.w(TAG, "compress failed: " + e);
-            return null;
-        } finally {
-            if (scaled != null) {
-                scaled.recycle();
-            }
-            if (bitmap != null) {
+            int targetHeight = Math.max(1, Math.round(height * (MAX_WIDTH / (float) width)));
+            Bitmap scaled = Bitmap.createScaledBitmap(bitmap, MAX_WIDTH, targetHeight, true);
+            if (scaled != bitmap) {
                 bitmap.recycle();
             }
+            return scaled;
+        } catch (RuntimeException | OutOfMemoryError e) {
+            AppLog.w(TAG, "decode failed: " + e);
+            return null;
         }
     }
 }

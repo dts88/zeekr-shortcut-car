@@ -53,19 +53,26 @@ public final class TelegramSender {
         public final boolean ok;
         public final String error;
         public final int httpCode;
+        /**
+         * 401 / 404：Telegram 不认这个令牌或这个会话。
+         *
+         * <p>分出来是为了让界面说人话 —— 「Unauthorized」上车主看不懂，也不该由他去猜是令牌还是网络。</p>
+         */
+        public final boolean rejected;
 
-        private Result(boolean ok, String error, int httpCode) {
+        private Result(boolean ok, String error, int httpCode, boolean rejected) {
             this.ok = ok;
-            this.error = error;
+            this.error = error == null ? "" : error;
             this.httpCode = httpCode;
+            this.rejected = rejected;
         }
 
         static Result ok() {
-            return new Result(true, "", 200);
+            return new Result(true, "", 200, false);
         }
 
         static Result fail(String error, int httpCode) {
-            return new Result(false, error == null ? "" : error, httpCode);
+            return new Result(false, error, httpCode, httpCode == 401 || httpCode == 404);
         }
 
         public String display() {
@@ -106,6 +113,12 @@ public final class TelegramSender {
      * @param caption 配图文字，可以为空；Telegram 上限 1024 字，这里先截
      */
     public static Result sendPhoto(String token, String chatId, byte[] jpeg, String caption) {
+        return sendPhoto(token, chatId, jpeg, caption, null);
+    }
+
+    /** 同上，带一排按钮（{@link TelegramRequest#keyboardMarkup()}）。 */
+    public static Result sendPhoto(String token, String chatId, byte[] jpeg, String caption,
+                                   String replyMarkup) {
         if (!TelegramRequest.looksLikeToken(token)) {
             return Result.fail("bad token", 0);
         }
@@ -126,13 +139,50 @@ public final class TelegramSender {
         String boundary = "zeekr" + Long.toHexString(System.nanoTime());
         byte[] body;
         try {
-            body = TelegramRequest.multipartBytes(boundary,
-                    TelegramRequest.fields(chatId, text),
+            java.util.Map<String, String> fields = TelegramRequest.fields(chatId, text);
+            if (replyMarkup != null && !replyMarkup.isEmpty()) {
+                fields.put("reply_markup", replyMarkup);
+            }
+            body = TelegramRequest.multipartBytes(boundary, fields,
                     "photo", "alert.jpg", jpeg, "image/jpeg");
         } catch (IOException e) {
             return Result.fail("could not build request", 0);
         }
 
+        // 上传一条照片最容易被 4G 掐断：写到一半连接被对面关掉，报的就是一句「closed」。
+        // 所以同一张照片再试一次（只在一次状态码都没拿到时重试 —— 已经答过的重试会变成重复消息）。
+        IOException last = null;
+        for (int attempt = 0; attempt < 2; attempt++) {
+            if (attempt > 0) {
+                try {
+                    Thread.sleep(1200L);
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+            try {
+                Result result = post(token, boundary, body);
+                if (result != null) {
+                    return result;
+                }
+            } catch (IOException e) {
+                last = e;
+                AppLog.w(TAG, "photo upload attempt " + (attempt + 1) + " failed: "
+                        + TelegramRequest.redact(String.valueOf(e)));
+            }
+        }
+        String reason = last == null ? "no answer from Telegram"
+                : TelegramRequest.redact(String.valueOf(last));
+        return Result.fail("upload interrupted: " + reason, 0);
+    }
+
+    /**
+     * 真正发一次。
+     *
+     * @return 拿到状态码的结果；一次都没拿到时返回 {@code null}，让外面重试
+     */
+    private static Result post(String token, String boundary, byte[] body) throws IOException {
         HttpURLConnection connection = null;
         try {
             connection = open(TelegramRequest.methodUrl(token, "sendPhoto"));
@@ -140,15 +190,13 @@ public final class TelegramSender {
             connection.setDoOutput(true);
             connection.setRequestProperty("Content-Type",
                     "multipart/form-data; boundary=" + boundary);
-            connection.setFixedLengthStreamingMode(body.length);
+            // 不设固定长度：让实现自己缓冲好再发。一边写一边发时，对面提前关连接就只剩一句「closed」，
+            // 既看不出是网络还是内容被拒；这条请求最多几 MB，内存吃得下。
+            connection.setRequestProperty("Connection", "close");
             try (OutputStream out = connection.getOutputStream()) {
                 out.write(body);
             }
             return read(connection);
-        } catch (IOException e) {
-            // 这里的 message 里可能带 URL（HTTP 异常会），出去之前一律擦掉。
-            AppLog.w(TAG, "send failed: " + TelegramRequest.redact(String.valueOf(e)));
-            return Result.fail(TelegramRequest.redact(String.valueOf(e)), 0);
         } finally {
             if (connection != null) {
                 connection.disconnect();
@@ -163,6 +211,11 @@ public final class TelegramSender {
      * 表单用 {@code application/x-www-form-urlencoded}，比 multipart 简单，也够用。</p>
      */
     public static Result sendMessage(String token, String chatId, String text) {
+        return sendMessage(token, chatId, text, null);
+    }
+
+    /** 同上，带一排按钮（{@link TelegramRequest#keyboardMarkup()}）。 */
+    public static Result sendMessage(String token, String chatId, String text, String replyMarkup) {
         if (!TelegramRequest.looksLikeToken(token)) {
             return Result.fail("bad token", 0);
         }
@@ -172,6 +225,9 @@ public final class TelegramSender {
         String body = "chat_id=" + java.net.URLEncoder.encode(chatId, StandardCharsets.UTF_8)
                 + "&text=" + java.net.URLEncoder.encode(text == null ? "" : text,
                 StandardCharsets.UTF_8);
+        if (replyMarkup != null && !replyMarkup.isEmpty()) {
+            body += "&reply_markup=" + java.net.URLEncoder.encode(replyMarkup, StandardCharsets.UTF_8);
+        }
         byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
         HttpURLConnection connection = null;
         try {
@@ -193,6 +249,26 @@ public final class TelegramSender {
                 connection.disconnect();
             }
         }
+    }
+
+    /**
+     * 长轮询：把 {@code offset} 之后的命令取回来，最多等 {@code timeoutSeconds} 秒。
+     *
+     * <p>长轮询是这套「反向命令」能穿过运营商 NAT 的全部原因：请求是车发出去的，
+     * 车主的消息塞在这条请求的回复里回来，车永远是客户端。</p>
+     *
+     * @param offset 已经处理到哪一条（{@code 0} 表示不要历史，只等新的）
+     */
+    static org.json.JSONObject getUpdates(String token, long offset, int timeoutSeconds)
+            throws ChatListException {
+        int wait = Math.max(1, Math.min(25, timeoutSeconds));
+        StringBuilder url = new StringBuilder(TelegramRequest.updatesUrl(token))
+                .append("?timeout=").append(wait)
+                .append("&allowed_updates=%5B%22message%22%5D");
+        if (offset > 0) {
+            url.append("&offset=").append(offset);
+        }
+        return get(url.toString());
     }
 
     /** 问机器人叫什么。名字对得上，说明令牌没错。 */
@@ -255,18 +331,18 @@ public final class TelegramSender {
         return chats;
     }
 
-    private static JSONObject get(String url) throws ChatListException {
+    static JSONObject get(String url) throws ChatListException {
         HttpURLConnection connection = null;
         try {
             connection = open(url);
             connection.setRequestMethod("GET");
-            Result result = read(connection);
-            if (!result.ok) {
-                throw new ChatListException(result.error);
+            // 一次请求只读一次回复体：读完再读一次，Android 的实现会抛 IOException("closed")。
+            Reply reply = exchange(connection);
+            if (reply.ok()) {
+                return reply.json;
             }
-            String text = readText(connection);
-            return new JSONObject(text);
-        } catch (IOException | org.json.JSONException e) {
+            throw new ChatListException(reply.failureText());
+        } catch (IOException e) {
             throw new ChatListException(TelegramRequest.redact(String.valueOf(e)));
         } finally {
             if (connection != null) {
@@ -284,41 +360,66 @@ public final class TelegramSender {
         return connection;
     }
 
-    /** 读一次回复：够用就返回，不够用就把 Telegram 的原话翻成一句短话。 */
-    private static Result read(HttpURLConnection connection) throws IOException {
-        int code = connection.getResponseCode();
-        String text = readText(connection);
-        JSONObject reply = null;
-        try {
-            reply = text.isEmpty() ? null : new JSONObject(text);
-        } catch (org.json.JSONException ignored) {
-            // 不是 JSON：下面按状态码说
+    /** 一次回复：状态码、原文、解析出来的 JSON。读一次就够，谁也别再读第二次。 */
+    private static final class Reply {
+        final int code;
+        final JSONObject json;
+
+        Reply(int code, JSONObject json) {
+            this.code = code;
+            this.json = json;
         }
-        if (code == HttpURLConnection.HTTP_OK && reply != null && reply.optBoolean("ok", false)) {
-            return Result.ok();
+
+        boolean ok() {
+            return code == HttpURLConnection.HTTP_OK && json != null && json.optBoolean("ok", false);
         }
-        String description = reply == null ? "" : reply.optString("description", "");
-        if (code == 401 || code == 404) {
-            return Result.fail("telegram: " + (description.isEmpty() ? "token or chat id rejected" : description), code);
+
+        String description() {
+            return json == null ? "" : json.optString("description", "");
         }
-        if (code == 400) {
-            return Result.fail("telegram: " + (description.isEmpty() ? "request rejected" : description), code);
-        }
-        if (code == 413) {
-            return Result.fail("telegram: picture too big", code);
-        }
-        if (code == 429) {
-            long retry = 1;
-            if (reply != null) {
-                JSONObject parameters = reply.optJSONObject("parameters");
+
+        /** 翻成车主看得懂的一句。已经擦过令牌。 */
+        String failureText() {
+            if (code == 401 || code == 404) {
+                return "telegram: " + (description().isEmpty() ? "token or chat id rejected" : description());
+            }
+            if (code == 400) {
+                return "telegram: " + (description().isEmpty() ? "request rejected" : description());
+            }
+            if (code == 413) {
+                return "telegram: picture too big";
+            }
+            if (code == 429) {
+                long retry = 1;
+                JSONObject parameters = json == null ? null : json.optJSONObject("parameters");
                 if (parameters != null) {
                     retry = parameters.optLong("retry_after", 1);
                 }
+                return "telegram: too many messages, wait " + retry + "s";
             }
-            return Result.fail("telegram: too many messages, wait " + retry + "s", code);
+            return "telegram: HTTP " + code + (description().isEmpty() ? "" : " " + description());
         }
-        return Result.fail("telegram: HTTP " + code
-                + (description.isEmpty() ? "" : " " + description), code);
+    }
+
+    private static Reply exchange(HttpURLConnection connection) throws IOException {
+        int code = connection.getResponseCode();
+        String text = readText(connection);
+        JSONObject json = null;
+        try {
+            json = text.isEmpty() ? null : new JSONObject(text);
+        } catch (org.json.JSONException ignored) {
+            // 不是 JSON：下面按状态码说
+        }
+        return new Reply(code, json);
+    }
+
+    /** 读一次回复：够用就返回，不够用就把 Telegram 的原话翻成一句短话。 */
+    private static Result read(HttpURLConnection connection) throws IOException {
+        Reply reply = exchange(connection);
+        if (reply.ok()) {
+            return Result.ok();
+        }
+        return Result.fail(reply.failureText(), reply.code);
     }
 
     private static String readText(HttpURLConnection connection) throws IOException {

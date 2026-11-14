@@ -901,6 +901,59 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             });
         }
 
+        // 发几张：一张四宫格，还是每一路各一张（AlertPicture）
+        ListPreference picture = findPreference("pref_alerts_picture");
+        if (picture != null) {
+            picture.setPersistent(false);
+            picture.setEntries(new CharSequence[] {getString(R.string.opt_alerts_picture_grid),
+                    getString(R.string.opt_alerts_picture_separate)});
+            picture.setEntryValues(new CharSequence[] {"grid", "separate"});
+            picture.setValue(appConfig.getAlertsLayout());
+            picture.setOnPreferenceChangeListener((preference, newValue) -> {
+                appConfig.setAlertsLayout(String.valueOf(newValue));
+                com.kooo.evcam.blackbox.BlackBox.noteImportant(
+                        "设置变更: pref_alerts_picture → " + newValue);
+                showAlertsRows();
+                return true;
+            });
+        }
+
+        // 要哪几路（只在「每一路各一张」时用得上）
+        Preference cameras = findPreference("pref_alerts_cameras");
+        if (cameras != null) {
+            cameras.setPersistent(false);
+            cameras.setOnPreferenceClickListener(preference -> {
+                pickAlertsCameras();
+                return true;
+            });
+        }
+
+        SwitchPreferenceCompat straighten = findPreference("pref_alerts_straighten");
+        if (straighten != null) {
+            straighten.setPersistent(false);
+            straighten.setChecked(appConfig.isAlertsStraighten());
+            straighten.setOnPreferenceChangeListener((preference, newValue) -> {
+                appConfig.setAlertsStraighten(Boolean.TRUE.equals(newValue));
+                com.kooo.evcam.blackbox.BlackBox.noteImportant("开关变更: pref_alerts_straighten → "
+                        + (Boolean.TRUE.equals(newValue) ? "开" : "关"));
+                return true;
+            });
+        }
+
+        SwitchPreferenceCompat commands = findPreference("pref_alerts_commands");
+        if (commands != null) {
+            commands.setPersistent(false);
+            commands.setChecked(appConfig.isAlertsCommands());
+            commands.setOnPreferenceChangeListener((preference, newValue) -> {
+                boolean answered = Boolean.TRUE.equals(newValue);
+                appConfig.setAlertsCommands(answered);
+                com.kooo.evcam.blackbox.BlackBox.noteImportant("开关变更: pref_alerts_commands → "
+                        + (answered ? "开" : "关"));
+                com.kooo.evcam.alarm.SentryAlerts.get(requireContext()).refreshConfig();
+                return true;
+            });
+        }
+
         Preference test = findPreference("pref_alerts_test");
         if (test != null) {
             test.setPersistent(false);
@@ -933,6 +986,77 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             chat.setSummary(value.isEmpty() ? getString(R.string.set_alerts_chat_empty)
                     : getString(R.string.set_alerts_chat_set, value));
         }
+        Preference cameras = findPreference("pref_alerts_cameras");
+        if (cameras != null) {
+            com.kooo.evcam.alarm.AlertPicture.Layout layout =
+                    com.kooo.evcam.alarm.AlertPicture.layout(appConfig.getAlertsLayout());
+            cameras.setVisible(layout == com.kooo.evcam.alarm.AlertPicture.Layout.SEPARATE);
+            int[] lanes = com.kooo.evcam.alarm.AlertPicture.lanes(appConfig.getAlertsCameras());
+            StringBuilder names = new StringBuilder();
+            for (int lane : lanes) {
+                if (names.length() > 0) {
+                    names.append(" · ");
+                }
+                names.append(com.kooo.evcam.camera.CameraNames.ofLane(requireContext(), lane));
+            }
+            cameras.setSummary(com.kooo.evcam.alarm.AlertPicture.allLanes(lanes)
+                    ? getString(R.string.set_alerts_cameras_all) : names.toString());
+        }
+    }
+
+    /** 勾要哪几路。四路都勾就等于「全部」。 */
+    private void pickAlertsCameras() {
+        int[] selected = com.kooo.evcam.alarm.AlertPicture.lanes(appConfig.getAlertsCameras());
+        CharSequence[] names = new CharSequence[com.kooo.evcam.alarm.AlertPicture.LANES];
+        boolean[] checked = new boolean[names.length];
+        for (int lane = 0; lane < names.length; lane++) {
+            names[lane] = com.kooo.evcam.camera.CameraNames.ofLane(requireContext(), lane);
+            checked[lane] = contains(selected, lane);
+        }
+        new MaterialAlertDialogBuilder(requireContext(), R.style.Theme_Cam_MaterialAlertDialog)
+                .setTitle(R.string.set_alerts_cameras_title)
+                .setMultiChoiceItems(names, checked, (dialog, which, isChecked) -> checked[which] = isChecked)
+                .setPositiveButton(R.string.action_save, (dialog, which) -> {
+                    int count = 0;
+                    for (boolean on : checked) {
+                        if (on) {
+                            count++;
+                        }
+                    }
+                    if (count == 0) {
+                        // 一路都不勾等于没有图可发：按「全部」算，别让警报静悄悄地变成哑巴
+                        toast(getString(R.string.set_alerts_cameras_all));
+                        appConfig.setAlertsCameras("0,1,2,3");
+                    } else {
+                        StringBuilder value = new StringBuilder();
+                        for (int lane = 0; lane < checked.length; lane++) {
+                            if (checked[lane]) {
+                                if (value.length() > 0) {
+                                    value.append(',');
+                                }
+                                value.append(lane);
+                            }
+                        }
+                        appConfig.setAlertsCameras(value.toString());
+                    }
+                    com.kooo.evcam.blackbox.BlackBox.noteImportant("设置变更: pref_alerts_cameras → "
+                            + appConfig.getAlertsCameras());
+                    showAlertsRows();
+                })
+                .setNegativeButton(R.string.action_cancel, null)
+                .show();
+    }
+
+    private static boolean contains(int[] values, int wanted) {
+        if (values == null) {
+            return false;
+        }
+        for (int value : values) {
+            if (value == wanted) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void editAlertsToken() {
@@ -944,6 +1068,12 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                             + (value.isEmpty() ? "（空）" : "已填写"));
                     com.kooo.evcam.alarm.SentryAlerts.get(requireContext()).refreshConfig();
                     showAlertsRows();
+                    // 存完当场问 Telegram 认不认：认不出来现在就说，别等到要发警报那天
+                    com.kooo.evcam.alarm.SentryAlerts.get(requireContext()).checkToken((ok, message) -> {
+                        if (isAdded()) {
+                            toast(message);
+                        }
+                    });
                 });
     }
 
@@ -2107,6 +2237,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         // 车辆状态面板（2026-10-23 从界面页挪来）：主界面那个控件自己听这个开关
         bindSwitch("pref_vehicle_status", appConfig.isVehicleStatusEnabled(),
                 value -> appConfig.setVehicleStatusEnabled(value));
+
 
         bindSwitch("pref_raw_frame_dump", appConfig.isRawFrameDumpEnabled(),
                 appConfig::setRawFrameDumpEnabled);
