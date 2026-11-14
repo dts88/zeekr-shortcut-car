@@ -21,13 +21,22 @@ package com.kooo.evcam.alarm;
  *       两者都要等于设置里那个号。</li>
  * </ul>
  *
- * <p>另外，睡了一夜的车醒过来时会把停机期间的命令一起收到。几小时前要的照片现在拍出来
- * 没有意义，还很唐突：超过 {@link #MAX_AGE_MS} 的命令只确认、不执行。</p>
+ * <p>另外，睡了一夜的车醒过来时会把停机期间的命令一起收到。超过 {@link #NOTE_AGE_MS} 的命令照执行，
+ * 但照片配文里写上“要求于几点”；超过 {@link #MAX_AGE_MS} 的只确认、不执行。</p>
  */
 public final class PollerGate {
 
-    /** 命令最多认多长时间以内的。 */
-    public static final long MAX_AGE_MS = 10 * 60_000L;
+    /**
+     * 超过这么久的命令就不算了。
+     *
+     * <p>为什么不是几分钟：车停在外面、车机睡着时消息只能堆着，等车醒过来
+     * 才能取；那时拍一张现在的照片仍然有用，只要配文里写清楚是几点要的。
+     * 超过 6 小时就太旧了（车已经换了地方），只确认、不执行。</p>
+     */
+    public static final long MAX_AGE_MS = 6 * 60 * 60_000L;
+
+    /** 超过这么久的命令，照片配文里要写上“要求于几点”。 */
+    public static final long NOTE_AGE_MS = 2 * 60_000L;
 
     public enum Verdict {
         /** 认，执行。 */

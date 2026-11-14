@@ -46,6 +46,11 @@
     <string name="set_alerts_chat_none">机器人还没收到任何消息：先在手机上给它发一句话</string>
     <string name="set_alerts_find_title">找会话号</string>
     <string name="set_alerts_find_summary">用已填的令牌去问 Telegram，把最近给机器人发过话的会话填上</string>
+    <string name="alert_caption_requested">要求于 %1$s（那时车在睡）</string>
+    <string name="set_alerts_probe_last_ok">上次问成：%1$s</string>
+    <string name="set_alerts_probe_last_error">上次失败：%1$s</string>
+    <string name="set_alerts_probe_reach_ok">现在能连上 Telegram：%1$s 毫秒 @%2$s</string>
+    <string name="set_alerts_probe_reach_fail">现在连不上 Telegram：%1$s</string>
     <string name="set_alerts_probe_title">检查警报链路</string>
     <string name="set_alerts_probe_summary">不发消息，只把现在的状态报一遍：监听在不在、哨兵开没开、轮询跑没跑、处理到哪一条</string>
     <string name="set_alerts_probe_watch">监听车辆信号：%1$s</string>
@@ -53,6 +58,14 @@
     <string name="set_alerts_probe_sentry">%1$s</string>
     <string name="set_alerts_probe_gear">挡位：%1$s</string>
     <string name="set_alerts_probe_offset">已处理到：%1$s</string>
+    <string name="set_alerts_triggers_title">什么算有事</string>
+    <string name="set_alerts_triggers_none">一项都没选：这样不会发警报</string>
+    <string name="alert_trigger_motion">画面里有东西在动</string>
+    <string name="alert_trigger_hazard">双闪亮起</string>
+    <string name="alert_trigger_flash">远光闪一下</string>
+    <string name="alert_trigger_doors">车门 / 前备箱 / 后备箱被打开</string>
+    <string name="alert_trigger_lamps">车灯自己亮起</string>
+    <string name="alert_trigger_screen">中控屏亮起</string>
     <string name="set_alerts_test_title">发一张测试照片</string>
     <string name="set_alerts_picture_title">发几张</string>
     <string name="set_alerts_picture_summary">一张四宫格看全，或者每一路各一张、在手机上更大</string>
@@ -75,6 +88,7 @@
     <string name="alert_headline_lights">停车时车灯自己亮起</string>
     <string name="alert_headline_screen">停车时中控屏亮起</string>
     <string name="alert_headline_door">停车时车门被打开</string>
+    <string name="alert_headline_motion">停车时画面里有东西在动</string>
     <string name="alert_headline_test">测试</string>
     <string name="alert_headline_request">按你的要求拍的</string>
     <string name="alert_cmd_no_sentry">哨兵模式没开：车机要睡了，拍不了</string>

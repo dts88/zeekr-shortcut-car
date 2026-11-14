@@ -103,8 +103,16 @@ public final class TelegramRequest {
      * @param time     本地时间 {@code HH:mm}
      */
     public static String caption(String headline, String sentry, String time) {
+        return caption(headline, "", sentry, time);
+    }
+
+    /** 带一行“要求于几点”的配文：车睡了一阵才醒过来时用。 */
+    public static String caption(String headline, String late, String sentry, String time) {
         StringBuilder out = new StringBuilder();
         out.append(headline == null ? "" : headline.trim());
+        if (late != null && !late.trim().isEmpty()) {
+            out.append('\n').append(late.trim());
+        }
         if (time != null && !time.trim().isEmpty()) {
             out.append('\n').append(time.trim());
         }

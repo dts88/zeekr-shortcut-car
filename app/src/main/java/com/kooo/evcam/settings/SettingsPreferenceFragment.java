@@ -941,6 +941,15 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             });
         }
 
+        Preference triggersRow = findPreference("pref_alerts_triggers");
+        if (triggersRow != null) {
+            triggersRow.setPersistent(false);
+            triggersRow.setOnPreferenceClickListener(preference -> {
+                pickAlertsTriggers(triggersRow);
+                return true;
+            });
+        }
+
         Preference probeRow = findPreference("pref_alerts_probe");
         if (probeRow != null) {
             probeRow.setPersistent(false);
@@ -987,6 +996,24 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             chat.setSummary(value.isEmpty() ? getString(R.string.set_alerts_chat_empty)
                     : getString(R.string.set_alerts_chat_set, maskChat(value)));
         }
+        Preference triggersRow = findPreference("pref_alerts_triggers");
+        if (triggersRow != null) {
+            com.kooo.evcam.alarm.TriggerSet set =
+                    com.kooo.evcam.alarm.TriggerSet.parse(appConfig.getAlertsTriggers());
+            StringBuilder text = new StringBuilder();
+            for (String name : com.kooo.evcam.alarm.TriggerSet.ALL) {
+                if (!set.has(name)) {
+                    continue;
+                }
+                if (text.length() > 0) {
+                    text.append(" · ");
+                }
+                text.append(triggerLabel(name));
+            }
+            triggersRow.setSummary(text.length() == 0
+                    ? getString(R.string.set_alerts_triggers_none) : text.toString());
+        }
+
         Preference cameras = findPreference("pref_alerts_cameras");
         if (cameras != null) {
             com.kooo.evcam.alarm.AlertPicture.Layout layout =
@@ -1002,6 +1029,55 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             }
             cameras.setSummary(com.kooo.evcam.alarm.AlertPicture.allLanes(lanes)
                     ? getString(R.string.set_alerts_cameras_all) : names.toString());
+        }
+    }
+
+    /** 哪些事情算「有事」（TriggerSet）。 */
+    private void pickAlertsTriggers(Preference row) {
+        com.kooo.evcam.alarm.TriggerSet current =
+                com.kooo.evcam.alarm.TriggerSet.parse(appConfig.getAlertsTriggers());
+        String[] names = com.kooo.evcam.alarm.TriggerSet.ALL;
+        CharSequence[] labels = new CharSequence[names.length];
+        boolean[] checked = new boolean[names.length];
+        for (int i = 0; i < names.length; i++) {
+            labels[i] = triggerLabel(names[i]);
+            checked[i] = current.has(names[i]);
+        }
+        new MaterialAlertDialogBuilder(requireContext(), R.style.Theme_Cam_MaterialAlertDialog)
+                .setTitle(R.string.set_alerts_triggers_title)
+                .setMultiChoiceItems(labels, checked, (dialog, which, isChecked) -> checked[which] = isChecked)
+                .setPositiveButton(R.string.action_save, (dialog, which) -> {
+                    java.util.Set<String> picked = new java.util.LinkedHashSet<>();
+                    for (int i = 0; i < names.length; i++) {
+                        if (checked[i]) {
+                            picked.add(names[i]);
+                        }
+                    }
+                    appConfig.setAlertsTriggers(com.kooo.evcam.alarm.TriggerSet.value(picked));
+                    com.kooo.evcam.blackbox.BlackBox.noteImportant("设置变更: pref_alerts_triggers → "
+                            + (picked.isEmpty() ? "（一项都没选）" : picked));
+                    com.kooo.evcam.alarm.SentryAlerts.get(requireContext()).refreshConfig();
+                    showAlertsRows();
+                })
+                .setNegativeButton(R.string.action_cancel, null)
+                .show();
+    }
+
+    /** 触发项的名字（存的是英文 key，界面上说人话）。 */
+    private CharSequence triggerLabel(String name) {
+        switch (name) {
+            case com.kooo.evcam.alarm.TriggerSet.MOTION:
+                return getString(R.string.alert_trigger_motion);
+            case com.kooo.evcam.alarm.TriggerSet.HAZARD:
+                return getString(R.string.alert_trigger_hazard);
+            case com.kooo.evcam.alarm.TriggerSet.FLASH:
+                return getString(R.string.alert_trigger_flash);
+            case com.kooo.evcam.alarm.TriggerSet.DOORS:
+                return getString(R.string.alert_trigger_doors);
+            case com.kooo.evcam.alarm.TriggerSet.LAMPS:
+                return getString(R.string.alert_trigger_lamps);
+            default:
+                return getString(R.string.alert_trigger_screen);
         }
     }
 

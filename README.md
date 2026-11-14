@@ -81,8 +81,9 @@ Off by default; set it up once, from the car screen, and nothing needs rebuildin
 
 - One picture of all four cameras, taken by the same photo path the shutter button uses, so it looks
   like a photo you would have taken yourself.
-- It goes to a Telegram chat when the hazards come on, the high beams flash, any door, the frunk or
-  the trunk opens, the car lights come on by themselves, or the centre screen lights up while parked.
+- It goes to a Telegram chat when: something moves in view, the hazards come on, the high beams flash,
+  a door / frunk / trunk opens, the car lights come on by themselves, or the centre screen lights up
+  while parked. Pick which of those count under **Settings → Alerts → What counts**.
 - **Settings → Alerts**: paste the bot token from @BotFather, then tap **Find chat id** — send the bot
   one message from your phone first, and the row fills in the chat it came from. **Send a test picture**
   proves the whole path before you rely on it.

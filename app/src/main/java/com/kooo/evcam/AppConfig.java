@@ -132,6 +132,7 @@ public class AppConfig {
     private static final String KEY_LICENSE_PLATE_ENABLED = "license_plate_enabled";
     // 停车警报（Telegram）：开关、机器人令牌、会话号
     private static final String KEY_ALERTS_ENABLED = "alerts_enabled";
+    private static final String KEY_ALERTS_TRIGGERS = "alerts_triggers";  // 哪些事情算「有事」
     private static final String KEY_ALERTS_TELEGRAM_TOKEN = "alerts_telegram_token";
     private static final String KEY_ALERTS_TELEGRAM_CHAT = "alerts_telegram_chat";
     private static final String KEY_ALERTS_OWNER_ID = "alerts_owner_id";  // 谁能发命令（私聊里就是会话号）
@@ -2186,6 +2187,32 @@ public class AppConfig {
     /** 会话号与车主号都有；群聊里要靠后者才能分出是谁。 */
     public boolean hasAlertsOwner() {
         return !getAlertsOwnerId().isEmpty();
+    }
+
+    /**
+     * 哪些事情算「有事」（{@link com.kooo.evcam.alarm.TriggerSet}）。
+     *
+     * <p>存的是一串逗号分开的名字；空串按全开算。每台车上能看到的信号不一样，
+     * 能不能看到那一项由车主自己选。</p>
+     */
+    public String getAlertsTriggers() {
+        return prefs.getString(KEY_ALERTS_TRIGGERS, com.kooo.evcam.alarm.TriggerSet.DEFAULT);
+    }
+
+    public void setAlertsTriggers(String value) {
+        String clean = com.kooo.evcam.alarm.TriggerSet.value(
+                parseTriggers(com.kooo.evcam.alarm.TriggerSet.parse(value)));
+        prefs.edit().putString(KEY_ALERTS_TRIGGERS, clean).apply();
+    }
+
+    private static java.util.Set<String> parseTriggers(com.kooo.evcam.alarm.TriggerSet set) {
+        java.util.Set<String> names = new java.util.LinkedHashSet<>();
+        for (String name : com.kooo.evcam.alarm.TriggerSet.ALL) {
+            if (set.has(name)) {
+                names.add(name);
+            }
+        }
+        return names;
     }
 
     /** 令牌和会话号都填了：可以试着发一条。 */

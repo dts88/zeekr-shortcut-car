@@ -9,6 +9,8 @@ commit message, not here.
 
 ## [Unreleased]
 
+- Alerts: movement in view is now a trigger of its own, read from the encoder's own frames; and every
+  trigger can be switched on or off under Settings → Alerts → What counts.
 - Alerts: nothing is sent when you come back to the car. Unlocking drops Sentry Mode out of its armed
   value before the screen and the lamps come on, and an alert needs the armed value.
 - Alerts: answer commands from Telegram while Sentry Mode is on — `pic` sends a picture now,

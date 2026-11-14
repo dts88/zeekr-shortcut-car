@@ -32,6 +32,11 @@
     <string name="set_alerts_chat_none">Bot belum menerima mesej. Hantar satu dari telefon dahulu</string>
     <string name="set_alerts_find_title">Cari id sembang</string>
     <string name="set_alerts_find_summary">Tanya Telegram dengan token di atas dan isi sembang yang terakhir menghantar mesej kepada bot</string>
+    <string name="alert_caption_requested">Diminta pada %1$s (kereta tidur ketika itu)</string>
+    <string name="set_alerts_probe_last_ok">Undian berjaya terakhir: %1$s</string>
+    <string name="set_alerts_probe_last_error">Kegagalan terakhir: %1$s</string>
+    <string name="set_alerts_probe_reach_ok">Telegram boleh dicapai sekarang: %1$s ms @%2$s</string>
+    <string name="set_alerts_probe_reach_fail">Telegram tidak dapat dicapai sekarang: %1$s</string>
     <string name="set_alerts_probe_title">Periksa pautan makluman</string>
     <string name="set_alerts_probe_summary">Tidak menghantar apa-apa. Laporkan keadaan sebenar: pemantauan, Mod Sentri, pengundi arahan, dan sejauh mana ia sudah baca</string>
     <string name="set_alerts_probe_watch">Memantau isyarat kereta: %1$s</string>
@@ -39,6 +44,14 @@
     <string name="set_alerts_probe_sentry">%1$s</string>
     <string name="set_alerts_probe_gear">Gear: %1$s</string>
     <string name="set_alerts_probe_offset">Diproses hingga: %1$s</string>
+    <string name="set_alerts_triggers_title">Apa yang dikira</string>
+    <string name="set_alerts_triggers_none">Tiada apa dipilih, jadi tiada makluman dihantar</string>
+    <string name="alert_trigger_motion">Ada pergerakan dalam pandangan</string>
+    <string name="alert_trigger_hazard">Lampu hazard menyala</string>
+    <string name="alert_trigger_flash">Lampu jauh berkelip</string>
+    <string name="alert_trigger_doors">Pintu / bonet depan / bagasi dibuka</string>
+    <string name="alert_trigger_lamps">Lampu kereta menyala sendiri</string>
+    <string name="alert_trigger_screen">Skrin tengah menyala</string>
     <string name="set_alerts_test_title">Hantar gambar ujian</string>
     <string name="set_alerts_picture_title">Berapa gambar</string>
     <string name="set_alerts_picture_summary">Satu gambar 2×2 untuk lihat semua, atau satu gambar setiap kamera supaya lebih besar di telefon</string>
@@ -61,6 +74,7 @@
     <string name="alert_headline_lights">Lampu kereta menyala semasa letak kereta</string>
     <string name="alert_headline_screen">Skrin menyala semasa letak kereta</string>
     <string name="alert_headline_door">Pintu dibuka semasa letak kereta</string>
+    <string name="alert_headline_motion">Ada pergerakan dalam pandangan semasa letak kereta</string>
     <string name="alert_headline_test">Ujian</string>
     <string name="alert_headline_request">Gambar diambil atas permintaan</string>
     <string name="alert_cmd_no_sentry">Mod Sentri mati, jadi kepala unit akan tidur dan tiada gambar boleh diambil</string>

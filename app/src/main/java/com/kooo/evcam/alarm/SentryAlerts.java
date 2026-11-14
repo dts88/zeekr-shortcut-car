@@ -111,6 +111,11 @@ public final class SentryAlerts implements Telemetry.Listener {
     private Boolean lastLamps;
     private Boolean lastScreenOn;
     private volatile long failureNotifiedAt;
+    /** 画面里的移动：编码器把小图送到这里，这里只管算不算一条警报。 */
+    private final MotionTap motion = MotionTap.get();
+    /** 车主选中的触发项（{@link TriggerSet}）。 */
+    private TriggerSet triggers = TriggerSet.parse(null);
+
     /** 人从 Telegram 要照片时的频率上限（和警报那一套分开）。 */
     private final RequestPolicy requests = new RequestPolicy();
     /**
@@ -129,6 +134,19 @@ public final class SentryAlerts implements Telemetry.Listener {
     /** 上一次看到的「哨兵模式开着」：变了就重看一次要不要轮询。 */
     private boolean pollerOn;
 
+    /**
+     * 车睡了一阵才醒过来时，配文里写上这张照片是几点要的。
+     *
+     * <p>不写的话，一张几小时后才到的照片会让人以为是现在的车周围。</p>
+     */
+    private String lateNote(long requestedAt) {
+        if (requestedAt <= 0 || System.currentTimeMillis() - requestedAt < PollerGate.NOTE_AGE_MS) {
+            return "";
+        }
+        return app.getString(R.string.alert_caption_requested,
+                new java.text.SimpleDateFormat("HH:mm", Locale.US).format(new Date(requestedAt)));
+    }
+
     /** 现在几点（{@code HH:mm}）。加锁是因为警报在主线程、命令在轮询线程，而 SimpleDateFormat 不是线程安全的。 */
     private String time() {
         synchronized (clock) {
@@ -138,6 +156,7 @@ public final class SentryAlerts implements Telemetry.Listener {
 
     private SentryAlerts(Context context) {
         this.app = context.getApplicationContext();
+        motion.setListener(score -> onMotion(score));
         this.config = new AppConfig(this.app);
         this.policy = new AlertPolicy(config.isAlertsEnabled());
     }
@@ -157,6 +176,7 @@ public final class SentryAlerts implements Telemetry.Listener {
      * <p>关着的时候什么都不登记 —— 不读信号、不占车辆接口。</p>
      */
     public void refresh() {
+        triggers = TriggerSet.parse(config.getAlertsTriggers());
         boolean enabled = config.isAlertsEnabled();
         policy.setEnabled(enabled);
         policy.setConfigured(config.hasAlertsTelegramConfig());
@@ -187,6 +207,7 @@ public final class SentryAlerts implements Telemetry.Listener {
 
     /** 设置里刚改过令牌 / 会话号：判断要重算，但没必要重挂监听。 */
     public void refreshConfig() {
+        triggers = TriggerSet.parse(config.getAlertsTriggers());
         policy.setEnabled(config.isAlertsEnabled());
         boolean configured = config.hasAlertsTelegramConfig();
         policy.setConfigured(configured);
@@ -215,12 +236,12 @@ public final class SentryAlerts implements Telemetry.Listener {
         if (want) {
             poller = new TelegramPoller(config, new TelegramPoller.Handler() {
                 @Override
-                public void onPicture(int lane) {
-                    requestPicture(lane);
+                public void onPicture(int lane, long requestedAt) {
+                    requestPicture(lane, requestedAt);
                 }
 
                 @Override
-                public void onStatus() {
+                public void onStatus(long requestedAt) {
                     requestStatus();
                 }
             });
@@ -237,9 +258,9 @@ public final class SentryAlerts implements Telemetry.Listener {
      * <p>停着才拍：车在开的时候拍照，拍的是一张他现在没法看的图，还可能和录像抢相机。
      * 频率由 {@link RequestPolicy} 管（30 秒一张、一小时 6 张）。</p>
      */
-    private void requestPicture(int lane) {
+    private void requestPicture(int lane, long requestedAt) {
         try {
-            requestPictureInner(lane);
+            requestPictureInner(lane, requestedAt);
         } catch (RuntimeException | OutOfMemoryError e) {
             // 已经发过「处理命令时出错」了，这里只保证不把进程带走
             BlackBox.noteImportant("停车警报：要照片时出错（"
@@ -247,7 +268,7 @@ public final class SentryAlerts implements Telemetry.Listener {
         }
     }
 
-    private void requestPictureInner(int lane) {
+    private void requestPictureInner(int lane, long requestedAt) {
         String token = config.getAlertsTelegramToken();
         String chatId = config.getAlertsTelegramChatId();
         if (!TelegramRequest.looksLikeToken(token) || !TelegramRequest.looksLikeChatId(chatId)) {
@@ -273,7 +294,7 @@ public final class SentryAlerts implements Telemetry.Listener {
         BlackBox.note("停车警报：车主在 Telegram 里要了一张照片"
                 + (lane == TelegramCommand.ANY_LANE ? "" : "（第 " + lane + " 路）"));
         String caption = TelegramRequest.caption(app.getString(R.string.alert_headline_request),
-                sentryLine(sentryValue()), time());
+                lateNote(requestedAt), sentryLine(sentryValue()), time());
         SnapshotTaker.take(app, new SnapshotTaker.Callback() {
             @Override
             public void onPicture(Bitmap grid) {
@@ -379,8 +400,33 @@ public final class SentryAlerts implements Telemetry.Listener {
         out.append(app.getString(R.string.set_alerts_probe_gear,
                 state == null || state.gear == null ? "?" : state.gear)).append('\n');
         out.append(app.getString(R.string.set_alerts_probe_offset,
-                String.valueOf(config.getAlertsCommandOffset())));
+                String.valueOf(config.getAlertsCommandOffset()))).append('\n');
+        long lastOk = poller == null ? 0 : poller.lastOkAt();
+        out.append(app.getString(R.string.set_alerts_probe_last_ok,
+                lastOk == 0 ? "never" : (System.currentTimeMillis() - lastOk) / 1000 + "s ago"));
+        String lastError = poller == null ? "" : poller.lastError();
+        if (!lastError.isEmpty()) {
+            out.append('\n').append(app.getString(R.string.set_alerts_probe_last_error, lastError));
+        }
         callback.onResult(watchingNow, out.toString());
+
+        // 顺手再问一次“现在能不能连上”：远处不回应、回家就好的问题，差别就在这一条
+        if (TelegramRequest.looksLikeToken(config.getAlertsTelegramToken())) {
+            sender.execute(() -> {
+                long started = System.currentTimeMillis();
+                String verdict;
+                try {
+                    String name = TelegramSender.botName(config.getAlertsTelegramToken());
+                    verdict = app.getString(R.string.set_alerts_probe_reach_ok,
+                            String.valueOf(System.currentTimeMillis() - started), name);
+                } catch (TelegramSender.ChatListException e) {
+                    verdict = app.getString(R.string.set_alerts_probe_reach_fail,
+                            e.getMessage() == null ? "" : e.getMessage());
+                }
+                final String line = verdict;
+                app.getMainExecutor().execute(() -> callback.onResult(watchingNow, line));
+            });
+        }
     }
 
     /**
@@ -460,11 +506,20 @@ public final class SentryAlerts implements Telemetry.Listener {
         Boolean screenOn = screenLit(readings.code(Signal.SCREEN_POWER_EVENT));
         boolean screenRising = SentryFacts.rising(screenOn, lastScreenOn);
 
+        // 画面移动只在停着、布防、录着的时候取样：开车时画面本来就在动
+        motion.setWanted(watching && parked && armed && triggers.has(TriggerSet.MOTION));
+
         lastHazard = hazard;
         lastFlash = flash;
         lastLamps = lamps;
         lastScreenOn = screenOn;
         rememberDoors(readings);
+
+        hazardRising = hazardRising && triggers.has(TriggerSet.HAZARD);
+        flashRising = flashRising && triggers.has(TriggerSet.FLASH);
+        doorOpening = doorOpening && triggers.has(TriggerSet.DOORS);
+        lampsRising = lampsRising && triggers.has(TriggerSet.LAMPS);
+        screenRising = screenRising && triggers.has(TriggerSet.SCREEN);
 
         if (!hazardRising && !flashRising && !doorOpening && !lampsRising && !screenRising) {
             return;
@@ -489,6 +544,32 @@ public final class SentryAlerts implements Telemetry.Listener {
         }
         BlackBox.note("停车警报：" + headline);
         // 冷却和每小时上限只在真的发出去之后才算数：发失败不该把这一小时的话都堵死
+        fire(headline, () -> policy.noteSent(SystemClock.elapsedRealtime()));
+    }
+
+    /**
+     * 画面里有东西在动（编码器线程送来的分数）。
+     *
+     * <p>分数已经过了 {@link FrameDiff} 的三道过滤；这里只看车是不是该报。</p>
+     */
+    private void onMotion(double score) {
+        if (!watching || !triggers.has(TriggerSet.MOTION)
+                || !FrameDiff.isMovement(score, FrameDiff.DEFAULT_THRESHOLD)) {
+            return;
+        }
+        long now = SystemClock.elapsedRealtime();
+        VehicleState state = Telemetry.get().latest();
+        boolean parked = state != null && "P".equals(state.gear);
+        Integer sentry = state == null ? null : state.sentry;
+        policy.setParked(parked);
+        policy.setArmed(SentryFacts.armed(sentry));
+        AlertPolicy.Decision decision = policy.decide(now);
+        String headline = app.getString(R.string.alert_headline_motion);
+        if (decision != AlertPolicy.Decision.ALLOW) {
+            BlackBox.note("停车警报：画面在动，但这一条不发（" + decision + "）");
+            return;
+        }
+        BlackBox.note("停车警报：" + headline + "（" + Math.round(score * 100) + "%）");
         fire(headline, () -> policy.noteSent(SystemClock.elapsedRealtime()));
     }
 

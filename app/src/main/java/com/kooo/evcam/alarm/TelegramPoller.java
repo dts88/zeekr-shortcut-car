@@ -56,16 +56,24 @@ public final class TelegramPoller {
 
     /** 收到一条命令之后交给谁。 */
     public interface Handler {
-        /** @param lane 0 前、1 后、2 左、3 右；{@link TelegramCommand#ANY_LANE} 表示按设置 */
-        void onPicture(int lane);
+        /**
+         * @param lane        0 前、1 后、2 左、3 右；{@link TelegramCommand#ANY_LANE} 表示按设置
+         * @param requestedAt 车主发命令的时刻（毫秒）；0 表示不知道
+         */
+        void onPicture(int lane, long requestedAt);
 
-        void onStatus();
+        void onStatus(long requestedAt);
     }
 
     private final AppConfig config;
     private final Handler handler;
     private Thread thread;
     private volatile boolean running;
+    /** 最近一次问成了的时刻（壁钟，0 = 这轮还没成功过）。 */
+    private volatile long lastOkAt;
+    /** 最近一次失败的原因（已擦令牌），空串表示没失败过。 */
+    private volatile String lastError = "";
+    private volatile long lastErrorAt;
     private String lastForeignChat;
     private long lastForeignAt;
 
@@ -76,6 +84,20 @@ public final class TelegramPoller {
 
     public boolean isRunning() {
         return running;
+    }
+
+    /** 最近一次问成的时刻；0 表示这轮还没成功过。 */
+    public long lastOkAt() {
+        return lastOkAt;
+    }
+
+    /** 最近一次失败的一句话（已擦令牌）；空串表示没失败过。 */
+    public String lastError() {
+        return lastError;
+    }
+
+    public long lastErrorAt() {
+        return lastErrorAt;
     }
 
     /** 开始问。已经在问就什么都不做（旧线程还活着也一样：同一个机器人不能有两个轮询者）。 */
@@ -127,6 +149,12 @@ public final class TelegramPoller {
                 JSONObject reply = TelegramSender.getUpdates(token,
                         config.getAlertsCommandOffset(), POLL_SECONDS);
                 retryMs = 0;
+                lastOkAt = System.currentTimeMillis();
+                if (!lastError.isEmpty()) {
+                    // 恢复了：这一行是线索 —— “远处不回应、回家就好”就是这样看出来的
+                    BlackBox.note("停车警报：问 Telegram 恢复了");
+                    lastError = "";
+                }
                 int before = (int) config.getAlertsCommandOffset();
                 dispatch(reply, token, chatId, ownerId);
                 int after = (int) config.getAlertsCommandOffset();
@@ -140,12 +168,21 @@ public final class TelegramPoller {
                 retryMs = suggested > 0 ? suggested
                         : conflict ? CONFLICT_PAUSE_MS
                         : (retryMs == 0 ? RETRY_MIN_MS : Math.min(RETRY_MAX_MS, retryMs * 2));
-                BlackBox.note("停车警报：问 Telegram 失败，"
-                        + (conflict ? "别处也在轮询同一个机器人" : message) + "；" + (retryMs / 1000) + " 秒后再问");
+                lastError = conflict ? "409 conflict" : message;
+                boolean first = lastErrorAt == 0 || System.currentTimeMillis() - lastErrorAt > 60_000L;
+                lastErrorAt = System.currentTimeMillis();
+                if (first) {
+                    // 只记头一次：没网的时候每半分钟一条会把黑匣子刷满
+                    BlackBox.note("停车警报：问 Telegram 失败，"
+                            + (conflict ? "别处也在轮询同一个机器人" : lastError)
+                            + "；" + (retryMs / 1000) + " 秒后再问");
+                }
                 sleep(retryMs);
             } catch (RuntimeException e) {
                 retryMs = retryMs == 0 ? RETRY_MIN_MS : Math.min(RETRY_MAX_MS, retryMs * 2);
-                AppLog.w(TAG, "poll failed: " + TelegramRequest.redact(String.valueOf(e)));
+                lastError = TelegramRequest.redact(String.valueOf(e));
+                lastErrorAt = System.currentTimeMillis();
+                AppLog.w(TAG, "poll failed: " + lastError);
                 sleep(retryMs);
             }
         }
@@ -191,7 +228,7 @@ public final class TelegramPoller {
                 continue;
             }
             if (verdict == PollerGate.Verdict.STALE) {
-                BlackBox.note("停车警报：跳过一条过期的命令（发在 " + (sentAt / 1000L) + "）");
+                BlackBox.note("停车警报：跳过一条太旧的命令（发在 " + (sentAt / 1000L) + "）");
                 continue;
             }
             if (verdict == PollerGate.Verdict.NOT_A_COMMAND) {
@@ -200,10 +237,10 @@ public final class TelegramPoller {
             try {
                 switch (command.verb) {
                     case PICTURE:
-                        handler.onPicture(command.lane);
+                        handler.onPicture(command.lane, sentAt);
                         break;
                     case STATUS:
-                        handler.onStatus();
+                        handler.onStatus(sentAt);
                         break;
                     default:
                         // 不是命令：不回，免得把聊天变成回声
