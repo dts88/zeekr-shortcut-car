@@ -59,6 +59,14 @@
     <string name="alert_trigger_doors">A door / frunk / trunk opens</string>
     <string name="alert_trigger_lamps">The car lights come on by themselves</string>
     <string name="alert_trigger_screen">The centre screen lights up</string>
+    <string name="alerts_debug_title">Alerts debug</string>
+    <string name="alerts_debug_refresh">Refresh</string>
+    <string name="alerts_debug_copy">Copy</string>
+    <string name="alerts_debug_save">Save</string>
+    <string name="alerts_debug_copied">Copied to the clipboard</string>
+    <string name="alerts_debug_saved">Saved to %1$s</string>
+    <string name="alerts_debug_row_title">Alerts debug (JSON + log)</string>
+    <string name="alerts_debug_row_summary">One screen: switches, watching, poller, sampling, car state and the last log lines. Screenshot it, copy it, or save it to the USB drive</string>
     <string name="set_alerts_test_title">Send a test picture</string>
     <string name="set_alerts_picture_title">How many pictures</string>
     <string name="set_alerts_picture_summary">One 2×2 to see everything, or one picture per camera so each is bigger on the phone</string>
@@ -94,6 +102,8 @@
     <string name="alert_sentry_on">Sentry Mode: on</string>
     <string name="alert_sentry_armed">Sentry Mode: armed (locked)</string>
     <string name="alert_sentry_off">Sentry Mode: off</string>
+    <string name="alert_fail_title">Parked alert not sent</string>
+    <string name="alert_fail_body">Reason: %1$s. Details are in Diagnostics</string>
     <string name="alert_channel">Parked alerts</string>
     <string name="alert_channel_desc">Says here when an alert could not be sent</string>
     <string name="alert_no_storage">No place to store the picture: text only this time</string>

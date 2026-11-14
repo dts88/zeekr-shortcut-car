@@ -492,6 +492,11 @@
         android:title="@string/set_section_developer">
 
         <Preference
+            android:key="pref_alerts_debug"
+            android:title="@string/alerts_debug_row_title"
+            android:summary="@string/alerts_debug_row_summary" />
+
+        <Preference
             android:key="pref_permissions"
             android:title="@string/dev_permissions_title"
             android:summary="@string/dev_permissions_summary" />

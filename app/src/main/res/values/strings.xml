@@ -73,6 +73,14 @@
     <string name="alert_trigger_doors">车门 / 前备箱 / 后备箱被打开</string>
     <string name="alert_trigger_lamps">车灯自己亮起</string>
     <string name="alert_trigger_screen">中控屏亮起</string>
+    <string name="alerts_debug_title">停车警报调试</string>
+    <string name="alerts_debug_refresh">刷新</string>
+    <string name="alerts_debug_copy">复制</string>
+    <string name="alerts_debug_save">存到存储</string>
+    <string name="alerts_debug_copied">已复制到剪贴板</string>
+    <string name="alerts_debug_saved">已存到 %1$s</string>
+    <string name="alerts_debug_row_title">停车警报调试（JSON + 日志）</string>
+    <string name="alerts_debug_row_summary">一屏看完开关、监听、轮询、取样、车身状态和最近的黑匣子；可截屏、复制、存到 U 盘</string>
     <string name="set_alerts_test_title">发一张测试照片</string>
     <string name="set_alerts_picture_title">发几张</string>
     <string name="set_alerts_picture_summary">一张四宫格看全，或者每一路各一张、在手机上更大</string>
@@ -108,6 +116,8 @@
     <string name="alert_sentry_on">哨兵模式：开</string>
     <string name="alert_sentry_armed">哨兵模式：已布防（锁车）</string>
     <string name="alert_sentry_off">哨兵模式：关</string>
+    <string name="alert_fail_title">停车警报：没发出去</string>
+    <string name="alert_fail_body">原因：%1$s。详情在诊断信息里</string>
     <string name="alert_channel">停车警报</string>
     <string name="alert_channel_desc">警报发不出去时在这一栏说</string>
     <string name="alert_no_storage">没有地方存照片：这一条只发文字</string>

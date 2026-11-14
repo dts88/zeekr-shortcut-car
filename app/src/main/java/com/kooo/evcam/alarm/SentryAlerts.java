@@ -412,6 +412,89 @@ public final class SentryAlerts implements Telemetry.Listener {
     }
 
     /**
+     * 一份给人看的 JSON：开关、监听、轮询、取样、车身状态，加上黑匣子的最后一段。
+     *
+     * <p>令牌不进这份报告；会话号和车主号只写末四位。</p>
+     */
+    public String debugReport() {
+        org.json.JSONObject root = new org.json.JSONObject();
+        try {
+            org.json.JSONObject appJson = new org.json.JSONObject();
+            appJson.put("version", com.kooo.evcam.update.UpdateFlow.currentVersion(this.app));
+            appJson.put("processUptimeS", android.os.SystemClock.elapsedRealtime() / 1000);
+            appJson.put("watching", watching);
+            appJson.put("sampling", sampling);
+            root.put("app", appJson);
+
+            org.json.JSONObject settingsJson = new org.json.JSONObject();
+            settingsJson.put("enabled", config.isAlertsEnabled());
+            settingsJson.put("commands", config.isAlertsCommands());
+            settingsJson.put("triggers", config.getAlertsTriggers());
+            settingsJson.put("layout", config.getAlertsLayout());
+            settingsJson.put("cameras", config.getAlertsCameras());
+            settingsJson.put("straighten", config.isAlertsStraighten());
+            settingsJson.put("motionSensitivity", config.getAlertsMotionSensitivity());
+            settingsJson.put("tokenSet", !config.getAlertsTelegramToken().isEmpty());
+            settingsJson.put("chatId", maskTail(config.getAlertsTelegramChatId()));
+            settingsJson.put("ownerId", maskTail(config.getAlertsOwnerId()));
+            root.put("settings", settingsJson);
+
+            org.json.JSONObject pollerJson = new org.json.JSONObject();
+            pollerJson.put("running", poller != null && poller.isRunning());
+            pollerJson.put("offset", config.getAlertsCommandOffset());
+            pollerJson.put("lastOkAgoS", poller == null || poller.lastOkAt() == 0 ? -1
+                    : (System.currentTimeMillis() - poller.lastOkAt()) / 1000);
+            pollerJson.put("lastError", poller == null ? "" : poller.lastError());
+            root.put("poller", pollerJson);
+
+            org.json.JSONObject motionJson = new org.json.JSONObject();
+            motionJson.put("samples", this.motion.samples());
+            motionJson.put("lastScore", round(this.motion.lastScore()));
+            motionJson.put("threshold", round(this.motion.threshold()));
+            motionJson.put("lastSampleAgoS", this.motion.lastSampleWallClock() == 0 ? -1
+                    : (System.currentTimeMillis() - this.motion.lastSampleWallClock()) / 1000);
+            root.put("motion", motionJson);
+
+            org.json.JSONObject carJson = new org.json.JSONObject();
+            VehicleState state = Telemetry.get().latest();
+            Readings now = Telemetry.get().readings();
+            carJson.put("sentryRaw", state == null || state.sentry == null ? "null" : state.sentry);
+            carJson.put("sentryLastSeen", lastSentryReading == null ? "null" : lastSentryReading);
+            carJson.put("armed", SentryFacts.armed(state == null ? null
+                    : (state.sentry != null ? state.sentry : lastSentryReading)));
+            carJson.put("gear", state == null ? "null" : String.valueOf(state.gear));
+            carJson.put("speedKmh", state == null || state.speedKmh == null ? "null" : state.speedKmh);
+            carJson.put("parked", parkedNow(state));
+            carJson.put("hazard", String.valueOf(hazardOn(now)));
+            carJson.put("lamps", String.valueOf(lampsOn(now)));
+            carJson.put("screenLit", String.valueOf(screenLit(now.code(Signal.SCREEN_POWER_EVENT))));
+            carJson.put("carLink", Telemetry.get().carLinkConnected());
+            root.put("car", carJson);
+        } catch (org.json.JSONException e) {
+            return "{\"error\":\"could not build report\"}";
+        }
+        String json;
+        try {
+            json = root.toString(2);
+        } catch (org.json.JSONException e) {
+            json = root.toString();
+        }
+        return json + "\n\n--- recent log ---\n"
+                + com.kooo.evcam.blackbox.BlackBox.export(this.app, 8000);
+    }
+
+    private static String maskTail(String value) {
+        if (value == null || value.isEmpty()) {
+            return "";
+        }
+        return value.length() <= 4 ? "…" : "…" + value.substring(value.length() - 4);
+    }
+
+    private static double round(double value) {
+        return Math.round(value * 1000.0) / 1000.0;
+    }
+
+    /**
      * 把这条链路现在的样子报一遍 —— 设置里那一行用它。
      *
      * <p>只读状态，不发消息。回答在主线程，一行一项，不含令牌。</p>
@@ -931,6 +1014,25 @@ public final class SentryAlerts implements Telemetry.Listener {
      * <p>一条警报发不出去是很要紧的事：车主以为有事会响，结果什么都没有。
      * 但也不能每 60 秒弹一次，所以这里自己再限一次频。</p>
      */
+    /**
+     * 把一个异常式的理由压成一行能读的话。
+     *
+     * <p>通知栏在车机上就那么一点宽，“java.io.IOException: …”连第一个词都显不完。
+     * 原文不丢：它在黑匣子和诊断报告里。</p>
+     */
+    private static String shortReason(String why) {
+        if (why == null || why.isEmpty()) {
+            return "";
+        }
+        String text = why;
+        int cut = text.indexOf(':');
+        if (cut > 0 && cut < text.length() - 1) {
+            text = text.substring(cut + 1);
+        }
+        text = text.trim();
+        return text.length() <= 90 ? text : text.substring(0, 90);
+    }
+
     private void notifyFailure(String why) {
         long now = SystemClock.elapsedRealtime();
         if (failureNotifiedAt != 0 && now - failureNotifiedAt < FAILURE_NOTIFY_MS) {
@@ -954,9 +1056,10 @@ public final class SentryAlerts implements Telemetry.Listener {
                     PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
             NotificationCompat.Builder builder = new NotificationCompat.Builder(app, CHANNEL_ID)
                     .setSmallIcon(R.drawable.ic_stat_app)
-                    .setContentTitle(app.getString(R.string.set_section_alerts))
-                    .setContentText(why)
-                    .setStyle(new NotificationCompat.BigTextStyle().bigText(why))
+                    .setContentTitle(app.getString(R.string.alert_fail_title))
+                    .setContentText(app.getString(R.string.alert_fail_body, shortReason(why)))
+                    .setStyle(new NotificationCompat.BigTextStyle()
+                            .bigText(app.getString(R.string.alert_fail_body, shortReason(why))))
                     .setContentIntent(open)
                     .setAutoCancel(true);
             manager.notify(NOTIFICATION_ID, builder.build());
