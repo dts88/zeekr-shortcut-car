@@ -195,6 +195,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         boundUnlocked = DeveloperMode.isUnlocked();
 
         bindRecording();
+        bindAlerts();
         bindStorage();
         bindRearView();
         bindSideView();
@@ -845,6 +846,569 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     //     }
     //     return String.format(java.util.Locale.US, "%.1f", minutes / 60.0);
     // }
+
+    /**
+     * 停车警报（{@code screen_alerts}）：一个开关，加上把 Telegram 那头配好的四行。
+     *
+     * <h3>为什么令牌要在这辆车上敲</h3>
+     *
+     * <p>谁的车谁自己配，不靠重编一次 APK：令牌从 @BotFather 拿来已是随手可得的，
+     * 会话号用「找会话号」从 {@code getUpdates} 自动取 —— 车主只需先在手机上给机器人说一句话。
+     * 令牌存进 {@link AppConfig} 的另一个文件（{@code app_config_secrets}），
+     * 不进设置导出、不进诊断报告；设置页只显示末四位。</p>
+     */
+    private void bindAlerts() {
+        SwitchPreferenceCompat on = findPreference("pref_alerts");
+        if (on == null) {
+            return;
+        }
+        on.setPersistent(false);
+        on.setChecked(appConfig.isAlertsEnabled());
+        on.setOnPreferenceChangeListener((preference, newValue) -> {
+            boolean enabled = Boolean.TRUE.equals(newValue);
+            appConfig.setAlertsEnabled(enabled);
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("开关变更: pref_alerts → "
+                    + (enabled ? "开" : "关"));
+            com.kooo.evcam.alarm.SentryAlerts.get(requireContext()).refresh();
+            showAlertsRows();
+            return true;
+        });
+
+        Preference token = findPreference("pref_alerts_token");
+        if (token != null) {
+            token.setPersistent(false);
+            token.setOnPreferenceClickListener(preference -> {
+                editAlertsToken();
+                return true;
+            });
+        }
+
+        Preference chat = findPreference("pref_alerts_chat");
+        if (chat != null) {
+            chat.setPersistent(false);
+            chat.setOnPreferenceClickListener(preference -> {
+                editAlertsChat();
+                return true;
+            });
+        }
+
+        Preference find = findPreference("pref_alerts_find_chat");
+        if (find != null) {
+            find.setPersistent(false);
+            find.setOnPreferenceClickListener(preference -> {
+                findAlertsChat();
+                return true;
+            });
+        }
+
+        // 发几张：一张四宫格，还是每一路各一张。合法取值在 SettingsRegistry.ALERTS_LAYOUT 一处
+        bindEnum("pref_alerts_picture", SettingsRegistry.ALERTS_LAYOUT, appConfig.getAlertsLayout(),
+                value -> appConfig.setAlertsLayout(value));
+
+        // 要哪几路（只在「每一路各一张」时用得上）
+        Preference cameras = findPreference("pref_alerts_cameras");
+        if (cameras != null) {
+            cameras.setPersistent(false);
+            cameras.setOnPreferenceClickListener(preference -> {
+                pickAlertsCameras();
+                return true;
+            });
+        }
+
+        SwitchPreferenceCompat straighten = findPreference("pref_alerts_straighten");
+        if (straighten != null) {
+            straighten.setPersistent(false);
+            straighten.setChecked(appConfig.isAlertsStraighten());
+            straighten.setOnPreferenceChangeListener((preference, newValue) -> {
+                appConfig.setAlertsStraighten(Boolean.TRUE.equals(newValue));
+                com.kooo.evcam.blackbox.BlackBox.noteImportant("开关变更: pref_alerts_straighten → "
+                        + (Boolean.TRUE.equals(newValue) ? "开" : "关"));
+                return true;
+            });
+        }
+
+        SwitchPreferenceCompat commands = findPreference("pref_alerts_commands");
+        if (commands != null) {
+            commands.setPersistent(false);
+            commands.setChecked(appConfig.isAlertsCommands());
+            commands.setOnPreferenceChangeListener((preference, newValue) -> {
+                boolean answered = Boolean.TRUE.equals(newValue);
+                appConfig.setAlertsCommands(answered);
+                com.kooo.evcam.blackbox.BlackBox.noteImportant("开关变更: pref_alerts_commands → "
+                        + (answered ? "开" : "关"));
+                com.kooo.evcam.alarm.SentryAlerts.get(requireContext()).refreshConfig();
+                return true;
+            });
+        }
+
+        // 这一栏的显示规则全写在这里（ui-spec §三：可见性只在一处）。
+        // 总开关关着时，下面那些设置没有意义；下层的选项只在它自己的上一层选中时才出现。
+        boolean alertsOn = appConfig.isAlertsEnabled();
+        com.kooo.evcam.alarm.TriggerSet shownTriggers =
+                com.kooo.evcam.alarm.TriggerSet.parse(appConfig.getAlertsTriggers());
+        boolean perCamera = com.kooo.evcam.alarm.AlertPicture.layout(appConfig.getAlertsLayout())
+                == com.kooo.evcam.alarm.AlertPicture.Layout.SEPARATE;
+        boolean clipOn = appConfig.getAlertsClipSeconds() > 0;
+        // 总开关关着时整组收起来：只留总开关和「检查」，
+        // 不要留下一排空的分组标题。
+        for (String key : new String[] {"cat_alerts_when", "cat_alerts_picture",
+                "cat_alerts_clip", "cat_alerts_telegram"}) {
+            show(key, alertsOn);
+        }
+        show("pref_alerts_motion_sensitivity", alertsOn && shownTriggers.has(
+                com.kooo.evcam.alarm.TriggerSet.MOTION));
+        boolean quietOn = appConfig.isAlertsQuietEnabled();
+        show("pref_alerts_arm_delay", alertsOn);
+        show("pref_alerts_quiet_start", alertsOn && quietOn);
+        show("pref_alerts_quiet_end", alertsOn && quietOn);
+        show("pref_alerts_cameras", alertsOn && perCamera);
+        show("pref_alerts_clip_audio", alertsOn && clipOn);
+        show("pref_alerts_clip_data", alertsOn && clipOn);
+
+        Preference quietStart = findPreference("pref_alerts_quiet_start");
+        if (quietStart != null) {
+            quietStart.setSummary(com.kooo.evcam.alarm.QuietHours.format(
+                    appConfig.getAlertsQuietStart()));
+        }
+        Preference quietEnd = findPreference("pref_alerts_quiet_end");
+        if (quietEnd != null) {
+            quietEnd.setSummary(com.kooo.evcam.alarm.QuietHours.format(
+                    appConfig.getAlertsQuietEnd()));
+        }
+
+        Preference triggersRow = findPreference("pref_alerts_triggers");
+        if (triggersRow != null) {
+            triggersRow.setPersistent(false);
+            triggersRow.setOnPreferenceClickListener(preference -> {
+                pickAlertsTriggers(triggersRow);
+                return true;
+            });
+        }
+
+        ListPreference clip = findPreference("pref_alerts_clip");
+        if (clip != null) {
+            clip.setPersistent(false);
+            clip.setEntries(new CharSequence[] {getString(R.string.opt_alerts_clip_off),
+                    getString(R.string.opt_alerts_clip_5), getString(R.string.opt_alerts_clip_10)});
+            clip.setEntryValues(new CharSequence[] {"0", "5", "10"});
+            clip.setValue(String.valueOf(appConfig.getAlertsClipSeconds()));
+            clip.setOnPreferenceChangeListener((preference, newValue) -> {
+                try {
+                    appConfig.setAlertsClipSeconds(Integer.parseInt(String.valueOf(newValue)));
+                } catch (NumberFormatException e) {
+                    appConfig.setAlertsClipSeconds(0);
+                }
+                com.kooo.evcam.blackbox.BlackBox.noteImportant(
+                        "设置变更: pref_alerts_clip → " + newValue);
+                showAlertsRows();
+                return true;
+            });
+        }
+
+        SwitchPreferenceCompat clipAudio = findPreference("pref_alerts_clip_audio");
+        if (clipAudio != null) {
+            clipAudio.setPersistent(false);
+            clipAudio.setChecked(appConfig.isAlertsClipAudio());
+            clipAudio.setOnPreferenceChangeListener((preference, newValue) -> {
+                boolean withSound = Boolean.TRUE.equals(newValue);
+                appConfig.setAlertsClipAudio(withSound);
+                return true;
+            });
+        }
+
+        ListPreference armDelay = findPreference("pref_alerts_arm_delay");
+        if (armDelay != null) {
+            armDelay.setPersistent(false);
+            armDelay.setEntries(new CharSequence[] {
+                    getString(R.string.opt_alerts_arm_now),
+                    getString(R.string.opt_alerts_arm_1),
+                    getString(R.string.opt_alerts_arm_3)});
+            armDelay.setEntryValues(new CharSequence[] {"0", "1", "3"});
+            armDelay.setValue(String.valueOf(appConfig.getAlertsArmDelayMinutes()));
+            armDelay.setOnPreferenceChangeListener((preference, newValue) -> {
+                try {
+                    appConfig.setAlertsArmDelayMinutes(Integer.parseInt(String.valueOf(newValue)));
+                } catch (NumberFormatException e) {
+                    appConfig.setAlertsArmDelayMinutes(com.kooo.evcam.alarm.ArmDelay.DEFAULT_MIN);
+                }
+                com.kooo.evcam.blackbox.BlackBox.noteImportant(
+                        "设置变更: pref_alerts_arm_delay → " + newValue);
+                return true;
+            });
+        }
+
+        SwitchPreferenceCompat quiet = findPreference("pref_alerts_quiet");
+        if (quiet != null) {
+            quiet.setPersistent(false);
+            quiet.setChecked(appConfig.isAlertsQuietEnabled());
+            quiet.setOnPreferenceChangeListener((preference, newValue) -> {
+                boolean quietWanted = Boolean.TRUE.equals(newValue);
+                appConfig.setAlertsQuietEnabled(quietWanted);
+                com.kooo.evcam.blackbox.BlackBox.noteImportant("设置变更: pref_alerts_quiet → "
+                        + (quietWanted ? "开" : "关"));
+                showAlertsRows();
+                return true;
+            });
+        }
+        bindAlertsQuietRow("pref_alerts_quiet_start", true);
+        bindAlertsQuietRow("pref_alerts_quiet_end", false);
+
+        androidx.preference.SeekBarPreference sensitivity =
+                findPreference("pref_alerts_motion_sensitivity");
+        if (sensitivity != null) {
+            sensitivity.setPersistent(false);
+            sensitivity.setMin(com.kooo.evcam.alarm.MotionSensitivity.MIN);
+            sensitivity.setMax(com.kooo.evcam.alarm.MotionSensitivity.MAX);
+            sensitivity.setSeekBarIncrement(1);
+            sensitivity.setShowSeekBarValue(true);
+            sensitivity.setValue(appConfig.getAlertsMotionSensitivity());
+            sensitivity.setOnPreferenceChangeListener((preference, newValue) -> {
+                int level = newValue instanceof Integer ? (Integer) newValue : 0;
+                appConfig.setAlertsMotionSensitivity(level);
+                com.kooo.evcam.blackbox.BlackBox.noteImportant("设置变更: pref_alerts_motion_sensitivity → " + level);
+                com.kooo.evcam.alarm.SentryAlerts.get(requireContext()).refreshConfig();
+                return true;
+            });
+        }
+
+        Preference diagnosticsRow = findPreference("pref_alerts_diagnostics");
+        if (diagnosticsRow != null) {
+            diagnosticsRow.setPersistent(false);
+            onClick("pref_alerts_diagnostics", pref -> startActivity(
+                    new Intent(requireContext(), DiagnosticsActivity.class)));
+        }
+
+        Preference probeRow = findPreference("pref_alerts_probe");
+        if (probeRow != null) {
+            probeRow.setPersistent(false);
+            probeRow.setOnPreferenceClickListener(preference -> {
+                com.kooo.evcam.alarm.SentryAlerts.get(requireContext()).probe((ok, text) -> {
+                    if (isAdded()) {
+                        probeRow.setSummary(text);
+                        toast(text.replace('\n', ' '));
+                    }
+                });
+                return true;
+            });
+        }
+
+        Preference test = findPreference("pref_alerts_test");
+        if (test != null) {
+            test.setPersistent(false);
+            test.setOnPreferenceClickListener(preference -> {
+                sendAlertsTest();
+                return true;
+            });
+        }
+
+        showAlertsRows();
+    }
+
+    /** 两行的行尾写当前填了什么；令牌只说末四位。 */
+    private void showAlertsRows() {
+        Preference token = findPreference("pref_alerts_token");
+        if (token != null) {
+            String value = appConfig.getAlertsTelegramToken();
+            if (value.isEmpty()) {
+                token.setSummary(R.string.set_alerts_token_empty);
+            } else if (!com.kooo.evcam.alarm.TelegramRequest.looksLikeToken(value)) {
+                token.setSummary(R.string.set_alerts_token_bad);
+            } else {
+                // 只写「填了」：令牌的末四位也不必留在常亮的屏幕上
+                token.setSummary(R.string.set_alerts_token_ok_unnamed);
+            }
+        }
+        Preference chat = findPreference("pref_alerts_chat");
+        if (chat != null) {
+            String value = appConfig.getAlertsTelegramChatId();
+            chat.setSummary(value.isEmpty() ? getString(R.string.set_alerts_chat_empty)
+                    : getString(R.string.set_alerts_chat_set, maskChat(value)));
+        }
+        Preference triggersRow = findPreference("pref_alerts_triggers");
+        if (triggersRow != null) {
+            com.kooo.evcam.alarm.TriggerSet set =
+                    com.kooo.evcam.alarm.TriggerSet.parse(appConfig.getAlertsTriggers());
+            StringBuilder text = new StringBuilder();
+            for (String name : com.kooo.evcam.alarm.TriggerSet.ALL) {
+                if (!set.has(name)) {
+                    continue;
+                }
+                if (text.length() > 0) {
+                    text.append(" · ");
+                }
+                text.append(triggerLabel(name));
+            }
+            triggersRow.setSummary(text.length() == 0
+                    ? getString(R.string.set_alerts_triggers_none) : text.toString());
+        }
+
+        Preference cameras = findPreference("pref_alerts_cameras");
+        if (cameras != null) {
+            com.kooo.evcam.alarm.AlertPicture.Layout layout =
+                    com.kooo.evcam.alarm.AlertPicture.layout(appConfig.getAlertsLayout());
+            cameras.setVisible(layout == com.kooo.evcam.alarm.AlertPicture.Layout.SEPARATE);
+            int[] lanes = com.kooo.evcam.alarm.AlertPicture.lanes(appConfig.getAlertsCameras());
+            StringBuilder names = new StringBuilder();
+            for (int lane : lanes) {
+                if (names.length() > 0) {
+                    names.append(" · ");
+                }
+                names.append(com.kooo.evcam.camera.CameraNames.ofLane(requireContext(), lane));
+            }
+            cameras.setSummary(com.kooo.evcam.alarm.AlertPicture.allLanes(lanes)
+                    ? getString(R.string.set_alerts_cameras_all) : names.toString());
+        }
+    }
+
+    /** 哪些事情算「有事」（TriggerSet）。 */
+    private void pickAlertsTriggers(Preference row) {
+        com.kooo.evcam.alarm.TriggerSet current =
+                com.kooo.evcam.alarm.TriggerSet.parse(appConfig.getAlertsTriggers());
+        String[] names = com.kooo.evcam.alarm.TriggerSet.ALL;
+        CharSequence[] labels = new CharSequence[names.length];
+        boolean[] checked = new boolean[names.length];
+        for (int i = 0; i < names.length; i++) {
+            labels[i] = triggerLabel(names[i]);
+            checked[i] = current.has(names[i]);
+        }
+        new MaterialAlertDialogBuilder(requireContext(), R.style.Theme_Cam_MaterialAlertDialog)
+                .setTitle(R.string.set_alerts_triggers_title)
+                .setMultiChoiceItems(labels, checked, (dialog, which, isChecked) -> checked[which] = isChecked)
+                .setPositiveButton(R.string.action_save, (dialog, which) -> {
+                    java.util.Set<String> picked = new java.util.LinkedHashSet<>();
+                    for (int i = 0; i < names.length; i++) {
+                        if (checked[i]) {
+                            picked.add(names[i]);
+                        }
+                    }
+                    appConfig.setAlertsTriggers(com.kooo.evcam.alarm.TriggerSet.value(picked));
+                    com.kooo.evcam.blackbox.BlackBox.noteImportant("设置变更: pref_alerts_triggers → "
+                            + (picked.isEmpty() ? "（一项都没选）" : picked));
+                    com.kooo.evcam.alarm.SentryAlerts.get(requireContext()).refreshConfig();
+                    showAlertsRows();
+                })
+                .setNegativeButton(R.string.action_cancel, null)
+                .show();
+    }
+
+    /** 触发项的名字（存的是英文 key，界面上说人话）。 */
+    private CharSequence triggerLabel(String name) {
+        switch (name) {
+            case com.kooo.evcam.alarm.TriggerSet.MOTION:
+                return getString(R.string.alert_trigger_motion);
+            case com.kooo.evcam.alarm.TriggerSet.HAZARD:
+                return getString(R.string.alert_trigger_hazard);
+            case com.kooo.evcam.alarm.TriggerSet.FLASH:
+                return getString(R.string.alert_trigger_flash);
+            case com.kooo.evcam.alarm.TriggerSet.DOORS:
+                return getString(R.string.alert_trigger_doors);
+            case com.kooo.evcam.alarm.TriggerSet.LAMPS:
+                return getString(R.string.alert_trigger_lamps);
+            default:
+                return getString(R.string.alert_trigger_screen);
+        }
+    }
+
+    /** 安静时段的一头（{@code HH:mm}）。 */
+    private void bindAlertsQuietRow(String key, boolean start) {
+        Preference row = findPreference(key);
+        if (row == null) {
+            return;
+        }
+        row.setPersistent(false);
+        row.setOnPreferenceClickListener(preference -> {
+            int current = start ? appConfig.getAlertsQuietStart() : appConfig.getAlertsQuietEnd();
+            showTextDialog(key, getString(start ? R.string.set_alerts_quiet_start_title
+                            : R.string.set_alerts_quiet_end_title),
+                    getString(R.string.set_alerts_quiet_hint),
+                    com.kooo.evcam.alarm.QuietHours.format(current), value -> {
+                        int minute = com.kooo.evcam.alarm.QuietHours.parse(value);
+                        if (minute < 0) {
+                            toast(getString(R.string.set_alerts_quiet_bad_time));
+                            return;
+                        }
+                        if (start) {
+                            appConfig.setAlertsQuietStart(minute);
+                        } else {
+                            appConfig.setAlertsQuietEnd(minute);
+                        }
+                        showAlertsRows();
+                    });
+            return true;
+        });
+    }
+
+    /** 勾要哪几路。四路都勾就等于「全部」。 */
+    private void pickAlertsCameras() {
+        int[] selected = com.kooo.evcam.alarm.AlertPicture.lanes(appConfig.getAlertsCameras());
+        CharSequence[] names = new CharSequence[com.kooo.evcam.alarm.AlertPicture.LANES];
+        boolean[] checked = new boolean[names.length];
+        for (int lane = 0; lane < names.length; lane++) {
+            names[lane] = com.kooo.evcam.camera.CameraNames.ofLane(requireContext(), lane);
+            checked[lane] = contains(selected, lane);
+        }
+        new MaterialAlertDialogBuilder(requireContext(), R.style.Theme_Cam_MaterialAlertDialog)
+                .setTitle(R.string.set_alerts_cameras_title)
+                .setMultiChoiceItems(names, checked, (dialog, which, isChecked) -> checked[which] = isChecked)
+                .setPositiveButton(R.string.action_save, (dialog, which) -> {
+                    int count = 0;
+                    for (boolean on : checked) {
+                        if (on) {
+                            count++;
+                        }
+                    }
+                    if (count == 0) {
+                        // 一路都不勾等于没有图可发：按「全部」算，别让警报静悄悄地变成哑巴
+                        toast(getString(R.string.set_alerts_cameras_none));
+                        appConfig.setAlertsCameras("0,1,2,3");
+                    } else {
+                        StringBuilder value = new StringBuilder();
+                        for (int lane = 0; lane < checked.length; lane++) {
+                            if (checked[lane]) {
+                                if (value.length() > 0) {
+                                    value.append(',');
+                                }
+                                value.append(lane);
+                            }
+                        }
+                        appConfig.setAlertsCameras(value.toString());
+                    }
+                    com.kooo.evcam.blackbox.BlackBox.noteImportant("设置变更: pref_alerts_cameras → "
+                            + appConfig.getAlertsCameras());
+                    showAlertsRows();
+                })
+                .setNegativeButton(R.string.action_cancel, null)
+                .show();
+    }
+
+    private static boolean contains(int[] values, int wanted) {
+        if (values == null) {
+            return false;
+        }
+        for (int value : values) {
+            if (value == wanted) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void editAlertsToken() {
+        showTextDialog("pref_alerts_token", getString(R.string.set_alerts_token_title),
+                getString(R.string.set_alerts_token_summary),
+                appConfig.getAlertsTelegramToken(), value -> {
+                    appConfig.setAlertsTelegramToken(value);
+                    com.kooo.evcam.blackbox.BlackBox.noteImportant("设置变更: pref_alerts_token → "
+                            + (value.isEmpty() ? "（空）" : "已填写"));
+                    com.kooo.evcam.alarm.SentryAlerts.get(requireContext()).refreshConfig();
+                    showAlertsRows();
+                    // 存完当场问 Telegram 认不认：认不出来现在就说，别等到要发警报那天
+                    com.kooo.evcam.alarm.SentryAlerts.get(requireContext()).checkToken((ok, message) -> {
+                        if (isAdded()) {
+                            toast(message);
+                        }
+                    });
+                });
+    }
+
+    private void editAlertsChat() {
+        showTextDialog("pref_alerts_chat", getString(R.string.set_alerts_chat_title),
+                getString(R.string.set_alerts_find_summary),
+                appConfig.getAlertsTelegramChatId(), value -> {
+                    appConfig.setAlertsTelegramChatId(value);
+                    com.kooo.evcam.blackbox.BlackBox.noteImportant("设置变更: pref_alerts_chat → "
+                            + (value.isEmpty() ? "（空）" : maskChat(value)));
+                    com.kooo.evcam.alarm.SentryAlerts.get(requireContext()).refreshConfig();
+                    showAlertsRows();
+                    if (!value.isEmpty()) {
+                        checkAlertsChat(value);
+                    }
+                });
+    }
+
+    /** 用已填的令牌去问 Telegram，把会话号自动填上。 */
+    private void findAlertsChat() {
+        toast(getString(R.string.set_alerts_find_summary));
+        com.kooo.evcam.alarm.SentryAlerts.get(requireContext()).findChats(
+                new com.kooo.evcam.alarm.SentryAlerts.ChatListCallback() {
+                    @Override
+                    public void onChats(java.util.List<com.kooo.evcam.alarm.TelegramSender.Chat> chats) {
+                        if (!isAdded()) {
+                            return;
+                        }
+                        if (chats.isEmpty()) {
+                            toast(getString(R.string.set_alerts_chat_none));
+                            return;
+                        }
+                        if (chats.size() == 1) {
+                            applyAlertsChat(chats.get(0));
+                            return;
+                        }
+                        CharSequence[] labels = new CharSequence[chats.size()];
+                        for (int i = 0; i < chats.size(); i++) {
+                            labels[i] = chats.get(i).toString();
+                        }
+                        new MaterialAlertDialogBuilder(requireContext(),
+                                R.style.Theme_Cam_MaterialAlertDialog)
+                                .setTitle(R.string.set_alerts_pick_one)
+                                .setItems(labels, (dialog, which) -> applyAlertsChat(chats.get(which)))
+                                .setNegativeButton(R.string.action_cancel, null)
+                                .show();
+                    }
+
+                    @Override
+                    public void onFailed(String message) {
+                        if (isAdded()) {
+                            toast(getString(R.string.set_alerts_failed, message));
+                        }
+                    }
+                });
+    }
+
+    private void applyAlertsChat(com.kooo.evcam.alarm.TelegramSender.Chat chat) {
+        String chatId = chat.id;
+        appConfig.setAlertsTelegramChatId(chatId);
+        // 记下发话的那个人：群聊里靠它才分得出是不是车主本人
+        if (chat.userId != null && !chat.userId.isEmpty()) {
+            appConfig.setAlertsOwnerId(chat.userId);
+        }
+        com.kooo.evcam.blackbox.BlackBox.noteImportant("设置变更: pref_alerts_chat → " + maskChat(chatId));
+        com.kooo.evcam.alarm.SentryAlerts.get(requireContext()).refreshConfig();
+        showAlertsRows();
+        toast(getString(R.string.set_alerts_chat_found, maskChat(chatId)));
+        checkAlertsChat(chatId);
+    }
+
+    /** 会话号只露末四位：它会进黑匣子、进诊断报告，也会一直显示在设置页上。 */
+    private static String maskChat(String chatId) {
+        if (chatId == null || chatId.length() <= 4) {
+            return "…";
+        }
+        return "…" + chatId.substring(chatId.length() - 4);
+    }
+
+    /**
+     * 问一句 Telegram 认不认这个会话。
+     *
+     * <p>手打错一位数字，照片就会发给另一个人的会话 —— 形状对（都是数字）不代表它存在。</p>
+     */
+    private void checkAlertsChat(String chatId) {
+        com.kooo.evcam.alarm.SentryAlerts.get(requireContext()).checkChat(chatId, (ok, message) -> {
+            if (isAdded()) {
+                toast(message);
+            }
+        });
+    }
+
+    /** 拍一张、发出去：和真警报走同一条路，所以它能通，警报就能通。 */
+    private void sendAlertsTest() {
+        toast(getString(R.string.set_alerts_test_summary));
+        com.kooo.evcam.alarm.SentryAlerts.get(requireContext()).sendTestPicture((ok, message) -> {
+            if (isAdded()) {
+                toast(message);
+            }
+        });
+    }
 
     /**
      * 车牌号水印（开关加下一层，ui-spec §三，项目所有者 2026-10-23）：开关管录像和照片上显不显示车牌号；
@@ -1920,6 +2484,9 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         // 这里原来先找一个 key 为 cat_developer 的分类，找不到就整个返回 ——
         // 而 0.21.0 把分区改成嵌套 PreferenceScreen 之后，这个 key 就不存在了。
         // 于是下面四个入口一个都没接上，点了毫无反应，也不报错。
+        onClick("pref_alerts_debug", pref -> startActivity(
+                new Intent(getContext(), com.kooo.evcam.alarm.AlertsDebugActivity.class)));
+
         onClick("pref_permissions",
                 pref -> openFragment(new PermissionsPreferenceFragment(), R.string.dev_permissions_title));
 
@@ -1937,6 +2504,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         // 车辆状态面板（2026-10-23 从界面页挪来）：主界面那个控件自己听这个开关
         bindSwitch("pref_vehicle_status", appConfig.isVehicleStatusEnabled(),
                 value -> appConfig.setVehicleStatusEnabled(value));
+
 
         bindSwitch("pref_raw_frame_dump", appConfig.isRawFrameDumpEnabled(),
                 appConfig::setRawFrameDumpEnabled);
@@ -2128,6 +2696,24 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                     | InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS);
             input.setFilters(new android.text.InputFilter[]{
                     new android.text.InputFilter.LengthFilter(LicensePlate.MAX_LENGTH)});
+            return;
+        }
+        if ("pref_alerts_token".equals(key)) {
+            // 令牌是“数字:一串字母数字下划线横线”，不能有空格；按密码显示，
+            // 免得常亮的屏幕上留着一整串凭据
+            input.setInputType(InputType.TYPE_CLASS_TEXT
+                    | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+            // 不要自己过滤输入：车机的输入法碰上自带的过滤器会把字母再插一遍，
+            // 现场就是“敲一个字母出现两个”。去空白、去怪字符在保存那一步做（AppConfig）。
+            input.setFilters(new android.text.InputFilter[]{
+                    new android.text.InputFilter.LengthFilter(64)});
+            return;
+        }
+        if ("pref_alerts_chat".equals(key)) {
+            // 群组的会话号是负数，所以允许一个前导减号
+            input.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_SIGNED);
+            input.setFilters(new android.text.InputFilter[]{
+                    new android.text.InputFilter.LengthFilter(20)});
             return;
         }
         // 熄屏录制的时长框（2026-11-02 停用，要恢复时放回）：

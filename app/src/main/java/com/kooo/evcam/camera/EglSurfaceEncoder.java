@@ -27,6 +27,7 @@ import android.opengl.Matrix;
 import android.view.Surface;
 
 import com.kooo.evcam.AppLog;
+import com.kooo.evcam.alarm.MotionTap;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -457,6 +458,95 @@ public class EglSurfaceEncoder {
                 + "允许提前 " + Math.round((1 - FrameThrottle.EARLY_TOLERANCE) * 100) + "%）");
     }
 
+    // ---- 停车警报的画面移动检测：每 250 ms 把当前帧画进一张 128×72 离屏缓存再读回来。
+    // 只在环视那一路、只在警报要它的时候跑（MotionTap.wantsFrames）。
+    private int motionFbo;
+    private int motionTex;
+    private java.nio.ByteBuffer motionBuffer;
+    private int[] motionLuma;
+    private int[] motionViewport;
+    private final float[] motionIdentity = new float[16];
+    private boolean motionBroken;
+
+    /**
+     * 把当前帧画进离屏缓存并读回 128×72 亮度。
+     *
+     * <p>任何一步出错就彻底停掉这条路：它是一个附加功能，
+     * 不能因为它把录像折了。</p>
+     */
+    private void sampleMotionFrame() {
+        if (motionBroken) {
+            return;
+        }
+        try {
+            if (motionFbo == 0) {
+                android.opengl.Matrix.setIdentityM(motionIdentity, 0);
+                int[] tex = new int[1];
+                GLES20.glGenTextures(1, tex, 0);
+                motionTex = tex[0];
+                GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, motionTex);
+                GLES20.glTexImage2D(GLES20.GL_TEXTURE_2D, 0, GLES20.GL_RGBA,
+                        MotionTap.WIDTH, MotionTap.HEIGHT, 0, GLES20.GL_RGBA,
+                        GLES20.GL_UNSIGNED_BYTE, null);
+                GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER,
+                        GLES20.GL_NEAREST);
+                GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER,
+                        GLES20.GL_NEAREST);
+                int[] fbo = new int[1];
+                GLES20.glGenFramebuffers(1, fbo, 0);
+                motionFbo = fbo[0];
+                GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, motionFbo);
+                GLES20.glFramebufferTexture2D(GLES20.GL_FRAMEBUFFER,
+                        GLES20.GL_COLOR_ATTACHMENT0, GLES20.GL_TEXTURE_2D, motionTex, 0);
+                int status = GLES20.glCheckFramebufferStatus(GLES20.GL_FRAMEBUFFER);
+                GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0);
+                if (status != GLES20.GL_FRAMEBUFFER_COMPLETE) {
+                    AppLog.w(TAG, "Camera " + cameraId + " 移动检测：离屏缓存建不成（" + status + "）");
+                    motionBroken = true;
+                    return;
+                }
+                motionBuffer = java.nio.ByteBuffer.allocateDirect(
+                        MotionTap.WIDTH * MotionTap.HEIGHT * 4);
+                motionLuma = new int[MotionTap.WIDTH * MotionTap.HEIGHT];
+                motionViewport = new int[4];
+            }
+
+            GLES20.glGetIntegerv(GLES20.GL_VIEWPORT, motionViewport, 0);
+            GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, motionFbo);
+            GLES20.glViewport(0, 0, MotionTap.WIDTH, MotionTap.HEIGHT);
+            GLES20.glUseProgram(program);
+            GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
+            GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, textureId);
+            GLES20.glUniformMatrix4fv(mvpMatrixHandle, 1, false, motionIdentity, 0);
+            GLES20.glUniformMatrix4fv(texMatrixHandle, 1, false, texMatrix, 0);
+            GLES20.glUniform1i(textureHandle, 0);
+            GLES20.glEnableVertexAttribArray(positionHandle);
+            GLES20.glVertexAttribPointer(positionHandle, 2, GLES20.GL_FLOAT, false, 0, vertexBuffer);
+            GLES20.glEnableVertexAttribArray(texCoordHandle);
+            GLES20.glVertexAttribPointer(texCoordHandle, 2, GLES20.GL_FLOAT, false, 0, texCoordBuffer);
+            GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4);
+            GLES20.glDisableVertexAttribArray(positionHandle);
+            GLES20.glDisableVertexAttribArray(texCoordHandle);
+            motionBuffer.position(0);
+            GLES20.glReadPixels(0, 0, MotionTap.WIDTH, MotionTap.HEIGHT,
+                    GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, motionBuffer);
+            GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0);
+            GLES20.glViewport(motionViewport[0], motionViewport[1],
+                    motionViewport[2], motionViewport[3]);
+
+            for (int i = 0; i < motionLuma.length; i++) {
+                int r = motionBuffer.get(i * 4) & 0xFF;
+                int g = motionBuffer.get(i * 4 + 1) & 0xFF;
+                int b = motionBuffer.get(i * 4 + 2) & 0xFF;
+                motionLuma[i] = (r * 77 + g * 151 + b * 28) >> 8;
+            }
+            MotionTap.get().submit(motionLuma);
+        } catch (RuntimeException | OutOfMemoryError e) {
+            AppLog.w(TAG, "Camera " + cameraId + " 移动检测停掉：" + e);
+            motionBroken = true;
+        }
+    }
+
     public void drawFrame(long presentationTimeNs) {
         if (!isInitialized || isReleased) {
             return;
@@ -530,6 +620,12 @@ public class EglSurfaceEncoder {
             // 设置呈现时间戳并交换缓冲区
             EGLExt.eglPresentationTimeANDROID(eglDisplay, eglSurface, presentationTimeNs);
             EGL14.eglSwapBuffers(eglDisplay, eglSurface);
+
+            // 交换之后才取样：主画面已经送出去了，这一步只动离屏缓存。
+            // 只在环视（四宫格）那一路取：它本来就是四路拼好的一张图。
+            if (fourLanePlan != null && MotionTap.get().wantsFrames(System.nanoTime())) {
+                sampleMotionFrame();
+            }
 
         } catch (Exception e) {
             AppLog.e(TAG, "Camera " + cameraId + " Error drawing frame", e);

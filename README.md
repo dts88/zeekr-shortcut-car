@@ -74,6 +74,76 @@ The file is served over your local network only while the dialog is open, from a
 address, and only that one file. Both devices need to be on the same network — the easiest way is
 to turn on the phone's hotspot and connect the car to it.
 
+### Alerts while parked
+
+With the car parked and Sentry Mode on, the app can send you a picture when something happens to it.
+Off by default; set it up once, from the car screen, and nothing needs rebuilding.
+
+- One picture of all four cameras, taken by the same photo path the shutter button uses, so it looks
+  like a photo you would have taken yourself.
+- It goes to a Telegram chat when: something moves in view, the hazards come on, the high beams flash,
+  a door / frunk / trunk opens, the car lights come on by themselves, or the centre screen lights up
+  while parked. Pick which of those count under **Settings → Alerts → What counts**.
+- **Settings → Alerts**: paste the bot token from @BotFather, then tap **Find chat id** — send the bot
+  one message from your phone first, and the row fills in the chat it came from. **Send a test picture**
+  proves the whole path before you rely on it.
+- One alert per minute at most, six an hour. The cooldown is there because one event trips several
+  signals at once.
+- Coming back to the car does not send anything: unlocking drops Sentry Mode out of its armed value
+  before the screen or the lamps come back on, and the alert needs the armed value.
+- The bot token stays on this car, in its own store: it is not in the exported settings, not in a
+  diagnostics report, and not in the log.
+
+This car has no impact, horn, airbag or tamper signal on the bus that this app can read, so a knock
+that never lights the hazards and never opens a door will not be seen. The picture is the four
+surround cameras stitched into the 2×2 grid, not the cabin cameras.
+
+### Sentry alerts
+
+With Sentry Mode on, the car already keeps recording. Turn this on and it also tells you: one picture
+of the four surround cameras arrives in Telegram when something happens to the car while you are away,
+and you can ask for a fresh picture from anywhere.
+
+Off by default. Settings → **Alerts**.
+
+#### Setting up the Telegram bot, step by step
+
+1. **Make a bot.** In Telegram, open **@BotFather**, send `/newbot`, give it a name and a user name
+   ending in `bot`. BotFather replies with a token that looks like `123456789:AAH...` — that string is
+   the bot.
+2. **Say hello to it.** Open the bot you just made and send it any message. A bot cannot talk to a chat
+   that has never spoken to it, so this one message is what gives it a chat to answer.
+3. **Type the token into the car.** Settings → Alerts → **Bot token**. Paste the whole string. The row
+   shows only whether it is set, never the token.
+4. **Let the car find the chat.** Tap **Find chat id**. The car asks Telegram which chat last messaged
+   the bot and fills it in. If the bot has been quiet, send it another message and tap again.
+5. **Prove the path.** Tap **Send a test picture**. If a photo arrives on your phone, everything works:
+   the car, its 4G, the bot, the chat.
+6. **Choose what counts** under **What counts as something**: movement in view, hazards, high beams, a
+   door, the car lights, the centre screen. By default only the three the car itself reacts with are on.
+7. **Park, lock, walk away.** Unlock the car and nothing is sent — unlocking drops Sentry Mode out of
+   its armed value before the lights come back on.
+
+Optional, in the same section:
+
+- **Pictures**: one 2×2 of all four cameras, or one picture per camera so each fills the phone screen.
+- **Straighten**: the same fisheye correction playback uses.
+- **Video**: 5 or 10 seconds, cut from the recording around the moment, with sound if the car records it.
+  Sent after the picture. Data per alert: picture under 1 MB, 5 s about 2–4 MB, 10 s about 5–8 MB.
+- **Answer commands**: send the bot `pic` for a fresh picture, `pic front|rear|left|right` for one
+  camera, `status` for one line. Only the chat you configured is answered, and only while Sentry Mode is
+  on — that is what keeps the head unit awake.
+- **Start after locking**: right away, 1 minute or 3 minutes after the car locks, so walking away
+  does not send you a picture of yourself.
+- **Quiet hours**: no alerts between two times, for the nights the car is at home.
+
+**What it cannot see.** The car reports no impact, horn or tamper signal, so a knock that lights nothing
+and opens nothing stays invisible. Cameras also need Sentry Mode to keep the head unit awake.
+
+![Sentry alerts settings](docs/screenshots/alerts-settings-en.png)
+
+![How it works](docs/screenshots/alerts-how-it-works.png)
+
 ### Experimental
 
 - *Smart buttons*: connect Bluetooth buttons named `ZEEKR_button`. Single and double press each run

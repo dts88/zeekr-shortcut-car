@@ -195,6 +195,10 @@ public class SettingsHeadersFragment extends PreferenceFragmentCompat {
                 int on = (config.isRecordingFloatingEnabled() ? 1 : 0) + (config.isSmartButtonsEnabled() ? 1 : 0);
                 return on == 0 ? getString(R.string.header_none_enabled) : getString(R.string.header_enabled_count, on);
             }
+            case "screen_alerts":
+                // 开着但没填令牌 / 会话号等于发不出去，写「开」就是在骗人
+                return getString(config.isAlertsEnabled() && config.hasAlertsTelegramConfig()
+                        ? R.string.header_alerts_on : R.string.header_alerts_off);
             case "screen_update":
                 return com.kooo.evcam.update.UpdateFlow.currentVersion(context);
             default:
@@ -228,6 +232,8 @@ public class SettingsHeadersFragment extends PreferenceFragmentCompat {
         switch (key) {
             case "screen_recording":
                 return R.drawable.ic_video;
+            case "screen_alerts":
+                return R.drawable.ic_alert;
             case "screen_storage":
                 return R.drawable.ic_storage;
             case "screen_rearview":

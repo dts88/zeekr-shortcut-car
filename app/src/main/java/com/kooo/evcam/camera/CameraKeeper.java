@@ -373,6 +373,12 @@ public final class CameraKeeper {
      * 拍一张（主界面的拍照键、悬浮按钮、灵动贴）：相机没开就先开（登记表的规矩），出了画面再拍，提示按真的存下了几路说。
      * 主界面在不在前台都一样。主线程。
      */
+    /** 停车警报的短视频：环视那一路最后几秒，写到 {@code out}。结果在异步回来。 */
+    public void writeClip(java.io.File out, int seconds, boolean includeAudio,
+                          java.util.function.Consumer<Boolean> done) {
+        pipeline().writeClip(out, seconds, includeAudio, done);
+    }
+
     public void takePhoto(MultiCameraManager.PhotoCallback callback) {
         pipeline().takePhoto(callback);
     }

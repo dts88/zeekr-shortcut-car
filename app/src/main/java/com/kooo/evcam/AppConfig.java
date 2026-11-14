@@ -25,7 +25,9 @@ import com.kooo.evcam.settings.SettingsRegistry;
 public class AppConfig {
     private static final String TAG = "AppConfig";
     /** 设置存在这个文件里（导出、导入设置时也读写它，{@code settings.SettingsBackup}）。 */
-    public static final String PREF_NAME = "app_config";
+    public static final String PREF_NAME = "app_config";  // 设置与运行状态
+    /** 只放凭据（现在是 Telegram 令牌）：不进设置导出、不进诊断报告、不进黑匣子。 */
+    public static final String SECRETS_PREF_NAME = "app_config_secrets";
     
     // 配置项键名
     private static final String KEY_FIRST_LAUNCH = "first_launch";  // 首次启动标记
@@ -128,6 +130,24 @@ public class AppConfig {
     private static final String KEY_FORCE_H264_ENCODING = "force_h264_encoding";  // 拍照走相机 JPEG 通道
     private static final String KEY_LICENSE_PLATE = "license_plate";  // 车牌号（可选）
     private static final String KEY_LICENSE_PLATE_ENABLED = "license_plate_enabled";
+    // 停车警报（Telegram）：开关、机器人令牌、会话号
+    private static final String KEY_ALERTS_ENABLED = "alerts_enabled";
+    private static final String KEY_ALERTS_TRIGGERS = "alerts_triggers";
+    private static final String KEY_ALERTS_MOTION_SENSITIVITY = "alerts_motion_sensitivity";
+    private static final String KEY_ALERTS_CLIP_SECONDS = "alerts_clip_seconds";  // 0 关 / 5 / 10
+    private static final String KEY_ALERTS_CLIP_AUDIO = "alerts_clip_audio";
+    private static final String KEY_ALERTS_ARM_DELAY = "alerts_arm_delay_minutes";  // 0 / 1 / 3
+    private static final String KEY_ALERTS_QUIET_ENABLED = "alerts_quiet_enabled";
+    private static final String KEY_ALERTS_QUIET_START = "alerts_quiet_start";
+    private static final String KEY_ALERTS_QUIET_END = "alerts_quiet_end";  // 哪些事情算「有事」
+    private static final String KEY_ALERTS_TELEGRAM_TOKEN = "alerts_telegram_token";
+    private static final String KEY_ALERTS_TELEGRAM_CHAT = "alerts_telegram_chat";
+    private static final String KEY_ALERTS_OWNER_ID = "alerts_owner_id";  // 谁能发命令（私聊里就是会话号）
+    private static final String KEY_ALERTS_LAYOUT = "alerts_layout";       // 一张四宫格 / 每路一张
+    private static final String KEY_ALERTS_CAMERAS = "alerts_cameras";     // 分开发时要哪几路（"0,1,2,3"）
+    private static final String KEY_ALERTS_STRAIGHTEN = "alerts_straighten";  // 发之前掰直
+    private static final String KEY_ALERTS_COMMANDS = "alerts_commands";   // 回应 Telegram 里的命令
+    private static final String KEY_ALERTS_COMMAND_OFFSET = "alerts_command_offset";  // 轮询到哪一条（运行状态）
 
     // 亮度/降噪调节配置
     private static final String KEY_IMAGE_ADJUST_ENABLED = "image_adjust_enabled";  // 是否启用亮度/降噪调节
@@ -766,7 +786,8 @@ public class AppConfig {
                 KEY_FRONT_CABIN_IN_USE,
                 KEY_LAST_DETECTED_SD_PATH,
                 KEY_REARVIEW_GUIDE_SEEN,
-                KEY_PHOTO_VIA_JPEG_RESET)));
+                KEY_PHOTO_VIA_JPEG_RESET,
+                KEY_ALERTS_COMMAND_OFFSET)));
     }
 
     /**
@@ -2011,6 +2032,282 @@ public class AppConfig {
         String clean = LicensePlate.sanitize(value);
         prefs.edit().putString(KEY_LICENSE_PLATE, clean).apply();
         AppLog.i(TAG, "车牌号设为 " + (clean.isEmpty() ? "（空）" : clean));
+    }
+
+    // ------------------------------------------------------------------ 停车警报（Telegram）
+
+    /**
+     * 令牌单独存一个文件，和设置分开。
+     *
+     * <h3>为什么不用上面那个 prefs</h3>
+     *
+     * <p>设置会整个导出去（{@code SettingsBackup} 把 {@code app_config} 里的每一个键都写进备份文件），
+     * 诊断报告和黑匣子也都从那一份读。令牌进了那里，就等于随着“导出设置”和“发一份报告”一起出门了。
+     * 存另一个文件之后，导出、诊断、黑匣子都不经过它 —— 这份秘密只在这辆车上。</p>
+     */
+    private android.content.SharedPreferences secrets() {
+        return this.context.getSharedPreferences(SECRETS_PREF_NAME, Context.MODE_PRIVATE);
+    }
+
+    /**
+     * 停车警报开着没有。默认关：这是要联网、要填令牌的功能，不该在没答应它的车上跑。
+     *
+     * <p>开着也未必发得出去 —— 令牌或会话号缺一个就不发，判断在
+     * {@link com.kooo.evcam.alarm.AlertPolicy}，那一条规则有单测。</p>
+     */
+    public boolean isAlertsEnabled() {
+        return prefs.getBoolean(KEY_ALERTS_ENABLED, false);
+    }
+
+    public void setAlertsEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_ALERTS_ENABLED, enabled).apply();
+        AppLog.i(TAG, "停车警报设为 " + (enabled ? "开" : "关"));
+    }
+
+    /**
+     * Telegram 机器人令牌。
+     *
+     * <p><b>这个值不进日志、不进故障报告。</b>写进来的第一个动作就是夹掉首尾空白；
+     * 外形不像令牌（{@code 数字:一串字符}）时原样存着，让设置界面去说“填得不对”，
+     * 而不是偷偷把用户敲的东西改掉。</p>
+     */
+    public String getAlertsTelegramToken() {
+        String raw = secrets().getString(KEY_ALERTS_TELEGRAM_TOKEN, "");
+        return raw == null ? "" : raw.trim();
+    }
+
+    public void setAlertsTelegramToken(String value) {
+        // 粘贴最容易带进来的东西：前后的空白、不断行空格、零宽字符、弯引号、从网页复制来的换行。
+        // 真令牌只有数字、冒号、字母、下划线、横线，所以别的字符一律丢掉 —— 存进去的必须就是能用的那一串。
+        StringBuilder kept = new StringBuilder();
+        if (value != null) {
+            for (int i = 0; i < value.length(); i++) {
+                char c = value.charAt(i);
+                boolean ok = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+                        || c == ':' || c == '_' || c == '-';
+                if (ok) {
+                    kept.append(c);
+                }
+            }
+        }
+        String clean = kept.toString();
+        secrets().edit().putString(KEY_ALERTS_TELEGRAM_TOKEN, clean).apply();
+        // 只记“填了还是清空了”：令牌本身绝不落进日志。
+        AppLog.i(TAG, "Telegram 令牌" + (clean.isEmpty() ? "已清空" : "已填写"));
+    }
+
+    /** 消息发到哪个会话。群组是负数，所以这里只去空白，不要求是正数。 */
+    public String getAlertsTelegramChatId() {
+        String raw = secrets().getString(KEY_ALERTS_TELEGRAM_CHAT, "");
+        if (raw == null || raw.trim().isEmpty()) {
+            // 会话号一度存在普通设置里，后来挪到了凭据文件。升级上来的那一份还在老地方，
+            // 不搬过来就是“令牌填了、会话号没了” —— 警报与命令都不会开始。
+            String legacy = prefs.getString(KEY_ALERTS_TELEGRAM_CHAT, "");
+            if (legacy != null && !legacy.trim().isEmpty()) {
+                String clean = legacy.trim();
+                secrets().edit().putString(KEY_ALERTS_TELEGRAM_CHAT, clean).apply();
+                prefs.edit().remove(KEY_ALERTS_TELEGRAM_CHAT).apply();
+                AppLog.i(TAG, "Telegram 会话号已从设置挪到凭据文件");
+                return clean;
+            }
+        }
+        return raw == null ? "" : raw.trim();
+    }
+
+    public void setAlertsTelegramChatId(String value) {
+        String clean = value == null ? "" : value.trim();
+        secrets().edit().putString(KEY_ALERTS_TELEGRAM_CHAT, clean).apply();
+        // 会话号也是身份：只记末四位，完整的不落日志
+        AppLog.i(TAG, "Telegram 会话号" + (clean.isEmpty() ? "已清空"
+                : "已填写（末四位 " + clean.substring(Math.max(0, clean.length() - 4)) + "）"));
+    }
+
+    /** 发一张 2×2，还是勾选的那几路各一张（{@link com.kooo.evcam.alarm.AlertPicture}）。 */
+    public String getAlertsLayout() {
+        return prefs.getString(KEY_ALERTS_LAYOUT, com.kooo.evcam.alarm.AlertPicture.layoutValue(
+                com.kooo.evcam.alarm.AlertPicture.Layout.GRID));
+    }
+
+    public void setAlertsLayout(String value) {
+        String clean = com.kooo.evcam.alarm.AlertPicture.layoutValue(
+                com.kooo.evcam.alarm.AlertPicture.layout(value));
+        prefs.edit().putString(KEY_ALERTS_LAYOUT, clean).apply();
+    }
+
+    /** 分开发时要哪几路。空表示全都要。 */
+    public String getAlertsCameras() {
+        return prefs.getString(KEY_ALERTS_CAMERAS, "0,1,2,3");
+    }
+
+    public void setAlertsCameras(String value) {
+        prefs.edit().putString(KEY_ALERTS_CAMERAS,
+                com.kooo.evcam.alarm.AlertPicture.lanesValue(
+                        com.kooo.evcam.alarm.AlertPicture.lanes(value))).apply();
+    }
+
+    /** 发之前把鱼眼掰直（和回看界面同一个校正）。 */
+    public boolean isAlertsStraighten() {
+        return prefs.getBoolean(KEY_ALERTS_STRAIGHTEN, false);
+    }
+
+    public void setAlertsStraighten(boolean enabled) {
+        prefs.edit().putBoolean(KEY_ALERTS_STRAIGHTEN, enabled).apply();
+    }
+
+    /**
+     * 回应 Telegram 里发来的命令（{@code pic}、{@code status}）。默认关。
+     *
+     * <p>开着的时候车会定期去问一次「有人找我吗」—— 长轮询，25 秒一次，车一直是客户端。
+     * 车机睡着时不问（进程本来就没了），所以那条命令要等车醒过来才有回音。</p>
+     */
+    public boolean isAlertsCommands() {
+        return prefs.getBoolean(KEY_ALERTS_COMMANDS, false);
+    }
+
+    public void setAlertsCommands(boolean enabled) {
+        prefs.edit().putBoolean(KEY_ALERTS_COMMANDS, enabled).apply();
+        AppLog.i(TAG, "停车警报命令回应设为 " + (enabled ? "开" : "关"));
+    }
+
+    /** 已经处理到哪一条更新：重启之后不能把上一条命令再执行一次。 */
+    public long getAlertsCommandOffset() {
+        return prefs.getLong(KEY_ALERTS_COMMAND_OFFSET, 0L);
+    }
+
+    /**
+     * 处理到哪一条。用 {@code commit()} 而不是 {@code apply()}：
+     * 这条命令接下来就要拍照发图，进程半路被杀时磁盘上必须已经写着「这条处理过了」，
+     * 否则重启会把同一张照片再发一遍。
+     */
+    public void setAlertsCommandOffset(long offset) {
+        prefs.edit().putLong(KEY_ALERTS_COMMAND_OFFSET, Math.max(0L, offset)).commit();
+    }
+
+    /**
+     * 谁能发命令 —— 车主自己的 Telegram 用户号。
+     *
+     * <p>为什么不只看会话号：会话可以是一个群，群里不只有车主。
+     * 配了这个号，群聊里只有车主自己能要照片，别人按一下那排按钮不算数。</p>
+     *
+     * <p>私聊里它和会话号是同一个数；「找会话号」会顺手把它一起记下来。</p>
+     */
+    public String getAlertsOwnerId() {
+        String raw = secrets().getString(KEY_ALERTS_OWNER_ID, "");
+        return raw == null ? "" : raw.trim();
+    }
+
+    public void setAlertsOwnerId(String value) {
+        String clean = value == null ? "" : value.trim();
+        secrets().edit().putString(KEY_ALERTS_OWNER_ID, clean).apply();
+        AppLog.i(TAG, "Telegram 车主号" + (clean.isEmpty() ? "已清空"
+                : "已填写（末四位 " + clean.substring(Math.max(0, clean.length() - 4)) + "）"));
+    }
+
+    /** 会话号与车主号都有；群聊里要靠后者才能分出是谁。 */
+    public boolean hasAlertsOwner() {
+        return !getAlertsOwnerId().isEmpty();
+    }
+
+    /**
+     * 哪些事情算「有事」（{@link com.kooo.evcam.alarm.TriggerSet}）。
+     *
+     * <p>存的是一串逗号分开的名字；空串按全开算。每台车上能看到的信号不一样，
+     * 能不能看到那一项由车主自己选。</p>
+     */
+    public String getAlertsTriggers() {
+        return prefs.getString(KEY_ALERTS_TRIGGERS, com.kooo.evcam.alarm.TriggerSet.DEFAULT);
+    }
+
+    public void setAlertsTriggers(String value) {
+        String clean = com.kooo.evcam.alarm.TriggerSet.value(
+                parseTriggers(com.kooo.evcam.alarm.TriggerSet.parse(value)));
+        prefs.edit().putString(KEY_ALERTS_TRIGGERS, clean).apply();
+    }
+
+    private static java.util.Set<String> parseTriggers(com.kooo.evcam.alarm.TriggerSet set) {
+        java.util.Set<String> names = new java.util.LinkedHashSet<>();
+        for (String name : com.kooo.evcam.alarm.TriggerSet.ALL) {
+            if (set.has(name)) {
+                names.add(name);
+            }
+        }
+        return names;
+    }
+
+    /** 画面移动的灵敏度（1–10，默认 5）。 */
+    public int getAlertsMotionSensitivity() {
+        return com.kooo.evcam.alarm.MotionSensitivity.clamp(
+                prefs.getInt(KEY_ALERTS_MOTION_SENSITIVITY, com.kooo.evcam.alarm.MotionSensitivity.DEFAULT));
+    }
+
+    public void setAlertsMotionSensitivity(int level) {
+        prefs.edit().putInt(KEY_ALERTS_MOTION_SENSITIVITY,
+                com.kooo.evcam.alarm.MotionSensitivity.clamp(level)).apply();
+    }
+
+    /** 警报时发一段短视频吗：0 关，5 或 10 秒。 */
+    public int getAlertsClipSeconds() {
+        int value = prefs.getInt(KEY_ALERTS_CLIP_SECONDS, 0);
+        return value == 5 || value == 10 ? value : 0;
+    }
+
+    public void setAlertsClipSeconds(int seconds) {
+        int clean = seconds == 5 || seconds == 10 ? seconds : 0;
+        prefs.edit().putInt(KEY_ALERTS_CLIP_SECONDS, clean).apply();
+    }
+
+    /** 短视频带不带声音（车上录着声音时才有）。 */
+    public boolean isAlertsClipAudio() {
+        return prefs.getBoolean(KEY_ALERTS_CLIP_AUDIO, true);
+    }
+
+    public void setAlertsClipAudio(boolean enabled) {
+        prefs.edit().putBoolean(KEY_ALERTS_CLIP_AUDIO, enabled).apply();
+    }
+
+    /** 安静时段开不开。默认关。 */
+    public boolean isAlertsQuietEnabled() {
+        return prefs.getBoolean(KEY_ALERTS_QUIET_ENABLED, false);
+    }
+
+    public void setAlertsQuietEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_ALERTS_QUIET_ENABLED, enabled).apply();
+    }
+
+    public int getAlertsQuietStart() {
+        return com.kooo.evcam.alarm.QuietHours.clampMinute(
+                prefs.getInt(KEY_ALERTS_QUIET_START, com.kooo.evcam.alarm.QuietHours.DEFAULT_START_MIN));
+    }
+
+    public void setAlertsQuietStart(int minute) {
+        prefs.edit().putInt(KEY_ALERTS_QUIET_START,
+                com.kooo.evcam.alarm.QuietHours.clampMinute(minute)).apply();
+    }
+
+    public int getAlertsQuietEnd() {
+        return com.kooo.evcam.alarm.QuietHours.clampMinute(
+                prefs.getInt(KEY_ALERTS_QUIET_END, com.kooo.evcam.alarm.QuietHours.DEFAULT_END_MIN));
+    }
+
+    public void setAlertsQuietEnd(int minute) {
+        prefs.edit().putInt(KEY_ALERTS_QUIET_END,
+                com.kooo.evcam.alarm.QuietHours.clampMinute(minute)).apply();
+    }
+
+    /** 锁车之后等几分钟才开始发警报（0 / 1 / 3）。 */
+    public int getAlertsArmDelayMinutes() {
+        return com.kooo.evcam.alarm.ArmDelay.clamp(
+                prefs.getInt(KEY_ALERTS_ARM_DELAY, com.kooo.evcam.alarm.ArmDelay.DEFAULT_MIN));
+    }
+
+    public void setAlertsArmDelayMinutes(int minutes) {
+        prefs.edit().putInt(KEY_ALERTS_ARM_DELAY,
+                com.kooo.evcam.alarm.ArmDelay.clamp(minutes)).apply();
+    }
+
+    /** 令牌和会话号都填了：可以试着发一条。 */
+    public boolean hasAlertsTelegramConfig() {
+        return !getAlertsTelegramToken().isEmpty() && !getAlertsTelegramChatId().isEmpty();
     }
 
     /**

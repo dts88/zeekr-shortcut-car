@@ -114,6 +114,17 @@ public final class SettingsRegistry {
      * 盲区画面的情境（项目所有者 2026-11-09）：哪几种情形显示画面，一档包含下一档（{@code zeekr.SideViewDecision.Mode}）；默认标准。
      * 界面上是「盲区画面」那一行的三选一。
      */
+    /**
+     * 停车警报发几张（设置 → 停车警报）。
+     *
+     * <p>合法取值只此一处：启动自检照它校验存着的值，设置页照它列选项、写行尾。
+     * {@code alarm.AlertPicture} 只负责把值读成排版，不再自己定义一套字符串。</p>
+     */
+    public static final SettingSpec ALERTS_LAYOUT = SettingSpec.of(
+            "alerts_layout", "警报照片", "grid",
+            entry("grid", "一张四宫格", R.string.opt_alerts_picture_grid),
+            entry("separate", "每一路各一张", R.string.opt_alerts_picture_separate));
+
     public static final SettingSpec SIDE_VIEW_MODE = SettingSpec.of(
             "side_view_mode", "盲区画面情境", com.kooo.evcam.AppConfig.SIDE_VIEW_MODE_STANDARD,
             entry(com.kooo.evcam.AppConfig.SIDE_VIEW_MODE_FULL, "丰富", R.string.opt_side_view_mode_full),
@@ -237,6 +248,7 @@ public final class SettingsRegistry {
             ACTION_RAIL_SIDE,
             REARVIEW_VIEWS,
             SIDE_VIEW_TARGET,
+            ALERTS_LAYOUT,
             SIDE_VIEW_MODE,
             FOOTAGE_AUDIO_SOURCE,
             SCREEN_OFF_FPS,

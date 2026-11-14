@@ -36,8 +36,8 @@ import java.io.File;
 public class SettingsShotsTest {
 
     private static final String[] SECTIONS = {
-            "screen_recording", "screen_storage", "screen_rearview", "screen_side_view", "screen_floating",
-            "screen_general", "screen_update",
+            "screen_recording", "screen_alerts", "screen_storage", "screen_rearview",
+            "screen_side_view", "screen_floating", "screen_general", "screen_update",
     };
 
     @Test
@@ -57,7 +57,28 @@ public class SettingsShotsTest {
         config.setRearViewEnabled(true);
         config.setSideViewEnabled(true);
         config.setDriveSoundEnabled(true);
+        // 停车警报开着时下面四组才出现：这张图就是用来看那一屏的
+        config.setAlertsEnabled(true);
+        config.setAlertsTelegramToken("123456789:AAHexampleTOKENvalue0123456789");
+        config.setAlertsTelegramChatId("123456789");
+        config.setAlertsClipSeconds(5);
         shoot(Shots.DAY, "day-on");
+    }
+
+    /** 同一张开关全开的图，英文：PR 里要用的那一张方便讨论。 */
+    @Test
+    public void englishSectionsWithEverythingOn() {
+        AppConfig config = new AppConfig(RuntimeEnvironment.getApplication());
+        config.setRearViewEnabled(true);
+        config.setSideViewEnabled(true);
+        config.setDriveSoundEnabled(true);
+        config.setAlertsEnabled(true);
+        config.setAlertsTelegramToken("123456789:AAHexampleTOKENvalue0123456789");
+        config.setAlertsTelegramChatId("123456789");
+        config.setAlertsOwnerId("123456789");
+        config.setAlertsClipSeconds(10);
+        config.setAlertsQuietEnabled(true);
+        shoot(Shots.DAY_EN, "en-on");
     }
 
     /**

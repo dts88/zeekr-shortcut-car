@@ -166,6 +166,13 @@
             android:theme="@style/Theme.Cam"
             android:exported="false" />
 
+        <!-- 停车警报调试（开发者选项）：一屏 JSON + 最近黑匣子，可截屏 / 复制 / 存盘 -->
+        <activity
+            android:name=".alarm.AlertsDebugActivity"
+            android:label="@string/alerts_debug_title"
+            android:theme="@style/Theme.Cam"
+            android:exported="false" />
+
         <!-- 关于与致谢：说明本应用两个功能来源及其许可证 -->
         <activity
             android:name=".zeekr.AboutActivity"

@@ -64,6 +64,8 @@ public class DeveloperSettingsTest {
         ROWS.put("pref_camera_mapping", Arrays.asList("zeekr_camera_override_front",
                 "zeekr_camera_override_back", "zeekr_camera_override_left"));
         ROWS.put("pref_permissions", NONE);
+        // 停车警报调试（开发者选项）：只是一个入口，不存设置
+        ROWS.put("pref_alerts_debug", NONE);
         ROWS.put("pref_raw_frame_dump", Arrays.asList("raw_frame_dump"));
         ROWS.put("pref_gpu_fisheye_preview", Arrays.asList("gpu_fisheye_preview"));
         ROWS.put("pref_gpu_fisheye_video", Arrays.asList("gpu_fisheye_video"));
