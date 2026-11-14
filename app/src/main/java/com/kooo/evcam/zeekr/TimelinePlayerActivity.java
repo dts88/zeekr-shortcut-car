@@ -577,9 +577,12 @@ public class TimelinePlayerActivity extends AppCompatActivity {
                         locksOn, locked, true));
             }
             if (round == scanRound) {
+                long[] off = check.numbers();
                 com.kooo.evcam.blackbox.BlackBox.note("回放扫描：环视 " + composite.size() + " 个文件、别的几路 "
                         + count(others) + " 个，" + recordings[0] + " 条录制；最新一条 " + firstAt[0] + " ms 出来，全部 "
-                        + (SystemClock.elapsedRealtime() - began) + " ms；" + check.summary());
+                        + (SystemClock.elapsedRealtime() - began) + " ms；拿修改时间估时长，和读出来的差：中位 "
+                        + off[0] + " ms、最大 " + off[1] + " ms，差 3 秒以上 " + off[2] + " 个 / 比了 " + off[3]
+                        + " 个，估不出 " + off[4] + " 个");
             }
         }).start();
     }
@@ -725,9 +728,10 @@ public class TimelinePlayerActivity extends AppCompatActivity {
             return durationMs;
         }
 
-        synchronized String summary() {
+        /** 差的中位数、最大值（毫秒；没有可比的是 -1），差 3 秒以上的个数，比了多少个，估不出的个数。 */
+        synchronized long[] numbers() {
             if (off.isEmpty()) {
-                return "拿修改时间估时长：没有可比的（估不出 " + unusable + " 个）";
+                return new long[] {-1, -1, 0, 0, unusable};
             }
             List<Long> sorted = new ArrayList<>(off);
             java.util.Collections.sort(sorted);
@@ -737,9 +741,8 @@ public class TimelinePlayerActivity extends AppCompatActivity {
                     far++;
                 }
             }
-            return "拿修改时间估时长，和读出来的差：中位 " + sorted.get(sorted.size() / 2) + " ms、最大 "
-                    + sorted.get(sorted.size() - 1) + " ms，差 3 秒以上 " + far + " 个 / " + sorted.size()
-                    + " 个，估不出 " + unusable + " 个";
+            return new long[] {sorted.get(sorted.size() / 2), sorted.get(sorted.size() - 1), far, sorted.size(),
+                    unusable};
         }
     }
 
