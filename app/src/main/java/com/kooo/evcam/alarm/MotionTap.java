@@ -47,6 +47,9 @@ public final class MotionTap {
     private volatile int samples;
     private volatile double lastScore;
     private volatile long lastSampleWallClock;
+    /** 现在用的两个阈值（由灵敏度档位算出来）。 */
+    private volatile double threshold = MotionSensitivity.threshold(MotionSensitivity.DEFAULT);
+    private volatile double fraction = MotionSensitivity.fraction(MotionSensitivity.DEFAULT);
     private int[] previous;
     private int[] current;
 
@@ -90,7 +93,7 @@ public final class MotionTap {
             current = new int[luma.length];
         }
         System.arraycopy(luma, 0, current, 0, luma.length);
-        double score = previous == null ? 0 : FrameDiff.score(previous, current);
+        double score = previous == null ? 0 : FrameDiff.score(previous, current, threshold, fraction);
         int[] swap = previous;
         previous = current;
         current = swap;
@@ -103,6 +106,17 @@ public final class MotionTap {
                 target.onMotionScore(score);
             }
         }
+    }
+
+    /** 换一个灵敏度（1–10）。 */
+    public void setSensitivity(int level) {
+        threshold = MotionSensitivity.threshold(level);
+        fraction = MotionSensitivity.fraction(level);
+    }
+
+    /** 现在的平均差阈值（诊断里显示用）。 */
+    public double threshold() {
+        return threshold;
     }
 
     /** 取过多少次样。 */

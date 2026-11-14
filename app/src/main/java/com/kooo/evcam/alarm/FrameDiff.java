@@ -45,6 +45,16 @@ public final class FrameDiff {
      * @return 0–1；{@code 0} 表示没动、或者被当成曝光 / 噪点丢掉了
      */
     public static double score(int[] previous, int[] current) {
+        return score(previous, current, DEFAULT_THRESHOLD, MIN_CHANGED_FRACTION);
+    }
+
+    /**
+     * 同上，但阈值由调节器决定（{@link MotionSensitivity}）。
+     *
+     * @param threshold 平均差门槛
+     * @param fraction  显著变化像素的最少占比
+     */
+    public static double score(int[] previous, int[] current, double threshold, double fraction) {
         if (previous == null || current == null || previous.length == 0
                 || previous.length != current.length) {
             return 0;
@@ -71,10 +81,10 @@ public final class FrameDiff {
             }
         }
         double score = (double) total / n / 255.0;
-        if (score < DEFAULT_THRESHOLD) {
+        if (score < threshold) {
             return 0;
         }
-        if ((double) changed / n < MIN_CHANGED_FRACTION) {
+        if ((double) changed / n < fraction) {
             return 0;
         }
         return Math.min(1.0, score);

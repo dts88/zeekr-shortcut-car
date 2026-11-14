@@ -63,6 +63,9 @@ public final class TelegramPoller {
         void onPicture(int lane, long requestedAt);
 
         void onStatus(long requestedAt);
+
+        /** 认不出来的话（但确实是车主发的）：回一句怎么用。 */
+        void onHelp();
     }
 
     private final AppConfig config;
@@ -234,6 +237,8 @@ public final class TelegramPoller {
             if (verdict == PollerGate.Verdict.NOT_A_COMMAND) {
                 continue;
             }
+            BlackBox.note("停车警报：收到命令 " + command.verb
+                    + (command.lane == TelegramCommand.ANY_LANE ? "" : "#" + command.lane));
             try {
                 switch (command.verb) {
                     case PICTURE:
@@ -243,7 +248,9 @@ public final class TelegramPoller {
                         handler.onStatus(sentAt);
                         break;
                     default:
-                        // 不是命令：不回，免得把聊天变成回声
+                        // 车主发的、但认不出来：回一句怎么用。不回的话，
+                        // “发了没反应”和“发错了”就分不出来。
+                        handler.onHelp();
                         break;
                 }
             } catch (RuntimeException | OutOfMemoryError e) {

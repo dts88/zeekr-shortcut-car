@@ -42,6 +42,8 @@
     <string name="set_alerts_probe_last_error">Last failure: %1$s</string>
     <string name="set_alerts_probe_reach_ok">Telegram reachable now: %1$s ms @%2$s</string>
     <string name="set_alerts_probe_reach_fail">Telegram unreachable now: %1$s</string>
+    <string name="set_alerts_motion_sensitivity_title">Motion sensitivity</string>
+    <string name="set_alerts_motion_sensitivity_summary">1 is least sensitive, 10 the most. Raise it when it misses you; lower it when rain or insects set it off</string>
     <string name="set_alerts_probe_title">Check the alert link</string>
     <string name="set_alerts_probe_summary">Sends nothing. Reports what is actually happening: watching, Sentry Mode, the command poller, and how far it has read</string>
     <string name="set_alerts_probe_watch">Watching car signals: %1$s</string>
@@ -82,6 +84,7 @@
     <string name="alert_headline_motion">Something moved in view while parked</string>
     <string name="alert_headline_test">Test</string>
     <string name="alert_headline_request">Picture taken on request</string>
+    <string name="alert_cmd_help">Send pic for a picture (add front / rear / left / right), or status for one line</string>
     <string name="alert_cmd_no_sentry">Sentry Mode is off, so the head unit is going to sleep and nothing can be taken</string>
     <string name="alert_cmd_not_parked">The car is not parked, so nothing was taken</string>
     <string name="alert_cmd_too_soon">Wait %1$d s before asking again</string>

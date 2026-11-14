@@ -950,6 +950,31 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             });
         }
 
+        androidx.preference.SeekBarPreference sensitivity =
+                findPreference("pref_alerts_motion_sensitivity");
+        if (sensitivity != null) {
+            sensitivity.setPersistent(false);
+            sensitivity.setMin(com.kooo.evcam.alarm.MotionSensitivity.MIN);
+            sensitivity.setMax(com.kooo.evcam.alarm.MotionSensitivity.MAX);
+            sensitivity.setSeekBarIncrement(1);
+            sensitivity.setShowSeekBarValue(true);
+            sensitivity.setValue(appConfig.getAlertsMotionSensitivity());
+            sensitivity.setOnPreferenceChangeListener((preference, newValue) -> {
+                int level = newValue instanceof Integer ? (Integer) newValue : 0;
+                appConfig.setAlertsMotionSensitivity(level);
+                com.kooo.evcam.blackbox.BlackBox.noteImportant("设置变更: pref_alerts_motion_sensitivity → " + level);
+                com.kooo.evcam.alarm.SentryAlerts.get(requireContext()).refreshConfig();
+                return true;
+            });
+        }
+
+        Preference diagnosticsRow = findPreference("pref_alerts_diagnostics");
+        if (diagnosticsRow != null) {
+            diagnosticsRow.setPersistent(false);
+            onClick("pref_alerts_diagnostics", pref -> startActivity(
+                    new Intent(requireContext(), DiagnosticsActivity.class)));
+        }
+
         Preference probeRow = findPreference("pref_alerts_probe");
         if (probeRow != null) {
             probeRow.setPersistent(false);

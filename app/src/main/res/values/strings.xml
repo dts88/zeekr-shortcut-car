@@ -56,6 +56,8 @@
     <string name="set_alerts_probe_last_error">上次失败：%1$s</string>
     <string name="set_alerts_probe_reach_ok">现在能连上 Telegram：%1$s 毫秒 @%2$s</string>
     <string name="set_alerts_probe_reach_fail">现在连不上 Telegram：%1$s</string>
+    <string name="set_alerts_motion_sensitivity_title">移动灵敏度</string>
+    <string name="set_alerts_motion_sensitivity_summary">1 最不敏敏，10 最敏敏。它太少响就往右拉；雨、飞虫也响就往左拉</string>
     <string name="set_alerts_probe_title">检查警报链路</string>
     <string name="set_alerts_probe_summary">不发消息，只把现在的状态报一遍：监听在不在、哨兵开没开、轮询跑没跑、处理到哪一条</string>
     <string name="set_alerts_probe_watch">监听车辆信号：%1$s</string>
@@ -96,6 +98,7 @@
     <string name="alert_headline_motion">停车时画面里有东西在动</string>
     <string name="alert_headline_test">测试</string>
     <string name="alert_headline_request">按你的要求拍的</string>
+    <string name="alert_cmd_help">发 pic 要一张照片（可以加 front / rear / left / right），发 status 要一句状态</string>
     <string name="alert_cmd_no_sentry">哨兵模式没开：车机要睡了，拍不了</string>
     <string name="alert_cmd_not_parked">车没停着，这一张不拍</string>
     <string name="alert_cmd_too_soon">等一下：%1$d 秒后再要</string>

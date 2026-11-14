@@ -89,7 +89,7 @@ public final class TelegramCommand {
         }
         String[] words = body.split("\\s+");
         String verb = words[0].toLowerCase(java.util.Locale.US);
-        if ("status".equals(verb) || "state".equals(verb)) {
+        if ("status".equals(verb) || "state".equals(verb) || "s".equals(verb)) {
             return new TelegramCommand(Verb.STATUS, ANY_LANE);
         }
         if (!"pic".equals(verb) && !"photo".equals(verb) && !"picture".equals(verb)

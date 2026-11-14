@@ -132,7 +132,8 @@ public class AppConfig {
     private static final String KEY_LICENSE_PLATE_ENABLED = "license_plate_enabled";
     // 停车警报（Telegram）：开关、机器人令牌、会话号
     private static final String KEY_ALERTS_ENABLED = "alerts_enabled";
-    private static final String KEY_ALERTS_TRIGGERS = "alerts_triggers";  // 哪些事情算「有事」
+    private static final String KEY_ALERTS_TRIGGERS = "alerts_triggers";
+    private static final String KEY_ALERTS_MOTION_SENSITIVITY = "alerts_motion_sensitivity";  // 哪些事情算「有事」
     private static final String KEY_ALERTS_TELEGRAM_TOKEN = "alerts_telegram_token";
     private static final String KEY_ALERTS_TELEGRAM_CHAT = "alerts_telegram_chat";
     private static final String KEY_ALERTS_OWNER_ID = "alerts_owner_id";  // 谁能发命令（私聊里就是会话号）
@@ -2213,6 +2214,17 @@ public class AppConfig {
             }
         }
         return names;
+    }
+
+    /** 画面移动的灵敏度（1–10，默认 5）。 */
+    public int getAlertsMotionSensitivity() {
+        return com.kooo.evcam.alarm.MotionSensitivity.clamp(
+                prefs.getInt(KEY_ALERTS_MOTION_SENSITIVITY, com.kooo.evcam.alarm.MotionSensitivity.DEFAULT));
+    }
+
+    public void setAlertsMotionSensitivity(int level) {
+        prefs.edit().putInt(KEY_ALERTS_MOTION_SENSITIVITY,
+                com.kooo.evcam.alarm.MotionSensitivity.clamp(level)).apply();
     }
 
     /** 令牌和会话号都填了：可以试着发一条。 */

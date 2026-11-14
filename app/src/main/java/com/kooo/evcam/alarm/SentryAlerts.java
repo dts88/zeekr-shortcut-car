@@ -187,6 +187,7 @@ public final class SentryAlerts implements Telemetry.Listener {
      */
     public void refresh() {
         triggers = TriggerSet.parse(config.getAlertsTriggers());
+        motion.setSensitivity(config.getAlertsMotionSensitivity());
         boolean enabled = config.isAlertsEnabled();
         policy.setEnabled(enabled);
         policy.setConfigured(config.hasAlertsTelegramConfig());
@@ -218,6 +219,7 @@ public final class SentryAlerts implements Telemetry.Listener {
     /** 设置里刚改过令牌 / 会话号：判断要重算，但没必要重挂监听。 */
     public void refreshConfig() {
         triggers = TriggerSet.parse(config.getAlertsTriggers());
+        motion.setSensitivity(config.getAlertsMotionSensitivity());
         policy.setEnabled(config.isAlertsEnabled());
         boolean configured = config.hasAlertsTelegramConfig();
         policy.setConfigured(configured);
@@ -254,6 +256,15 @@ public final class SentryAlerts implements Telemetry.Listener {
                 @Override
                 public void onStatus(long requestedAt) {
                     requestStatus();
+                }
+
+                @Override
+                public void onHelp() {
+                    String token = config.getAlertsTelegramToken();
+                    String chatId = config.getAlertsTelegramChatId();
+                    if (TelegramRequest.looksLikeToken(token) && TelegramRequest.looksLikeChatId(chatId)) {
+                        deliverText(token, chatId, app.getString(R.string.alert_cmd_help));
+                    }
                 }
             });
             poller.start();
@@ -321,6 +332,17 @@ public final class SentryAlerts implements Telemetry.Listener {
         if (!TelegramRequest.looksLikeToken(token) || !TelegramRequest.looksLikeChatId(chatId)) {
             return;
         }
+        try {
+            requestStatusInner(token, chatId);
+        } catch (RuntimeException | OutOfMemoryError e) {
+            // 不要报一句“状态”就没了下文：把原因回过去（已擦令牌）
+            BlackBox.note("停车警报：回状态时出错（" + TelegramRequest.redact(String.valueOf(e)) + "）");
+            deliverText(token, chatId, app.getString(R.string.set_alerts_failed,
+                    TelegramRequest.redact(String.valueOf(e))));
+        }
+    }
+
+    private void requestStatusInner(String token, String chatId) {
         VehicleState state = Telemetry.get().latest();
         String gear = state == null || state.gear == null ? "?" : state.gear;
         String text = sentryLine(sentryValue()) + "\n"
@@ -417,7 +439,7 @@ public final class SentryAlerts implements Telemetry.Listener {
         out.append(app.getString(R.string.set_alerts_probe_motion,
                 (sampling ? "on" : "off"), String.valueOf(samples),
                 String.format(Locale.US, "%.3f", motion.lastScore()),
-                String.format(Locale.US, "%.3f", FrameDiff.DEFAULT_THRESHOLD))).append('\n');
+                String.format(Locale.US, "%.3f", motion.threshold()))).append('\n');
         out.append(app.getString(R.string.set_alerts_probe_last_ok,
                 lastOk == 0 ? "never" : (System.currentTimeMillis() - lastOk) / 1000 + "s ago"));
         String lastError = poller == null ? "" : poller.lastError();
@@ -651,7 +673,7 @@ public final class SentryAlerts implements Telemetry.Listener {
      */
     private void onMotion(double score) {
         if (!watching || !triggers.has(TriggerSet.MOTION)
-                || !FrameDiff.isMovement(score, FrameDiff.DEFAULT_THRESHOLD)) {
+                || !FrameDiff.isMovement(score, motion.threshold())) {
             return;
         }
         long now = SystemClock.elapsedRealtime();
