@@ -29,10 +29,10 @@
 大的方向：
 
 - **新增，本项目独立实现**：极氪合成流的识别、拆分与四宫格渲染（`app/src/main/java/com/kooo/evcam/zeekr/`），
-  视频流配置与配置编辑器（`app/src/main/java/com/kooo/evcam/profile/`），电子后视镜，发送到手机，
+  视频流配置与配置编辑器（`app/src/main/java/com/kooo/evcam/profile/`），超级镜子，发送到手机，
   模拟声浪（`app/src/main/java/com/kooo/evcam/sound/`，见第 5 节）。
 - **删除**：钉钉 / 飞书 / Telegram 远程查看、心跳推图、MJPEG / RTP 推流，连同对应的 SDK 依赖。
-- **重做**：录制参数的来源（改由视频流配置按路决定）、设置界面、主界面与悬浮按钮、视频回看。
+- **重做**：录制参数的来源（改由视频流配置按路决定）、设置界面、主界面与悬浮按钮、录像回放。
 - **包名与构建**：applicationId 改为 `io.github.dts88.zeekrshortcut`，签名可由环境变量覆盖，
   CI 构建与发布见 `.github/`。
 
@@ -92,12 +92,13 @@ dts88 写的部分另有两条 GPL-3.0 第 7 条允许的附加条款（署名�
 
 ## 3. 第三方依赖
 
-以下组件由 Gradle 在构建时拉取，随 APK 分发，各自受其上游许可证约束：
+以下组件由 Gradle 在构建时拉取，随 APK 分发，各自受其上游许可证约束（应用的「关于与致谢」页也列着）：
 
 | 组件 | 许可证 |
 |------|--------|
 | AndroidX（AppCompat、Activity、ConstraintLayout、RecyclerView、CardView、Preference、SlidingPaneLayout、WorkManager） | Apache License 2.0 |
 | Material Components | Apache License 2.0 |
+| AndroidX Media3 ExoPlayer（录像回放） | Apache License 2.0 |
 | Gson | Apache License 2.0 |
 | Glide | BSD / MIT / Apache 2.0（见其仓库 LICENSE） |
 | NanoHTTPD | BSD 3-Clause |
