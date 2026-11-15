@@ -11,6 +11,11 @@ commit message, not here.
 
 Nothing yet.
 
+## [4.7.0-alpha] - 2026-11-16
+
+- Smart buttons: the Bluetooth scan restarts every 25 minutes, so presses are no longer missed after a long drive.
+- Diagnostics: the black box timeline is also kept on the USB drive (Download/EVCam_Log/blackbox.log), so it survives an App Lab reinstall. Exported reports include its older part.
+
 ## [4.6.0-alpha] - 2026-11-15
 
 - Floating button: tap and long press can use every smart-button action (driving, media, seats, climate, body, lights, scenes), chosen the same way as for smart buttons.
