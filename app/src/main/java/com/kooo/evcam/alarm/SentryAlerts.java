@@ -593,7 +593,7 @@ public final class SentryAlerts implements Telemetry.Listener {
         SnapshotTaker.take(app, new SnapshotTaker.Callback() {
             @Override
             public void onPicture(Bitmap grid) {
-                deliver(channel, grid, caption, lane, null, null);
+                deliver(channel, grid, caption, lane, true, null, null);
             }
 
             @Override
@@ -661,7 +661,7 @@ public final class SentryAlerts implements Telemetry.Listener {
         SnapshotTaker.take(app, new SnapshotTaker.Callback() {
             @Override
             public void onPicture(Bitmap grid) {
-                deliver(channel, grid, caption, TelegramCommand.ANY_LANE, callback, null);
+                deliver(channel, grid, caption, TelegramCommand.ANY_LANE, true, callback, null);
             }
 
             @Override
@@ -1299,7 +1299,7 @@ public final class SentryAlerts implements Telemetry.Listener {
         SnapshotTaker.take(app, new SnapshotTaker.Callback() {
             @Override
             public void onPicture(Bitmap grid) {
-                deliver(channel, grid, caption, TelegramCommand.ANY_LANE, null, onDelivered);
+                deliver(channel, grid, caption, TelegramCommand.ANY_LANE, false, null, onDelivered);
             }
 
             @Override
@@ -1378,7 +1378,7 @@ public final class SentryAlerts implements Telemetry.Listener {
      * several times a night and must not leak memory.</p>
      */
     private void deliver(AlertChannel channel, Bitmap grid, String caption, int onlyLane,
-                         Callback callback, Runnable onDelivered) {
+                         boolean ownerAsked, Callback callback, Runnable onDelivered) {
         sender.execute(() -> {
             // 掰直、切图、压缩都在这一条线程上：一张 2×2 的校正要翻一百六十万像素，
             // 放在主线程上就是和相机、和设置界面抢那几十毫秒。
@@ -1432,12 +1432,16 @@ public final class SentryAlerts implements Telemetry.Listener {
             // 开工之后设置可能已经关掉、哨兵也可能刚退出：那就不发了，别送出一张没人要的照片
             // After starting, settings may have been turned off or sentry may have just exited: then
             // don't send, so as not to deliver a photo nobody wants
-            if (!config.isAlertsEnabled() || !sentryOn()) {
+            // 这一道只拦真警报，不拦车主自己开口要的那一张：他按了「发一张测试照片」、或者在
+            // 聊天里发了 pic，图已经在手上，这时候因为哨兵刚好退成 0 就把它扣下，只会让他以为
+            // 链路坏了 —— 而「开关还关着」那句话本来就在回话里写清楚了。
+            // 真警报照旧拦：开关刚关、布防刚退，说明这一张已经没人要了。
+            // This gate stops real alerts, not a picture the owner asked for. The bytes are already in
+            // hand, and dropping them because sentry happened to drop to 0 only makes the link look
+            // broken; the "the switch is still OFF" note already says what matters. An alert is
+            // different: a switch just turned off or an arming just released means nobody wants it.
+            if (!ownerAsked && (!config.isAlertsEnabled() || !sentryOn())) {
                 BlackBox.note("alerts: dropped (feature off or sentry gone)");
-                if (callback != null) {
-                    app.getMainExecutor().execute(() -> callback.onResult(false,
-                            app.getString(R.string.set_alerts_failed, "alerts off")));
-                }
                 return;
             }
 
