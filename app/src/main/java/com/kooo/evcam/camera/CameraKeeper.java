@@ -386,6 +386,20 @@ public final class CameraKeeper {
         pipeline().writeClip(out, seconds, includeAudio, cameraKey, done);
     }
 
+    /**
+     * 停车警报里「那一刻」的短视频：不是最新几秒，而是现在往前 {@code endAgoMs} 那一刻结束的几秒。
+     * 那一阵环里没留住（{@link com.kooo.evcam.camera.MultiCameraManager} 的 {@code writeClipEndingMsAgo}）
+     * 就回 false —— 那一刻没有，不拿此刻的画面顶。
+     *
+     * The alert's clip of that moment: not the newest few seconds, but the few seconds ending at the
+     * moment {@code endAgoMs} before now. When the ring did not hold that stretch it answers false —
+     * that moment is not available, and this instant's picture never stands in for it.
+     */
+    public void writeClipEndingMsAgo(java.io.File out, int seconds, boolean includeAudio, String cameraKey,
+                                     long endAgoMs, java.util.function.Consumer<Boolean> done) {
+        pipeline().writeClipEndingMsAgo(out, seconds, includeAudio, cameraKey, endAgoMs, done);
+    }
+
     public void takePhoto(MultiCameraManager.PhotoCallback callback) {
         pipeline().takePhoto(callback);
     }

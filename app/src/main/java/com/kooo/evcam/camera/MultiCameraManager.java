@@ -5472,6 +5472,34 @@ public class MultiCameraManager {
         });
     }
 
+    /**
+     * 同上，但结尾不是最新一帧，是现在往前 {@code endAgoMs} 那一刻（停车警报里那一条所指的时刻）。
+     *
+     * <p>车主十分钟后才点「片段」，要的还是那一刻的画面：从那一槽的样本环里切出「那一刻之前几秒」，
+     * 绝不重新录一段、也不拿此刻的画面顶。环里没留到那么早，回 false —— 那一刻没有。</p>
+     *
+     * The same, except the clip ends at the moment {@code endAgoMs} before now instead of at the
+     * newest frame (the moment the alert names). The owner taps "clip" ten minutes later and still
+     * gets that moment: the last few seconds before it, cut from that lane's sample ring. Nothing is
+     * recorded afresh and this instant's picture never stands in. A ring that did not hold that
+     * stretch answers false — the moment is not available.
+     */
+    void writeClipEndingMsAgo(java.io.File out, int seconds, boolean includeAudio, String cameraKey,
+                              long endAgoMs, java.util.function.Consumer<Boolean> done) {
+        mainHandler.post(() -> {
+            Slot slot = slots.get(cameraKey);
+            CodecVideoRecorder recorder = slot == null ? null : slot.recorder;
+            if (recorder == null) {
+                done.accept(false);
+                return;
+            }
+            new Thread(() -> {
+                boolean ok = recorder.writeClipSecondsEndingMsAgo(out, seconds, includeAudio, endAgoMs);
+                done.accept(ok);
+            }, "alert-clip").start();
+        });
+    }
+
     public boolean takePhoto(PhotoCallback callback) {
         if (android.os.Looper.myLooper() != android.os.Looper.getMainLooper()) {
             mainHandler.post(() -> takePhoto(callback));
