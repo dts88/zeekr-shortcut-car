@@ -58,18 +58,21 @@ public class QuietHoursTest {
 
     @Test
     public void aDstChangeMovesTheWindowByOneRealHour() {
-        // D-10：安静时段看的是墙上的钟（只看一天里的第几分钟），不是绝对时间。
-        // 所以同一个瞬间在时针跳了一格之后就是另一个分钟数，窗口在现实中跟着多/少一小时。
-        java.time.OffsetDateTime sameInstant =
-                java.time.OffsetDateTime.parse("2026-03-08T06:30:00Z");
-        int beforeTheChange = minuteOfDay(sameInstant, java.time.ZoneOffset.ofHours(-5));
-        int afterTheChange = minuteOfDay(sameInstant, java.time.ZoneOffset.ofHours(-4));
+        // D-10：安静时段看的是车机墙上的钟（只看一天里的第几分钟），不是绝对时间。
+        // 所以时针跳一格，同一个瞬间就是另一个分钟数 —— 窗口在现实中跟着多/少一小时。
+        // 钉的是两条边（不是 JDK 的偏移算术）：同一个 UTC 瞬间，换一格偏移，答案得翻过来。
+        java.time.ZoneOffset before = java.time.ZoneOffset.ofHours(-5);
+        java.time.ZoneOffset after = java.time.ZoneOffset.ofHours(-4);
 
-        assertEquals(60, afterTheChange - beforeTheChange);
-        // 判断只看分钟数：两个分钟数它都给同一个答案 —— 行为没动，动的是一小时现实时间。
-        // 春进那一夜窗口在现实中是五小时，回拨那一夜是九小时（D-10）。
-        assertTrue(QuietHours.active(true, TEN_PM, SEVEN_AM, beforeTheChange));
-        assertTrue(QuietHours.active(true, TEN_PM, SEVEN_AM, afterTheChange));
+        // 收尾那条边：换之前是清晨 06:30（在窗口里），换之后是 07:30（出去了）。
+        java.time.OffsetDateTime nearTheEnd = java.time.OffsetDateTime.parse("2026-03-08T11:30:00Z");
+        assertTrue(QuietHours.active(true, TEN_PM, SEVEN_AM, minuteOfDay(nearTheEnd, before)));
+        assertFalse("跳一小时就该出窗口", QuietHours.active(true, TEN_PM, SEVEN_AM, minuteOfDay(nearTheEnd, after)));
+
+        // 起头那条边：同一个瞬间换之前是 21:30（还没进），换之后是 22:30（进去了）。
+        java.time.OffsetDateTime nearTheStart = java.time.OffsetDateTime.parse("2026-03-08T02:30:00Z");
+        assertFalse(QuietHours.active(true, TEN_PM, SEVEN_AM, minuteOfDay(nearTheStart, before)));
+        assertTrue("跳一小时就该进窗口", QuietHours.active(true, TEN_PM, SEVEN_AM, minuteOfDay(nearTheStart, after)));
     }
 
     private static int minuteOfDay(java.time.OffsetDateTime at, java.time.ZoneOffset offset) {
