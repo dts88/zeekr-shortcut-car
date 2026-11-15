@@ -30,7 +30,7 @@ import java.io.File;
  * 录像下面那一条行驶信息条（项目所有者 2026-11-15，wiki 的 Driving info bar 页配图）：勾的是默认那几项
  * （{@link InfoBarLayout#defaultSelection}），各给一组看得懂的示例读数。中英各一张，宽 1920（录像的宽），高 {@link InfoBar#HEIGHT}。
  *
- * <p>经纬度用明显是假的 0.0000、0.0000；车牌不填，前灯组的车牌上不写数字。座位照右舵车：主驾（右前）有人系着，副驾没人；
+ * <p>经纬度用新加坡市区的一个通用坐标（项目所有者 2026-11-15「经纬度放一个新加坡的经纬度」，不是哪个具体地址）；车牌不填，前灯组的车牌上不写数字。座位照右舵车：主驾（右前）有人系着，副驾没人；
  * 后排的安全带没验证，不是开发者时就是没数据，照实画。</p>
  */
 @RunWith(RobolectricTestRunner.class)
@@ -78,7 +78,7 @@ public class InfoBarShotsTest {
                 .stopLamps(false)
                 .reverseLamps(false)
                 .odometerKm(8642.3f)
-                .position(0.0, 0.0)
+                .position(1.290270, 103.851959)
                 .build();
     }
 
