@@ -1714,6 +1714,12 @@ public final class SentryAlerts implements Telemetry.Listener {
     /** 屏幕亮 → 灭，或者主驾有人 → 没人：车主走了。 */
     private void watchForForgottenSentry(Readings readings, VehicleState state, Integer sentry,
                                          boolean parked, Boolean screenOn) {
+        // 按钮是 Telegram 的回程，别的出口没有：这一项在 ntfy 下整段不做（DECISIONS.md D8）。
+        // The buttons are Telegram's return path and the other exit has none, so under ntfy this whole
+        // block stands down (DECISIONS.md D8).
+        if (config.isAlertsNtfy()) {
+            return;
+        }
         if (!parked) {
             // 开着车：记着「真的动过」，回来停车时才不会被当成停在车库没动的车
             guardDroveSincePark = true;
