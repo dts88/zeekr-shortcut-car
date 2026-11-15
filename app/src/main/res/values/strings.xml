@@ -126,7 +126,7 @@
     <string name="alert_headline_motion">停车时画面里有东西在动</string>
     <string name="alert_headline_test">测试</string>
     <string name="alert_headline_request">按你的要求拍的</string>
-    <string name="alert_cmd_help">发 pic 要一张照片（可以加 front / rear / left / right），发 status 要一句状态</string>
+    <string name="alert_cmd_help">发 pic 要一张照片（后面可加 front / rear / left / right），pic 18:22 要那一刻录像里的一帧，status 要一句话。只有你，只有配好的会话</string>
     <string name="alert_cmd_no_sentry">哨兵模式没开：车机要睡了，拍不了</string>
     <string name="alert_cmd_not_parked">车没停着，这一张不拍</string>
     <string name="alert_cmd_too_soon">等一下：%1$d 秒后再要</string>
@@ -1463,4 +1463,9 @@
     <string name="set_alerts_transport_summary">Telegram 机器人，或者 ntfy 话题</string>
     <string name="set_alerts_transport_telegram">Telegram</string>
     <string name="set_alerts_transport_ntfy">ntfy</string>
+    <string name="alert_clip_not_available">那一刻的片段已经不在环里了（%1$s）。车只留最近一分钟左右</string>
+    <string name="alert_hd_not_available">%1$s 那张 HD 已经不在手里了。要一张新的就发 pic</string>
+    <string name="alert_pic_not_available">%1$s 那一刻没有录像</string>
+    <string name="alert_pic_bad_time">看不懂这个时间：%1$s。试试 pic 18:22</string>
+    <string name="alert_headline_recorded">按你要的时刻，从录像里取的一帧</string>
 </resources>

@@ -120,7 +120,7 @@ public final class TelegramPoller {
          *                    the settings
          * @param requestedAt when the owner sent the command (milliseconds); 0 means unknown
          */
-        void onPicture(int lane, long requestedAt);
+        void onPicture(int lane, String timeWord, long requestedAt);
 
         void onStatus(long requestedAt);
 
@@ -458,7 +458,7 @@ public final class TelegramPoller {
             try {
                 switch (command.verb) {
                     case PICTURE:
-                        handler.onPicture(command.lane, sentAt);
+                        handler.onPicture(command.lane, command.timeWord, sentAt);
                         break;
                     case STATUS:
                         handler.onStatus(sentAt);

@@ -138,6 +138,16 @@ public final class TelegramCommand {
      */
     public final int lane;
     /**
+     * {@code pic} 后面那个像时间的词（{@code 18:22} / {@code 6:22pm}）；空串表示没有。
+     *
+     * <p>这里是纯粹的字符串，不是时刻：要拿「现在」才能算出是哪一天的几点，
+     * 那件事在 {@code alarm.AlertMoment} 里做，调用方给时间。</p>
+     *
+     * The word after {@code pic} that looks like a time, or an empty string. Parsing it into an instant
+     * needs "now", so that happens in {@code alert.AlertMoment} with the caller's clock.
+     */
+    public final String timeWord;
+    /**
      * 只有 {@link Verb#GUARD} 有值；别的命令全是 {@code null}。
      *
      * Set only for {@link Verb#GUARD}; {@code null} for every other verb.
@@ -145,13 +155,18 @@ public final class TelegramCommand {
     public final GuardAction guard;
 
     private TelegramCommand(Verb verb, int lane) {
-        this(verb, lane, null);
+        this(verb, lane, null, "");
     }
 
     private TelegramCommand(Verb verb, int lane, GuardAction guard) {
+        this(verb, lane, guard, "");
+    }
+
+    private TelegramCommand(Verb verb, int lane, GuardAction guard, String timeWord) {
         this.verb = verb;
         this.lane = lane;
         this.guard = guard;
+        this.timeWord = timeWord == null ? "" : timeWord;
     }
 
     /**
@@ -211,6 +226,7 @@ public final class TelegramCommand {
             return new TelegramCommand(Verb.UNKNOWN, ANY_LANE);
         }
         int lane = ANY_LANE;
+        String timeWord = "";
         for (int i = 1; i < words.length; i++) {
             String word = words[i].toLowerCase(java.util.Locale.US);
             for (int index = 0; index < LANE_WORDS.length; index++) {
@@ -222,8 +238,13 @@ public final class TelegramCommand {
             if (lane != ANY_LANE) {
                 break;
             }
+            // 像时间的那个词留着，由调用方拿「现在」去算 —— 这里没有时钟。
+            // Keep a word that looks like a time; the caller resolves it against "now".
+            if (timeWord.isEmpty() && looksLikeClock(word)) {
+                timeWord = word;
+            }
         }
-        return new TelegramCommand(Verb.PICTURE, lane);
+        return new TelegramCommand(Verb.PICTURE, lane, null, timeWord);
     }
 
     /**
@@ -279,6 +300,17 @@ public final class TelegramCommand {
             return new TelegramCommand(Verb.GUARD, ANY_LANE, GuardAction.AUTO_ON);
         }
         return new TelegramCommand(Verb.UNKNOWN, ANY_LANE);
+    }
+
+    /** 像不像一个时刻：带冒号，或者以 am / pm 结尾。Whether the word looks like a time of day. */
+    static boolean looksLikeClock(String word) {
+        if (word == null || word.isEmpty()) {
+            return false;
+        }
+        String body = word.trim();
+        return body.indexOf(':') > 0
+                || body.endsWith("am") || body.endsWith("pm")
+                || body.endsWith("a.m.") || body.endsWith("p.m.");
     }
 
     @Override

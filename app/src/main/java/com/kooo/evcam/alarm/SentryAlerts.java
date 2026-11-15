@@ -204,6 +204,21 @@ public final class SentryAlerts implements Telemetry.Listener {
 
     /** 这一次警报的按钮记号（{@link AlertButton}）；空串表示手上没有活着的按钮。 */
     private volatile String alertToken = "";
+    /** 这一次警报是哪一刻（墙钟毫秒）：按钮回的就是那一刻，不是按下按钮的这一刻。 */
+    private volatile long alertWallMs;
+    /** 最近几次警报那一刻的 HD 那份和配文（{@link AlertAnchor}）：HD 那颗按钮从这里取，不再拍一张。 */
+    private final AlertAnchor anchors = new AlertAnchor();
+    /**
+     * 样本环最多能回溯多久：超过这个岁数的片段只有「没有」这一个答案。
+     *
+     * <p>数字来自相机那边：{@code SampleRing.MAX_MS = 60 s}（其中 15 s 是保证留着的）。
+     * 两边都写死是不好，但这里要的是一个「问不问」的判断，真实答案永远由切片那一步给。</p>
+     *
+     * The furthest the sample ring reaches. The number comes from the camera side
+     * ({@code SampleRing.MAX_MS}); the real answer always comes from the cut itself, this is only the gate
+     * before asking.
+     */
+    static final long RING_MS = 60_000L;
     /** 一次只切一段视频：样本环是共享的，连点两下不该起两个切片的活。 */
     private final java.util.concurrent.atomic.AtomicBoolean clipBusy =
             new java.util.concurrent.atomic.AtomicBoolean(false);
@@ -512,8 +527,8 @@ public final class SentryAlerts implements Telemetry.Listener {
             if (poller == null) {
                 poller = new TelegramPoller(config, new TelegramPoller.Handler() {
                     @Override
-                    public void onPicture(int lane, long requestedAt) {
-                        requestPicture(lane, requestedAt);
+                    public void onPicture(int lane, String timeWord, long requestedAt) {
+                        requestPicture(lane, timeWord, requestedAt);
                     }
 
                     @Override
@@ -565,8 +580,12 @@ public final class SentryAlerts implements Telemetry.Listener {
      * it could contend with recording for the camera. Frequency is governed by
      * {@link RequestPolicy} (one per 30 seconds, 6 per hour).</p>
      */
-    private void requestPicture(int lane, long requestedAt) {
+    private void requestPicture(int lane, String timeWord, long requestedAt) {
         try {
+            if (timeWord != null && !timeWord.isEmpty()) {
+                requestPictureAt(timeWord, requestedAt);
+                return;
+            }
             requestPictureInner(lane, requestedAt);
         } catch (RuntimeException | OutOfMemoryError e) {
             // 已经发过「处理命令时出错」了，这里只保证不把进程带走
@@ -576,7 +595,48 @@ public final class SentryAlerts implements Telemetry.Listener {
         }
     }
 
+    /**
+     * {@code pic 18:22}：要的是那一刻录下来的一帧，不是现在拍一张。
+     *
+     * <p>时间解析不出、或者那一刻不在录像里，都直说 —— 拿一张新的顶上去是最坏的一种「成功」。</p>
+     *
+     * <p>{@code pic 18:22}: a frame from what was recorded at that moment, not a new photograph. An
+     * unparseable time and a moment with no recording both get an honest answer; substituting a fresh
+     * picture would be the worst kind of success.</p>
+     */
+    private void requestPictureAt(String timeWord, long requestedAt) {
+        AlertChannel channel = channel();
+        if (!channel.ready()) {
+            blockedChannel(channel);
+            return;
+        }
+        long now = System.currentTimeMillis();
+        Long wallMs = AlertMoment.parseClock(timeWord, now);
+        if (wallMs == null) {
+            BlackBox.note("alerts: a time was asked for that cannot be read (" + timeWord + ")");
+            deliverText(channel, app.getString(R.string.alert_pic_bad_time, timeWord));
+            return;
+        }
+        Bitmap frame = RecordedFrame.at(app, wallMs);
+        if (frame == null) {
+            BlackBox.note("alerts: nothing recorded at the moment asked for");
+            deliverText(channel, app.getString(R.string.alert_pic_not_available,
+                    AlertMoment.describe(wallMs, now)));
+            return;
+        }
+        // 锚点是车主点名的那个时刻：HD 那颗按钮回的也得是它。
+        // The anchor is the moment the owner named; the HD button has to answer with that one too.
+        alertWallMs = wallMs;
+        BlackBox.note("alerts: a frame from the recordings at " + AlertMoment.clock(wallMs));
+        String caption = TelegramRequest.caption(app.getString(R.string.alert_headline_recorded),
+                lateNote(requestedAt), sentryLine(sentryValue()), AlertMoment.clock(wallMs));
+        deliver(channel, frame, caption, TelegramCommand.ANY_LANE, true, false, null, null);
+    }
+
     private void requestPictureInner(int lane, long requestedAt) {
+        // 这是「现在拍一张」：这一刻变成这一次的锚点，印在图上、也留给 HD 那颗按钮。
+        // This is "take one now": this moment becomes the anchor, stamped on the picture and kept for HD.
+        alertWallMs = System.currentTimeMillis();
         AlertChannel channel = channel();
         if (!channel.ready()) {
             blockedChannel(channel);
@@ -678,6 +738,7 @@ public final class SentryAlerts implements Telemetry.Listener {
     }
 
     private void sendTestPicture(Callback callback, boolean highQuality) {
+        alertWallMs = System.currentTimeMillis();
         AlertChannel channel = channel();
         if (!channel.ready()) {
             callback.onResult(false, blockedText(channel.blockedReason()));
@@ -1458,6 +1519,17 @@ public final class SentryAlerts implements Telemetry.Listener {
             // the settings screen for those few tens of milliseconds.
             Bitmap picture = AlertPicture.straighten(grid, config.isAlertsStraighten(),
                     fisheyeFov(), fisheyeProjection());
+            // 时刻印在画面上（车主 2026-11-15）：那张图以后被翻出来时，自己带着是哪一刻。
+            // The moment is drawn onto the picture: whenever it is looked at again, it carries when it was.
+            if (picture != null) {
+                Bitmap stamped = AlertPicture.stamped(picture, AlertMoment.iso(alertWallMs));
+                if (stamped != null && stamped != picture) {
+                    if (picture != grid && !picture.isRecycled()) {
+                        picture.recycle();
+                    }
+                    picture = stamped;
+                }
+            }
             List<byte[]> photos = new ArrayList<>();
             List<String> captions = new ArrayList<>();
             try {
@@ -1523,6 +1595,17 @@ public final class SentryAlerts implements Telemetry.Listener {
             }
 
             alertToken = GuardToken.mint(SystemClock.elapsedRealtime());
+            // HD 那一份现在就压好、留在手里：那颗按钮回的是这一刻，不是按下去那一刻。
+            // The HD copy is encoded and kept now: that button answers about this moment, not the tap.
+            try {
+                byte[] hd = AlertPicture.jpegAt(picture, AlertPicture.HIGH_QUALITY,
+                        PictureBudget.HIGH_BYTES);
+                if (hd != null && hd.length > 0) {
+                    anchors.add(alertWallMs, hd, caption);
+                }
+            } catch (RuntimeException e) {
+                BlackBox.note("alerts: hd copy could not be kept (" + e + ")");
+            }
             // 按钮只有 Telegram 有：别的出口按主题发图，没有回程。
             // Only Telegram has buttons: the other exit posts to a topic and has no way back.
             boolean buttons = channel.supportsClips() && !config.isAlertsNtfy();
@@ -1811,6 +1894,7 @@ public final class SentryAlerts implements Telemetry.Listener {
 
     /** 一条警报的样例：和真的一样拍、一样压、一样带按钮，只是不等车上的信号。 */
     private void fireSample(String headline, Callback callback) {
+        alertWallMs = System.currentTimeMillis();
         AlertChannel channel = channel();
         if (!channel.ready()) {
             blockedChannel(channel);
@@ -1914,25 +1998,37 @@ public final class SentryAlerts implements Telemetry.Listener {
     }
 
     /** 再拍一张、按 900 kB 那一档发（车主点了 HD）。Snapshot again and send at the 900 kB budget. */
+    /**
+     * 『HD 一张』：回的是这一次警报那一刻的那张，画质更高 —— <b>不是再拍一张</b>。
+     *
+     * <p>手里没有那一刻（车重启过、或者那是很久以前的按钮）就直说没有，不拿一张新的顶上去。</p>
+     *
+     * <p>"HD picture" answers with the very frame that alert carried, at higher quality — <b>not a new
+     * one</b>. When that moment is no longer in hand (a restart, or a very old button) it says so rather
+     * than passing off a fresh picture.</p>
+     */
     private void sendHighQualityPicture() {
         AlertChannel channel = channel();
         if (!channel.ready()) {
             blockedChannel(channel);
             return;
         }
-        String caption = TelegramRequest.caption(app.getString(R.string.alert_headline_request),
-                lateNote(0L), sentryLine(sentryValue()), time());
-        SnapshotTaker.take(app, new SnapshotTaker.Callback() {
-            @Override
-            public void onPicture(Bitmap grid) {
-                deliver(channel, grid, caption, TelegramCommand.ANY_LANE, true, true, null, null);
-            }
-
-            @Override
-            public void onFailed(String reason) {
-                BlackBox.note("alerts: no high-quality picture (" + reason + ")");
-                deliverText(channel, app.getString(R.string.alert_clip_none));
-            }
+        AlertAnchor.Entry entry = alertWallMs > 0 ? anchors.at(alertWallMs) : null;
+        if (entry == null || entry.hd == null || entry.hd.length == 0) {
+            BlackBox.note("alerts: hd asked for, that moment is not in hand");
+            deliverText(channel, app.getString(R.string.alert_hd_not_available,
+                    AlertMoment.describe(alertWallMs, System.currentTimeMillis())));
+            return;
+        }
+        String caption = TelegramRequest.caption(app.getString(R.string.alert_btn_hd),
+                lateNote(0L), sentryLine(sentryValue()), AlertMoment.clock(entry.wallMs));
+        String markup = alertMarkup();
+        sender.execute(() -> {
+            TelegramSender.Result result = TelegramSender.sendPhoto(
+                    config.getAlertsTelegramToken(), config.getAlertsTelegramChatId(),
+                    entry.hd, caption, markup);
+            BlackBox.note(result.ok ? "alerts: hd sent for " + AlertMoment.clock(entry.wallMs)
+                    : "alerts: hd send failed (" + result.display() + ")");
         });
     }
 
@@ -1967,6 +2063,19 @@ public final class SentryAlerts implements Telemetry.Listener {
         if (seconds <= 0) {
             return;
         }
+        long now = System.currentTimeMillis();
+        long wallMs = alertWallMs;
+        // 按钮回的是那一次警报的那一刻：环里已经没有那一段了就说没有，不拿「现在」这段顶上去。
+        // The button answers about that alert's moment: when the ring no longer reaches back, say so
+        // rather than passing off the last minute as if it were the event.
+        if (wallMs <= 0 || !AlertMoment.withinRing(wallMs, now, RING_MS)) {
+            BlackBox.note("alerts: clip asked for, that moment is out of the ring ("
+                    + (wallMs <= 0 ? "no moment" : (now - wallMs) / 1000 + " s ago") + ")");
+            deliverText(channel(), app.getString(R.string.alert_clip_not_available,
+                    AlertMoment.describe(wallMs, now)));
+            return;
+        }
+        long endAgoMs = Math.max(0L, now - wallMs);
         if (!clipBusy.compareAndSet(false, true)) {
             BlackBox.note("alerts: a clip is already being cut, ignoring the second tap");
             return;
@@ -1974,11 +2083,11 @@ public final class SentryAlerts implements Telemetry.Listener {
         java.io.File file = new java.io.File(app.getCacheDir(),
                 "alert_clip_" + cameraKey + "_" + System.currentTimeMillis() + ".mp4");
         BlackBox.note("alerts: clip asked for, " + camera + ", " + seconds + " s");
-        CameraKeeper.get(app).writeClip(file, seconds, config.isAlertsClipAudio(),
-                cameraKey, ok -> {
+        CameraKeeper.get(app).writeClipEndingMsAgo(file, seconds, config.isAlertsClipAudio(),
+                cameraKey, endAgoMs, ok -> {
             clipBusy.set(false);
             if (!ok || !file.isFile() || file.length() == 0) {
-                BlackBox.note("alerts: no clip for " + camera + " (ring holds too little video)");
+                BlackBox.note("alerts: no clip for " + camera + " at that moment");
                 deliverText(channel(), app.getString(R.string.alert_clip_none));
                 return;
             }

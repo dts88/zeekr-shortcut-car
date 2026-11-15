@@ -112,7 +112,7 @@
     <string name="alert_headline_motion">Ada pergerakan dalam pandangan semasa letak kereta</string>
     <string name="alert_headline_test">Ujian</string>
     <string name="alert_headline_request">Gambar diambil atas permintaan</string>
-    <string name="alert_cmd_help">Hantar pic untuk gambar (tambah front / rear / left / right), atau status untuk satu baris</string>
+    <string name="alert_cmd_help">Hantar pic untuk gambar (tambah front / rear / left / right), pic 18:22 untuk satu bingkai rakaman pada masa itu, atau status untuk satu baris</string>
     <string name="alert_cmd_no_sentry">Mod Sentri mati, jadi kepala unit akan tidur dan tiada gambar boleh diambil</string>
     <string name="alert_cmd_not_parked">Kereta tidak diletakkan, jadi tiada gambar diambil</string>
     <string name="alert_cmd_too_soon">Tunggu %1$d saat sebelum minta lagi</string>
@@ -1447,4 +1447,9 @@ Kalau lupa: %3$s</string>
     <string name="set_alerts_transport_summary">Bot Telegram, atau topik ntfy</string>
     <string name="set_alerts_transport_telegram">Telegram</string>
     <string name="set_alerts_transport_ntfy">ntfy</string>
+    <string name="alert_clip_not_available">Klip untuk saat itu sudah tiada dalam gelung (%1$s). Kereta menyimpan sekitar satu minit terakhir</string>
+    <string name="alert_hd_not_available">Salinan HD %1$s sudah tiada. Hantar pic untuk gambar baharu</string>
+    <string name="alert_pic_not_available">Tiada rakaman pada %1$s</string>
+    <string name="alert_pic_bad_time">Masa itu tidak dapat dibaca: %1$s. Cuba pic 18:22</string>
+    <string name="alert_headline_recorded">Satu bingkai daripada rakaman, pada masa yang anda minta</string>
 </resources>
