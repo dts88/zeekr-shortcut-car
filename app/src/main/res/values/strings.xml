@@ -134,6 +134,7 @@
     <string name="floating_action_open_app">打开主界面</string>
     <string name="floating_action_toggle_recording">开始 / 停止录制</string>
     <string name="floating_action_take_photo">拍照</string>
+    <string name="floating_action_take_screenshot">截屏</string>
     <string name="floating_action_toggle_mirror">开启 / 关闭超级镜子</string>
     <string name="floating_action_lock_footage">锁定当前录像</string>
     <string name="floating_action_toggle_drive_sound">开启 / 关闭模拟声浪</string>
@@ -556,6 +557,8 @@
     <string name="msg_photo_not_saved">拍照失败：无法保存照片</string>
     <string name="msg_photo_no_picture">拍照失败：摄像头无画面</string>
     <string name="msg_photo_no_drive">拍照失败：未检测到 U 盘</string>
+    <string name="msg_screenshot_no_drive">截图失败：未检测到 U 盘</string>
+    <string name="msg_screenshot_saved">截图已保存</string>
     <string name="msg_recording_stopped">录制已停止</string>
     <string name="msg_recording_started_all">已开始录制（全部摄像头）</string>
     <string name="msg_recording_started_n">已开始录制 %1$d 路</string>

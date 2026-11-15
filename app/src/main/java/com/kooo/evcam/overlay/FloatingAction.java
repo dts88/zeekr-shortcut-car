@@ -28,6 +28,8 @@ public enum FloatingAction {
     TOGGLE_RECORDING("toggle_recording"),
     /** 拍一张。 */
     TAKE_PHOTO("take_photo"),
+    /** 截下整个中控屏的画面（{@code capture.ScreenCapture}，项目所有者 2026-11-15）。 */
+    TAKE_SCREENSHOT("take_screenshot"),
     /** 开 / 关超级镜子。 */
     TOGGLE_MIRROR("toggle_mirror"),
     /** 锁定此刻前后 10 秒所在的录像：和闪远光自动锁定同一套（{@code AutoLock#lockNow}）。 */
@@ -54,6 +56,8 @@ public enum FloatingAction {
                 return com.kooo.evcam.R.string.floating_action_toggle_recording;
             case TAKE_PHOTO:
                 return com.kooo.evcam.R.string.floating_action_take_photo;
+            case TAKE_SCREENSHOT:
+                return com.kooo.evcam.R.string.floating_action_take_screenshot;
             case TOGGLE_MIRROR:
                 return com.kooo.evcam.R.string.floating_action_toggle_mirror;
             case LOCK_FOOTAGE:

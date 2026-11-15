@@ -44,6 +44,9 @@ public final class QuickActions {
             case TAKE_PHOTO:
                 takePhoto(context);
                 return;
+            case TAKE_SCREENSHOT:
+                com.kooo.evcam.capture.ScreenCapture.take(context);
+                return;
             case TOGGLE_MIRROR:
                 toggleMirror(context);
                 return;

@@ -113,6 +113,7 @@
     <string name="floating_action_open_app">Open the app</string>
     <string name="floating_action_toggle_recording">Start / stop recording</string>
     <string name="floating_action_take_photo">Take a photo</string>
+    <string name="floating_action_take_screenshot">Take a screenshot</string>
     <string name="floating_action_toggle_mirror">Super mirror on / off</string>
     <string name="floating_action_lock_footage">Lock the current recording</string>
     <string name="floating_action_toggle_drive_sound">Simulated drive sound on / off</string>
@@ -546,6 +547,8 @@
     <string name="msg_photo_not_saved">No photo: couldn\'t save it</string>
     <string name="msg_photo_no_picture">No photo: no image from the cameras</string>
     <string name="msg_photo_no_drive">No photo: no USB drive found</string>
+    <string name="msg_screenshot_no_drive">No screenshot: no USB drive found</string>
+    <string name="msg_screenshot_saved">Screenshot saved</string>
     <string name="msg_recording_stopped">Recording stopped</string>
     <string name="msg_recording_started_all">Recording started (all cameras)</string>
     <string name="msg_recording_started_n">Recording started (cameras: %1$d)</string>
