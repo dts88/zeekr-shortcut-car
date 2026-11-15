@@ -121,6 +121,11 @@ public class StorageHelper {
         return new File(new File(root, Environment.DIRECTORY_DCIM), VIDEO_DIR_NAME);
     }
 
+    /** 这个盘上放日志的文件夹（导出的诊断报告、黑匣子那一份），和 {@link #getLogDir} 同一个位置。 */
+    public static File logDirOn(File root) {
+        return new File(new File(root, Environment.DIRECTORY_DOWNLOADS), LOG_DIR_NAME);
+    }
+
     /**
      * 此刻系统里挂着哪些 U 盘（读 /proc/mounts），黑匣子用：「XXXX-XXXX, YYYY-YYYY」，一个都没有时「none」。
      *
@@ -361,6 +366,22 @@ public class StorageHelper {
         }
         return getStorageDir(sdCardRoot != null ? sdCardRoot : Environment.getExternalStorageDirectory(),
                 LOG_DIR_NAME, Environment.DIRECTORY_DOWNLOADS);
+    }
+
+    /**
+     * U 盘上放日志的文件夹（{@link #logDirOn}）：存储位置是 U 盘、盘此刻在、文件夹建得起来才有，否则 null。不记日志（黑匣子每一行都来问）。
+     * 黑匣子在这里另存一份，App Lab 丢了、应用重装以后还在（项目所有者 2026-11-15）。
+     */
+    public static File usbLogDir(Context context) {
+        if (context == null || !new AppConfig(context).isUsingExternalSdCard()) {
+            return null;
+        }
+        File root = getExternalSdCardRoot(context);
+        if (root == null) {
+            return null;
+        }
+        File dir = logDirOn(root);
+        return dir.isDirectory() || dir.mkdirs() ? dir : null;
     }
 
     /**
