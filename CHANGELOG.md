@@ -11,6 +11,11 @@ commit message, not here.
 
 Nothing yet.
 
+## [4.6.0-alpha] - 2026-11-15
+
+- Floating button: tap and long press can use every smart-button action (driving, media, seats, climate, body, lights, scenes), chosen the same way as for smart buttons.
+- Floating button and smart buttons: new Take a screenshot action. It saves the whole screen as a PNG in the raw folder under photos on the USB drive. The first press asks for the system's screen recording permission, which lasts until the screen turns off or the app exits.
+
 ## [4.5.0-alpha] - 2026-11-15
 
 - Smart buttons: new Body actions to close all doors, the driver door, the passenger door, the rear left door, the rear right door or the tailgate. They only work on power-operated doors and need the car to be stationary.
