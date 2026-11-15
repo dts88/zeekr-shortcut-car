@@ -590,6 +590,26 @@ public class CarMovesTest {
         assertEquals(1, stuck.writes.size());
     }
 
+    /** 关到一半受阻、停在半路（读到号加 1）：到时是做不了，不说「此车可能没有该功能」。 */
+    @Test
+    public void aDoorThatStopsHalfwayIsUnavailable() {
+        FakeCar car = new FakeCar() {
+            @Override
+            public boolean write(int id, int zone, int value) {
+                writes.add(id + "@" + zone + "=" + value);
+                set(id, zone, id + 1);
+                return true;
+            }
+        };
+        car.set(DOOR, Signal.DOOR_TRUNK.zone, 1);
+        assertEquals(CarMoves.Result.UNAVAILABLE, run(car, CarMoves.closeDoors(Signal.DOOR_TRUNK)));
+        assertEquals(1, car.writes.size());
+        car.writes.clear();
+        assertEquals("停在半路的再按一下再写一次关", CarMoves.Result.UNAVAILABLE,
+                run(car, CarMoves.closeDoors(Signal.DOOR_TRUNK)));
+        assertEquals(DOOR + "@" + Signal.DOOR_TRUNK.zone + "=0", car.writes.get(0));
+    }
+
     /** 车机不受理写：做不了。 */
     @Test
     public void aRefusedCloseIsUnavailable() {

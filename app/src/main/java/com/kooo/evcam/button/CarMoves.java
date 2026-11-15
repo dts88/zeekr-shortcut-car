@@ -80,7 +80,7 @@ final class CarMoves {
         DONE,
         /** 车机受理了，车上没变。 */
         NO_CHANGE,
-        /** 做不了：车辆接口没连上、这台车机没有这个功能号、读到的值不认识、车机不受理。 */
+        /** 做不了：车辆接口没连上、这台车机没有这个功能号、读到的值不认识、车机不受理；关门时门停在半路（受阻）。 */
         UNAVAILABLE,
         /** 超级省电模式下不执行。 */
         POWER_SAVING,
@@ -306,7 +306,10 @@ final class CarMoves {
             return Result.NO_CHANGE;
         }
 
-        /** 写了关的那几扇：{@link #DOOR_BACK_MS} 内都读到 0（关好了）算成了，不然是没生效。 */
+        /**
+         * 写了关的那几扇：{@link #DOOR_BACK_MS} 内都读到 0（关好了）算成了。到时有一扇读到号加 1（受阻、停在半路，
+         * Lab findings §2.139）是做不了；还开着是没生效。关门途中一直读 1，不提前停。
+         */
         Result closed(List<Signal> doors) {
             for (long waited = DOOR_STEP_MS; waited <= DOOR_BACK_MS; waited += DOOR_STEP_MS) {
                 sleeper.sleep(DOOR_STEP_MS);
@@ -316,11 +319,14 @@ final class CarMoves {
                 }
             }
             StringBuilder still = new StringBuilder();
+            boolean stopped = false;
             for (Signal door : doors) {
-                still.append(' ').append(hex(door.zone)).append('=').append(hex(read(door.id, door.zone)));
+                Integer v = read(door.id, door.zone);
+                stopped |= v != null && v == door.id + 1;
+                still.append(' ').append(hex(door.zone)).append('=').append(hex(v));
             }
-            note("not closed after " + DOOR_BACK_MS + " ms:" + still);
-            return Result.NO_CHANGE;
+            note((stopped ? "stopped halfway" : "not closed") + " after " + DOOR_BACK_MS + " ms:" + still);
+            return stopped ? Result.UNAVAILABLE : Result.NO_CHANGE;
         }
 
         private boolean allClosed(List<Signal> doors) {
@@ -482,12 +488,12 @@ final class CarMoves {
     /**
      * 关门（项目所有者 2026-11-15）：只关不开，一扇或几扇（「关闭所有车门」是四扇侧门，后备箱单独一项）。
      * 号、区域用车辆信号表里车上对过的那几项（{@link Signal#DOOR_DRIVER} 这些，信息条读的也是它们）。
-     * 照 Lab findings §2.93 车上用的做法：读到 0 是关着、1 是开着、号加 1 是停在半路；开着、停在半路的写 0；
+     * 照 Lab findings §2.93、§2.139：读到 0 是关着、1 是开着（关门途中也是 1）、号加 1 是受阻或停在半路；开着、停在半路的写 0；
      * 车机说这一扇不是 active（没有电动门的车、没有电动门的那一扇）就不写。
      * 项目所有者的车侧门用不了（副驾那扇是 notavailable），选项照留，给有电动门的车用（项目所有者 2026-11-15）。
      *
      * <p>读不到、读到别的值的那一扇跳过（几扇一起关时不影响别的）；一扇都读不到是做不了。都关着算做成；
-     * 有开着的、一扇都写不了是做不了；写了的 {@link #DOOR_BACK_MS} 内都读到关好算做成，不然是没生效。</p>
+     * 有开着的、一扇都写不了是做不了；写了的 {@link #DOOR_BACK_MS} 内都读到关好算做成，到时停在半路是做不了，还开着是没生效。</p>
      */
     static Job closeDoors(Signal... doors) {
         return c -> {
