@@ -81,7 +81,7 @@ def main():
     out.append("**App Lab lost after a restart.** Some users report that App Lab disappears after "
                "the head unit restarts and must be reinstalled. This is likely related to this app; "
                "the cause is under investigation. If this happens, or the app stutters or camera "
-               "images are unavailable, **export a report from Settings → System → Diagnostics "
+               "images are unavailable, **export a report from Settings → General → Diagnostics "
                "before restarting the head unit** and report it via a "
                "[GitHub issue](" + REPO + "/issues) or other channels.")
     out.append("")
