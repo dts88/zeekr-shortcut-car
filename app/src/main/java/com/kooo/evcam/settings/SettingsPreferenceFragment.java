@@ -942,6 +942,49 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             });
         }
 
+        // 忘了开哨兵：四档（关 / 先问我 / 问一句就自己开 / 不问就开），存的是 0..3。
+        // 取值怎么算在 alarm.GuardPolicy 一处，这里只写设置。
+        // Forgot Sentry: four modes stored 0..3; GuardPolicy owns what each one does, this row only saves it.
+        ListPreference guard = findPreference("pref_alerts_guard");
+        if (guard != null) {
+            guard.setPersistent(false);
+            guard.setEntries(new CharSequence[] {
+                    getString(R.string.set_alerts_guard_mode_off),
+                    getString(R.string.set_alerts_guard_mode_ask),
+                    getString(R.string.set_alerts_guard_mode_ask_then_on),
+                    getString(R.string.set_alerts_guard_mode_on)});
+            guard.setEntryValues(new CharSequence[] {"0", "1", "2", "3"});
+            guard.setValue(String.valueOf(appConfig.getAlertsGuardMode().stored()));
+            guard.setOnPreferenceChangeListener((preference, newValue) -> {
+                int value = 0;
+                try {
+                    value = Integer.parseInt(String.valueOf(newValue));
+                } catch (NumberFormatException e) {
+                    value = com.kooo.evcam.alarm.GuardPolicy.DEFAULT_MODE.stored();
+                }
+                appConfig.setAlertsGuardMode(com.kooo.evcam.alarm.GuardPolicy.Mode.of(value));
+                com.kooo.evcam.blackbox.BlackBox.noteImportant(
+                        "设置变更: pref_alerts_guard → " + value);
+                return true;
+            });
+        }
+
+        // 把车此刻的位置记成家：结果由 SentryAlerts 回话，显示在行尾并弹一句
+        // Store the car's current position as home; SentryAlerts answers, the row shows it and a toast repeats it.
+        Preference guardHome = findPreference("pref_alerts_guard_home");
+        if (guardHome != null) {
+            guardHome.setPersistent(false);
+            guardHome.setOnPreferenceClickListener(preference -> {
+                com.kooo.evcam.alarm.SentryAlerts.get(requireContext()).setGuardHomeHere((ok, message) -> {
+                    if (isAdded()) {
+                        guardHome.setSummary(message);
+                        toast(message);
+                    }
+                });
+                return true;
+            });
+        }
+
         // 这一栏的显示规则全写在这里（ui-spec §三：可见性只在一处）。
         // 总开关关着时，下面那些设置没有意义；下层的选项只在它自己的上一层选中时才出现。
         boolean alertsOn = appConfig.isAlertsEnabled();
@@ -965,6 +1008,10 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         show("pref_alerts_cameras", alertsOn && perCamera);
         show("pref_alerts_clip_audio", alertsOn && clipOn);
         show("pref_alerts_clip_data", alertsOn && clipOn);
+        // 忘了开哨兵那两行跟着 telegram 那一组：警报总开关关着时一起收起来
+        // The two Forgot Sentry rows follow the Telegram group: hidden with the master switch.
+        show("pref_alerts_guard", alertsOn);
+        show("pref_alerts_guard_home", alertsOn);
 
         Preference quietStart = findPreference("pref_alerts_quiet_start");
         if (quietStart != null) {
@@ -1158,6 +1205,15 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             }
             cameras.setSummary(com.kooo.evcam.alarm.AlertPicture.allLanes(lanes)
                     ? getString(R.string.set_alerts_cameras_all) : names.toString());
+        }
+
+        // 家的位置：记过就写「记下了」，没记过就写「还不知道家在哪」。那一行不设成不可点 ——
+        // 没记过时点一下就是唯一的办法，点了会给一句原因（没有定位）。
+        // The home point: say it is stored, or that it is not; the row stays tappable and answers with a reason.
+        Preference guardHome = findPreference("pref_alerts_guard_home");
+        if (guardHome != null) {
+            guardHome.setSummary(appConfig.getAlertsGuardHome().isEmpty()
+                    ? R.string.set_alerts_guard_home_none : R.string.set_alerts_guard_home_set);
         }
     }
 

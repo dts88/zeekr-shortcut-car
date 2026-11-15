@@ -124,6 +124,77 @@ signal changes (`SignalAges`), and if still unknown, **send as usual** — bette
 noisy than to swallow a real event because it was unknown. Alerts blocked by this wait write one
 line in the black box (`alerts: armed N s ago, waiting for M min`).
 
+## 1.8 忘了开哨兵
+
+下车那一刻哨兵模式还关着、车又不在家 —— 车在会话里问一句，没人反对就自己打开。
+触发点是「车主走了」这一刻：屏幕熄灭（`SCREEN_POWER_EVENT 0 → 1`，这台车上和点火 ON → ACC 同一毫秒，
+`Signal.java:143`）或者主驾座椅从有人变成没人，**两者都要在停着车的时候**，而且这一趟真的开过车 ——
+从上次停车起没动过的车不提醒，那是「停了一星期」，不是「刚下车」。
+
+设置里四档（`alarm.GuardPolicy.Mode`，存 0..3，默认 0 关）：
+
+| 档 | 存 | 做什么 |
+|---|---|---|
+| 关 | 0 | 什么都不做 |
+| 先问我 | 1 | 只发问，按钮说开才开 |
+| 问一句，一分钟没人反对就自己开 | 2 | 发问，60 秒没人否决就自己开 |
+| 不问，自己开 | 3 | 直接开，发一条收据 |
+
+数字：下车 **5 秒**后发问（`GuardPolicy.ASK_AT_MS`，让关门那一下过去）、问出去 **60 秒**没人否决就自己开
+（`AUTO_ON_MS`）、下车 **180 秒**之后按的按钮一律拒绝并说明原因（`ACT_WINDOW_MS`）。窗口按实测的
+4–6 分钟往短里取，永远在窗口关掉之前就结束，不会出现按了没反应的按钮。
+
+家是一个点（`alarm.GuardHome`）：**离家 200 m** 以内算在家，定位超过 **10 分钟**没更新算不知道在哪。
+在家不动；在外面、或者根本不知道在哪，可以问；只有「在外面」或者「压根没设过家」才会自己开。
+
+它**不是 AlertPolicy 的一次警报**：没有布防门、没有冷却、安静时段也不管 —— 那三样是为「车被人动了」写的，
+这一件事是「车主自己忘了」，按那套算只会让该说的话不说。它要的是 Telegram 那条路：按钮是回调
+（`callback_query`），别的传输方式没有回程，这一版只做 Telegram（`DECISIONS.md` D8）。
+
+已知的两条限：
+
+- 进程那一刻没在跑，就没有提醒 —— 提醒是应用进程里的一段代码（`DECISIONS.md` D7）。
+- 车机睡了叫不醒，没有任何手段能把它叫回来；所以按钮的寿命只有三分钟，晚了的按键会收到一句「太晚了」。
+
+##### English
+
+The owner walks away with Sentry Mode still off and the car not at home — the car asks in the chat and
+switches it on by itself unless the owner objects. The trigger is the moment the owner leaves: the
+screen going black (`SCREEN_POWER_EVENT 0 → 1`, the same millisecond as ignition ON → ACC on this car,
+`Signal.java:143`) or the driver seat going from occupied to empty, **both while parked**, and only
+after a real drive — a car that has not moved since the last park is "parked since Tuesday", not
+"just left".
+
+Four modes in the settings (`alarm.GuardPolicy.Mode`, stored 0..3, default 0 = off):
+
+| Mode | Stored | What it does |
+|---|---|---|
+| Off | 0 | nothing |
+| Ask | 1 | send the ask; only the button switches it on |
+| Ask then on | 2 | send the ask, switch it on 60 s later unless vetoed |
+| On | 3 | switch it on silently and send a receipt |
+
+The numbers: ask **5 s** after leaving (`GuardPolicy.ASK_AT_MS`, so the door-close noise has passed),
+switch on **60 s** after the ask unless vetoed (`AUTO_ON_MS`), and any button pressed more than
+**180 s** after leaving is refused with a reason (`ACT_WINDOW_MS`). The window is deliberately shorter
+than the measured 4–6 minutes, so the refusal always lands before the car can sleep, never after.
+
+Home is one point (`alarm.GuardHome`): within **200 m** counts as home, and a fix older than
+**10 minutes** counts as unknown. Home never acts; away or unknown may ask; only away — or no home set
+at all — may switch it on by itself.
+
+This is **not an AlertPolicy alert**: no armed gate, no cooldown, and quiet hours do not apply — those
+three were written for "someone touched the car", and this one is "the owner forgot". It needs the
+Telegram transport: the buttons are callbacks (`callback_query`), the other transport has no return
+path, so this version is Telegram only (`DECISIONS.md` D8).
+
+Two known limits:
+
+- If the process was not running at that moment, nothing reminds anyone — the feature is code inside
+the app process (`DECISIONS.md` D7).
+- A sleeping head unit cannot be woken by anything, which is why a button lives only three minutes; a
+  late press gets the honest "too late" answer.
+
 ## 2. 不做什么（车上看不到的信号）
 
 这台车的车辆接口没有撞击、气囊、喇叭、防盗 / 倾斜 / 震动触发的信号，

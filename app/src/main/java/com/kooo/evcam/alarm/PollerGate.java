@@ -126,6 +126,74 @@ public final class PollerGate {
                                   String configuredChatId, String ownerUserId,
                                   long messageDateMs, long nowMs,
                                   TelegramCommand command) {
+        Verdict identity = identityVerdict(chatType, chatId, fromUserId, configuredChatId, ownerUserId);
+        if (identity != null) {
+            return identity;
+        }
+        Verdict freshness = freshnessVerdict(messageDateMs, nowMs);
+        if (freshness != null) {
+            return freshness;
+        }
+        if (command == null || command.verb == TelegramCommand.Verb.UNKNOWN) {
+            return Verdict.NOT_A_COMMAND;
+        }
+        return Verdict.ACCEPT;
+    }
+
+    /**
+     * 一颗按钮按下了（{@code callback_query}）：同样两条身份、同样的 {@link #MAX_AGE_MS}。
+     *
+     * <p>和 {@link #verdict} 只差一点：按钮上带的是 {@code data}，没有句子可解析，所以永远不会是
+     * {@link Verdict#NOT_A_COMMAND}。</p>
+     *
+     * @param chatType         {@code message.chat.type}（按钮挂在哪条消息上）
+     * @param chatId           {@code message.chat.id}
+     * @param fromUserId       {@code callback_query.from.id}，按按钮的那个人
+     * @param configuredChatId 设置里配的会话号
+     * @param ownerUserId      车主自己的用户号；空串表示还没记下来
+     * @param messageDateMs    那条消息的时间（{@code message.date} × 1000）；0 表示不知道
+     * @param nowMs            现在
+     *
+     * A button was pressed ({@code callback_query}): the same two identities and the same
+     * {@link #MAX_AGE_MS}.
+     *
+     * <p>Only one difference from {@link #verdict}: a button carries {@code data} and no sentence to
+     * parse, so it is never {@link Verdict#NOT_A_COMMAND}.</p>
+     *
+     * @param chatType         {@code message.chat.type} (the message the button hangs on)
+     * @param chatId           {@code message.chat.id}
+     * @param fromUserId       {@code callback_query.from.id}, the person who pressed
+     * @param configuredChatId the session number configured in settings
+     * @param ownerUserId      the owner's own user number; empty string means not recorded yet
+     * @param messageDateMs    that message's time ({@code message.date} × 1000); 0 means unknown
+     * @param nowMs            now
+     */
+    public static Verdict verdictForCallback(String chatType, String chatId, String fromUserId,
+                                             String configuredChatId, String ownerUserId,
+                                             long messageDateMs, long nowMs) {
+        Verdict identity = identityVerdict(chatType, chatId, fromUserId, configuredChatId, ownerUserId);
+        if (identity != null) {
+            return identity;
+        }
+        Verdict freshness = freshnessVerdict(messageDateMs, nowMs);
+        if (freshness != null) {
+            return freshness;
+        }
+        return Verdict.ACCEPT;
+    }
+
+    /**
+     * 两条身份：先看会话，再看人。其于 {@code null} 表示两条都过了。
+     *
+     * <p>抽出来只为了让它只写一遍：文字命令和按钮走的是同一套判断，两处各写一遍就会有一天只改了一边。</p>
+     *
+     * Two identities: the session first, then the person. {@code null} means both passed.
+     *
+     * <p>Pulled out so it is written once: text commands and buttons pass the same judgment, and two
+     * copies drift the day one of them is edited alone.</p>
+     */
+    private static Verdict identityVerdict(String chatType, String chatId, String fromUserId,
+                                          String configuredChatId, String ownerUserId) {
         if (!TelegramCommand.fromOwner(chatId, configuredChatId)) {
             return Verdict.NOT_OWNER;
         }
@@ -141,16 +209,18 @@ public final class PollerGate {
             // When the owner is still unknown, only accept the person himself in a private chat (then session id == user id)
             return Verdict.NOT_OWNER;
         }
-        if (privateChat && !TelegramCommand.fromOwner(fromUserId, configuredChatId)
-                && (ownerUserId == null || ownerUserId.isEmpty())) {
-            return Verdict.NOT_OWNER;
-        }
+        return null;
+    }
+
+    /**
+     * 过期判断：{@code null} 表示还新鲜（时间不知道时不按过期处理）。
+     *
+     * The staleness check: {@code null} means still fresh (an unknown time is not treated as stale).
+     */
+    private static Verdict freshnessVerdict(long messageDateMs, long nowMs) {
         if (messageDateMs > 0 && nowMs - messageDateMs > MAX_AGE_MS) {
             return Verdict.STALE;
         }
-        if (command == null || command.verb == TelegramCommand.Verb.UNKNOWN) {
-            return Verdict.NOT_A_COMMAND;
-        }
-        return Verdict.ACCEPT;
+        return null;
     }
 }

@@ -148,6 +148,9 @@ public class AppConfig {
     private static final String KEY_ALERTS_CAMERAS = "alerts_cameras";     // 分开发时要哪几路（"0,1,2,3"）
     private static final String KEY_ALERTS_STRAIGHTEN = "alerts_straighten";  // 发之前掰直
     private static final String KEY_ALERTS_COMMANDS = "alerts_commands";   // 回应 Telegram 里的命令
+    // 忘了开哨兵：提醒哪一档（存 0..3，见 alarm.GuardPolicy）
+    private static final String KEY_ALERTS_GUARD_MODE = "alerts_guard_mode";
+    private static final String KEY_ALERTS_GUARD_HOME = "alerts_guard_home";  // "lat,lon"，存在 secrets 里
     private static final String KEY_ALERTS_COMMAND_OFFSET = "alerts_command_offset";  // 轮询到哪一条（运行状态）
 
     // 亮度/降噪调节配置
@@ -2304,6 +2307,63 @@ public class AppConfig {
     public void setAlertsArmDelayMinutes(int minutes) {
         prefs.edit().putInt(KEY_ALERTS_ARM_DELAY,
                 com.kooo.evcam.alarm.ArmDelay.clamp(minutes)).apply();
+    }
+
+    /**
+     * 「忘了开哨兵」提醒哪一档：关 / 只问 / 问了就开 / 直接开。存 0..3，默认关。
+     *
+     * <p>默认关是有意的：没打开这一项的车上，行为和以前一模一样。打开了之后默认是「问了就开」——
+     * 车主忘了才是这一项要治的病，等他按按钮不是。</p>
+     *
+     * <p>Which mode the Forgot Sentry reminder is in. Stored 0..3, off by default, so a car that never
+     * touches this row behaves exactly as before. Once switched on, "ask then on" is the default:
+     * forgetting is the problem being solved, waiting for a tap is not the cure.</p>
+     */
+    public com.kooo.evcam.alarm.GuardPolicy.Mode getAlertsGuardMode() {
+        return com.kooo.evcam.alarm.GuardPolicy.Mode.of(prefs.getInt(KEY_ALERTS_GUARD_MODE,
+                com.kooo.evcam.alarm.GuardPolicy.DEFAULT_MODE.stored()));
+    }
+
+    public void setAlertsGuardMode(com.kooo.evcam.alarm.GuardPolicy.Mode mode) {
+        com.kooo.evcam.alarm.GuardPolicy.Mode value =
+                mode == null ? com.kooo.evcam.alarm.GuardPolicy.DEFAULT_MODE : mode;
+        prefs.edit().putInt(KEY_ALERTS_GUARD_MODE, value.stored()).apply();
+    }
+
+    /**
+     * 家的坐标（{@code "lat,lon"}），设过才有。
+     *
+     * <p>存 {@link #secrets()} 那一份，和令牌同理：家的位置是最私人的一条数据，不该随「导出设置」
+     * 和一份诊断报告出门。空的字符串表示没设过 —— 没设过照样会提醒，只是不会自己开。</p>
+     *
+     * <p>The home point, kept in the secrets file for the same reason as the token: an exported settings
+     * file or a diagnostics report must not carry where the owner lives. Empty means never set.</p>
+     */
+    public String getAlertsGuardHome() {
+        String raw = secrets().getString(KEY_ALERTS_GUARD_HOME, "");
+        return raw == null ? "" : raw.trim();
+    }
+
+    /**
+     * 记下家的位置。认不出来的坐标不收（{@link com.kooo.evcam.alarm.GuardHome#parse} 说了不算）。
+     *
+     * @return 收下了没有
+     */
+    public boolean setAlertsGuardHome(double latitude, double longitude) {
+        com.kooo.evcam.alarm.GuardHome.Point point =
+                com.kooo.evcam.alarm.GuardHome.parse(
+                        com.kooo.evcam.alarm.GuardHome.format(latitude, longitude));
+        if (point == null) {
+            return false;
+        }
+        secrets().edit().putString(KEY_ALERTS_GUARD_HOME,
+                com.kooo.evcam.alarm.GuardHome.format(point.lat, point.lon)).apply();
+        return true;
+    }
+
+    /** 忘掉家的位置（换房子的时候）。Forget the home point. */
+    public void clearAlertsGuardHome() {
+        secrets().edit().remove(KEY_ALERTS_GUARD_HOME).apply();
     }
 
     /** 令牌和会话号都填了：可以试着发一条。 */

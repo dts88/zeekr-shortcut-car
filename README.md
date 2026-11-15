@@ -136,6 +136,9 @@ Optional, in the same section:
 - **Start after locking**: right away, 1 minute or 3 minutes after the car locks, so walking away
   does not send you a picture of yourself.
 - **Quiet hours**: no alerts between two times, for the nights the car is at home.
+- **Forgot Sentry**: park away from home with Sentry Mode off and the car asks in the chat, then switches
+  it on 60 s later unless you say no. It only works while the car is awake, about five minutes; the
+  buttons stop working after three minutes.
 
 **What it cannot see.** The car reports no impact, horn or tamper signal, so a knock that lights nothing
 and opens nothing stays invisible. Cameras also need Sentry Mode to keep the head unit awake.

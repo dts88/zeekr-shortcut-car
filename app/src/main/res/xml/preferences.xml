@@ -198,6 +198,17 @@
                 android:title="@string/set_alerts_commands_title"
                 android:summary="@string/set_alerts_commands_summary" />
 
+            <!-- 忘了开哨兵：下车那一刻问一句，或者自己开（alarm.GuardPolicy 判，见 docs/sentry-alerts-spec.md §1.8）
+                 Forgot Sentry: ask when the owner leaves, or switch it on by itself (§1.8). -->
+            <ListPreference
+                android:key="pref_alerts_guard"
+                android:title="@string/set_alerts_guard_title"
+                android:summary="%s" />
+
+            <Preference
+                android:key="pref_alerts_guard_home"
+                android:title="@string/set_alerts_guard_home_title" />
+
             <Preference
                 android:key="pref_alerts_test"
                 android:title="@string/set_alerts_test_title"

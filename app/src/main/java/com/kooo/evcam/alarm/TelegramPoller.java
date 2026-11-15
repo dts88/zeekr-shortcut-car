@@ -33,6 +33,8 @@ import org.json.JSONObject;
  *   <li><b>一个机器人只有一个轮询者</b>：Telegram 对同一个机器人并发轮询会回 409。
  *       所以车上只有这一条线程，别处（脚本、Home Assistant）不能再轮询同一个机器人。</li>
  *   <li><b>不拦着睡觉</b>：车机睡了，进程没了，这条线程自然停；不为它拿唤醒锁。</li>
+ *   <li><b>按钮也走同一道门</b>：{@code callback_query} 和文字命令一样只认那个人，
+ *       先回一声停掉手机上的转圈，再交给上层（{@link #dispatchCallback}）。</li>
  * </ul>
  *
  * The thread that asks Telegram "did anyone message me?".
@@ -56,6 +58,8 @@ import org.json.JSONObject;
  *       car runs only this one thread; nothing else (scripts, Home Assistant) may poll the same bot.</li>
  *   <li><b>Never blocks sleep</b>: when the head unit sleeps the process goes away and this thread stops
  *       with it; no wake lock is taken for it.</li>
+ *   <li><b>Buttons pass the same gate</b>: a {@code callback_query} accepts only that same person, and
+ *       answers the spinner before handing it up ({@link #dispatchCallback}).</li>
  * </ul>
  */
 public final class TelegramPoller {
@@ -124,6 +128,34 @@ public final class TelegramPoller {
          * On a message that is not recognized (but really is from the owner): reply with how to use it.
          */
         void onHelp();
+
+        /**
+         * 一颗按钮按下了。已经回过了（手机上不转了），剩下的事在这里做。
+         *
+         * @param data      按钮上的 {@code callback_data}，布局见 {@code GuardToken}
+         * @param pressedAt 那条带按钮的消息的时刻（毫秒）；0 表示不知道
+         *
+         * A button was pressed. It has already been answered (the phone stopped spinning); what is left
+         * happens here.
+         *
+         * @param data      the button's {@code callback_data}, layout in {@code GuardToken}
+         * @param pressedAt the time of the message carrying the button (milliseconds); 0 means unknown
+         */
+        void onButton(String data, long pressedAt);
+
+        /**
+         * {@code /guard …}。
+         *
+         * @param action      后面那个词；{@code null} 不会出现在这里（光写 {@code guard} 是 {@code REPORT}）
+         * @param requestedAt 车主发命令的时刻（毫秒）；0 表示不知道
+         *
+         * {@code /guard …}.
+         *
+         * @param action      the word after it; {@code null} never arrives here (a bare {@code guard} is
+         *                    {@code REPORT})
+         * @param requestedAt when the owner sent the command (milliseconds); 0 means unknown
+         */
+        void onGuard(TelegramCommand.GuardAction action, long requestedAt);
     }
 
     private final AppConfig config;
@@ -305,8 +337,18 @@ public final class TelegramPoller {
                 continue;
             }
             long updateId = update.optLong("update_id", 0L);
-            // 只认普通消息：编辑过的、频道帖子、回调查询都不算
-            // Only plain messages count: edits, channel posts, and callback queries do not.
+            // 按钮按下：单独一条路。先推 offset 再动手 —— 崩了也不能把同一颗按钮再按一次。
+            // A button press: its own path. Push the offset before acting; a crash must not press the
+            // same button again.
+            JSONObject callback = update.optJSONObject("callback_query");
+            if (callback != null) {
+                offset = Math.max(offset, updateId + 1);
+                config.setAlertsCommandOffset(offset);
+                dispatchCallback(callback, token, chatId, ownerId);
+                continue;
+            }
+            // 只认普通消息：编辑过的、频道帖子都不算
+            // Only plain messages count: edits and channel posts do not.
             JSONObject message = update.optJSONObject("message");
             if (message == null) {
                 offset = Math.max(offset, updateId + 1);
@@ -338,8 +380,7 @@ public final class TelegramPoller {
             if (verdict == PollerGate.Verdict.NOT_A_COMMAND) {
                 continue;
             }
-            BlackBox.note("alerts: command " + command.verb
-                    + (command.lane == TelegramCommand.ANY_LANE ? "" : "#" + command.lane));
+            BlackBox.note("alerts: command " + command);
             try {
                 switch (command.verb) {
                     case PICTURE:
@@ -347,6 +388,9 @@ public final class TelegramPoller {
                         break;
                     case STATUS:
                         handler.onStatus(sentAt);
+                        break;
+                    case GUARD:
+                        handler.onGuard(command.guard, sentAt);
                         break;
                     default:
                         // 车主发的、但认不出来：回一句怎么用。不回的话，
@@ -366,6 +410,76 @@ public final class TelegramPoller {
             }
         }
         config.setAlertsCommandOffset(offset);
+    }
+
+    /**
+     * 一颗按钮（{@code callback_query}）：先过门、再回一声、最后才交给上面。
+     *
+     * <p>顺序是故意的（{@code DECISIONS.md} D10）：回一声只是把手机上的转圈停掉，不是结果；
+     * 结果另发一条消息。不先回，车主会以为没按上，再按两下。</p>
+     *
+     * <p>陌生会话照旧什么都不回，只记一行 —— 回了，任何人拿一个旧按钮就能探这辆车。</p>
+     *
+     * One button ({@code callback_query}): through the gate, then one acknowledgement, and only then hand
+     * it up.
+     *
+     * <p>The order is deliberate ({@code DECISIONS.md} D10): the acknowledgement only stops the spinner on
+     * the phone, it is not the outcome; the outcome is a separate message. Without it the owner thinks
+     * the tap missed and taps twice more.</p>
+     *
+     * <p>A foreign chat still gets no answer at all, only one line in the black box; answering would let
+     * anyone with an old button probe this car.</p>
+     */
+    private void dispatchCallback(JSONObject callback, String token, String chatId, String ownerId) {
+        if (!running) {
+            return;
+        }
+        JSONObject fromUser = callback.optJSONObject("from");
+        String fromUserId = fromUser == null ? "" : fromUser.optString("id", "");
+        JSONObject message = callback.optJSONObject("message");
+        JSONObject chat = message == null ? null : message.optJSONObject("chat");
+        String fromChat = chat == null ? "" : chat.optString("id", "");
+        String chatType = chat == null ? "" : chat.optString("type", "");
+        long pressedAt = message == null ? 0L : message.optLong("date", 0L) * 1000L;
+        PollerGate.Verdict verdict = PollerGate.verdictForCallback(chatType, fromChat, fromUserId,
+                chatId, ownerId, pressedAt, System.currentTimeMillis());
+        if (verdict == PollerGate.Verdict.NOT_PRIVATE
+                || verdict == PollerGate.Verdict.NOT_OWNER) {
+            noteForeign(fromChat, chatType);
+            return;
+        }
+        if (verdict == PollerGate.Verdict.STALE) {
+            BlackBox.note("alerts: skipped a button older than 6 h (" + (pressedAt / 1000L) + ")");
+            return;
+        }
+        if (verdict != PollerGate.Verdict.ACCEPT) {
+            return;
+        }
+        // 先让它别转了：一条没有 data 的按钮也算处理过（offset 在上面推过了），只是没动作。
+        // Stop the spinner first: a button with no data counts as handled too (the offset moved above),
+        // it just has no action.
+        TelegramSender.Result acked = TelegramSender.answerCallbackQuery(token,
+                callback.optString("id", ""), null);
+        if (!acked.ok) {
+            // 转圈没停不算事故：动作接着做，结果照样发出去。
+            // A spinner that did not stop is not an incident: the action still runs and the outcome still
+            // goes out.
+            AppLog.w(TAG, "callback answer failed: " + acked.error);
+        }
+        String data = callback.optString("data", "");
+        if (data.isEmpty()) {
+            return;
+        }
+        try {
+            handler.onButton(data, pressedAt);
+        } catch (RuntimeException | OutOfMemoryError e) {
+            // 一颗按钮出错不能把整辆车带走：记下来，线程接着问下一条。
+            // One bad button must not take down the whole car: log it, and the thread keeps polling the
+            // next one.
+            AppLog.w(TAG, "button failed: " + TelegramRequest.redact(String.valueOf(e)));
+            BlackBox.noteImportant("alerts: button failed ("
+                    + TelegramRequest.redact(String.valueOf(e)) + "）");
+        }
     }
 
     /**

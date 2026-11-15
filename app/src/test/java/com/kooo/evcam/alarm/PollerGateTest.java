@@ -104,4 +104,59 @@ public class PollerGateTest {
         assertEquals("拿不到消息时间时不按过期处理", PollerGate.Verdict.ACCEPT,
                 verdict("private", OWNER, OWNER, 0L, pic()));
     }
+
+    // ---- 按钮（callback_query）
+    // ---- Buttons (callback_query)
+
+    private static PollerGate.Verdict button(String type, String chatId, String fromId, long sentAt) {
+        return PollerGate.verdictForCallback(type, chatId, fromId, OWNER, "", sentAt, NOW);
+    }
+
+    @Test
+    public void aButtonFromTheOwnerInHisPrivateChatIsAccepted() {
+        assertEquals(PollerGate.Verdict.ACCEPT, button("private", OWNER, OWNER, NOW - 1_000L));
+        assertEquals("记下了车主号之后，群里他自己按也算", PollerGate.Verdict.ACCEPT,
+                PollerGate.verdictForCallback("group", OWNER, OWNER, OWNER, OWNER, NOW, NOW));
+    }
+
+    @Test
+    public void aButtonFromAnotherChatIsRefused() {
+        assertEquals("别的会话里的按钮不是我们的", PollerGate.Verdict.NOT_OWNER,
+                button("private", "999", "999", NOW));
+        assertEquals(PollerGate.Verdict.NOT_OWNER, button("group", "-100999", OWNER, NOW));
+    }
+
+    @Test
+    public void aButtonPressedBySomeoneElseInTheOwnersGroupIsRefused() {
+        // 车主自己的群里，别人按下去也不算：否则群里任何人一点就能让哨兵开关。
+        // In the owner's own group, anyone else pressing does not count either; otherwise any member
+        // could toggle sentry with one tap.
+        assertEquals(PollerGate.Verdict.NOT_OWNER,
+                PollerGate.verdictForCallback("group", OWNER, "42", OWNER, OWNER, NOW, NOW));
+        assertEquals(PollerGate.Verdict.NOT_OWNER,
+                PollerGate.verdictForCallback("private", OWNER, "42", OWNER, OWNER, NOW, NOW));
+    }
+
+    @Test
+    public void aButtonOlderThanTheCapIsStale() {
+        assertEquals(PollerGate.Verdict.STALE,
+                button("private", OWNER, OWNER, NOW - PollerGate.MAX_AGE_MS - 1_000L));
+        assertEquals("刚好在窗口里还算", PollerGate.Verdict.ACCEPT,
+                button("private", OWNER, OWNER, NOW - PollerGate.MAX_AGE_MS + 1_000L));
+        assertEquals("拿不到消息时间时不按过期处理", PollerGate.Verdict.ACCEPT,
+                button("private", OWNER, OWNER, 0L));
+    }
+
+    @Test
+    public void aButtonIsNeverAnUnparsedCommand() {
+        // 按钮上带的是 data，没有句子可解析，所以那一道门对按钮不存在。
+        // A button carries data, no sentence to parse, so that gate does not exist for buttons.
+        for (String type : new String[] {"private", "group", "supergroup", "channel"}) {
+            PollerGate.Verdict fromOwner = PollerGate.verdictForCallback(type, OWNER, OWNER, OWNER,
+                    OWNER, NOW, NOW);
+            assertEquals(type, PollerGate.Verdict.ACCEPT, fromOwner);
+        }
+        assertEquals("频道里按下去不是私聊，也不是我们的", PollerGate.Verdict.NOT_OWNER,
+                button("channel", OWNER, OWNER, NOW));
+    }
 }
