@@ -1,0 +1,162 @@
+/*
+ * Zeekr Shortcut - https://github.com/dts88/zeekr-shortcut-car
+ * Copyright (C) 2026 dts88
+ * SPDX-License-Identifier: GPL-3.0-only
+ * Additional terms under GPL-3.0 section 7 apply to dts88's code; see NOTICE.md.
+ */
+
+package com.kooo.evcam.button;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertTrue;
+
+import com.kooo.evcam.overlay.FloatingAction;
+import com.kooo.evcam.telemetry.Signal;
+
+import org.junit.Test;
+
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
+/**
+ * 按键动作（{@link ButtonAction}，悬浮按钮、灵动贴同一份，2026-11-15）：不使用 + 悬浮按钮的全部 + 驾驶模式三项 + 手排模式四项 + 车控动作（2026-11-05），
+ * 按组列出，认不出的当不使用。
+ */
+public class ButtonActionTest {
+
+    @Test
+    public void listsNoneThenEveryFloatingActionThenTheDriveModes() {
+        List<ButtonAction> all = ButtonAction.all();
+        assertSame(ButtonAction.NONE, all.get(0));
+        Set<String> keys = new HashSet<>();
+        for (ButtonAction action : all) {
+            assertTrue("重复的 key " + action.key, keys.add(action.key));
+        }
+        for (FloatingAction floating : FloatingAction.values()) {
+            ButtonAction action = ButtonAction.fromKey(floating.key);
+            assertSame(floating, action.floating);
+            assertEquals(0, action.driveMode);
+        }
+        assertEquals(1 + FloatingAction.values().length + 3 + 4 + 42, all.size());
+    }
+
+    /** 「不使用」不在哪一组；别的都在一组里，按组的先后列出，每一组都有东西。 */
+    @Test
+    public void everyActionButNoneIsInAGroupListedInOrder() {
+        List<ButtonAction> all = ButtonAction.all();
+        assertNull(ButtonAction.NONE.group);
+        int last = -1;
+        for (ButtonAction action : all.subList(1, all.size())) {
+            assertNotNull(action.key, action.group);
+            assertTrue(action.key + " 排在前一组后面", action.group.ordinal() >= last);
+            last = action.group.ordinal();
+        }
+        for (ButtonAction.Group group : ButtonAction.Group.values()) {
+            assertTrue(group + " 是空的", !ButtonAction.of(group).isEmpty());
+        }
+        for (FloatingAction floating : FloatingAction.values()) {
+            assertSame(ButtonAction.Group.APP, ButtonAction.fromKey(floating.key).group);
+        }
+    }
+
+    /** 车控动作：写车的有要做的事，媒体、语音的有不碰车的那一样；关门六项在「车身」里（2026-11-15）。 */
+    @Test
+    public void theCarActionsKnowWhatToDo() {
+        String[] car = {"sport_one_touch", "volume_up", "volume_down", "steering_wheel_heat", "seat_vent_driver",
+                "seat_vent_passenger", "seat_heat_driver", "seat_heat_passenger", "seat_heat_rear_left",
+                "seat_heat_rear_right", "seat_heat_rear", "seat_massage_driver", "seat_massage_passenger", "seat_restore",
+                "climate_power", "climate_circulation", "defrost_front", "defrost_rear", "central_lock", "mirror_fold",
+                "charging_cap", "view_360", "welcome_light", "charging_light", "driving_light", "fragrance",
+                "theater_driver", "theater_passenger", "camping", "sentry", "close_all_doors", "close_driver_door",
+                "close_passenger_door", "close_rear_left_door", "close_rear_right_door", "close_tailgate"};
+        for (String key : car) {
+            ButtonAction action = ButtonAction.fromKey(key);
+            assertNotNull(key, action.car);
+            assertNull(key, action.media);
+            assertNull(key, action.floating);
+        }
+        String[] media = {"voice_assistant", "media_play_pause", "media_previous", "media_next", "media_mute"};
+        for (String key : media) {
+            ButtonAction action = ButtonAction.fromKey(key);
+            assertNotNull(key, action.media);
+            assertNull(key, action.car);
+            assertSame(key, ButtonAction.Group.MEDIA, action.group);
+        }
+        assertEquals(41, car.length + media.length);
+        for (String key : new String[] {"close_all_doors", "close_driver_door", "close_passenger_door",
+                "close_rear_left_door", "close_rear_right_door", "close_tailgate"}) {
+            assertSame(key, ButtonAction.Group.BODY, ButtonAction.fromKey(key).group);
+        }
+    }
+
+    @Test
+    public void driveModesWriteTheThreeKnownValues() {
+        assertEquals(Signal.DRIVE_MODE_COMFORT, ButtonAction.fromKey("drive_mode_comfort").driveMode);
+        assertEquals(Signal.DRIVE_MODE_STANDARD, ButtonAction.fromKey("drive_mode_standard").driveMode);
+        assertEquals(Signal.DRIVE_MODE_SPORT, ButtonAction.fromKey("drive_mode_sport").driveMode);
+        assertNull(ButtonAction.fromKey("drive_mode_sport").floating);
+        assertNotNull(ButtonAction.fromKey("lock_footage").floating);
+    }
+
+    @Test
+    public void theManualShiftActionsOnlyStep() {
+        assertEquals(1, ButtonAction.fromKey("drive_mode_up").driveModeStep);
+        assertEquals(-1, ButtonAction.fromKey("drive_mode_down").driveModeStep);
+        assertEquals(1, ButtonAction.fromKey("gear_up").gearStep);
+        assertEquals(-1, ButtonAction.fromKey("gear_down").gearStep);
+        for (String key : new String[] {"drive_mode_up", "drive_mode_down", "gear_up", "gear_down"}) {
+            assertNull(key, ButtonAction.fromKey(key).floating);
+            assertEquals(key, 0, ButtonAction.fromKey(key).driveMode);
+        }
+        assertEquals(0, ButtonAction.fromKey("gear_up").driveModeStep);
+        assertEquals(0, ButtonAction.fromKey("drive_mode_up").gearStep);
+        assertEquals(0, ButtonAction.fromKey("drive_mode_sport").driveModeStep);
+        assertEquals(0, ButtonAction.NONE.gearStep);
+    }
+
+    /** 舒适、标准、运动一次走一级，到头还是它（不循环）。 */
+    @Test
+    public void driveModesStepOneAtATimeAndDoNotWrap() {
+        assertEquals(Signal.DRIVE_MODE_STANDARD, ButtonAction.nextDriveMode(Signal.DRIVE_MODE_COMFORT, 1));
+        assertEquals(Signal.DRIVE_MODE_SPORT, ButtonAction.nextDriveMode(Signal.DRIVE_MODE_STANDARD, 1));
+        assertEquals(Signal.DRIVE_MODE_SPORT, ButtonAction.nextDriveMode(Signal.DRIVE_MODE_SPORT, 1));
+        assertEquals(Signal.DRIVE_MODE_STANDARD, ButtonAction.nextDriveMode(Signal.DRIVE_MODE_SPORT, -1));
+        assertEquals(Signal.DRIVE_MODE_COMFORT, ButtonAction.nextDriveMode(Signal.DRIVE_MODE_STANDARD, -1));
+        assertEquals(Signal.DRIVE_MODE_COMFORT, ButtonAction.nextDriveMode(Signal.DRIVE_MODE_COMFORT, -1));
+    }
+
+    /** 雪地、读不到：不在这三种里，不切换。 */
+    @Test
+    public void otherDriveModesDoNotStep() {
+        assertEquals(0, ButtonAction.nextDriveMode(Signal.DRIVE_MODE_SNOW, 1));
+        assertEquals(0, ButtonAction.nextDriveMode(Signal.DRIVE_MODE_SNOW, -1));
+        assertEquals(0, ButtonAction.nextDriveMode(null, 1));
+    }
+
+    /** 悬浮按钮：原来存的 key 照样认；选了「不使用」就是它；认不出的、没存过的回到「打开主界面」。 */
+    @Test
+    public void floatingKeysKeepWorking() {
+        for (FloatingAction floating : FloatingAction.values()) {
+            assertSame(floating, ButtonAction.forFloating(floating.key).floating);
+        }
+        assertSame(ButtonAction.NONE, ButtonAction.forFloating("none"));
+        assertSame(FloatingAction.OPEN_APP, ButtonAction.forFloating(null).floating);
+        assertSame(FloatingAction.OPEN_APP, ButtonAction.forFloating("something_else").floating);
+        assertSame(ButtonAction.fromKey("close_tailgate"), ButtonAction.forFloating("close_tailgate"));
+        assertSame(ButtonAction.fromKey("drive_mode_up"), ButtonAction.forFloating("drive_mode_up"));
+    }
+
+    /** 配置可以被手改：认不出的、空的都当「不使用」，按一下不做没选过的事。 */
+    @Test
+    public void unknownKeysDoNothing() {
+        assertSame(ButtonAction.NONE, ButtonAction.fromKey(null));
+        assertSame(ButtonAction.NONE, ButtonAction.fromKey(""));
+        assertSame(ButtonAction.NONE, ButtonAction.fromKey("unlock_doors"));
+        assertNull(ButtonAction.NONE.floating);
+        assertEquals(0, ButtonAction.NONE.driveMode);
+    }
+}

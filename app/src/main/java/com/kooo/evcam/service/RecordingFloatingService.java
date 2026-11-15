@@ -40,7 +40,8 @@ import com.kooo.evcam.AppLog;
 import com.kooo.evcam.MainActivity;
 import com.kooo.evcam.R;
 import com.kooo.evcam.WakeUpHelper;
-import com.kooo.evcam.overlay.FloatingAction;
+import com.kooo.evcam.button.ButtonAction;
+import com.kooo.evcam.button.ButtonActions;
 
 /**
  * 悬浮按钮服务：整个应用只有这一个悬浮按钮。
@@ -52,7 +53,7 @@ import com.kooo.evcam.overlay.FloatingAction;
  * 一句 startActivity。类名没跟着改：改名和合并放进同一个提交，diff 就没法看了。</p>
  *
  * <p>按钮的颜色说明现在是不是在录（录制红的方块 + 本段进度，空闲是个空心圈；一路都没在录、在等摄像头时
- * 是灰环、灰方块，没有进度弧）。单击和长按各做什么由设置决定，默认都是打开主界面（见 {@link FloatingAction}）。</p>
+ * 是灰环、灰方块，没有进度弧）。单击和长按各做什么由设置决定，和灵动贴从同一份动作列表里选（{@link ButtonAction}），默认都是打开主界面。</p>
  */
 public class RecordingFloatingService extends Service {
     private static final String TAG = "RecordingFloatingService";
@@ -111,7 +112,7 @@ public class RecordingFloatingService extends Service {
     private boolean slidWhileLocked = false;
     private final Runnable longPressRunnable = () -> {
         longPressFired = true;
-        perform(FloatingAction.fromKey(appConfig.getFloatingLongPressAction()));
+        perform(ButtonAction.forFloating(appConfig.getFloatingLongPressAction()));
     };
 
     // 视图组件
@@ -507,7 +508,7 @@ public class RecordingFloatingService extends Service {
                             return true;
                         }
                         if (!isDragging && !longPressFired) {
-                            perform(FloatingAction.fromKey(appConfig.getFloatingTapAction()));
+                            perform(ButtonAction.forFloating(appConfig.getFloatingTapAction()));
                         } else if (!isDragging) {
                             // 长按已经在计时器里做过了，抬手不再做第二件事
                             AppLog.d(TAG, "长按已处理，忽略这次抬手");
@@ -539,11 +540,10 @@ public class RecordingFloatingService extends Service {
     // ========== 按钮动作 ==========
 
     /**
-     * 单击 / 长按各做什么，见 {@link FloatingAction}；怎么做在 {@link com.kooo.evcam.overlay.QuickActions}（灵动贴走同一份）。
+     * 单击 / 长按各做什么，见 {@link ButtonAction}；怎么做在 {@link ButtonActions}（灵动贴走同一份）。
      */
-    private void perform(FloatingAction action) {
-        com.kooo.evcam.overlay.QuickActions.perform(this, action,
-                com.kooo.evcam.camera.CameraKeeper.Why.FLOATING);
+    private void perform(ButtonAction action) {
+        ButtonActions.perform(getApplicationContext(), action, com.kooo.evcam.camera.CameraKeeper.Why.FLOATING);
     }
 
     /**

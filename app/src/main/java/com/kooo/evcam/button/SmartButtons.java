@@ -27,21 +27,15 @@ import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
 import android.os.SystemClock;
-import android.widget.Toast;
 
 import androidx.core.content.ContextCompat;
 
 import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.AppLog;
-import com.kooo.evcam.R;
 import com.kooo.evcam.UserExit;
 import com.kooo.evcam.blackbox.BlackBox;
 import com.kooo.evcam.camera.CameraKeeper;
-import com.kooo.evcam.overlay.QuickActions;
 import com.kooo.evcam.screen.ScreenState;
-import com.kooo.evcam.sound.DriveSound;
-import com.kooo.evcam.telemetry.Signal;
-import com.kooo.evcam.telemetry.Telemetry;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -86,9 +80,8 @@ import java.util.TreeSet;
  * <h3>按法</h3>
  * <ul>
  *   <li>广播里的计数变了就是按了一下（{@link SmartButtonAd}）。计数存着，进程重启后照样接得上。</li>
- *   <li>单击、双击查这一台选的动作（{@link SmartButtonAction}），在主线程上做：悬浮按钮那几项走 {@link QuickActions}（同一份），
- *       写车的（驾驶模式和其他车控动作）交给 {@link CarMoves}，媒体、语音走 {@link MediaMove}，升挡、降挡交给模拟声浪
- *       （{@link DriveSound#shift}）。写车的没做成提示一句（{@link #carResult}）。没开启灵动贴、用户退出以后什么都不做。</li>
+ *   <li>单击、双击查这一台选的动作（{@link ButtonAction}），在主线程上交给 {@link ButtonActions}（悬浮按钮走同一份）。
+ *       没开启灵动贴、用户退出以后什么都不做。</li>
  *   <li>长按（约 3 秒、背光闪）只用来连接，不绑动作（车主 2026-11-04）。</li>
  *   <li>同一下从广播、通知各来一遍只算一次（{@link SmartButtonAd#samePress}）。</li>
  *   <li>正在绑定时绑过的按了不做；拿绑过的来长按，告诉一声，这次绑定结束。</li>
@@ -134,8 +127,6 @@ public final class SmartButtons {
     /** 开扫描的次数按这么长一阵算，一阵里最多开 {@link #MAX_STARTS} 次（安卓 12 按 uid 算 5 次，容器里别的应用也算，Lab 3.5.4）。 */
     static final long STARTS_WINDOW_MS = 30_000L;
     static final int MAX_STARTS = 3;
-    /** 连按驾驶模式向上、向下时，这么久（毫秒）之内接着上一次的目标算。 */
-    static final long DRIVE_TARGET_MS = 2000L;
     /** 绑定等多久（长按要 3 秒，再给连接留点，Lab）。 */
     static final long BIND_WINDOW_MS = 30_000L;
     /** 绑定的时间到了还在连：隔这么久再看（连接自己的超时管着它）。 */
@@ -323,9 +314,6 @@ public final class SmartButtons {
     private final Map<String, Pressed> pressed = new HashMap<>();
 
     // ---- 只在主线程上碰
-    /** 刚要切到的驾驶模式、什么时候要的（{@link #stepDriveMode}）；0 = 没有。 */
-    private int driveTarget;
-    private long driveTargetAt;
     private BindListener bindListener;
     private final List<Runnable> changeListeners = new ArrayList<>();
 
@@ -1259,62 +1247,9 @@ public final class SmartButtons {
         if (!config.getSmartButtons().contains(address)) {
             return;
         }
-        SmartButtonAction action = SmartButtonAction.fromKey(config.getSmartButtonAction(address, clicks));
+        ButtonAction action = ButtonAction.fromKey(config.getSmartButtonAction(address, clicks));
         BlackBox.noteImportant("灵动贴 " + SmartButtonAd.shortId(address) + "：" + (clicks == SmartButtonAd.DOUBLE ? "双击" : "单击") + " → " + action.key);
-        if (action.floating != null) {
-            try {
-                QuickActions.perform(app, action.floating, CameraKeeper.Why.BUTTON);
-            } catch (RuntimeException e) {
-                // 应用在后台、又没有前台服务撑着时，安卓不让起服务（超级镜子、录制）：这一下不做，进程不能因为它崩
-                AppLog.w(TAG, "action " + action.key + " failed: " + e);
-            }
-        } else if (action.driveMode != 0) {
-            writeDriveMode(action.driveMode);
-        } else if (action.driveModeStep != 0) {
-            stepDriveMode(action.driveModeStep);
-        } else if (action.gearStep != 0) {
-            DriveSound.shift(action.gearStep);
-        } else if (action.car != null) {
-            String label = action.label(app);
-            CarMoves.run(app, action.key, action.car, result -> carResult(label, result));
-        } else if (action.media != null && !action.media.perform(app)) {
-            Toast.makeText(app, app.getString(R.string.msg_car_action_unavailable, action.label(app)), Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    /** 写车的没做成（主线程）：提示一句为什么。做成了不提示：车上看得到。 */
-    private void carResult(String label, CarMoves.Result result) {
-        String text = CarMoves.failureText(app, label, result);
-        if (text != null) {
-            Toast.makeText(app, text, Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    /**
-     * 驾驶模式走一级（{@link SmartButtonAction#nextDriveMode}）：到头不动、不提示；此刻不在舒适、标准、运动里（雪地、读不到）不切换。
-     * 连按时接着上一次的目标算，车机回报晚了也不会少走一级（{@link #DRIVE_TARGET_MS}）。
-     */
-    private void stepDriveMode(int step) {
-        boolean recent = driveTarget != 0 && SystemClock.elapsedRealtime() - driveTargetAt < DRIVE_TARGET_MS;
-        Integer from = recent ? Integer.valueOf(driveTarget) : Telemetry.get().readings().code(Signal.DRIVE_MODE);
-        int to = SmartButtonAction.nextDriveMode(from, step);
-        if (to == 0) {
-            Toast.makeText(app, R.string.msg_drive_mode_failed, Toast.LENGTH_SHORT).show();
-        } else if (to != from) {
-            writeDriveMode(to);
-        }
-    }
-
-    /** 切驾驶模式（{@link CarMoves#driveMode}）：没切成提示「驾驶模式没有切换」，连按的目标作废。 */
-    private void writeDriveMode(int mode) {
-        driveTarget = mode;
-        driveTargetAt = SystemClock.elapsedRealtime();
-        CarMoves.run(app, "drive_mode", CarMoves.driveMode(mode), result -> {
-            if (result != CarMoves.Result.DONE) {
-                driveTarget = 0;
-                Toast.makeText(app, R.string.msg_drive_mode_failed, Toast.LENGTH_SHORT).show();
-            }
-        });
+        ButtonActions.perform(app, action, CameraKeeper.Why.BUTTON);
     }
 
     // ================================================================= 连接（bt 线程）

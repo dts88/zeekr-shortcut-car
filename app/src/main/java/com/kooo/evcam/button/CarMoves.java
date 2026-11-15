@@ -17,6 +17,7 @@ import android.os.Looper;
 import android.os.SystemClock;
 
 import com.kooo.evcam.blackbox.BlackBox;
+import com.kooo.evcam.camera.CameraKeeper;
 import com.kooo.evcam.telemetry.CarAccess;
 import com.kooo.evcam.telemetry.CarNames;
 import com.kooo.evcam.telemetry.Signal;
@@ -147,8 +148,16 @@ final class CarMoves {
         return handler;
     }
 
-    /** 排一件（主线程上叫）：在写车的线程上做，结果在主线程上交给 {@code done}。{@code key} 是动作的名字，黑匣子用。 */
+    /** 排一件（主线程上叫），黑匣子记成灵动贴按的（主界面的哨兵键也走这里）。 */
     static void run(Context app, String key, Job job, Consumer<Result> done) {
+        run(app, CameraKeeper.Why.BUTTON, key, job, done);
+    }
+
+    /**
+     * 排一件（主线程上叫）：在写车的线程上做，结果在主线程上交给 {@code done}。{@code key} 是动作的名字，黑匣子用；
+     * {@code why} 是谁按的：悬浮按钮按的记「悬浮按钮动作」，别的照旧记「灵动贴动作」。
+     */
+    static void run(Context app, CameraKeeper.Why why, String key, Job job, Consumer<Result> done) {
         Handler h = handler();
         Handler back = main;
         h.post(() -> {
@@ -168,7 +177,7 @@ final class CarMoves {
                 }
                 detail = car.detail();
             }
-            BlackBox.note("灵动贴动作 " + key + "：" + result + "（" + detail + "）");
+            BlackBox.note((why == CameraKeeper.Why.FLOATING ? "悬浮按钮动作 " : "灵动贴动作 ") + key + "：" + result + "（" + detail + "）");
             Result r = result;
             back.post(() -> done.accept(r));
         });
