@@ -137,6 +137,8 @@
     <string name="set_alerts_guard_mode_ask_then_on">问一句，一分钟没人反对就自己开</string>
     <string name="set_alerts_guard_mode_on">不问，自己开</string>
     <string name="set_alerts_guard_home_title">把这里记成家</string>
+    <string name="set_alerts_guard_everywhere_title">在哪都开哨兵</string>
+    <string name="set_alerts_guard_everywhere_summary">在家也算：每次停车都问、都开。代价是车机在车库里也不睡</string>
     <string name="set_alerts_guard_home_set">记下了，只存在这辆车上，不会发出去</string>
     <string name="set_alerts_guard_home_missing">车现在没有定位。开着车，等行驶信息条上有经纬度再试</string>
     <string name="set_alerts_guard_home_none">家的位置忘掉了</string>

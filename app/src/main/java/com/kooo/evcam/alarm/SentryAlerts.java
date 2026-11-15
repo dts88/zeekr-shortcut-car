@@ -1746,7 +1746,7 @@ public final class SentryAlerts implements Telemetry.Listener {
         cancelGuardPending();
         GuardPolicy.Mode mode = config.getAlertsGuardMode();
         GuardPolicy.Verdict verdict = GuardPolicy.decide(mode, sentry, parked, afterDrive,
-                guardWhere(), now, 0L, now);
+                guardWhere(), config.isAlertsGuardEverywhere(), now, 0L, now);
         if (verdict == GuardPolicy.Verdict.IGNORE) {
             return;
         }
@@ -1826,7 +1826,8 @@ public final class SentryAlerts implements Telemetry.Listener {
                 BlackBox.note("alerts: forgot sentry, too late to switch it on");
                 return;
             }
-            if (!GuardPolicy.maySwitchOnItself(guardWhere(), guardHomeConfigured())) {
+            if (!GuardPolicy.maySwitchOnItself(guardWhere(), guardHomeConfigured(),
+                    config.isAlertsGuardEverywhere())) {
                 BlackBox.note("alerts: forgot sentry, at home or still unsure of where it is");
                 return;
             }
@@ -1834,7 +1835,7 @@ public final class SentryAlerts implements Telemetry.Listener {
             Integer sentry = state == null ? null : state.sentry;
             boolean parked = parkedNow(state);
             GuardPolicy.Verdict again = GuardPolicy.decide(GuardPolicy.Mode.ON, sentry, parked, true,
-                    guardWhere(), guardLeftAtMs, 0L, now);
+                    guardWhere(), config.isAlertsGuardEverywhere(), guardLeftAtMs, 0L, now);
             if (again != GuardPolicy.Verdict.ACT) {
                 return;
             }

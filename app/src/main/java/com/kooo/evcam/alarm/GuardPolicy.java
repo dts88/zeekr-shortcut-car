@@ -92,12 +92,14 @@ public final class GuardPolicy {
      * @param parked     车停着（和录像那边同一条规则）
      * @param afterDrive 上一次停车之后真的开过车（不然「停在车库没动过」也会提醒）
      * @param where      离家远不远（{@link GuardHome}）；{@code UNKNOWN} 照样可以问
+     * @param anywhere   车主选了「在哪都开」：在家也算数（{@link #maySwitchOnItself}）
      * @param leftAtMs   车主离开那一刻（{@code elapsedRealtime}）；0 表示不知道
      * @param askedAtMs  这一趟停车已经问过的时刻；0 表示没问过
      * @param nowMs      现在（同一把时钟）
      */
     public static Verdict decide(Mode mode, Integer sentry, boolean parked, boolean afterDrive,
-                                 GuardHome.Where where, long leftAtMs, long askedAtMs, long nowMs) {
+                                 GuardHome.Where where, boolean anywhere,
+                                 long leftAtMs, long askedAtMs, long nowMs) {
         if (mode == null || mode == Mode.OFF) {
             return Verdict.IGNORE;
         }
@@ -112,8 +114,10 @@ public final class GuardPolicy {
         if (!parked || !afterDrive) {
             return Verdict.IGNORE;
         }
-        // 在家不开：车库里天天提醒一次，这一项活不过一周
-        if (where == GuardHome.Where.HOME) {
+        // 在家不开：车库里天天提醒一次，这一项活不过一周 —— 除非车主自己选了「在哪都开」
+        // Home is left alone: a reminder every evening in the driveway would not survive a week —
+        // unless the owner asked for "everywhere" themselves.
+        if (where == GuardHome.Where.HOME && !anywhere) {
             return Verdict.IGNORE;
         }
         if (leftAtMs <= 0) {
@@ -144,14 +148,22 @@ public final class GuardPolicy {
     }
 
     /**
-     * 没问过就可以自己开吗：知道在外面，或者干脆没设过家。
+     * 没问过就可以自己开吗：知道在外面，或者干脆没设过家，或者车主选了「在哪都开」。
      *
-     * <p>设了家、定位却说「不知道」时不自己开 —— 那可能就在车库里，而车主没在看手机。</p>
+     * <p>设了家、定位却说「不知道」时不自己开 —— 那可能就在车库里，而车主没在看手机。
+     * 「在哪都开」是车主自己把这一条放开的：在家也开，代价是每次停进车库哨兵也跟着开，
+     * 就寝中的车机被它顶着不睡。默认关。</p>
      *
-     * <p>Whether switching on unasked is allowed: away, or no home configured at all. A configured home
-     * plus an unknown fix does not qualify — that may well be the garage.</p>
+     * <p>Whether switching on unasked is allowed: away, no home configured at all, or the owner asked
+     * for everywhere. A configured home plus an unknown fix does not qualify — that may well be the
+     * garage. "Everywhere" is the owner lifting that rule: sentry also comes on in their own driveway,
+     * and the cost is that the head unit stays awake there too. Off by default.</p>
      */
-    public static boolean maySwitchOnItself(GuardHome.Where where, boolean homeConfigured) {
+    public static boolean maySwitchOnItself(GuardHome.Where where, boolean homeConfigured,
+                                            boolean anywhere) {
+        if (anywhere) {
+            return true;
+        }
         if (where == GuardHome.Where.HOME) {
             return false;
         }

@@ -135,6 +135,9 @@ Optional, in the same section:
   on — that is what keeps the head unit awake.
 - **Start after locking**: right away, 1 minute or 3 minutes after the car locks, so walking away
   does not send you a picture of yourself.
+- **Forgot Sentry**: park away from home with Sentry Mode off and the car asks in the chat, then
+  switches it on 60 s later unless you say no. It only works while the car is awake — about five
+  minutes — so a button refuses politely after three. "Also at home" makes it apply everywhere.
 - **Quiet hours**: no alerts between two times, for the nights the car is at home.
 - **Forgot Sentry**: park away from home with Sentry Mode off and the car asks in the chat, then switches
   it on 60 s later unless you say no. It only works while the car is awake, about five minutes; the

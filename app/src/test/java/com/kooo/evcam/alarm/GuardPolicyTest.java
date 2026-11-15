@@ -24,7 +24,14 @@ public class GuardPolicyTest {
 
     private static GuardPolicy.Verdict decide(GuardPolicy.Mode mode, Integer sentry, boolean parked,
                                               boolean afterDrive, GuardHome.Where where) {
-        return GuardPolicy.decide(mode, sentry, parked, afterDrive, where, LEFT, 0L, LEFT + 10_000L);
+        return decide(mode, sentry, parked, afterDrive, where, false);
+    }
+
+    private static GuardPolicy.Verdict decide(GuardPolicy.Mode mode, Integer sentry, boolean parked,
+                                              boolean afterDrive, GuardHome.Where where,
+                                              boolean anywhere) {
+        return GuardPolicy.decide(mode, sentry, parked, afterDrive, where, anywhere,
+                LEFT, 0L, LEFT + 10_000L);
     }
 
     @Test
@@ -95,7 +102,7 @@ public class GuardPolicyTest {
     public void oneAskPerPark() {
         long askedAt = LEFT + GuardPolicy.ASK_AT_MS;
         assertEquals(GuardPolicy.Verdict.IGNORE,
-                GuardPolicy.decide(GuardPolicy.Mode.ASK, 0, true, true, GuardHome.Where.AWAY,
+                GuardPolicy.decide(GuardPolicy.Mode.ASK, 0, true, true, GuardHome.Where.AWAY, false,
                         LEFT, askedAt, askedAt + 15_000L));
     }
 
@@ -103,14 +110,14 @@ public class GuardPolicyTest {
     public void aPreviousParksAskDoesNotCount() {
         long previousAsk = LEFT - 4 * 3_600_000L;
         assertEquals(GuardPolicy.Verdict.ASK,
-                GuardPolicy.decide(GuardPolicy.Mode.ASK, 0, true, true, GuardHome.Where.AWAY,
+                GuardPolicy.decide(GuardPolicy.Mode.ASK, 0, true, true, GuardHome.Where.AWAY, false,
                         LEFT, previousAsk, LEFT + 10_000L));
     }
 
     @Test
     public void anUnknownLeavingMomentIsNeverActedOn() {
         assertEquals(GuardPolicy.Verdict.IGNORE,
-                GuardPolicy.decide(GuardPolicy.Mode.ON, 0, true, true, GuardHome.Where.AWAY,
+                GuardPolicy.decide(GuardPolicy.Mode.ON, 0, true, true, GuardHome.Where.AWAY, false,
                         0L, 0L, LEFT));
     }
 
@@ -133,7 +140,7 @@ public class GuardPolicyTest {
     @Test
     public void tooLateMeansIgnoreRatherThanActOnAnOldPark() {
         assertEquals(GuardPolicy.Verdict.IGNORE,
-                GuardPolicy.decide(GuardPolicy.Mode.ON, 0, true, true, GuardHome.Where.AWAY,
+                GuardPolicy.decide(GuardPolicy.Mode.ON, 0, true, true, GuardHome.Where.AWAY, false,
                         LEFT, 0L, LEFT + GuardPolicy.ACT_WINDOW_MS + 1));
     }
 
@@ -147,10 +154,39 @@ public class GuardPolicyTest {
 
     @Test
     public void actingUnaskedNeedsBeingAwayOrNeverHavingSetAHome() {
-        assertTrue(GuardPolicy.maySwitchOnItself(GuardHome.Where.AWAY, true));
-        assertTrue(GuardPolicy.maySwitchOnItself(GuardHome.Where.UNKNOWN, false));
-        assertFalse(GuardPolicy.maySwitchOnItself(GuardHome.Where.UNKNOWN, true));
-        assertFalse(GuardPolicy.maySwitchOnItself(GuardHome.Where.HOME, false));
+        assertTrue(GuardPolicy.maySwitchOnItself(GuardHome.Where.AWAY, true, false));
+        assertTrue(GuardPolicy.maySwitchOnItself(GuardHome.Where.UNKNOWN, false, false));
+        assertFalse(GuardPolicy.maySwitchOnItself(GuardHome.Where.UNKNOWN, true, false));
+        assertFalse(GuardPolicy.maySwitchOnItself(GuardHome.Where.HOME, false, false));
+    }
+
+    @Test
+    public void homeIsTouchedOnlyWhenTheOwnerAskedForEverywhere() {
+        assertEquals(GuardPolicy.Verdict.ASK,
+                decide(GuardPolicy.Mode.ASK_THEN_ON, 0, true, true, GuardHome.Where.HOME, true));
+        assertEquals(GuardPolicy.Verdict.ACT,
+                decide(GuardPolicy.Mode.ON, 0, true, true, GuardHome.Where.HOME, true));
+    }
+
+    @Test
+    public void everywhereDoesNotOverrideTheOtherRefusals() {
+        // 在家也开不等于什么都不看：开着、没停、没开过车、读不到，一样不动
+        assertEquals(GuardPolicy.Verdict.IGNORE,
+                decide(GuardPolicy.Mode.ON, 1, true, true, GuardHome.Where.HOME, true));
+        assertEquals(GuardPolicy.Verdict.IGNORE,
+                decide(GuardPolicy.Mode.ON, 0, false, true, GuardHome.Where.HOME, true));
+        assertEquals(GuardPolicy.Verdict.IGNORE,
+                decide(GuardPolicy.Mode.ON, 0, true, false, GuardHome.Where.HOME, true));
+        assertEquals(GuardPolicy.Verdict.IGNORE,
+                decide(GuardPolicy.Mode.ON, null, true, true, GuardHome.Where.HOME, true));
+    }
+
+    @Test
+    public void everywhereLetsTheCarActUnaskedWhereverItIs() {
+        assertTrue(GuardPolicy.maySwitchOnItself(GuardHome.Where.HOME, true, true));
+        assertTrue(GuardPolicy.maySwitchOnItself(GuardHome.Where.UNKNOWN, true, true));
+        assertTrue(GuardPolicy.maySwitchOnItself(GuardHome.Where.AWAY, true, true));
+        assertFalse(GuardPolicy.maySwitchOnItself(GuardHome.Where.HOME, true, false));
     }
 
     @Test

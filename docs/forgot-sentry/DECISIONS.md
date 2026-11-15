@@ -58,6 +58,16 @@ switch on by itself.
 and by "once per park". The opposite mistake — refusing to act because the fix is unknown — costs the
 whole feature, which is worse in a theft-protection context.
 
+**Amended 2026-11-15, at the owner's request:** one switch, "Also at home" (`alerts_guard_everywhere`,
+off by default), lifts the home rule so the car asks and switches on wherever it is parked. It is a
+separate switch rather than a fifth mode because the two questions are independent — *when* to act
+(timeout) and *where* it counts.
+
+**Its cost, plainly:** with it on, every park in the owner's own driveway switches sentry on, and the
+head unit then stays awake there on the 12V battery. That is the load that made the project owner
+delete the "prevent sleep" switch, which is exactly why this one defaults to off and says so in its
+summary instead of hiding the price.
+
 ## D6 — Nothing is claimed before the car confirms it
 
 Every message quotes the read-back value (`Sentry Mode: on (1)`), never the requested one. The receipt

@@ -147,6 +147,10 @@ line in the black box (`alerts: armed N s ago, waiting for M min`).
 家是一个点（`alarm.GuardHome`）：**离家 200 m** 以内算在家，定位超过 **10 分钟**没更新算不知道在哪。
 在家不动；在外面、或者根本不知道在哪，可以问；只有「在外面」或者「压根没设过家」才会自己开。
 
+「在哪都开哨兵」（`pref_alerts_guard_everywhere`，存 `alerts_guard_everywhere`，默认关）把「在家不动」这一条
+放开：在家也照样问、照样开。关着时是车库里安安静静；开着时是每次停进自家车道哨兵也跟着开，
+车机就一直在那儿醒着 —— 这就是它默认关、summary 明写代价的原因。
+
 它**不是 AlertPolicy 的一次警报**：没有布防门、没有冷却、安静时段也不管 —— 那三样是为「车被人动了」写的，
 这一件事是「车主自己忘了」，按那套算只会让该说的话不说。它要的是 Telegram 那条路：按钮是回调
 （`callback_query`），别的传输方式没有回程，这一版只做 Telegram（`DECISIONS.md` D8）。
@@ -182,6 +186,11 @@ than the measured 4–6 minutes, so the refusal always lands before the car can 
 Home is one point (`alarm.GuardHome`): within **200 m** counts as home, and a fix older than
 **10 minutes** counts as unknown. Home never acts; away or unknown may ask; only away — or no home set
 at all — may switch it on by itself.
+
+"Also at home" (`pref_alerts_guard_everywhere`, stored as `alerts_guard_everywhere`, off by default)
+lifts that one rule: at home the car asks and switches on just the same. Off means a quiet garage; on
+means sentry also comes on in the owner's own driveway and the head unit stays awake there — which is
+why it is off by default and why its summary states the cost.
 
 This is **not an AlertPolicy alert**: no armed gate, no cooldown, and quiet hours do not apply — those
 three were written for "someone touched the car", and this one is "the owner forgot". It needs the

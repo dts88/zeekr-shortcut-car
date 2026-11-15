@@ -123,6 +123,8 @@
     <string name="set_alerts_guard_mode_ask_then_on">Tanya, kemudian hidupkan selepas seminit</string>
     <string name="set_alerts_guard_mode_on">Hidupkan tanpa bertanya</string>
     <string name="set_alerts_guard_home_title">Guna lokasi ini sebagai rumah</string>
+    <string name="set_alerts_guard_everywhere_title">Juga di rumah</string>
+    <string name="set_alerts_guard_everywhere_summary">Di mana-mana dikira, termasuk laman rumah. Kosnya kepala unit juga kekal jaga di situ</string>
     <string name="set_alerts_guard_home_set">Disimpan, dalam kereta ini sahaja. Tidak dihantar ke mana-mana</string>
     <string name="set_alerts_guard_home_missing">Kereta tiada lokasi sekarang. Pandu sehingga bar maklumat menunjukkan lokasi</string>
     <string name="set_alerts_guard_home_none">Lokasi rumah dilupakan</string>

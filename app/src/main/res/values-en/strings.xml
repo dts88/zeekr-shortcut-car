@@ -123,6 +123,8 @@
     <string name="set_alerts_guard_mode_ask_then_on">Ask, then switch it on after a minute</string>
     <string name="set_alerts_guard_mode_on">Switch it on without asking</string>
     <string name="set_alerts_guard_home_title">Use this position as home</string>
+    <string name="set_alerts_guard_everywhere_title">Also at home</string>
+    <string name="set_alerts_guard_everywhere_summary">Everywhere counts, the driveway included. The cost is the head unit staying awake there too</string>
     <string name="set_alerts_guard_home_set">Saved, on this car only. It is never sent anywhere</string>
     <string name="set_alerts_guard_home_missing">The car has no position right now. Drive until the info bar shows one, then try again</string>
     <string name="set_alerts_guard_home_none">Home forgotten</string>

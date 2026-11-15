@@ -258,6 +258,12 @@
                 android:key="pref_alerts_guard_home"
                 android:title="@string/set_alerts_guard_home_title" />
 
+            <SwitchPreferenceCompat
+                android:key="pref_alerts_guard_everywhere"
+                android:title="@string/set_alerts_guard_everywhere_title"
+                android:summary="@string/set_alerts_guard_everywhere_summary"
+                android:defaultValue="false" />
+
             <Preference
                 android:key="pref_alerts_test"
                 android:title="@string/set_alerts_test_title"

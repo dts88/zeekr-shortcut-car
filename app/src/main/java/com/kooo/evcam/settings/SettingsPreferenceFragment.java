@@ -1035,6 +1035,22 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             });
         }
 
+        // 在哪都开：在家也照样问、照样开。默认关，代价写在 summary 里（车机在车库里也不睡）。
+        // Everywhere: ask and switch on at home too. Off by default, and its summary states the cost.
+        androidx.preference.SwitchPreferenceCompat guardEverywhere =
+                findPreference("pref_alerts_guard_everywhere");
+        if (guardEverywhere != null) {
+            guardEverywhere.setPersistent(false);
+            guardEverywhere.setChecked(appConfig.isAlertsGuardEverywhere());
+            guardEverywhere.setOnPreferenceChangeListener((preference, newValue) -> {
+                boolean everywhere = Boolean.TRUE.equals(newValue);
+                appConfig.setAlertsGuardEverywhere(everywhere);
+                com.kooo.evcam.blackbox.BlackBox.noteImportant(
+                        "设置变更: pref_alerts_guard_everywhere → " + everywhere);
+                return true;
+            });
+        }
+
         // 这一栏的显示规则全写在这里（ui-spec §三：可见性只在一处）。
         // 总开关关着时，下面那些设置没有意义；下层的选项只在它自己的上一层选中时才出现。
         boolean alertsOn = appConfig.isAlertsEnabled();
@@ -1066,6 +1082,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         boolean guardRows = alertsOn && !appConfig.isAlertsNtfy();
         show("pref_alerts_guard", guardRows);
         show("pref_alerts_guard_home", guardRows);
+        show("pref_alerts_guard_everywhere", guardRows);
 
         Preference quietStart = findPreference("pref_alerts_quiet_start");
         if (quietStart != null) {

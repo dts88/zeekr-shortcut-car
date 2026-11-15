@@ -9,6 +9,13 @@ commit message, not here.
 
 ## [Unreleased]
 
+- Alerts: **Forgot Sentry**. Park away from home with Sentry Mode off and the car says so in the chat,
+  with a button to switch it on — and switches it on 60 s later by itself unless you say no. Four
+  modes under Settings → Alerts, off by default; "Also at home" lifts the away-from-home rule.
+- Alerts: the reminder only exists while the car can still be written to (about five minutes after
+  the door shuts), so a button never looks alive after the car has gone to sleep: it answers "too
+  late" instead.
+
 - Alerts: ntfy.sh as a second place for them — a free topic (no account, no token), or a paid
   account's protected one. **Off by default**: the switch is in Developer options, so with
   Developer options closed alerts go to Telegram and nothing on the ntfy side is touched; the

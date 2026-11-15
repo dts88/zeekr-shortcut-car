@@ -151,6 +151,7 @@ public class AppConfig {
     // 忘了开哨兵：提醒哪一档（存 0..3，见 alarm.GuardPolicy）
     private static final String KEY_ALERTS_GUARD_MODE = "alerts_guard_mode";
     private static final String KEY_ALERTS_GUARD_HOME = "alerts_guard_home";  // "lat,lon"，存在 secrets 里
+    private static final String KEY_ALERTS_GUARD_EVERYWHERE = "alerts_guard_everywhere";  // 在家也开
     private static final String KEY_ALERTS_COMMAND_OFFSET = "alerts_command_offset";  // 轮询到哪一条（运行状态）
     // ntfy（开发者选项里才选得了；规格见 docs/ntfy/）：走哪条路、服务器、档位、话题、令牌、风险提示的接受记录。
     // ntfy (selectable only under developer options; see docs/ntfy/): route, server, tier, topic, token,
@@ -2525,6 +2526,25 @@ public class AppConfig {
     /** 忘掉家的位置（换房子的时候）。Forget the home point. */
     public void clearAlertsGuardHome() {
         secrets().edit().remove(KEY_ALERTS_GUARD_HOME).apply();
+    }
+
+    /**
+     * 在哪都开：在家也照样问、照样开。默认关。
+     *
+     * <p>关着时在家什么都不做 —— 车库里天天提醒一次，这一项活不过一周。车主自己愿意把这一条放开时
+     * 才开：代价是每次停进车库哨兵也跟着开，车机被它顶着不睡，用掉的是 12V 电瓶。</p>
+     *
+     * <p>"Everywhere": ask and switch on at home too. Off by default, because a reminder every evening in
+     * the owner's own driveway would not survive a week. Turning it on means sentry also comes on there,
+     * and the head unit then stays awake on the 12V battery.</p>
+     */
+    public boolean isAlertsGuardEverywhere() {
+        return prefs.getBoolean(KEY_ALERTS_GUARD_EVERYWHERE, false);
+    }
+
+    public void setAlertsGuardEverywhere(boolean everywhere) {
+        prefs.edit().putBoolean(KEY_ALERTS_GUARD_EVERYWHERE, everywhere).apply();
+        AppLog.i(TAG, "忘了开哨兵：在哪都开 = " + everywhere);
     }
 
     /** 令牌和会话号都填了：可以试着发一条。 */
