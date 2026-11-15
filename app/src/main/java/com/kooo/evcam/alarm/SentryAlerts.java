@@ -2065,14 +2065,21 @@ public final class SentryAlerts implements Telemetry.Listener {
         }
         long now = System.currentTimeMillis();
         long wallMs = alertWallMs;
-        // 按钮回的是那一次警报的那一刻：环里已经没有那一段了就说没有，不拿「现在」这段顶上去。
-        // The button answers about that alert's moment: when the ring no longer reaches back, say so
-        // rather than passing off the last minute as if it were the event.
-        if (wallMs <= 0 || !AlertMoment.withinRing(wallMs, now, RING_MS)) {
-            BlackBox.note("alerts: clip asked for, that moment is out of the ring ("
-                    + (wallMs <= 0 ? "no moment" : (now - wallMs) / 1000 + " s ago") + ")");
+        if (wallMs <= 0) {
+            BlackBox.note("alerts: clip asked for with no moment in hand");
             deliverText(channel(), app.getString(R.string.alert_clip_not_available,
                     AlertMoment.describe(wallMs, now)));
+            return;
+        }
+        // 环里还有那一段：直接切，不重新编码。环只留最近一分钟（SampleRing.MAX_MS）。
+        // Still in the ring: cut it straight out, no re-encode. The ring keeps about the last minute.
+        if (!AlertMoment.withinRing(wallMs, now, RING_MS)) {
+            // 更早的那一段：从盘上的录像里取 —— 车一直在录，盘上有几小时，代价是这一次要真处理。
+            // Older than the ring: take it from the recordings on storage. The car records all the time, so
+            // the disk holds hours; the cost is that this one really does process.
+            BlackBox.note("alerts: clip asked for, out of the ring, trying the recordings ("
+                    + (now - wallMs) / 1000 + " s ago)");
+            cutFromRecordings(cameraKey, camera, wallMs, seconds);
             return;
         }
         long endAgoMs = Math.max(0L, now - wallMs);
@@ -2116,6 +2123,65 @@ public final class SentryAlerts implements Telemetry.Listener {
                 }
             });
         });
+    }
+
+    /**
+     * 从盘上的录像里切出那一刻的几秒（{@link RecordedClip}）。
+     *
+     * <p>环只有一分钟，录像有几小时：要更早的那一段就只能从文件里取。这一步是唯一的「要处理一会儿」，
+     * 所以它自己占一条线程；拿不到就照实说，并且告诉车主录像能回溯到几点。</p>
+     *
+     * <p>Cuts that moment's few seconds out of the recordings on storage. The ring holds a minute, the
+     * recordings hold hours; this is the only path that really processes, so it gets its own thread. When
+     * nothing covers the moment it says so and reports how far back the recordings go.</p>
+     */
+    private void cutFromRecordings(String cameraKey, String camera, long wallMs, int seconds) {
+        if (!clipBusy.compareAndSet(false, true)) {
+            BlackBox.note("alerts: a clip is already being cut, ignoring the second tap");
+            return;
+        }
+        String token = config.getAlertsTelegramToken();
+        String chatId = config.getAlertsTelegramChatId();
+        new Thread(() -> {
+            java.io.File file = null;
+            try {
+                file = RecordedClip.cut(app, wallMs, seconds);
+                if (file == null || !file.isFile() || file.length() == 0) {
+                    Long earliest = RecordedClip.earliestRecording(app);
+                    long now = System.currentTimeMillis();
+                    BlackBox.note("alerts: no recording covers " + AlertMoment.clock(wallMs));
+                    String message = app.getString(R.string.alert_clip_not_available,
+                            AlertMoment.describe(wallMs, now));
+                    if (earliest != null && earliest > 0) {
+                        message = message + "\n" + app.getString(R.string.alert_clip_available_from,
+                                AlertMoment.describe(earliest, now));
+                    }
+                    deliverText(channel(), message);
+                    return;
+                }
+                if (file.length() > PictureBudget.CLIP_BYTES) {
+                    BlackBox.note("alerts: recorded clip too big (" + PictureBudget.size(file.length()) + ")");
+                    deliverText(channel(), app.getString(R.string.alert_clip_too_big,
+                            PictureBudget.size(file.length())));
+                    return;
+                }
+                String caption = TelegramRequest.caption(
+                        app.getString(R.string.alert_headline_recorded_clip, camera),
+                        sentryLine(sentryValue()), AlertMoment.clock(wallMs));
+                TelegramSender.Result result = TelegramSender.sendVideo(token, chatId, file, caption,
+                        TelegramRequest.keyboardMarkup());
+                BlackBox.note(result.ok
+                        ? "alerts: recorded clip sent, " + camera + ", " + AlertMoment.clock(wallMs)
+                        : "alerts: recorded clip send failed (" + result.display() + ")");
+            } catch (RuntimeException e) {
+                BlackBox.note("alerts: recorded clip failed (" + e + ")");
+            } finally {
+                clipBusy.set(false);
+                if (file != null && file.isFile() && !file.delete()) {
+                    BlackBox.note("alerts: temp clip could not be deleted");
+                }
+            }
+        }, "alert-recorded-clip").start();
     }
 
     /** 路号 → 录制那边的槽键（front / back / left / right）。Lane to the recorder's slot key. */

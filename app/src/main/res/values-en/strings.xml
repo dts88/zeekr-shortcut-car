@@ -1476,4 +1476,6 @@ If I forget: %3$s</string>
     <string name="alert_pic_not_available">Nothing was recorded at %1$s</string>
     <string name="alert_pic_bad_time">I cannot read that time: %1$s. Try pic 18:22</string>
     <string name="alert_headline_recorded">One frame from the recording, at the time you asked for</string>
+    <string name="alert_clip_available_from">The recordings go back to %1$s</string>
+    <string name="alert_headline_recorded_clip">%1$s, cut from the recording at the time you asked for</string>
 </resources>

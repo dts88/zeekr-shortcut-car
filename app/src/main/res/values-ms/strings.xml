@@ -1452,4 +1452,6 @@ Kalau lupa: %3$s</string>
     <string name="alert_pic_not_available">Tiada rakaman pada %1$s</string>
     <string name="alert_pic_bad_time">Masa itu tidak dapat dibaca: %1$s. Cuba pic 18:22</string>
     <string name="alert_headline_recorded">Satu bingkai daripada rakaman, pada masa yang anda minta</string>
+    <string name="alert_clip_available_from">Rakaman hanya sampai %1$s</string>
+    <string name="alert_headline_recorded_clip">%1$s, dipotong daripada rakaman pada masa yang diminta</string>
 </resources>
