@@ -673,6 +673,12 @@
   smart_button_action_close_rear_right_door「关闭右后门」/ Close rear right door / Tutup pintu belakang kanan；
   smart_button_action_close_tailgate「关闭后备箱」/ Close tailgate / Tutup but belakang。
   门的叫法同「车辆信号」页（vi_door_*）；没做成时的提示用已有的 msg_car_action_*。
+- 2026-11-15 批准（悬浮按钮、灵动贴的动作「截屏」；项目所有者：「用“截屏”，同意」，草稿是「截取屏幕」）：
+  floating_action_take_screenshot「截屏」/ Take a screenshot / Ambil tangkapan skrin；
+  msg_screenshot_saved「截图已保存」/ Screenshot saved / Tangkapan skrin disimpan；
+  msg_screenshot_no_drive「截图失败：未检测到 U 盘」/ No screenshot: no USB drive found /
+  Tiada tangkapan skrin: tiada pemacu USB ditemui（照 msg_photo_no_drive 的写法）。截不到用已有的
+  msg_car_action_unavailable「无法执行「截屏」」；通知标题就是动作名。
 - vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
 - 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
 
@@ -681,11 +687,7 @@
 下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
 可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
 
-- 2026-11-15 截取屏幕（悬浮按钮、灵动贴的动作）：floating_action_take_screenshot「截取屏幕」/ Take a screenshot /
-  Ambil tangkapan skrin；msg_screenshot_saved「截图已保存」/ Screenshot saved / Tangkapan skrin disimpan；
-  msg_screenshot_no_drive「截图失败：未检测到 U 盘」/ No screenshot: no USB drive found /
-  Tiada tangkapan skrin: tiada pemacu USB ditemui（照 msg_photo_no_drive 的写法）。截不到用已有的
-  msg_car_action_unavailable「无法执行「截取屏幕」」；通知标题就是动作名。
+- （现在没有。）
 
 ---
 

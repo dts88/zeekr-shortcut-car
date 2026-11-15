@@ -13,7 +13,7 @@ import org.junit.Test;
 
 import java.util.Calendar;
 
-/** 截取屏幕的文件名：时间在前，同照片、整帧原图的写法。 */
+/** 截屏的文件名：时间在前，同照片、整帧原图的写法。 */
 public class ScreenCaptureTest {
 
     @Test

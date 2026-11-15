@@ -134,7 +134,7 @@
     <string name="floating_action_open_app">打开主界面</string>
     <string name="floating_action_toggle_recording">开始 / 停止录制</string>
     <string name="floating_action_take_photo">拍照</string>
-    <string name="floating_action_take_screenshot">截取屏幕</string>
+    <string name="floating_action_take_screenshot">截屏</string>
     <string name="floating_action_toggle_mirror">开启 / 关闭超级镜子</string>
     <string name="floating_action_lock_footage">锁定当前录像</string>
     <string name="floating_action_toggle_drive_sound">开启 / 关闭模拟声浪</string>

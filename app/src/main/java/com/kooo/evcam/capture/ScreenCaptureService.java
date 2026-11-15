@@ -49,7 +49,7 @@ import java.util.Date;
  *
  * <ul>
  *   <li>安卓 10 起拿授权要先有一个「屏幕录制」类型的前台服务，所以先 {@code startForeground} 再 {@code getMediaProjection}。
- *       通知一条，标题是「截取屏幕」，用前台服务那个渠道。</li>
+ *       通知一条，标题是「截屏」，用前台服务那个渠道。</li>
  *   <li>镜像整个中控屏的虚拟屏一直留着，平时不接画面（{@code setSurface(null)}，不合成、不耗电）；截的时候接上
  *       {@link ImageReader}，等来一帧就断开，存成 PNG（在自己的线程上，几百万像素压一张要一阵）。</li>
  *   <li>刚同意时系统的框还在收起，第一张等 {@link #FIRST_SHOT_DELAY_MS} 再截；{@link #FRAME_TIMEOUT_MS} 里没来一帧算截不到。

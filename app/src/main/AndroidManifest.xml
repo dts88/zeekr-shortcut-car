@@ -32,7 +32,7 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <!-- 录制声音开着时，前台服务试着带上麦克风类型（安卓 11 起后台用麦克风要它；带不上照旧） -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
-    <!-- 截取屏幕（悬浮按钮、灵动贴的动作，capture.ScreenCapture）：拿屏幕录制授权要一个「屏幕录制」类型的前台服务，
+    <!-- 截屏（悬浮按钮、灵动贴的动作，capture.ScreenCapture）：拿屏幕录制授权要一个「屏幕录制」类型的前台服务，
          安卓 14 起还要这个权限 -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
     <!-- CPU唤醒锁（保持CPU运行，不亮屏，用于息屏状态下拍照/录制） -->
@@ -176,7 +176,7 @@
             android:theme="@style/Theme.Cam"
             android:exported="false" />
 
-        <!-- 截取屏幕：拿着屏幕录制授权的前台服务；弹系统同意框的透明界面（单独一个任务：弹框时主界面不跟着出来） -->
+        <!-- 截屏：拿着屏幕录制授权的前台服务；弹系统同意框的透明界面（单独一个任务：弹框时主界面不跟着出来） -->
         <service
             android:name=".capture.ScreenCaptureService"
             android:foregroundServiceType="mediaProjection"

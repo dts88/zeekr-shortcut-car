@@ -321,7 +321,7 @@ public class CameraForegroundService extends Service {
         channel(this);
     }
 
-    /** 前台服务通知用的渠道（截取屏幕那一条也用它，{@code capture.ScreenCaptureService}）：建好，返回它的 id。 */
+    /** 前台服务通知用的渠道（截屏那一条也用它，{@code capture.ScreenCaptureService}）：建好，返回它的 id。 */
     public static String channel(Context context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(

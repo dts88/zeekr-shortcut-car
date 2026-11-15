@@ -23,7 +23,7 @@ import java.util.Date;
 import java.util.Locale;
 
 /**
- * 截取屏幕（项目所有者 2026-11-15，悬浮按钮、灵动贴的动作，给 wiki 统一截实车图）：截下整个中控屏的画面。
+ * 截屏（项目所有者 2026-11-15，悬浮按钮、灵动贴的动作，给 wiki 统一截实车图）：截下整个中控屏的画面。
  *
  * <ul>
  *   <li>普通应用截整个屏幕只能走系统的屏幕录制授权（MediaProjection）：第一次按弹系统的同意框
@@ -76,7 +76,7 @@ public final class ScreenCapture {
         return new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(when) + "_screenshot.png";
     }
 
-    /** 截不到：提示「无法执行「截取屏幕」」（和车控动作做不了是同一句）。 */
+    /** 截不到：提示「无法执行「截屏」」（和车控动作做不了是同一句）。 */
     static void failed(Context app) {
         Toast.makeText(app, app.getString(R.string.msg_car_action_unavailable,
                 app.getString(R.string.floating_action_take_screenshot)), Toast.LENGTH_SHORT).show();
