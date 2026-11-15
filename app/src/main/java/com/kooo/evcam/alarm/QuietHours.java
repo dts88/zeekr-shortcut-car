@@ -17,6 +17,11 @@ package com.kooo.evcam.alarm;
  * <p>跨午夜算得对：{@code 22:00 → 07:00} 是一段，不是两段。开头与结尾相同时当作“不安静”，
  * 不能因为几次点错就把警报永远关掉。</p>
  *
+ * <p><b>用的是车机墙上的钟</b>（D-10，就这样，不改）：这里只看一天里的第几分钟，
+ * 那个分钟数由调用方从默认时区取。所以时区一旦因为夏令时改了一小时，窗口在现实中就跟着
+ * 多一小时或少一小时 —— 回拨那一夜 {@code 22:00 → 07:00} 是九小时，春进那一夜是五小时。
+ * 车平时跑的地方没有夏令时，所以不动它；{@code QuietHoursTest} 用固定偏移把这件事钉住。</p>
+ *
  * Quiet hours: no alarm (parking alarm) fires during this time. Pure judgment ({@code QuietHoursTest}).
  *
  * <p>Why this is needed: when the car is parked in your own garage or residential compound, someone
@@ -26,6 +31,13 @@ package com.kooo.evcam.alarm;
  * <p>Crossing midnight is computed correctly: {@code 22:00 → 07:00} is one span, not two. When start
  * and end are equal it is treated as "not quiet", so a few wrong taps must not turn the alarm off
  * forever.</p>
+ *
+ * <p><b>Uses the head unit's wall clock</b> (D-10, settled, not changing): only the minute of the day
+ * matters, and the caller takes that minute from the default time zone. So when the offset moves by an
+ * hour for daylight saving, the window grows or shrinks by an hour of real time — {@code 22:00 → 07:00}
+ * is nine hours on the night the clocks go back and five on the night they go forward. The car does not
+ * drive where that happens, so nothing is changed for it; {@code QuietHoursTest} pins this with fixed
+ * offsets.</p>
  */
 public final class QuietHours {
 

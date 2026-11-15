@@ -57,6 +57,27 @@ public class QuietHoursTest {
     }
 
     @Test
+    public void aDstChangeMovesTheWindowByOneRealHour() {
+        // D-10：安静时段看的是墙上的钟（只看一天里的第几分钟），不是绝对时间。
+        // 所以同一个瞬间在时针跳了一格之后就是另一个分钟数，窗口在现实中跟着多/少一小时。
+        java.time.OffsetDateTime sameInstant =
+                java.time.OffsetDateTime.parse("2026-03-08T06:30:00Z");
+        int beforeTheChange = minuteOfDay(sameInstant, java.time.ZoneOffset.ofHours(-5));
+        int afterTheChange = minuteOfDay(sameInstant, java.time.ZoneOffset.ofHours(-4));
+
+        assertEquals(60, afterTheChange - beforeTheChange);
+        // 判断只看分钟数：两个分钟数它都给同一个答案 —— 行为没动，动的是一小时现实时间。
+        // 春进那一夜窗口在现实中是五小时，回拨那一夜是九小时（D-10）。
+        assertTrue(QuietHours.active(true, TEN_PM, SEVEN_AM, beforeTheChange));
+        assertTrue(QuietHours.active(true, TEN_PM, SEVEN_AM, afterTheChange));
+    }
+
+    private static int minuteOfDay(java.time.OffsetDateTime at, java.time.ZoneOffset offset) {
+        java.time.OffsetDateTime local = at.withOffsetSameInstant(offset);
+        return local.getHour() * 60 + local.getMinute();
+    }
+
+    @Test
     public void timesRoundTripAsHoursAndMinutes() {
         assertEquals(TEN_PM, QuietHours.parse("22:00"));
         assertEquals(SEVEN_AM, QuietHours.parse("07:00"));
