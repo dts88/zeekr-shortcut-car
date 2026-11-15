@@ -106,20 +106,27 @@ public class AlertTransportTest {
     }
 
     @Test
-    public void developerOptionsClosedSendsToTelegramWhateverIsStored() {
+    public void theOwnersChoiceAppliesWithDeveloperOptionsClosedToo() {
+        // 2026-11-15：这一项从开发者选项搬到「停车警报」，成了普通选择 ——
+        // 所以锁上开发者选项之后，车主选的这条仍然算数；只有存坏的值才回到 Telegram。
+        // 2026-11-15: the choice moved out of Developer options into the alerts section, so it applies with
+        // that switch closed too; only a stored value that makes no sense falls back to Telegram.
         seedBothSides();
         config.setAlertsTransport(NtfyGate.NTFY);
         DeveloperMode.unlock(context, "6651");
-
-        assertEquals("开发者选项开着：听存着的那一个", NtfyGate.NTFY, config.getAlertsTransport());
-        assertTrue(config.isAlertsNtfy());
+        assertEquals(NtfyGate.NTFY, config.getAlertsTransport());
 
         DeveloperMode.lock(context);
         assertEquals("存着的没变", NtfyGate.NTFY, config.getAlertsTransportStored());
-        assertEquals("但发的是 Telegram —— 藏起来的功能不能变成悄悄不发",
-                NtfyGate.TELEGRAM, config.getAlertsTransport());
-        assertFalse(config.isAlertsNtfy());
+        assertEquals("车主选了 ntfy，锁上开发者选项也还是 ntfy",
+                NtfyGate.NTFY, config.getAlertsTransport());
+        assertTrue(config.isAlertsNtfy());
         assertEquals("另一边的设置还在", NTFY_TOPIC, config.getAlertsNtfyTopic());
+
+        // 存坏的值仍然按 telegram 算
+        config.setAlertsTransport("nonsense");
+        assertEquals(NtfyGate.TELEGRAM, config.getAlertsTransport());
+        assertFalse(config.isAlertsNtfy());
     }
 
     @Test
