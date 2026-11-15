@@ -447,6 +447,64 @@ public final class TelegramSender {
     }
 
     /**
+     * 告诉 Telegram「这颗按钮收到了」（{@code answerCallbackQuery}）。
+     *
+     * <p>手机上按下按钮后那个转圈，只有在车回了这一句之后才停；不回也能过，但车主会以为是没按上，
+     * 再按两下。{@code text} 留空就只是停转圈 —— 结果由另发的一条消息说（{@code DECISIONS.md} D10）。</p>
+     *
+     * <p>令牌照旧不进日志：失败的那句话先过 {@link TelegramRequest#redact(String)}。</p>
+     *
+     * @param callbackQueryId {@code callback_query.id}，不是按钮上的 {@code data}
+     * @param text            提示文字，可以为 null 或空（只停转圈）；Telegram 上限 200 字，这里先截
+     *
+     * Tell Telegram "this button press was received" ({@code answerCallbackQuery}).
+     *
+     * <p>The spinner on the phone only stops once the car answers this; skipping it still works, but the
+     * owner thinks the tap missed and taps two more times. An empty {@code text} only stops the spinner;
+     * the outcome goes out as a separate message ({@code DECISIONS.md} D10).</p>
+     *
+     * <p>The token still never enters a log: the failure sentence is passed through
+     * {@link TelegramRequest#redact(String)} first.</p>
+     *
+     * @param callbackQueryId the {@code callback_query.id}, not the button's {@code data}
+     * @param text            the notice text, may be null or empty (spinner only); Telegram caps it at
+     *                        200 characters, so truncate here
+     */
+    public static Result answerCallbackQuery(String token, String callbackQueryId, String text) {
+        if (!TelegramRequest.looksLikeToken(token)) {
+            return Result.fail("bad token", 0);
+        }
+        if (callbackQueryId == null || callbackQueryId.trim().isEmpty()) {
+            return Result.fail("bad callback id", 0);
+        }
+        String body = "callback_query_id=" + formEncode(callbackQueryId.trim());
+        if (text != null && !text.isEmpty()) {
+            body += "&text=" + formEncode(text.length() > 200 ? text.substring(0, 200) : text);
+        }
+        byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
+        HttpURLConnection connection = null;
+        try {
+            connection = open(TelegramRequest.methodUrl(token, "answerCallbackQuery"));
+            connection.setRequestMethod("POST");
+            connection.setDoOutput(true);
+            connection.setRequestProperty("Content-Type",
+                    "application/x-www-form-urlencoded; charset=UTF-8");
+            connection.setFixedLengthStreamingMode(bytes.length);
+            try (OutputStream out = connection.getOutputStream()) {
+                out.write(bytes);
+            }
+            return read(connection);
+        } catch (IOException e) {
+            AppLog.w(TAG, "callback answer failed: " + TelegramRequest.redact(String.valueOf(e)));
+            return Result.fail(TelegramRequest.redact(String.valueOf(e)), 0);
+        } finally {
+            if (connection != null) {
+                connection.disconnect();
+            }
+        }
+    }
+
+    /**
      * 这个会话的名字（{@code getChat}）。空串表示问到了但没有名字。
      *
      * <p>用来确认「填进去的会话号真的存在」 —— 形状对不代表它存在，错一位就是别人的会话。</p>
@@ -499,7 +557,10 @@ public final class TelegramSender {
         int wait = Math.max(1, Math.min(25, timeoutSeconds));
         StringBuilder url = new StringBuilder(TelegramRequest.updatesUrl(token))
                 .append("?timeout=").append(wait)
-                .append("&allowed_updates=%5B%22message%22%5D");
+                // 只问这两样：普通消息（命令）和按钮按下的回调；编辑过的、频道帖子一概不来。
+                // Ask for exactly these two: plain messages (commands) and button-press callbacks;
+                // edits and channel posts never arrive.
+                .append("&allowed_updates=%5B%22message%22,%22callback_query%22%5D");
         if (offset > 0) {
             url.append("&offset=").append(offset);
         }

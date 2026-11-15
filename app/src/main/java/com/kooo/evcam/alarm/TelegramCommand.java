@@ -16,7 +16,9 @@ package com.kooo.evcam.alarm;
  * <ul>
  *   <li>{@code pic} / {@code photo} / {@code picture} / {@code snap} / {@code snapshot}：现在拍一张；</li>
  *   <li>后面可以跟一路：{@code front} / {@code rear} / {@code left} / {@code right}；</li>
- *   <li>{@code status} / {@code state}：只回一句话，不拍。</li>
+ *   <li>{@code status} / {@code state}：只回一句话，不拍；</li>
+ *   <li>{@code guard} 及后面一个词（{@code on} / {@code off} / {@code home} / {@code home clear} /
+ *       {@code auto off|ask|then|on} / {@code then}）：忘了开哨兵那一块的事，见 {@link GuardAction}。</li>
  * </ul>
  *
  * <p>命令前面的 {@code /}、命令后面的 {@code @BotName}（群里会带）、大小写、前后空白都不计较。
@@ -34,7 +36,10 @@ package com.kooo.evcam.alarm;
  * <ul>
  *   <li>{@code pic} / {@code photo} / {@code picture} / {@code snap} / {@code snapshot}: take one picture now;</li>
  *   <li>optionally followed by one lane: {@code front} / {@code rear} / {@code left} / {@code right};</li>
- *   <li>{@code status} / {@code state}: reply with one line, no picture.</li>
+ *   <li>{@code status} / {@code state}: reply with one line, no picture;</li>
+ *   <li>{@code guard} plus one word ({@code on} / {@code off} / {@code home} / {@code home clear} /
+ *       {@code auto off|ask|then|on} / {@code then}): the forgotten-sentry block, see
+ *       {@link GuardAction}.</li>
  * </ul>
  *
  * <p>A leading {@code /}, a trailing {@code @BotName} (present in groups), letter case, and
@@ -66,11 +71,49 @@ public final class TelegramCommand {
          */
         STATUS,
         /**
+         * 忘了开哨兵那一块说的话（{@code /guard …}）。
+         *
+         * The forgotten-sentry block's verb ({@code /guard …}).
+         */
+        GUARD,
+        /**
          * 不是命令，或者不认识。
          *
          * Not a command, or not recognized.
          */
         UNKNOWN
+    }
+
+    /**
+     * {@code /guard} 后面跟的那一个词。
+     *
+     * <p>{@link #REPORT} 是光写一个 {@code guard}；其他的每一种都对应一个整齐的动作，
+     * 认不出来的词不会撑到某个最近的意思上，而是整句 {@link Verb#UNKNOWN}。</p>
+     *
+     * The one word after {@code /guard}.
+     *
+     * <p>{@link #REPORT} is a bare {@code guard}; every other value names one action. An unrecognized
+     * word does not snap to the nearest meaning; the whole message becomes {@link Verb#UNKNOWN}.</p>
+     */
+    public enum GuardAction {
+        /** 没说做什么：报一句现在。 No word: one line of state. */
+        REPORT,
+        /** {@code guard on}：现在就开。 Turn it on now. */
+        ON,
+        /** {@code guard off}：关掉。 Switch it off. */
+        OFF,
+        /** {@code guard home}：把车现在的位置记成家。 Remember where the car is now as home. */
+        HOME_SET,
+        /** {@code guard home clear}：忘掉那个家。 Forget that home point. */
+        HOME_CLEAR,
+        /** {@code guard auto off}：不再自己开。 Stop acting by itself. */
+        AUTO_OFF,
+        /** {@code guard auto ask}：只问。 Only ask. */
+        AUTO_ASK,
+        /** {@code guard auto then}：问了不开就自己开。 Ask, then switch on. */
+        AUTO_ASK_THEN_ON,
+        /** {@code guard auto on}：不问，自己开。 Switch on silently. */
+        AUTO_ON
     }
 
     /**
@@ -94,10 +137,21 @@ public final class TelegramCommand {
      * {@link #ANY_LANE} means send per the settings (one four-grid, or one per lane).
      */
     public final int lane;
+    /**
+     * 只有 {@link Verb#GUARD} 有值；别的命令全是 {@code null}。
+     *
+     * Set only for {@link Verb#GUARD}; {@code null} for every other verb.
+     */
+    public final GuardAction guard;
 
     private TelegramCommand(Verb verb, int lane) {
+        this(verb, lane, null);
+    }
+
+    private TelegramCommand(Verb verb, int lane, GuardAction guard) {
         this.verb = verb;
         this.lane = lane;
+        this.guard = guard;
     }
 
     /**
@@ -146,6 +200,9 @@ public final class TelegramCommand {
         }
         String[] words = body.split("\\s+");
         String verb = words[0].toLowerCase(java.util.Locale.US);
+        if ("guard".equals(verb)) {
+            return parseGuard(words);
+        }
         if ("status".equals(verb) || "state".equals(verb) || "s".equals(verb)) {
             return new TelegramCommand(Verb.STATUS, ANY_LANE);
         }
@@ -169,8 +226,64 @@ public final class TelegramCommand {
         return new TelegramCommand(Verb.PICTURE, lane);
     }
 
+    /**
+     * {@code guard} 及后面的词。认不出来就整句不认。
+     *
+     * <p>{@code guard then} 是 {@code guard auto then} 的短写法：同一件事说两遍，不如两个都收。</p>
+     *
+     * {@code guard} and the words after it. An unrecognized word makes the whole message unknown.
+     *
+     * <p>{@code guard then} is shorthand for {@code guard auto then}: the same act said twice is better
+     * accepted both ways.</p>
+     */
+    private static TelegramCommand parseGuard(String[] words) {
+        if (words.length == 1) {
+            return new TelegramCommand(Verb.GUARD, ANY_LANE, GuardAction.REPORT);
+        }
+        String first = words[1].toLowerCase(java.util.Locale.US);
+        if (words.length == 2) {
+            if ("on".equals(first)) {
+                return new TelegramCommand(Verb.GUARD, ANY_LANE, GuardAction.ON);
+            }
+            if ("off".equals(first)) {
+                return new TelegramCommand(Verb.GUARD, ANY_LANE, GuardAction.OFF);
+            }
+            if ("home".equals(first)) {
+                return new TelegramCommand(Verb.GUARD, ANY_LANE, GuardAction.HOME_SET);
+            }
+            if ("then".equals(first)) {
+                return new TelegramCommand(Verb.GUARD, ANY_LANE, GuardAction.AUTO_ASK_THEN_ON);
+            }
+            return new TelegramCommand(Verb.UNKNOWN, ANY_LANE);
+        }
+        if (words.length != 3) {
+            return new TelegramCommand(Verb.UNKNOWN, ANY_LANE);
+        }
+        String second = words[2].toLowerCase(java.util.Locale.US);
+        if ("home".equals(first) && "clear".equals(second)) {
+            return new TelegramCommand(Verb.GUARD, ANY_LANE, GuardAction.HOME_CLEAR);
+        }
+        if (!"auto".equals(first)) {
+            return new TelegramCommand(Verb.UNKNOWN, ANY_LANE);
+        }
+        if ("off".equals(second)) {
+            return new TelegramCommand(Verb.GUARD, ANY_LANE, GuardAction.AUTO_OFF);
+        }
+        if ("ask".equals(second)) {
+            return new TelegramCommand(Verb.GUARD, ANY_LANE, GuardAction.AUTO_ASK);
+        }
+        if ("then".equals(second)) {
+            return new TelegramCommand(Verb.GUARD, ANY_LANE, GuardAction.AUTO_ASK_THEN_ON);
+        }
+        if ("on".equals(second)) {
+            return new TelegramCommand(Verb.GUARD, ANY_LANE, GuardAction.AUTO_ON);
+        }
+        return new TelegramCommand(Verb.UNKNOWN, ANY_LANE);
+    }
+
     @Override
     public String toString() {
-        return verb + (lane == ANY_LANE ? "" : "#" + lane);
+        return verb + (guard == null ? "" : ":" + guard)
+                + (lane == ANY_LANE ? "" : "#" + lane);
     }
 }

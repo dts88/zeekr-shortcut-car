@@ -116,6 +116,37 @@
     <string name="alert_cmd_no_sentry">Mod Sentri mati, jadi kepala unit akan tidur dan tiada gambar boleh diambil</string>
     <string name="alert_cmd_not_parked">Kereta tidak diletakkan, jadi tiada gambar diambil</string>
     <string name="alert_cmd_too_soon">Tunggu %1$d saat sebelum minta lagi</string>
+    <!-- Lupa Mod Sentri: kereta ditinggal dengan Mod Sentri tutup, jadi ia bertanya atau menghidupkannya sendiri -->
+    <string name="set_alerts_guard_title">Kalau saya lupa Mod Sentri</string>
+    <string name="set_alerts_guard_mode_off">Tutup</string>
+    <string name="set_alerts_guard_mode_ask">Tanya saya dulu</string>
+    <string name="set_alerts_guard_mode_ask_then_on">Tanya, kemudian hidupkan selepas seminit</string>
+    <string name="set_alerts_guard_mode_on">Hidupkan tanpa bertanya</string>
+    <string name="set_alerts_guard_home_title">Guna lokasi ini sebagai rumah</string>
+    <string name="set_alerts_guard_home_set">Disimpan, dalam kereta ini sahaja. Tidak dihantar ke mana-mana</string>
+    <string name="set_alerts_guard_home_missing">Kereta tiada lokasi sekarang. Pandu sehingga bar maklumat menunjukkan lokasi</string>
+    <string name="set_alerts_guard_home_none">Lokasi rumah dilupakan</string>
+    <string name="alert_guard_ask">Mod Sentri tidak dihidupkan.
+Berhenti pada %1$s. Akan dihidupkan dalam %2$d saat melainkan anda kata tidak.
+Kereta hanya menjawab beberapa minit, selepas itu ia tidur</string>
+    <string name="alert_guard_btn_on">Hidupkan sekarang</string>
+    <string name="alert_guard_btn_no">Biarkan tutup</string>
+    <string name="alert_guard_btn_off">Tutupkan</string>
+    <string name="alert_guard_btn_state">Status</string>
+    <string name="alert_guard_on">%1$s
+Ini bacaan kereta</string>
+    <string name="alert_guard_off">%1$s
+Ini bacaan kereta</string>
+    <string name="alert_guard_off_armed">Kereta sudah berjaga, jadi tidak boleh ditutup. Buka kunci sekali, kemudian cuba lagi</string>
+    <string name="alert_guard_late">Terlambat: kereta sudah tidur dan tidak boleh menghidupkan apa-apa. Ia menjawab semula apabila pintu dibuka</string>
+    <string name="alert_guard_veto">Baik, Mod Sentri dibiarkan tutup</string>
+    <string name="alert_guard_already_on">Sudah dihidupkan untuk parkir ini</string>
+    <string name="alert_guard_report">%1$s
+Dari rumah: %2$s
+Kalau lupa: %3$s</string>
+    <string name="alert_guard_where_home">di rumah</string>
+    <string name="alert_guard_where_away">di luar rumah</string>
+    <string name="alert_guard_where_unknown">lokasi tidak diketahui</string>
     <string name="alert_status_gear">Gear: %1$s</string>
     <string name="set_alerts_commands_title">Jawab arahan</string>
     <string name="set_alerts_commands_summary">Hantar pic untuk gambar, status untuk satu baris. Hanya anda, dan hanya semasa Mod Sentri hidup</string>

@@ -116,6 +116,37 @@
     <string name="alert_cmd_no_sentry">Sentry Mode is off, so the head unit is going to sleep and nothing can be taken</string>
     <string name="alert_cmd_not_parked">The car is not parked, so nothing was taken</string>
     <string name="alert_cmd_too_soon">Wait %1$d s before asking again</string>
+    <!-- Forgot Sentry: the car was left with Sentry Mode off, so it asks, or switches it on itself -->
+    <string name="set_alerts_guard_title">If I forget Sentry Mode</string>
+    <string name="set_alerts_guard_mode_off">Off</string>
+    <string name="set_alerts_guard_mode_ask">Ask me first</string>
+    <string name="set_alerts_guard_mode_ask_then_on">Ask, then switch it on after a minute</string>
+    <string name="set_alerts_guard_mode_on">Switch it on without asking</string>
+    <string name="set_alerts_guard_home_title">Use this position as home</string>
+    <string name="set_alerts_guard_home_set">Saved, on this car only. It is never sent anywhere</string>
+    <string name="set_alerts_guard_home_missing">The car has no position right now. Drive until the info bar shows one, then try again</string>
+    <string name="set_alerts_guard_home_none">Home forgotten</string>
+    <string name="alert_guard_ask">Sentry Mode is off.
+Parked at %1$s. Switching it on in %2$d s unless you say no.
+The car answers for a few minutes only, then it sleeps</string>
+    <string name="alert_guard_btn_on">Turn on now</string>
+    <string name="alert_guard_btn_no">Leave it off</string>
+    <string name="alert_guard_btn_off">Turn it off</string>
+    <string name="alert_guard_btn_state">Status</string>
+    <string name="alert_guard_on">%1$s
+Read back from the car</string>
+    <string name="alert_guard_off">%1$s
+Read back from the car</string>
+    <string name="alert_guard_off_armed">The car is armed, so it will not switch Sentry Mode off. Unlock it once, then try again</string>
+    <string name="alert_guard_late">Too late: the car is asleep and cannot switch anything on. It answers again when a door opens</string>
+    <string name="alert_guard_veto">Leaving Sentry Mode off</string>
+    <string name="alert_guard_already_on">Already on for this park</string>
+    <string name="alert_guard_report">%1$s
+Home: %2$s
+If I forget: %3$s</string>
+    <string name="alert_guard_where_home">at home</string>
+    <string name="alert_guard_where_away">away from home</string>
+    <string name="alert_guard_where_unknown">position unknown</string>
     <string name="alert_status_gear">Gear: %1$s</string>
     <string name="set_alerts_commands_title">Answer commands</string>
     <string name="set_alerts_commands_summary">Send pic for a picture, status for one line. Only you, and only while Sentry Mode is on</string>

@@ -130,6 +130,37 @@
     <string name="alert_cmd_no_sentry">哨兵模式没开：车机要睡了，拍不了</string>
     <string name="alert_cmd_not_parked">车没停着，这一张不拍</string>
     <string name="alert_cmd_too_soon">等一下：%1$d 秒后再要</string>
+    <!-- 忘了开哨兵：哨兵没开就下车了，车自己问一句、或者自己开（alarm.GuardPolicy 判） -->
+    <string name="set_alerts_guard_title">忘了开哨兵模式</string>
+    <string name="set_alerts_guard_mode_off">关</string>
+    <string name="set_alerts_guard_mode_ask">先问我</string>
+    <string name="set_alerts_guard_mode_ask_then_on">问一句，一分钟没人反对就自己开</string>
+    <string name="set_alerts_guard_mode_on">不问，自己开</string>
+    <string name="set_alerts_guard_home_title">把这里记成家</string>
+    <string name="set_alerts_guard_home_set">记下了，只存在这辆车上，不会发出去</string>
+    <string name="set_alerts_guard_home_missing">车现在没有定位。开着车，等行驶信息条上有经纬度再试</string>
+    <string name="set_alerts_guard_home_none">家的位置忘掉了</string>
+    <string name="alert_guard_ask">哨兵模式没开。
+%1$s 停的车，%2$d 秒后自己打开，除非你说不要。
+车只在这几分钟里答应，再晚就睡了</string>
+    <string name="alert_guard_btn_on">现在就开</string>
+    <string name="alert_guard_btn_no">别开</string>
+    <string name="alert_guard_btn_off">关掉</string>
+    <string name="alert_guard_btn_state">状态</string>
+    <string name="alert_guard_on">%1$s
+这是车读回来的</string>
+    <string name="alert_guard_off">%1$s
+这是车读回来的</string>
+    <string name="alert_guard_off_armed">车已经布防了，这样关不掉。解一次锁，再关</string>
+    <string name="alert_guard_late">太晚了：车机已经睡了，什么也开不了。开门时它会再应答</string>
+    <string name="alert_guard_veto">好，哨兵模式不开</string>
+    <string name="alert_guard_already_on">这一趟已经开了</string>
+    <string name="alert_guard_report">%1$s
+离家：%2$s
+忘了开：%3$s</string>
+    <string name="alert_guard_where_home">在家</string>
+    <string name="alert_guard_where_away">在外面</string>
+    <string name="alert_guard_where_unknown">不知道在哪</string>
     <string name="alert_status_gear">挡位：%1$s</string>
     <string name="set_alerts_commands_title">回应 Telegram 命令</string>
     <string name="set_alerts_commands_summary">发 pic 要一张照片，发 status 要一句状态。只回你自己，只在哨兵模式开着时</string>
