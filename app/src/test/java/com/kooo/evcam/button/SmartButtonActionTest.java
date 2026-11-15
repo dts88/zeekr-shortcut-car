@@ -41,7 +41,7 @@ public class SmartButtonActionTest {
             assertSame(floating, action.floating);
             assertEquals(0, action.driveMode);
         }
-        assertEquals(1 + FloatingAction.values().length + 3 + 4 + 36, all.size());
+        assertEquals(1 + FloatingAction.values().length + 3 + 4 + 42, all.size());
     }
 
     /** 「不使用」不在哪一组；别的都在一组里，按组的先后列出，每一组都有东西。 */
@@ -63,7 +63,7 @@ public class SmartButtonActionTest {
         }
     }
 
-    /** 车控动作：写车的有要做的事，媒体、语音的有不碰车的那一样；车门、尾门不在里面。 */
+    /** 车控动作：写车的有要做的事，媒体、语音的有不碰车的那一样；关门六项在「车身」里（2026-11-15）。 */
     @Test
     public void theCarActionsKnowWhatToDo() {
         String[] car = {"sport_one_touch", "volume_up", "volume_down", "steering_wheel_heat", "seat_vent_driver",
@@ -71,7 +71,8 @@ public class SmartButtonActionTest {
                 "seat_heat_rear_right", "seat_heat_rear", "seat_massage_driver", "seat_massage_passenger", "seat_restore",
                 "climate_power", "climate_circulation", "defrost_front", "defrost_rear", "central_lock", "mirror_fold",
                 "charging_cap", "view_360", "welcome_light", "charging_light", "driving_light", "fragrance",
-                "theater_driver", "theater_passenger", "camping", "sentry"};
+                "theater_driver", "theater_passenger", "camping", "sentry", "close_all_doors", "close_driver_door",
+                "close_passenger_door", "close_rear_left_door", "close_rear_right_door", "close_tailgate"};
         for (String key : car) {
             SmartButtonAction action = SmartButtonAction.fromKey(key);
             assertNotNull(key, action.car);
@@ -85,9 +86,11 @@ public class SmartButtonActionTest {
             assertNull(key, action.car);
             assertSame(key, SmartButtonAction.Group.MEDIA, action.group);
         }
-        assertEquals(35, car.length + media.length);
-        assertSame(SmartButtonAction.NONE, SmartButtonAction.fromKey("door_passenger"));
-        assertSame(SmartButtonAction.NONE, SmartButtonAction.fromKey("tailgate"));
+        assertEquals(41, car.length + media.length);
+        for (String key : new String[] {"close_all_doors", "close_driver_door", "close_passenger_door",
+                "close_rear_left_door", "close_rear_right_door", "close_tailgate"}) {
+            assertSame(key, SmartButtonAction.Group.BODY, SmartButtonAction.fromKey(key).group);
+        }
     }
 
     @Test

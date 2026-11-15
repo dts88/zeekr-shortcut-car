@@ -27,6 +27,12 @@ public interface CarAccess {
     /** 带区域写一个功能号：车机受理了返回 true（这台车机没有带区域的写法也是 false）。 */
     boolean write(int id, int zone, int value);
 
+    /**
+     * 车机说这个号在这个区域上现在能不能用（ECARX 的 {@code isFunctionSupported}：active / notactive / notavailable / error）；
+     * 问不了（这台车机上没有这个方法、出了错）是 null。关门照 Lab findings §2.93：不是 active 不写。
+     */
+    String status(int id, int zone);
+
     /** 一个传感器现在的值；读不到（含占位值）是 null。 */
     Float sensor(int type);
 }

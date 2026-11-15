@@ -171,6 +171,12 @@
     <string name="smart_button_action_defrost_front">Front defrost</string>
     <string name="smart_button_action_defrost_rear">Rear defrost</string>
     <string name="smart_button_action_central_lock">Central locking</string>
+    <string name="smart_button_action_close_all_doors">Close all doors</string>
+    <string name="smart_button_action_close_driver_door">Close driver door</string>
+    <string name="smart_button_action_close_passenger_door">Close passenger door</string>
+    <string name="smart_button_action_close_rear_left_door">Close rear left door</string>
+    <string name="smart_button_action_close_rear_right_door">Close rear right door</string>
+    <string name="smart_button_action_close_tailgate">Close tailgate</string>
     <string name="smart_button_action_mirrors">Fold / unfold side mirrors</string>
     <string name="smart_button_action_charging_cap">Charging port cover</string>
     <string name="smart_button_action_view_360">Factory 360 view</string>

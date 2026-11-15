@@ -193,6 +193,12 @@
     <string name="smart_button_action_defrost_front">前除霜</string>
     <string name="smart_button_action_defrost_rear">后除霜</string>
     <string name="smart_button_action_central_lock">中控锁</string>
+    <string name="smart_button_action_close_all_doors">关闭所有车门</string>
+    <string name="smart_button_action_close_driver_door">关闭主驾门</string>
+    <string name="smart_button_action_close_passenger_door">关闭副驾门</string>
+    <string name="smart_button_action_close_rear_left_door">关闭左后门</string>
+    <string name="smart_button_action_close_rear_right_door">关闭右后门</string>
+    <string name="smart_button_action_close_tailgate">关闭后备箱</string>
     <string name="smart_button_action_mirrors">后视镜折叠 / 展开</string>
     <string name="smart_button_action_charging_cap">充电口盖</string>
     <string name="smart_button_action_view_360">原厂 360 画面</string>
