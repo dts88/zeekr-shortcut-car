@@ -268,6 +268,12 @@
                 android:key="pref_alerts_test"
                 android:title="@string/set_alerts_test_title"
                 android:summary="@string/set_alerts_test_summary" />
+
+            <!-- 高清那一张：警报第一张压到 100 kB，这一行发的就是老样子的 400–600 kB（车主 2026-11-15） -->
+            <Preference
+                android:key="pref_alerts_test_hq"
+                android:title="@string/set_alerts_test_hq_title"
+                android:summary="@string/set_alerts_test_hq_summary" />
         </PreferenceCategory>
 
         <PreferenceCategory

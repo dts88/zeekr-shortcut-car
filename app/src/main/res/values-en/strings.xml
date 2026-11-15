@@ -147,6 +147,14 @@ If I forget: %3$s</string>
     <string name="alert_guard_where_home">at home</string>
     <string name="alert_guard_where_away">away from home</string>
     <string name="alert_guard_where_unknown">position unknown</string>
+    <string name="alert_btn_hd">HD picture</string>
+    <string name="alert_btn_clip">Clip %1$s</string>
+    <string name="alert_clip_none">No video for that camera yet</string>
+    <string name="alert_clip_too_big">That clip is %1$s, over the 10 MB limit. Try 5 s in settings</string>
+    <string name="alert_headline_clip">%1$s, on request</string>
+    <string name="set_alerts_test_hq_title">Send a high-quality picture</string>
+    <string name="set_alerts_test_hq_summary">The 400–600 kB ladder: sharper plates, more data</string>
+    <string name="set_alerts_test_size">Sent, %1$s</string>
     <string name="alert_status_gear">Gear: %1$s</string>
     <string name="set_alerts_commands_title">Answer commands</string>
     <string name="set_alerts_commands_summary">Send pic for a picture, status for one line. Only you, and only while Sentry Mode is on</string>

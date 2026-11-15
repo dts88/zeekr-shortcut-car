@@ -128,8 +128,12 @@ Optional, in the same section:
 
 - **Pictures**: one 2×2 of all four cameras, or one picture per camera so each fills the phone screen.
 - **Straighten**: the same fisheye correction playback uses.
-- **Video**: 5 or 10 seconds, cut from the recording around the moment, with sound if the car records it.
-  Sent after the picture. Data per alert: picture under 1 MB, 5 s about 2–4 MB, 10 s about 5–8 MB.
+- **The first picture is small.** Every alert opens with one picture compressed on the car to under
+  100 kB: enough to see what is happening, small enough to ignore. Data per alert, by default: 100 kB.
+- **Ask for more from the chat.** The picture carries buttons: **HD picture** sends the same view at the
+  400–600 kB ladder, sharper plates; **Clip front / rear / left / right** cuts those few seconds for one
+  camera and sends it, refused above 10 MB. Nothing but the small picture goes out until you ask, and the
+  clip's size follows the frame rate the car records sentry video at.
 - **Answer commands**: send the bot `pic` for a fresh picture, `pic front|rear|left|right` for one
   camera, `status` for one line. Only the chat you configured is answered, and only while Sentry Mode is
   on — that is what keeps the head unit awake.

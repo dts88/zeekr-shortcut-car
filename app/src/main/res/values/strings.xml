@@ -161,6 +161,14 @@
     <string name="alert_guard_where_home">在家</string>
     <string name="alert_guard_where_away">在外面</string>
     <string name="alert_guard_where_unknown">不知道在哪</string>
+    <string name="alert_btn_hd">高清一张</string>
+    <string name="alert_btn_clip">%1$s 的片段</string>
+    <string name="alert_clip_none">这一路现在没有可切的视频</string>
+    <string name="alert_clip_too_big">这段有 %1$s，超过 10 MB。设置里改成 5 秒试试</string>
+    <string name="alert_headline_clip">%1$s，按你要的</string>
+    <string name="set_alerts_test_hq_title">发一张高清照片</string>
+    <string name="set_alerts_test_hq_summary">400–600 kB 那一档，车牌更清楚，也更费流量</string>
+    <string name="set_alerts_test_size">已发出，%1$s</string>
     <string name="alert_status_gear">挡位：%1$s</string>
     <string name="set_alerts_commands_title">回应 Telegram 命令</string>
     <string name="set_alerts_commands_summary">发 pic 要一张照片，发 status 要一句状态。只回你自己，只在哨兵模式开着时</string>

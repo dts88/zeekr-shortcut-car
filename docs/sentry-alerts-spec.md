@@ -219,6 +219,43 @@ the app process (`DECISIONS.md` D7).
 - A sleeping head unit cannot be woken by anything, which is why a button lives only three minutes; a
   late press gets the honest "too late" answer.
 
+## 1.9 第一张只有 100 kB，要看更多再点
+
+车主 2026-11-15 定的：**第一条消息只发一张压到 100 kB 以下的照片**，看得见发生什么，小到可以完全不管；
+要看清楚、要看那几秒，在聊天里点一下再传。所以车上往上传的量只有他真的想看的那一份。
+
+| 做什么 | 多大 | 怎么做的 |
+|---|---|---|
+| 警报第一张 | **≤ 100 kB** | `PictureBudget`：先降画质（70 → 45），再降尺寸（1.0 → 0.85 → 0.7），一档档试到进预算 |
+| 照片下面的 **HD 一张** | 400–600 kB | 老样子那一档（`AlertPicture.jpeg`，上限 900 kB），车牌更清楚 |
+| 照片下面的 **片段 · 哪一路** | **≤ 10 MB** | 从那一路自己的样本环里切 5 或 10 秒（设置里那一档），超了不发、回一句实际大小 |
+
+- 每颗按钮带这一次警报的号（`AlertButton`，`a:<action>:<token>`），只对这一次有效；一周前那条消息上的
+  按钮按下去什么都不做。按下先 ACK（`answerCallbackQuery`），再动手。
+- **片段不再跟着照片自动发**：切视频要走那一路的录制器，按需才值得。长度用「短视频」那一档，
+  关掉就只剩 HD 那颗按钮。
+- **片段多大由录制那边定**：哨兵 / 熄屏那一段的帧率设置（「跟随视频流配置」或固定 10 fps 之类）就是
+  让这件事可控的旋钮；按需切出来的片段直接来自那段录像，不重新编码。
+- 一次只切一段：样本环是共享的，连点两下不该起两个切片的活。
+
+###### English
+
+The owner's rule (2026-11-15): **the first message carries one picture compressed below 100 kB** — enough
+to see what is happening, small enough to ignore. Sharper, or those few seconds, is one tap away, so the
+car uploads only what the owner actually wants to look at.
+
+| What | Size | How |
+|---|---|---|
+| The alert's first picture | **≤ 100 kB** | `PictureBudget`: quality down first (70 → 45), then scale (1.0 → 0.85 → 0.7), step by step into the budget |
+| **HD picture** under it | 400–600 kB | The old ladder (`AlertPicture.jpeg`, capped at 900 kB) for readable plates |
+| **Clip · one camera** under it | **≤ 10 MB** | 5 or 10 seconds cut from that camera's own sample ring (the setting decides); over the limit it is refused with the real size |
+
+Each button carries this alert's token (`AlertButton`, `a:<action>:<token>`), so a button on a week-old
+message does nothing, and the tap is acknowledged before any work starts. Clips no longer ride along with
+the picture: cutting one needs that camera's recorder, and on demand is when it is worth doing. The clip's
+size is decided on the recording side — the sentry frame-rate setting is the knob — and nothing is
+re-encoded. One clip at a time, because the sample ring is shared.
+
 ## 2. 不做什么（车上看不到的信号）
 
 这台车的车辆接口没有撞击、气囊、喇叭、防盗 / 倾斜 / 震动触发的信号，

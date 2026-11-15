@@ -5444,8 +5444,22 @@ public class MultiCameraManager {
      */
     void writeClip(java.io.File out, int seconds, boolean includeAudio,
                    java.util.function.Consumer<Boolean> done) {
+        writeClip(out, seconds, includeAudio, com.kooo.evcam.camera.CameraSlots.KEY_SURROUND, done);
+    }
+
+    /**
+     * 同上，但那一路由调用方点名（停车警报里「要 front 的片段」）。
+     *
+     * <p>每一路有自己的录制器，片段就从那一路的样本环里切；没有那一槽、没在录、环里不够长，回 false。</p>
+     *
+     * The same, for the camera the caller names (the alert's "give me the front clip"). Each lane has its
+     * own recorder, so the clip is cut from that lane's sample ring; a missing slot, no recording, or a
+     * ring that is too short answers false.
+     */
+    void writeClip(java.io.File out, int seconds, boolean includeAudio, String cameraKey,
+                   java.util.function.Consumer<Boolean> done) {
         mainHandler.post(() -> {
-            Slot slot = slots.get(com.kooo.evcam.camera.CameraSlots.KEY_SURROUND);
+            Slot slot = slots.get(cameraKey);
             CodecVideoRecorder recorder = slot == null ? null : slot.recorder;
             if (recorder == null) {
                 done.accept(false);

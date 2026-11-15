@@ -200,6 +200,14 @@ public final class SentryAlerts implements Telemetry.Listener {
      */
     private final RequestPolicy requests = new RequestPolicy();
 
+    // ---- 警报那张照片下面的按钮 / the buttons under the alert picture ----
+
+    /** 这一次警报的按钮记号（{@link AlertButton}）；空串表示手上没有活着的按钮。 */
+    private volatile String alertToken = "";
+    /** 一次只切一段视频：样本环是共享的，连点两下不该起两个切片的活。 */
+    private final java.util.concurrent.atomic.AtomicBoolean clipBusy =
+            new java.util.concurrent.atomic.AtomicBoolean(false);
+
     // ---- 忘了开哨兵 / Forgot Sentry ----
 
     /**
@@ -243,20 +251,6 @@ public final class SentryAlerts implements Telemetry.Listener {
      * Sending photos and text both queue on this one thread: one at a time, no concurrency
      * (Telegram has rate limits), and no unmanaged thread per message.
      */
-    /**
-     * 延后一半时长再切短视频用的。和发送那条线程分开，
-     * 否则等这几秒会把后面的照片也堵在后面。
-     *
-     * Used to cut the short video after half its duration has passed. Kept separate from the
-     * sending thread, otherwise waiting these seconds would also block the photos behind it.
-     */
-    private final java.util.concurrent.ScheduledExecutorService clipDelay =
-            java.util.concurrent.Executors.newSingleThreadScheduledExecutor(runnable -> {
-                Thread thread = new Thread(runnable, "alert-clip-delay");
-                thread.setDaemon(true);
-                return thread;
-            });
-
     private final java.util.concurrent.ExecutorService sender =
             java.util.concurrent.Executors.newSingleThreadExecutor(runnable -> {
                 Thread thread = new Thread(runnable, "telegram-send");
@@ -531,6 +525,13 @@ public final class SentryAlerts implements Telemetry.Listener {
 
                     @Override
                     public void onButton(String data, long pressedAt) {
+                        // 两套按钮共用一个回调：a: 是照片下面那排，g: 是「忘了开哨兵」那一排。
+                        // Two sets of buttons share one callback: a: is the row under a picture, g: is
+                        // the Sentry reminder.
+                        if (data != null && data.startsWith("a:")) {
+                            onAlertButton(data);
+                            return;
+                        }
                         onGuardButton(data, pressedAt);
                     }
 
@@ -649,6 +650,15 @@ public final class SentryAlerts implements Telemetry.Listener {
      * will say which step failed.</p>
      */
     public void sendTestPicture(Callback callback) {
+        sendTestPicture(callback, false);
+    }
+
+    /** 「发一张高清照片」：同一张，按 900 kB 那一档压（车主 2026-11-15）。 */
+    public void sendTestPictureHighQuality(Callback callback) {
+        sendTestPicture(callback, true);
+    }
+
+    private void sendTestPicture(Callback callback, boolean highQuality) {
         AlertChannel channel = channel();
         if (!channel.ready()) {
             callback.onResult(false, blockedText(channel.blockedReason()));
@@ -661,7 +671,8 @@ public final class SentryAlerts implements Telemetry.Listener {
         SnapshotTaker.take(app, new SnapshotTaker.Callback() {
             @Override
             public void onPicture(Bitmap grid) {
-                deliver(channel, grid, caption, TelegramCommand.ANY_LANE, true, callback, null);
+                deliver(channel, grid, caption, TelegramCommand.ANY_LANE, true, highQuality, callback,
+                        null);
             }
 
             @Override
@@ -1379,6 +1390,18 @@ public final class SentryAlerts implements Telemetry.Listener {
      */
     private void deliver(AlertChannel channel, Bitmap grid, String caption, int onlyLane,
                          boolean ownerAsked, Callback callback, Runnable onDelivered) {
+        deliver(channel, grid, caption, onlyLane, ownerAsked, false, callback, onDelivered);
+    }
+
+    /**
+     * 发一张照片。
+     *
+     * @param ownerAsked  车主自己开口要的（测试按钮、聊天里的 pic）
+     * @param highQuality 「HD」那一档：900 kB 而不是 100 kB
+     */
+    private void deliver(AlertChannel channel, Bitmap grid, String caption, int onlyLane,
+                         boolean ownerAsked, boolean highQuality, Callback callback,
+                         Runnable onDelivered) {
         sender.execute(() -> {
             // 掰直、切图、压缩都在这一条线程上：一张 2×2 的校正要翻一百六十万像素，
             // 放在主线程上就是和相机、和设置界面抢那几十毫秒。
@@ -1399,7 +1422,9 @@ public final class SentryAlerts implements Telemetry.Listener {
                         if (cell == null) {
                             continue;
                         }
-                        byte[] jpeg = AlertPicture.jpeg(cell);
+                        byte[] jpeg = highQuality
+                                ? AlertPicture.jpeg(cell)
+                                : AlertPicture.jpegUnder(cell, PictureBudget.ALERT_BYTES);
                         cell.recycle();
                         if (jpeg != null && jpeg.length > 0) {
                             photos.add(jpeg);
@@ -1407,7 +1432,9 @@ public final class SentryAlerts implements Telemetry.Listener {
                         }
                     }
                 } else {
-                    byte[] jpeg = AlertPicture.jpeg(picture);
+                    byte[] jpeg = highQuality
+                            ? AlertPicture.jpeg(picture)
+                            : AlertPicture.jpegUnder(picture, PictureBudget.ALERT_BYTES);
                     if (jpeg != null && jpeg.length > 0) {
                         photos.add(jpeg);
                         captions.add(caption);
@@ -1445,22 +1472,31 @@ public final class SentryAlerts implements Telemetry.Listener {
                 return;
             }
 
+            alertToken = GuardToken.mint(SystemClock.elapsedRealtime());
+            // 按钮只有 Telegram 有：别的出口按主题发图，没有回程。
+            // Only Telegram has buttons: the other exit posts to a topic and has no way back.
+            boolean buttons = channel.supportsClips() && !config.isAlertsNtfy();
+            String markup = buttons ? alertMarkup() : "";
+            int biggestPhoto = 0;
             AlertChannel.Result last = AlertChannel.Result.fail(
                     AlertChannel.Kind.NETWORK, 0, "nothing sent");
             for (int i = 0; i < photos.size(); i++) {
-                last = channel.sendPhoto(photos.get(i), captions.get(i));
+                last = markup.isEmpty()
+                        ? channel.sendPhoto(photos.get(i), captions.get(i))
+                        : sendPhotoWithButtons(photos.get(i), captions.get(i), markup);
                 if (!last.ok) {
                     break;
                 }
+                biggestPhoto = Math.max(biggestPhoto, photos.get(i).length);
             }
+            final int photoBytes = biggestPhoto;
             final AlertChannel.Result outcome = last;
             if (outcome.ok && onDelivered != null) {
                 onDelivered.run();
             }
-            if (outcome.ok && channel.supportsClips()) {
-                sendClip(config.getAlertsTelegramToken(), config.getAlertsTelegramChatId(), caption,
-                        TelegramRequest.keyboardMarkup());
-            }
+            // 视频不再跟着照片一起发：「要哪一路的片段」是照片下面的一颗按钮（车主 2026-11-15）。
+            // No clip rides along with the picture any more: "a clip of which camera" is a button under
+            // it (the owner, 2026-11-15).
             if (!outcome.ok) {
                 BlackBox.note("alerts: send failed via " + channel.name() + " ("
                         + outcome.kind + " " + outcome.display() + ")");
@@ -1469,7 +1505,10 @@ public final class SentryAlerts implements Telemetry.Listener {
             if (callback != null) {
                 String message;
                 if (outcome.ok) {
-                    message = app.getString(R.string.set_alerts_sent);
+                    // 测试那一栏要看得见「到底多大」：100 kB 是预算，不是承诺
+                    // The test row has to show what actually went out: 100 kB is a budget, not a promise
+                    message = app.getString(R.string.set_alerts_test_size,
+                            PictureBudget.size(photoBytes));
                     if (config.isAlertsNtfy() && !NtfyRisk.accepted(config.getAlertsNtfyTopic(),
                             config.getAlertsNtfyRiskAck())) {
                         // 发得出去不等于风险提示已经被接受
@@ -1619,53 +1658,167 @@ public final class SentryAlerts implements Telemetry.Listener {
      * happens, and then nothing comes. But it also must not pop up every 60 seconds, so here we
      * rate-limit once more ourselves.</p>
      */
+
+    // ================================================================= 照片下面的按钮 (buttons under the picture)
+
     /**
-     * 警报的短视频：从环里切出最后 5 或 10 秒，发出去再删掉临时文件。
+     * 警报那张照片下面那排：**HD** 一张，或者**哪一路的片段**。
      *
-     * <p>只在照片已经发出去之后才做：照片是那条一定会到的消息，视频是附加的。
-     * 写不出来、发不出去，都只记一行，不去打扰车主。</p>
+     * <p>第一张压到 100 kB，小到可以完全不管；要看清楚、要看那几秒，点一下再传。传上来的量因此只有
+     * 车主真的想看的那一份（车主 2026-11-15）。片段长度还是设置里那一档（5 / 10 秒），
+     * 关掉视频时这一排只有 HD。</p>
      *
-     * The alert's short video: cut the last 5 or 10 seconds out of the ring, send it, then delete
-     * the temp file.
+     * <p>顺序是 HD、然后是四路、每行两颗：四颗挤一行，手机上一颗只剩几个字。</p>
      *
-     * <p>Only done after the photo has already been sent: the photo is the message that will
-     * definitely arrive, the video is a bonus. If it cannot be written or sent, just log one line
-     * and do not bother the owner.</p>
+     * <p>The row under the alert picture: <b>HD</b>, or <b>a clip of one camera</b>. The first picture is
+     * compressed under 100 kB, small enough to ignore; sharper, or those few seconds, is one tap away, so
+     * only what the owner wants is uploaded. Clip length stays the setting (5 or 10 s); with video off the
+     * row is HD alone.</p>
      */
-    private void sendClip(String token, String chatId, String caption, String markup) {
+    private String alertMarkup() {
+        if (alertToken.isEmpty()) {
+            return "";
+        }
+        java.util.List<String> labels = new ArrayList<>();
+        java.util.List<String> datas = new ArrayList<>();
+        labels.add(app.getString(R.string.alert_btn_hd));
+        datas.add(AlertButton.data(AlertButton.ACTION_HIGH, alertToken));
+        if (config.getAlertsClipSeconds() > 0) {
+            for (int lane = 0; lane < 4; lane++) {
+                labels.add(app.getString(R.string.alert_btn_clip, CameraNames.ofLane(app, lane)));
+                datas.add(AlertButton.data(AlertButton.clipAction(lane), alertToken));
+            }
+        }
+        return TelegramRequest.inlineKeyboard(labels.toArray(new String[0]),
+                datas.toArray(new String[0]), 2);
+    }
+
+    /** 带按钮发一张照片（只有 Telegram 有按钮）。Photo with buttons; only Telegram has them. */
+    private AlertChannel.Result sendPhotoWithButtons(byte[] jpeg, String caption, String markup) {
+        TelegramSender.Result result = TelegramSender.sendPhoto(
+                config.getAlertsTelegramToken(), config.getAlertsTelegramChatId(), jpeg, caption, markup);
+        if (result.ok) {
+            return AlertChannel.Result.ok();
+        }
+        return AlertChannel.Result.fail(AlertChannel.Kind.NETWORK, result.httpCode, result.display());
+    }
+
+    /** 一颗按钮按下了（{@code callback_query}，在轮询那条线程上叫）。 */
+    void onAlertButton(String data) {
+        String action = AlertButton.actionFor(data, alertToken);
+        if (action == null) {
+            BlackBox.note("alerts: a button from an older alert, ignored");
+            return;
+        }
+        if (AlertButton.ACTION_HIGH.equals(action)) {
+            BlackBox.note("alerts: a high-quality picture was asked for");
+            sendHighQualityPicture();
+            return;
+        }
+        int lane = AlertButton.laneOf(action);
+        if (lane != TelegramCommand.ANY_LANE) {
+            sendClipForLane(lane);
+        }
+    }
+
+    /** 再拍一张、按 900 kB 那一档发（车主点了 HD）。Snapshot again and send at the 900 kB budget. */
+    private void sendHighQualityPicture() {
+        AlertChannel channel = channel();
+        if (!channel.ready()) {
+            blockedChannel(channel);
+            return;
+        }
+        String caption = TelegramRequest.caption(app.getString(R.string.alert_headline_request),
+                lateNote(0L), sentryLine(sentryValue()), time());
+        SnapshotTaker.take(app, new SnapshotTaker.Callback() {
+            @Override
+            public void onPicture(Bitmap grid) {
+                deliver(channel, grid, caption, TelegramCommand.ANY_LANE, true, true, null, null);
+            }
+
+            @Override
+            public void onFailed(String reason) {
+                BlackBox.note("alerts: no high-quality picture (" + reason + ")");
+                deliverText(channel, app.getString(R.string.alert_clip_none));
+            }
+        });
+    }
+
+    /**
+     * 切一段那一路的视频发出去，不超过 {@link PictureBudget#CLIP_BYTES}。
+     *
+     * <p>片段的画质和大小由录制那边决定 —— 熄屏 / 哨兵那一段的帧率设置（默认跟随视频流配置，
+     * 可以调低到 10 fps）就是让这件事可控的那个旋钮。超过 10 MB 就不发，回一句实话和实际大小。</p>
+     *
+     * <p>Cut that camera's clip and send it, under {@link PictureBudget#CLIP_BYTES}. The clip's size is set
+     * on the recording side — the sentry / screen-off frame-rate setting is the knob that keeps it
+     * manageable — and anything over 10 MB is refused with the real number instead of a silent failure.</p>
+     */
+    private void sendClipForLane(int lane) {
         int seconds = config.getAlertsClipSeconds();
+        String token = config.getAlertsTelegramToken();
+        String chatId = config.getAlertsTelegramChatId();
         if (seconds <= 0) {
             return;
         }
-        // 名字带时间戳：两条警报挨得近时不会互相覆盖
-        // The name carries a timestamp: two alerts close together won't overwrite each other
+        if (!clipBusy.compareAndSet(false, true)) {
+            BlackBox.note("alerts: a clip is already being cut, ignoring the second tap");
+            return;
+        }
         java.io.File file = new java.io.File(app.getCacheDir(),
-                "alert_clip_" + System.currentTimeMillis() + ".mp4");
-        // 要的是“那一刻”：环里只有已经录过的画面，所以等一半时长再切，
-        // 切出来的那段就是一半在事情之前、一半在之后。
-        // What we want is "that moment": the ring only holds already-recorded frames, so wait
-        // half the duration before cutting, and the cut segment is half before the event and
-        // half after.
-        long waitMs = seconds * 1000L / 2L;
-        clipDelay.schedule(() -> CameraKeeper.get(app).writeClip(file, seconds,
-                config.isAlertsClipAudio(), ok -> {
+                "alert_clip_" + lane + "_" + System.currentTimeMillis() + ".mp4");
+        String camera = CameraNames.ofLane(app, lane);
+        BlackBox.note("alerts: clip asked for, " + camera + ", " + seconds + " s");
+        CameraKeeper.get(app).writeClip(file, seconds, config.isAlertsClipAudio(),
+                cameraKeyOfLane(lane), ok -> {
+            clipBusy.set(false);
             if (!ok || !file.isFile() || file.length() == 0) {
-                BlackBox.note("alerts: no clip (ring holds too little video)");
+                BlackBox.note("alerts: no clip for " + camera + " (ring holds too little video)");
+                deliverText(channel(), app.getString(R.string.alert_clip_none));
                 return;
             }
-            String clipCaption = caption + "\n"
-                    + app.getString(seconds == 5 ? R.string.opt_alerts_clip_5 : R.string.opt_alerts_clip_10);
+            long bytes = file.length();
+            if (bytes > PictureBudget.CLIP_BYTES) {
+                BlackBox.note("alerts: clip too big for " + camera + " (" + PictureBudget.size(bytes) + ")");
+                deliverText(channel(), app.getString(R.string.alert_clip_too_big,
+                        PictureBudget.size(bytes)));
+                if (!file.delete()) {
+                    BlackBox.note("alerts: temp clip could not be deleted");
+                }
+                return;
+            }
+            String caption = TelegramRequest.caption(app.getString(R.string.alert_headline_clip, camera),
+                    sentryLine(sentryValue()), time());
             sender.execute(() -> {
-                TelegramSender.Result result = TelegramSender.sendVideo(token, chatId, file, clipCaption, markup);
+                TelegramSender.Result result = TelegramSender.sendVideo(token, chatId, file, caption,
+                        TelegramRequest.keyboardMarkup());
                 if (!result.ok) {
                     BlackBox.note("alerts: clip send failed (" + result.display() + ")");
+                } else {
+                    BlackBox.note("alerts: clip sent, " + camera + ", " + PictureBudget.size(bytes));
                 }
                 if (!file.delete()) {
                     BlackBox.note("alerts: temp clip could not be deleted");
                 }
             });
-        }), waitMs, java.util.concurrent.TimeUnit.MILLISECONDS);
+        });
     }
+
+    /** 路号 → 录制那边的槽键（front / back / left / right）。Lane to the recorder's slot key. */
+    private static String cameraKeyOfLane(int lane) {
+        switch (lane) {
+            case 0:
+                return com.kooo.evcam.camera.CameraSlots.KEY_SURROUND;
+            case 1:
+                return com.kooo.evcam.camera.CameraSlots.KEY_CABIN_FRONT;
+            case 2:
+                return com.kooo.evcam.camera.CameraSlots.KEY_CABIN_REAR;
+            case 3:
+            default:
+                return com.kooo.evcam.camera.CameraSlots.KEY_FOURTH;
+        }
+    }
+
 
     /**
      * 把一个异常式的理由压成一行能读的话。

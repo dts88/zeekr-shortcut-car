@@ -1215,7 +1215,18 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         if (test != null) {
             test.setPersistent(false);
             test.setOnPreferenceClickListener(preference -> {
-                sendAlertsTest();
+                sendAlertsTest(false);
+                return true;
+            });
+        }
+
+        // 高清那一张：同一个动作，按 900 kB 那一档压。警报自己发的是 100 kB 那一张。
+        // The high-quality one: same action, compressed at the 900 kB budget; alerts send the 100 kB one.
+        Preference testHq = findPreference("pref_alerts_test_hq");
+        if (testHq != null) {
+            testHq.setPersistent(false);
+            testHq.setOnPreferenceClickListener(preference -> {
+                sendAlertsTest(true);
                 return true;
             });
         }
@@ -1676,13 +1687,21 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     }
 
     /** 拍一张、发出去：和真警报走同一条路，所以它能通，警报就能通。 */
-    private void sendAlertsTest() {
-        toast(getString(R.string.set_alerts_test_summary));
-        com.kooo.evcam.alarm.SentryAlerts.get(requireContext()).sendTestPicture((ok, message) -> {
+    private void sendAlertsTest(boolean highQuality) {
+        toast(getString(highQuality ? R.string.set_alerts_test_hq_summary
+                : R.string.set_alerts_test_summary));
+        com.kooo.evcam.alarm.SentryAlerts alerts =
+                com.kooo.evcam.alarm.SentryAlerts.get(requireContext());
+        com.kooo.evcam.alarm.SentryAlerts.Callback done = (ok, message) -> {
             if (isAdded()) {
                 toast(message);
             }
-        });
+        };
+        if (highQuality) {
+            alerts.sendTestPictureHighQuality(done);
+        } else {
+            alerts.sendTestPicture(done);
+        }
     }
 
     /**

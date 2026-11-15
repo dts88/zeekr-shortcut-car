@@ -220,22 +220,39 @@ public final class TelegramRequest {
      * @return {@code reply_markup} 的值；两个数组不配对时是空串（宁可没有按钮，也不要一排按不动的）
      */
     public static String inlineKeyboard(String[] labels, String[] datas) {
+        return inlineKeyboard(labels, datas, labels == null ? 0 : labels.length);
+    }
+
+    /**
+     * 同一排按钮，每 {@code perRow} 颗换一行。
+     *
+     * <p>四颗挤在一行，手机上一颗只有几个字的宽度，所以警报那张照片下面是两行两行排的。</p>
+     *
+     * The same buttons, wrapped every {@code perRow} of them: four in one row leaves each button only a
+     * few characters wide on a phone, so the alert's picture carries two rows of two.
+     */
+    public static String inlineKeyboard(String[] labels, String[] datas, int perRow) {
         if (labels == null || datas == null || labels.length == 0
-                || labels.length != datas.length) {
+                || labels.length != datas.length || perRow <= 0) {
             return "";
         }
-        StringBuilder out = new StringBuilder("{\"inline_keyboard\":[[");
+        StringBuilder out = new StringBuilder("{\"inline_keyboard\":[");
         for (int i = 0; i < labels.length; i++) {
             if (labels[i] == null || datas[i] == null || datas[i].isEmpty()) {
                 return "";
             }
-            if (i > 0) {
+            if (i % perRow == 0) {
+                out.append(i == 0 ? "[" : ",[");
+            } else {
                 out.append(',');
             }
             out.append("{\"text\":\"").append(jsonEscape(labels[i]))
                     .append("\",\"callback_data\":\"").append(jsonEscape(datas[i])).append("\"}");
+            if (i % perRow == perRow - 1 || i == labels.length - 1) {
+                out.append(']');
+            }
         }
-        return out.append("]]}").toString();
+        return out.append("]}").toString();
     }
 
     /** JSON 字符串里的那两个字符。The two characters that matter inside a JSON string. */

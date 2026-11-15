@@ -380,6 +380,12 @@ public final class CameraKeeper {
         pipeline().writeClip(out, seconds, includeAudio, done);
     }
 
+    /** 同上，点名要哪一路的片段（{@link com.kooo.evcam.camera.CameraSlots} 的键：front / back / left / right）。 */
+    public void writeClip(java.io.File out, int seconds, boolean includeAudio, String cameraKey,
+                          java.util.function.Consumer<Boolean> done) {
+        pipeline().writeClip(out, seconds, includeAudio, cameraKey, done);
+    }
+
     public void takePhoto(MultiCameraManager.PhotoCallback callback) {
         pipeline().takePhoto(callback);
     }

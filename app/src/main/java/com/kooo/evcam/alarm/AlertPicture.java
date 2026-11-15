@@ -298,6 +298,54 @@ public final class AlertPicture {
      * Compress into a sendable JPEG: step down through {@link #QUALITIES}, stopping once
      * it is at or below {@link #MAX_BYTES}.
      */
+    /**
+     * 压进预算：先降画质，再降尺寸，直到 {@code maxBytes} 以下（{@link PictureBudget}）。
+     *
+     * <p>哪一档都不进预算时，给的是试过的最小那一张 —— 宁可小得看不清，也不发一张超预算的。</p>
+     *
+     * <p>Compress into the budget: quality first, then scale, until it fits ({@link PictureBudget}). If no
+     * step fits, the smallest one tried is returned — too small beats over budget.</p>
+     */
+    public static byte[] jpegUnder(Bitmap bitmap, int maxBytes) {
+        if (bitmap == null || bitmap.isRecycled()) {
+            return null;
+        }
+        int budget = maxBytes > 0 ? maxBytes : PictureBudget.ALERT_BYTES;
+        byte[] smallest = null;
+        for (int step = 0; step < PictureBudget.steps(); step++) {
+            float[] plan = PictureBudget.step(step);
+            if (plan == null) {
+                break;
+            }
+            float scale = plan[0];
+            int quality = (int) plan[1];
+            Bitmap source = bitmap;
+            Bitmap scaled = null;
+            if (PictureBudget.shrinks(scale)) {
+                int width = Math.max(1, Math.round(bitmap.getWidth() * scale));
+                int height = Math.max(1, Math.round(bitmap.getHeight() * scale));
+                scaled = Bitmap.createScaledBitmap(bitmap, width, height, true);
+                source = scaled;
+            }
+            try {
+                ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+                source.compress(Bitmap.CompressFormat.JPEG, quality, bytes);
+                byte[] encoded = bytes.toByteArray();
+                if (smallest == null || encoded.length < smallest.length) {
+                    smallest = encoded;
+                }
+                if (PictureBudget.fits(encoded.length, budget)) {
+                    return encoded;
+                }
+            } finally {
+                if (scaled != null && !scaled.isRecycled()) {
+                    scaled.recycle();
+                }
+            }
+        }
+        return smallest;
+    }
+
     public static byte[] jpeg(Bitmap bitmap) {
         if (bitmap == null || bitmap.isRecycled()) {
             return null;

@@ -147,6 +147,14 @@ Kalau lupa: %3$s</string>
     <string name="alert_guard_where_home">di rumah</string>
     <string name="alert_guard_where_away">di luar rumah</string>
     <string name="alert_guard_where_unknown">lokasi tidak diketahui</string>
+    <string name="alert_btn_hd">Gambar HD</string>
+    <string name="alert_btn_clip">Klip %1$s</string>
+    <string name="alert_clip_none">Belum ada video untuk kamera itu</string>
+    <string name="alert_clip_too_big">Klip itu %1$s, melebihi had 10 MB. Cuba 5 saat dalam tetapan</string>
+    <string name="alert_headline_clip">%1$s, atas permintaan</string>
+    <string name="set_alerts_test_hq_title">Hantar gambar kualiti tinggi</string>
+    <string name="set_alerts_test_hq_summary">Tahap 400–600 kB: plat lebih jelas, lebih banyak data</string>
+    <string name="set_alerts_test_size">Dihantar, %1$s</string>
     <string name="alert_status_gear">Gear: %1$s</string>
     <string name="set_alerts_commands_title">Jawab arahan</string>
     <string name="set_alerts_commands_summary">Hantar pic untuk gambar, status untuk satu baris. Hanya anda, dan hanya semasa Mod Sentri hidup</string>
