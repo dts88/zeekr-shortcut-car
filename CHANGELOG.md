@@ -9,6 +9,11 @@ commit message, not here.
 
 ## [Unreleased]
 
+- Alerts: ntfy.sh as a second place for them — a free topic (no account, no token), or a paid
+  account's protected one. **Off by default**: the switch is in Developer options, so with
+  Developer options closed alerts go to Telegram and nothing on the ntfy side is touched; the
+  free-plan warning has to be accepted before a single alert is sent. Developer only until it
+  has been tested on a car.
 - Alerts: movement in view is now a trigger of its own, read from the encoder's own frames; and every
   trigger can be switched on or off under Settings → Alerts → What counts.
 - Alerts: nothing is sent when you come back to the car. Unlocking drops Sentry Mode out of its armed
