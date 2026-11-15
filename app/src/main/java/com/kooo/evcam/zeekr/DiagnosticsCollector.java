@@ -752,8 +752,18 @@ public final class DiagnosticsCollector {
      */
     private static void appendBlackBox(StringBuilder sb, Context context) {
         sb.append("## 2.6 黑匣子（进程 / 服务 / 界面的生死时间线）").append('\n');
+        String shown = "";
         try {
-            sb.append(com.kooo.evcam.blackbox.BlackBox.export(context, 128 * 1024));
+            shown = com.kooo.evcam.blackbox.BlackBox.export(context, 128 * 1024);
+            sb.append(shown);
+        } catch (Exception e) {
+            sb.append("!! 读取失败: ").append(e).append('\n');
+        }
+        sb.append('\n');
+        // 应用重装过（App Lab 丢了）时，之前的时间线只在 U 盘那一份里
+        sb.append("## 2.6.1 黑匣子：U 盘那一份里更早的部分").append('\n');
+        try {
+            sb.append(com.kooo.evcam.blackbox.BlackBox.exportUsbBefore(context, shown, 96 * 1024));
         } catch (Exception e) {
             sb.append("!! 读取失败: ").append(e).append('\n');
         }
