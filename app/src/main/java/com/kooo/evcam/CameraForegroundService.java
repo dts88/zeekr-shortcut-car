@@ -318,20 +318,26 @@ public class CameraForegroundService extends Service {
      * 创建通知渠道（Android 8.0+）
      */
     private void createNotificationChannel() {
+        channel(this);
+    }
+
+    /** 前台服务通知用的渠道（截取屏幕那一条也用它，{@code capture.ScreenCaptureService}）：建好，返回它的 id。 */
+    public static String channel(Context context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(
                     CHANNEL_ID,
-                    getString(R.string.notif_channel_name),
+                    context.getString(R.string.notif_channel_name),
                     NotificationManager.IMPORTANCE_LOW
             );
-            channel.setDescription(getString(R.string.notif_channel_desc));
+            channel.setDescription(context.getString(R.string.notif_channel_desc));
             channel.setShowBadge(false);
 
-            NotificationManager manager = getSystemService(NotificationManager.class);
+            NotificationManager manager = context.getSystemService(NotificationManager.class);
             if (manager != null) {
                 manager.createNotificationChannel(channel);
             }
         }
+        return CHANNEL_ID;
     }
 
     /** 前台服务那一条通知：标题写状态，正文写能做的动作，点了回主界面。 */
