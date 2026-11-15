@@ -64,6 +64,8 @@ final class CarMoves {
     static final long DOOR_BACK_MS = 15_000;
     /** 关门读回多久看一次。 */
     static final long DOOR_STEP_MS = 200;
+    /** 几扇一起关时，两扇之间隔多久写：车自己的设置页逐扇关就是隔 200 ms（Lab findings §2.139）。 */
+    static final long DOOR_GAP_MS = 200;
     /** 一键运动记下的原来的驾驶模式（运行状态，在 {@code smart_button_state} 里）。 */
     static final String SPORT_SAVED = "sport_saved_mode";
 
@@ -492,7 +494,8 @@ final class CarMoves {
      * 车机说这一扇不是 active（没有电动门的车、没有电动门的那一扇）就不写。
      * 项目所有者的车侧门用不了（副驾那扇是 notavailable），选项照留，给有电动门的车用（项目所有者 2026-11-15）。
      *
-     * <p>读不到、读到别的值的那一扇跳过（几扇一起关时不影响别的）；一扇都读不到是做不了。都关着算做成；
+     * <p>几扇一起关时一扇一扇写，两扇之间隔 {@link #DOOR_GAP_MS}（同车自己的设置页）。
+     * 读不到、读到别的值的那一扇跳过（几扇一起关时不影响别的）；一扇都读不到是做不了。都关着算做成；
      * 有开着的、一扇都写不了是做不了；写了的 {@link #DOOR_BACK_MS} 内都读到关好算做成，到时停在半路是做不了，还开着是没生效。</p>
      */
     static Job closeDoors(Signal... doors) {
@@ -517,6 +520,9 @@ final class CarMoves {
                 if (!active(status)) {
                     c.note(which + " " + (status == null ? "status ?" : status));
                     continue;
+                }
+                if (!closing.isEmpty()) {
+                    c.sleeper.sleep(DOOR_GAP_MS);
                 }
                 if (c.write(door.id, door.zone, 0)) {
                     closing.add(door);
