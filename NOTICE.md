@@ -36,9 +36,6 @@
 - **包名与构建**：applicationId 改为 `io.github.dts88.zeekrshortcut`，签名可由环境变量覆盖，
   CI 构建与发布见 `.github/`。
 
-平台事实笔记见 [`docs/zeekr-platform-notes.md`](docs/zeekr-platform-notes.md)，
-其中逐条标注了来源与未验证项。
-
 上游的两份免责声明保留在 [`docs/`](docs/) 目录：`upstream-EVCam-免责声明.md`、`upstream-EVCam-补盲免责声明.md`。
 上游的其他原始文档（README、CLAUDE.md、AGENTS.md 和 README 里的图片）已不适用于本项目，从当前目录删去，
 原文都在第一个 commit 里。
