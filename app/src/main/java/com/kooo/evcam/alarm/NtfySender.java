@@ -50,6 +50,29 @@ public final class NtfySender {
 
     private static final String TAG = "NtfySender";
 
+    /**
+     * 车自己发的那些消息上的标记：轮询回来时靠它认出「这是我发的」，别把自己的警报当命令执行。
+     *
+     * <p>配图那条路本来就有它（{@link NtfyRequest#photoUrl} 的 {@code tags=car,warning}）；文字那条路
+     * 原来什么标签都不带，所以这里补上同一个词。用现成的词而不是新造一个：手机上它显示成一个车的
+     * 图标，而不是一串没人认识的字。</p>
+     *
+     * <p>这一条是<b>加强</b>，不是全部：别处还可能有人往这个标签上凑。所以读的那一头（{@link NtfyCommandPoller}）
+     * 额外还要求消息认得出是命令。分级：ntfy 的发布头 {@code X-Tags} 是单一来源（官方发布文档），
+     * 没有第二处量过；就算服务器不认这个头，丢的也只是这一道加强。</p>
+     *
+     * The tag on messages the car itself publishes: the poller keys on it so an own alert is never run as a
+     * command. The picture path already carried it (the {@code tags=car,warning} in
+     * {@link NtfyRequest#photoUrl}); the text path carried no tag at all, so the same word goes there. The
+     * existing word rather than a new one: the phone shows a car icon instead of a string nobody knows.
+     *
+     * <p>This is a reinforcement, not the whole story: anyone could put that tag on a message too. So the
+     * reading side ({@link NtfyCommandPoller}) additionally requires the text to parse as a command.
+     * Grade: ntfy's {@code X-Tags} publish header is single-source (the official publishing docs), not
+     * measured here; if the server ignored it, all that is lost is this reinforcement.</p>
+     */
+    public static final String MARKER_TAG = "car";
+
     private static final int CONNECT_TIMEOUT_MS = 15_000;
     private static final int READ_TIMEOUT_MS = 30_000;
 
@@ -68,7 +91,10 @@ public final class NtfySender {
                                                String text, String title) {
         String url = NtfyRequest.textUrl(server, topic);
         byte[] body = (text == null ? "" : text).getBytes(StandardCharsets.UTF_8);
-        return publish("POST", url, body, token, title);
+        // 文字这条路自己带标记：没有它，车读回来的第一句可能就是自己的警报。
+        // The text path carries the marker itself: without it the first thing the car reads back could be
+        // its own alert.
+        return publish("POST", url, body, token, title, MARKER_TAG);
     }
 
     /**
@@ -93,7 +119,10 @@ public final class NtfySender {
         }
         String name = "alert_" + System.currentTimeMillis() + ".jpg";
         String url = NtfyRequest.photoUrl(server, topic, caption, title, name);
-        return publish("PUT", url, jpeg, token, title);
+        // 配图的标记已经在那条 URL 的 tags 里，不再往头上补一个（同一个参数两处给，谁覆盖谁没人量过）。
+        // A picture's marker is already in that URL's tags, so no header is added on top of it (who
+        // overrides whom when the same parameter comes from two places was never measured).
+        return publish("PUT", url, jpeg, token, title, null);
     }
 
     /**
@@ -117,7 +146,7 @@ public final class NtfySender {
     public static Account account(String server, String token) {
         String url = NtfyRequest.accountUrl(server);
         try {
-            Reply reply = call("GET", url, null, token, null);
+            Reply reply = call("GET", url, null, token, null, null);
             if (reply.code != 200) {
                 return Account.failed(kind(reply.code), NtfyRequest.redact(reply.body, token));
             }
@@ -146,7 +175,7 @@ public final class NtfySender {
     public static Boolean protectedTopic(String server, String topic) {
         String url = NtfyRequest.probePublishUrl(server, topic);
         try {
-            Reply reply = call("POST", url, null, null, null);
+            Reply reply = call("POST", url, null, null, null, null);
             if (reply.code == 403) {
                 return Boolean.TRUE;
             }
@@ -161,9 +190,9 @@ public final class NtfySender {
 
     /** 发一次，把 HTTP 码翻成 {@link AlertChannel.Kind}。 */
     private static AlertChannel.Result publish(String method, String url, byte[] body, String token,
-                                               String title) {
+                                               String title, String tags) {
         try {
-            Reply reply = call(method, url, body, token, title);
+            Reply reply = call(method, url, body, token, title, tags);
             if (reply.code == 200) {
                 return AlertChannel.Result.ok();
             }
@@ -206,7 +235,8 @@ public final class NtfySender {
      * One request. The {@code Authorization} header is the token's only landing place, and no exception
      * text carries it because the URL never does.
      */
-    private static Reply call(String method, String url, byte[] body, String token, String title)
+    private static Reply call(String method, String url, byte[] body, String token, String title,
+                              String tags)
             throws IOException {
         HttpURLConnection connection = null;
         try {
@@ -221,6 +251,10 @@ public final class NtfySender {
                 // A title must stay ASCII: not every stack sends headers as UTF-8; the caption carries
                 // any non-ASCII text.
                 connection.setRequestProperty("X-Title", ascii(title));
+            }
+            if (tags != null && !tags.trim().isEmpty()) {
+                // 标签只带 ASCII：和标题同一个理由。Tags stay ASCII, same reason as the title.
+                connection.setRequestProperty("X-Tags", ascii(tags.trim()));
             }
             if (token != null && !token.trim().isEmpty()) {
                 connection.setRequestProperty("Authorization", "Bearer " + token.trim());
