@@ -928,6 +928,56 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             });
         }
 
+        // ------------------------------------------------------------------ ntfy（试验）
+        // 整组只在开发者选项里那个开关打开时出现（D11/D14）；关着时下面这些行都在，只是不显示。
+        // The whole group only appears while the developer switch is on (D11/D14); closed, these rows
+        // exist but do not render.
+        Preference ntfySetup = findPreference("pref_alerts_ntfy_setup");
+        if (ntfySetup != null) {
+            ntfySetup.setPersistent(false);
+            ntfySetup.setOnPreferenceClickListener(preference -> {
+                NtfySetupDialog.show(this, appConfig, this::afterNtfyChange);
+                return true;
+            });
+        }
+
+        Preference ntfyTopic = findPreference("pref_alerts_ntfy_topic");
+        if (ntfyTopic != null) {
+            ntfyTopic.setPersistent(false);
+            // 点这一行就是「重新配一遍」：换话题、重新接受提醒、重新确认收到。
+            // Tapping this row means "set it up again": new topic, warning accepted again, delivery
+            // confirmed again.
+            ntfyTopic.setOnPreferenceClickListener(preference -> {
+                NtfySetupDialog.show(this, appConfig, this::afterNtfyChange);
+                return true;
+            });
+        }
+
+        bindSwitch("pref_alerts_ntfy_paid", appConfig.isAlertsNtfyPaid(), value -> {
+            appConfig.setAlertsNtfyPaid(value);
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("设置变更: pref_alerts_ntfy_paid → "
+                    + (value ? "付费" : "免费"));
+            afterNtfyChange();
+        });
+
+        Preference ntfyToken = findPreference("pref_alerts_ntfy_token");
+        if (ntfyToken != null) {
+            ntfyToken.setPersistent(false);
+            ntfyToken.setOnPreferenceClickListener(preference -> {
+                editAlertsNtfyToken();
+                return true;
+            });
+        }
+
+        Preference ntfyServer = findPreference("pref_alerts_ntfy_server");
+        if (ntfyServer != null) {
+            ntfyServer.setPersistent(false);
+            ntfyServer.setOnPreferenceClickListener(preference -> {
+                editAlertsNtfyServer();
+                return true;
+            });
+        }
+
         SwitchPreferenceCompat commands = findPreference("pref_alerts_commands");
         if (commands != null) {
             commands.setPersistent(false);
@@ -1107,6 +1157,45 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
 
     /** 两行的行尾写当前填了什么；令牌只说末四位。 */
     private void showAlertsRows() {
+        // 真的发到哪儿：读生效的出口，和发送那边是同一个函数，说法不会打架。
+        // Where alerts actually go: the effective exit, from the same function the sender uses, so the
+        // two cannot disagree.
+        Preference channelStatus = findPreference("pref_alerts_channel_status");
+        if (channelStatus != null) {
+            if (!appConfig.isAlertsNtfy()) {
+                channelStatus.setSummary(R.string.set_alerts_channel_status_telegram);
+            } else if (!appConfig.isAlertsNtfyPaid()) {
+                channelStatus.setSummary(R.string.set_alerts_channel_status_ntfy_public);
+            } else {
+                channelStatus.setSummary(R.string.set_alerts_channel_status_ntfy_paid);
+            }
+        }
+
+        // ntfy 整组只在它生效时出现（开发者选项里那个开关）；两边各自的「现在没用」说明反而只看生效值。
+        // The ntfy group only appears while it is effective; each side's "not in use" note follows the
+        // same effective value.
+        boolean ntfy = appConfig.isAlertsNtfy();
+        show("cat_alerts_ntfy", ntfy);
+        show("pref_alerts_telegram_inactive", ntfy);
+        show("pref_alerts_ntfy_inactive", !ntfy);
+        show("pref_alerts_ntfy_topic", ntfy);
+        show("pref_alerts_ntfy_paid", ntfy);
+        show("pref_alerts_ntfy_token", ntfy && appConfig.isAlertsNtfyPaid());
+        show("pref_alerts_ntfy_server", ntfy);
+
+        Preference ntfyTopic = findPreference("pref_alerts_ntfy_topic");
+        if (ntfyTopic != null) {
+            String topic = appConfig.getAlertsNtfyTopic();
+            ntfyTopic.setSummary(topic.isEmpty() ? getString(R.string.set_alerts_ntfy_topic_empty)
+                    : getString(R.string.set_alerts_ntfy_topic_set, tail(topic)));
+        }
+        Preference ntfyToken = findPreference("pref_alerts_ntfy_token");
+        if (ntfyToken != null) {
+            String token = appConfig.getAlertsNtfyToken();
+            ntfyToken.setSummary(token.isEmpty() ? getString(R.string.set_alerts_ntfy_token_empty)
+                    : getString(R.string.set_alerts_ntfy_token_set, tail(token)));
+        }
+
         Preference token = findPreference("pref_alerts_token");
         if (token != null) {
             String value = appConfig.getAlertsTelegramToken();
@@ -1292,6 +1381,114 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             }
         }
         return false;
+    }
+
+    /**
+     * ntfy 那条路存完之后的收尾：让对方重新读设置、重画行。
+     *
+     * <p>换出口只写一个键（{@link com.kooo.evcam.alarm.NtfyGate}），这边只负责通知。</p>
+     *
+     * The tidy-up after ntfy settings change: make the sender re-read its config and repaint the rows.
+     * Switching exits writes one key; this only tells the rest.
+     */
+    private void afterNtfyChange() {
+        if (getContext() == null) {
+            return;
+        }
+        com.kooo.evcam.alarm.SentryAlerts.get(requireContext()).refreshConfig();
+        showAlertsRows();
+    }
+
+    /** ntfy 访问令牌（付费档才用得上）。只存在凭据文件里，界面上只露末四位以外什么都不说。 */
+    private void editAlertsNtfyToken() {
+        showTextDialog("pref_alerts_ntfy_token", getString(R.string.set_alerts_ntfy_token_title),
+                getString(R.string.set_alerts_ntfy_token_summary),
+                appConfig.getAlertsNtfyToken(), value -> {
+                    appConfig.setAlertsNtfyToken(value);
+                    com.kooo.evcam.blackbox.BlackBox.noteImportant("设置变更: pref_alerts_ntfy_token → "
+                            + (value.isEmpty() ? "（空）" : "已填写"));
+                    afterNtfyChange();
+                });
+    }
+
+    /** ntfy 服务器地址。自己搭的才改；改完当场试一路，认不出来现在就说。 */
+    private void editAlertsNtfyServer() {
+        showTextDialog("pref_alerts_ntfy_server", getString(R.string.set_alerts_ntfy_server_title),
+                getString(R.string.set_alerts_ntfy_server_summary),
+                appConfig.getAlertsNtfyServer(), value -> {
+                    appConfig.setAlertsNtfyServer(value);
+                    com.kooo.evcam.blackbox.BlackBox.noteImportant("设置变更: pref_alerts_ntfy_server → "
+                            + (value.isEmpty() ? "（默认）" : "已填写"));
+                    afterNtfyChange();
+                });
+    }
+
+    /** 末四位：话题名和令牌都只这样露。The last four characters: topics and tokens are only shown this way. */
+    private static String tail(String value) {
+        if (value == null || value.length() <= 4) {
+            return "…";
+        }
+        return value.substring(value.length() - 4);
+    }
+
+    /**
+     * ntfy 那个开关：换出口，不是开关一个功能。
+     *
+     * <p>打开而且还没有话题时，先走一遍设置流程（提醒 → 扫码 → 四位数）；中途退出就回到关着。</p>
+     *
+     * The ntfy switch: it switches exits, it does not toggle a feature. Turning it on with no topic
+     * walks through setup first; leaving setup puts it back to off.
+     */
+    private void bindNtfyToggle() {
+        SwitchPreferenceCompat toggle = findPreference("pref_dev_alerts_ntfy");
+        if (toggle == null) {
+            return;
+        }
+        toggle.setPersistent(false);
+        toggle.setChecked(com.kooo.evcam.alarm.NtfyGate.NTFY.equals(appConfig.getAlertsTransportStored()));
+        toggle.setSummary(toggle.isChecked()
+                ? R.string.set_dev_alerts_ntfy_on : R.string.set_dev_alerts_ntfy_off);
+        toggle.setOnPreferenceChangeListener((preference, newValue) -> {
+            boolean wantsNtfy = Boolean.TRUE.equals(newValue);
+            if (!wantsNtfy) {
+                // 关：只写这一个键。Telegram 那边的令牌、会话号一个字都不动。
+                // Off: one key. Nothing on the Telegram side is touched.
+                appConfig.setAlertsTransport(com.kooo.evcam.alarm.NtfyGate.TELEGRAM);
+                com.kooo.evcam.blackbox.BlackBox.noteImportant("开关变更: pref_dev_alerts_ntfy → 关（发到 Telegram）");
+                finishNtfyToggle(preference, false);
+                return true;
+            }
+            if (appConfig.hasAlertsNtfyConfig()) {
+                appConfig.setAlertsTransport(com.kooo.evcam.alarm.NtfyGate.NTFY);
+                com.kooo.evcam.blackbox.BlackBox.noteImportant("开关变更: pref_dev_alerts_ntfy → 开（发到 ntfy）");
+                finishNtfyToggle(preference, true);
+                return true;
+            }
+            // 还没话题：先配。配完（且风险被接受）才算打开；中途退出就回到关着。
+            // No topic yet: set it up first. It only turns on once setup finished and the warning was
+            // accepted; leaving setup puts it back to off.
+            toast(getString(R.string.set_dev_alerts_ntfy_needs_setup));
+            NtfySetupDialog.show(this, appConfig, () -> {
+                boolean ready = appConfig.hasAlertsNtfyConfig()
+                        && com.kooo.evcam.alarm.NtfyRisk.accepted(appConfig.getAlertsNtfyTopic(),
+                                appConfig.getAlertsNtfyRiskAck());
+                appConfig.setAlertsTransport(ready
+                        ? com.kooo.evcam.alarm.NtfyGate.NTFY : com.kooo.evcam.alarm.NtfyGate.TELEGRAM);
+                com.kooo.evcam.blackbox.BlackBox.noteImportant("开关变更: pref_dev_alerts_ntfy → "
+                        + (ready ? "开（发到 ntfy）" : "关（设置没完成）"));
+                finishNtfyToggle(preference, ready);
+            });
+            return false;
+        });
+    }
+
+    /** 开关之后的共同收尾：把勾选状态、行尾说明、发送那边一起对齐。 */
+    private void finishNtfyToggle(androidx.preference.Preference preference, boolean on) {
+        if (preference instanceof SwitchPreferenceCompat) {
+            ((SwitchPreferenceCompat) preference).setChecked(on);
+        }
+        preference.setSummary(on ? R.string.set_dev_alerts_ntfy_on : R.string.set_dev_alerts_ntfy_off);
+        afterNtfyChange();
     }
 
     private void editAlertsToken() {
@@ -2485,6 +2682,10 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         // 这里原来先找一个 key 为 cat_developer 的分类，找不到就整个返回 ——
         // 而 0.21.0 把分区改成嵌套 PreferenceScreen 之后，这个 key 就不存在了。
         // 于是下面四个入口一个都没接上，点了毫无反应，也不报错。
+        // ntfy 的出口开关（2026-11-15）：换出口，不擦设置（D14）
+        // The ntfy exit switch: switches exits and erases nothing (D14)
+        bindNtfyToggle();
+
         onClick("pref_alerts_debug", pref -> startActivity(
                 new Intent(getContext(), com.kooo.evcam.alarm.AlertsDebugActivity.class)));
 

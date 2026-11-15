@@ -173,6 +173,14 @@ public final class SentryAlerts implements Telemetry.Listener {
     private Boolean lastScreenOn;
     private volatile long failureNotifiedAt;
     /**
+     * 上一次「发不出去」的原因（{@code 出口:原因}）。同一个原因只闹一次，换了原因才再闹。
+     *
+     * The last reason nothing could be sent ({@code channel:kind}). One noise per reason, and again
+     * only when the reason changes.
+     */
+    private volatile String lastBlockedState;
+
+    /**
      * 画面里的移动：编码器把小图送到这里，这里只管算不算一条警报。
      *
      * Motion in the frame: the encoder sends the small image here, and this code only decides whether it counts as an alert.
@@ -444,8 +452,10 @@ public final class SentryAlerts implements Telemetry.Listener {
      * As long as the process is alive and settings are on, there is no reason not to ask.</p>
      */
     private void syncPoller() {
+        // 命令是 Telegram 的功能：ntfy 这条路没有入口（开发者选项里先只做警报）。
+        // Commands belong to Telegram: the ntfy route has no entry point (alerts only, for now).
         boolean want = config.isAlertsEnabled() && config.hasAlertsTelegramConfig()
-                && config.isAlertsCommands();
+                && config.isAlertsCommands() && !config.isAlertsNtfy();
         if (want == pollerWanted) {
             return;
         }
@@ -475,11 +485,9 @@ public final class SentryAlerts implements Telemetry.Listener {
 
                     @Override
                     public void onHelp() {
-                        String token = config.getAlertsTelegramToken();
-                        String chatId = config.getAlertsTelegramChatId();
-                        if (TelegramRequest.looksLikeToken(token)
-                                && TelegramRequest.looksLikeChatId(chatId)) {
-                            deliverText(token, chatId, app.getString(R.string.alert_cmd_help));
+                        AlertChannel channel = channel();
+                        if (channel.ready()) {
+                            deliverText(channel, app.getString(R.string.alert_cmd_help));
                         }
                     }
                 });
@@ -513,20 +521,20 @@ public final class SentryAlerts implements Telemetry.Listener {
     }
 
     private void requestPictureInner(int lane, long requestedAt) {
-        String token = config.getAlertsTelegramToken();
-        String chatId = config.getAlertsTelegramChatId();
-        if (!TelegramRequest.looksLikeToken(token) || !TelegramRequest.looksLikeChatId(chatId)) {
+        AlertChannel channel = channel();
+        if (!channel.ready()) {
+            blockedChannel(channel);
             return;
         }
         long now = SystemClock.elapsedRealtime();
         VehicleState state = Telemetry.get().latest();
         if (!parkedNow(state)) {
-            deliverText(token, chatId, app.getString(R.string.alert_cmd_not_parked));
+            deliverText(channel, app.getString(R.string.alert_cmd_not_parked));
             return;
         }
         if (!requests.allows(now)) {
             long wait = Math.max(1, requests.cooldownLeftMs(now) / 1000);
-            deliverText(token, chatId, app.getString(R.string.alert_cmd_too_soon, wait));
+            deliverText(channel, app.getString(R.string.alert_cmd_too_soon, wait));
             return;
         }
         requests.noteSent(now);
@@ -537,12 +545,12 @@ public final class SentryAlerts implements Telemetry.Listener {
         SnapshotTaker.take(app, new SnapshotTaker.Callback() {
             @Override
             public void onPicture(Bitmap grid) {
-                deliver(token, chatId, grid, caption, lane, null, null);
+                deliver(channel, grid, caption, lane, null, null);
             }
 
             @Override
             public void onFailed(String reason) {
-                deliverText(token, chatId, app.getString(R.string.set_alerts_failed, reason));
+                deliverText(channel, app.getString(R.string.set_alerts_failed, reason));
             }
         });
     }
@@ -553,28 +561,28 @@ public final class SentryAlerts implements Telemetry.Listener {
      * The owner asks for status: reply with one line, take no photo.
      */
     private void requestStatus() {
-        String token = config.getAlertsTelegramToken();
-        String chatId = config.getAlertsTelegramChatId();
-        if (!TelegramRequest.looksLikeToken(token) || !TelegramRequest.looksLikeChatId(chatId)) {
+        AlertChannel channel = channel();
+        if (!channel.ready()) {
+            blockedChannel(channel);
             return;
         }
         try {
-            requestStatusInner(token, chatId);
+            requestStatusInner(channel);
         } catch (RuntimeException | OutOfMemoryError e) {
             // 不要报一句“状态”就没了下文：把原因回过去（已擦令牌）
             // Do not leave the user with a bare "status" and no follow-up: send the reason back (token already redacted)
             BlackBox.note("alerts: status reply failed (" + TelegramRequest.redact(String.valueOf(e)) + ")");
-            deliverText(token, chatId, app.getString(R.string.set_alerts_failed,
+            deliverText(channel, app.getString(R.string.set_alerts_failed,
                     TelegramRequest.redact(String.valueOf(e))));
         }
     }
 
-    private void requestStatusInner(String token, String chatId) {
+    private void requestStatusInner(AlertChannel channel) {
         VehicleState state = Telemetry.get().latest();
         String gear = state == null || state.gear == null ? "?" : state.gear;
         String text = sentryLine(sentryValue()) + "\n"
                 + app.getString(R.string.alert_status_gear, gear);
-        deliverText(token, chatId, text);
+        deliverText(channel, text);
     }
 
     // ------------------------------------------------------------------ 设置里的两个动作
@@ -593,14 +601,9 @@ public final class SentryAlerts implements Telemetry.Listener {
      * will say which step failed.</p>
      */
     public void sendTestPicture(Callback callback) {
-        String token = config.getAlertsTelegramToken();
-        String chatId = config.getAlertsTelegramChatId();
-        if (!TelegramRequest.looksLikeToken(token)) {
-            callback.onResult(false, app.getString(R.string.set_alerts_need_token));
-            return;
-        }
-        if (!TelegramRequest.looksLikeChatId(chatId)) {
-            callback.onResult(false, app.getString(R.string.set_alerts_need_chat));
+        AlertChannel channel = channel();
+        if (!channel.ready()) {
+            callback.onResult(false, blockedText(channel.blockedReason()));
             return;
         }
         String caption = TelegramRequest.caption(
@@ -610,7 +613,7 @@ public final class SentryAlerts implements Telemetry.Listener {
         SnapshotTaker.take(app, new SnapshotTaker.Callback() {
             @Override
             public void onPicture(Bitmap grid) {
-                deliver(token, chatId, grid, caption, TelegramCommand.ANY_LANE, callback, null);
+                deliver(channel, grid, caption, TelegramCommand.ANY_LANE, callback, null);
             }
 
             @Override
@@ -1237,9 +1240,9 @@ public final class SentryAlerts implements Telemetry.Listener {
     // ------------------------------------------------------------------ photo and send
 
     private void fire(String headline, Runnable onDelivered) {
-        String token = config.getAlertsTelegramToken();
-        String chatId = config.getAlertsTelegramChatId();
-        if (!TelegramRequest.looksLikeToken(token) || !TelegramRequest.looksLikeChatId(chatId)) {
+        AlertChannel channel = channel();
+        if (!channel.ready()) {
+            blockedChannel(channel);
             return;
         }
         String caption = TelegramRequest.caption(headline, sentryLine(sentryValue()),
@@ -1247,7 +1250,7 @@ public final class SentryAlerts implements Telemetry.Listener {
         SnapshotTaker.take(app, new SnapshotTaker.Callback() {
             @Override
             public void onPicture(Bitmap grid) {
-                deliver(token, chatId, grid, caption, TelegramCommand.ANY_LANE, null, onDelivered);
+                deliver(channel, grid, caption, TelegramCommand.ANY_LANE, null, onDelivered);
             }
 
             @Override
@@ -1256,9 +1259,59 @@ public final class SentryAlerts implements Telemetry.Listener {
                 // Photo not taken, still send text: the owner should at least know "someone just touched the car".
                 BlackBox.note("alerts: no picture (" + reason + "), text only");
                 notifyFailure(app.getString(R.string.alert_no_storage));
-                deliverText(token, chatId, caption + "\n" + app.getString(R.string.alert_no_storage));
+                deliverText(channel, caption + "\n" + app.getString(R.string.alert_no_storage));
             }
         });
+    }
+
+    /**
+     * 现在该走哪条出口。
+     *
+     * <p>两条规矩都在这里，且只在这里：开发者选项关着就是 Telegram，存着 ntfy 也一样
+     * （{@link NtfyGate}）—— 藏起来的功能不能变成「悄悄不发了」；ntfy 免费话题的风险提示没被接受，
+     * 就返回一个永远发不出去的出口（{@link NtfyRisk}），由 {@link #blockedChannel} 说清楚。</p>
+     *
+     * Which exit to use now. Both rules live here and only here: developer options closed means
+     * Telegram even when ntfy is stored (a hidden feature must not turn into silence), and an
+     * unaccepted free-topic warning yields an exit that never sends, explained by
+     * {@link #blockedChannel}.
+     */
+    private AlertChannel channel() {
+        if (config.isAlertsNtfy()) {
+            return NtfyChannel.of(config);
+        }
+        return new TelegramChannel(config.getAlertsTelegramToken(), config.getAlertsTelegramChatId());
+    }
+
+    /**
+     * 发不出去：黑匣子记一行，车主那边闹一次。同一个原因只闹一次。
+     *
+     * <p>宁可吵一下，也不能让车主以为车在盯着而其实一条都没发。</p>
+     *
+     * Nothing could be sent: one blackbox line, one local notification, once per reason — noise is
+     * cheaper than an owner believing the car is watched when nothing is leaving it.
+     */
+    private void blockedChannel(AlertChannel channel) {
+        AlertChannel.Kind why = channel.blockedReason();
+        String state = channel.name() + ":" + why;
+        BlackBox.note("alerts: dropped (" + state + ")");
+        if (state.equals(lastBlockedState)) {
+            return;
+        }
+        lastBlockedState = state;
+        BlackBox.noteImportant("alerts: not sending (" + state + ")");
+        notifyFailure(blockedText(why));
+    }
+
+    /** 发不出去的原因，翻成一句话。The reason, as one sentence. */
+    private String blockedText(AlertChannel.Kind why) {
+        if (why == AlertChannel.Kind.NOT_ACKNOWLEDGED) {
+            return app.getString(R.string.alert_ntfy_not_acknowledged);
+        }
+        if (why == AlertChannel.Kind.NOT_CONFIGURED && config.isAlertsNtfy()) {
+            return app.getString(R.string.alert_ntfy_no_topic);
+        }
+        return app.getString(R.string.set_alerts_need_token);
     }
 
     /**
@@ -1275,7 +1328,7 @@ public final class SentryAlerts implements Telemetry.Listener {
      * time, so as not to hit Telegram's rate limits), then recycles bitmaps; this path can run
      * several times a night and must not leak memory.</p>
      */
-    private void deliver(String token, String chatId, Bitmap grid, String caption, int onlyLane,
+    private void deliver(AlertChannel channel, Bitmap grid, String caption, int onlyLane,
                          Callback callback, Runnable onDelivered) {
         sender.execute(() -> {
             // 掰直、切图、压缩都在这一条线程上：一张 2×2 的校正要翻一百六十万像素，
@@ -1339,38 +1392,43 @@ public final class SentryAlerts implements Telemetry.Listener {
                 return;
             }
 
-            TelegramSender.Result last = TelegramSender.Result.fail("nothing sent", 0);
-            String markup = TelegramRequest.keyboardMarkup();
+            AlertChannel.Result last = AlertChannel.Result.fail(
+                    AlertChannel.Kind.NETWORK, 0, "nothing sent");
             for (int i = 0; i < photos.size(); i++) {
-                last = TelegramSender.sendPhoto(token, chatId, photos.get(i), captions.get(i), markup);
+                last = channel.sendPhoto(photos.get(i), captions.get(i));
                 if (!last.ok) {
                     break;
                 }
             }
-            final TelegramSender.Result outcome = last;
+            final AlertChannel.Result outcome = last;
             if (outcome.ok && onDelivered != null) {
                 onDelivered.run();
             }
-            if (outcome.ok) {
-                sendClip(token, chatId, caption, markup);
+            if (outcome.ok && channel.supportsClips()) {
+                sendClip(config.getAlertsTelegramToken(), config.getAlertsTelegramChatId(), caption,
+                        TelegramRequest.keyboardMarkup());
             }
             if (!outcome.ok) {
-                BlackBox.note("alerts: send failed (" + outcome.display() + ")");
-                notifyFailure(outcome.display());
+                BlackBox.note("alerts: send failed via " + channel.name() + " ("
+                        + outcome.kind + " " + outcome.display() + ")");
+                notifyFailure(failureText(outcome));
             }
             if (callback != null) {
                 String message;
                 if (outcome.ok) {
                     message = app.getString(R.string.set_alerts_sent);
-                    if (!config.isAlertsEnabled()) {
+                    if (config.isAlertsNtfy() && !NtfyRisk.accepted(config.getAlertsNtfyTopic(),
+                            config.getAlertsNtfyRiskAck())) {
+                        // 发得出去不等于风险提示已经被接受
+                        // Being able to send does not mean the warning was accepted
+                        message = message + "\n" + app.getString(R.string.alert_ntfy_not_acknowledged);
+                    } else if (!config.isAlertsEnabled()) {
                         // 发得出去不等于警报开着
                         // Being able to send does not mean alerts are on
                         message = message + "\n" + app.getString(R.string.set_alerts_test_switch_off);
                     }
-                } else if (outcome.rejected) {
-                    message = app.getString(R.string.set_alerts_token_rejected);
                 } else {
-                    message = app.getString(R.string.set_alerts_failed, outcome.display());
+                    message = failureText(outcome);
                 }
                 final String reply = message;
                 app.getMainExecutor().execute(() -> callback.onResult(outcome.ok, reply));
@@ -1401,15 +1459,43 @@ public final class SentryAlerts implements Telemetry.Listener {
      *
      * When there is no photo, send only one line (Telegram's sendMessage).
      */
-    private void deliverText(String token, String chatId, String text) {
+    private void deliverText(AlertChannel channel, String text) {
         sender.execute(() -> {
-            TelegramSender.Result result = TelegramSender.sendMessage(token, chatId, text,
-                    TelegramRequest.keyboardMarkup());
+            AlertChannel.Result result = channel.sendText(text);
             if (!result.ok) {
-                BlackBox.note("alerts: text send failed (" + result.display() + ")");
-                notifyFailure(result.display());
+                BlackBox.note("alerts: text send failed via " + channel.name() + " ("
+                        + result.kind + " " + result.display() + ")");
+                notifyFailure(failureText(result));
             }
         });
+    }
+
+    /**
+     * 一次失败的说明：先说「哪一步不对」，再说细节。
+     *
+     * <p>「什么没配好」「图太大」「免费方案的提醒没接受」是三件不同的事，车主能做的也是三件不同的事。</p>
+     *
+     * The explanation for one failure: what is wrong, then the detail. "Not set up", "picture too
+     * large" and "free-plan warning not accepted" are three things the owner fixes three ways.
+     */
+    private String failureText(AlertChannel.Result result) {
+        boolean ntfy = config.isAlertsNtfy();
+        switch (result.kind) {
+            case NOT_CONFIGURED:
+                return app.getString(ntfy
+                        ? R.string.set_alerts_ntfy_no_topic : R.string.set_alerts_need_token);
+            case NOT_ACKNOWLEDGED:
+                return app.getString(R.string.alert_ntfy_not_acknowledged);
+            case REJECTED:
+                return app.getString(ntfy
+                        ? R.string.set_alerts_ntfy_rejected : R.string.set_alerts_token_rejected);
+            case TOO_LARGE:
+                return app.getString(R.string.set_alerts_ntfy_too_big);
+            case RATE_LIMITED:
+                return app.getString(R.string.set_alerts_ntfy_rate);
+            default:
+                return app.getString(R.string.set_alerts_failed, result.display());
+        }
     }
 
     private Integer sentryValue() {
