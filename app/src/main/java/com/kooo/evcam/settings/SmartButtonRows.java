@@ -25,7 +25,7 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.R;
 import com.kooo.evcam.button.DeviceLabel;
-import com.kooo.evcam.button.SmartButtonAction;
+import com.kooo.evcam.button.ButtonAction;
 import com.kooo.evcam.button.SmartButtonAd;
 import com.kooo.evcam.button.SmartButtons;
 import com.kooo.evcam.ui.CamDialogs;
@@ -43,8 +43,8 @@ import java.util.List;
  *       都提示一句、关框。人关了框就不绑了。</li>
  *   <li>绑定的每一台一行（{@link ValueActionPreference}）：名字「灵动贴 B5:E6」，说明写单击、双击各做什么，下面一行版本和序列号
  *       （有了才写），行尾值是电量，按钮「删除」（先问一句）；点这一行改「名称 / 位置」（用户自己起的名字，2026-11-14，
- *       {@link DeviceLabel}）或者改单击、双击（{@link SmartButtonAction}）：先选单击还是双击，
- *       再选一组（最上面是「不使用」），再在组里单选（2026-11-05）。</li>
+ *       {@link DeviceLabel}）或者改单击、双击（{@link ButtonAction}）：先选单击还是双击，
+ *       再选一组（最上面是「不使用」），再在组里单选（2026-11-05；选法在 {@link ButtonActionPicker}，悬浮按钮同一套）。</li>
  * </ul>
  *
  * <p>真正的绑定、听、连在 {@link SmartButtons}；这里只摆界面。绑定的、电量这些变了，它叫一声，这里照着重摆。</p>
@@ -309,7 +309,7 @@ final class SmartButtonRows {
     }
 
     private static String actionLabel(Context context, AppConfig config, String address, int clicks) {
-        return SmartButtonAction.fromKey(config.getSmartButtonAction(address, clicks)).label(context);
+        return ButtonAction.fromKey(config.getSmartButtonAction(address, clicks)).label(context);
     }
 
     /** 点一台：改「名称 / 位置」，或者先选改单击还是双击、再选做什么。 */
@@ -379,64 +379,19 @@ final class SmartButtonRows {
         return input;
     }
 
-    /**
-     * 选做什么（2026-11-05 动作变多以后分组）：先选组，最上面是「不使用」（选了直接生效）；再在组里单选。
-     * 两层都勾着现在选的那一项（所在的组）。
-     */
+    /** 选做什么：和悬浮按钮的点击、长按同一套选法（{@link ButtonActionPicker}），标题是单击还是双击。 */
     private void pickAction(String address, int clicks) {
         Context context = fragment.getContext();
         if (context == null) {
             return;
         }
-        SmartButtonAction current = SmartButtonAction.fromKey(new AppConfig(context).getSmartButtonAction(address, clicks));
-        SmartButtonAction.Group[] groups = SmartButtonAction.Group.values();
-        String[] labels = new String[groups.length + 1];
-        labels[0] = SmartButtonAction.NONE.label(context);
-        int checked = 0;
-        for (int i = 0; i < groups.length; i++) {
-            labels[i + 1] = context.getString(groups[i].labelRes);
-            if (current.group == groups[i]) {
-                checked = i + 1;
-            }
-        }
-        CamDialogs.show(new MaterialAlertDialogBuilder(context, R.style.Theme_Cam_MaterialAlertDialog)
-                .setTitle(clicks == SmartButtonAd.DOUBLE ? R.string.set_smart_button_double : R.string.set_smart_button_single)
-                .setSingleChoiceItems(labels, checked, (d, which) -> {
-                    d.dismiss();
-                    if (which == 0) {
-                        choose(address, clicks, SmartButtonAction.NONE);
-                    } else {
-                        pickInGroup(address, clicks, groups[which - 1], current);
-                    }
-                })
-                .setNegativeButton(R.string.action_cancel, null));
+        ButtonAction current = ButtonAction.fromKey(new AppConfig(context).getSmartButtonAction(address, clicks));
+        ButtonActionPicker.show(context, context.getString(clicks == SmartButtonAd.DOUBLE
+                        ? R.string.set_smart_button_double : R.string.set_smart_button_single),
+                current, picked -> choose(address, clicks, picked));
     }
 
-    /** 组里单选一项：标题是组名。 */
-    private void pickInGroup(String address, int clicks, SmartButtonAction.Group group, SmartButtonAction current) {
-        Context context = fragment.getContext();
-        if (context == null) {
-            return;
-        }
-        List<SmartButtonAction> actions = SmartButtonAction.of(group);
-        String[] labels = new String[actions.size()];
-        int checked = -1;
-        for (int i = 0; i < actions.size(); i++) {
-            labels[i] = actions.get(i).label(context);
-            if (actions.get(i) == current) {
-                checked = i;
-            }
-        }
-        CamDialogs.show(new MaterialAlertDialogBuilder(context, R.style.Theme_Cam_MaterialAlertDialog)
-                .setTitle(group.labelRes)
-                .setSingleChoiceItems(labels, checked, (d, which) -> {
-                    d.dismiss();
-                    choose(address, clicks, actions.get(which));
-                })
-                .setNegativeButton(R.string.action_cancel, null));
-    }
-
-    private void choose(String address, int clicks, SmartButtonAction picked) {
+    private void choose(String address, int clicks, ButtonAction picked) {
         Context context = fragment.getContext();
         if (context == null) {
             return;

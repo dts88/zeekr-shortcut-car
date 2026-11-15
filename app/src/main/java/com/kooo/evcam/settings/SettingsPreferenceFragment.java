@@ -33,7 +33,7 @@ import com.kooo.evcam.R;
 import com.kooo.evcam.StorageHelper;
 import com.kooo.evcam.WakeUpHelper;
 import com.kooo.evcam.overlay.OverlayCoordinator;
-import com.kooo.evcam.overlay.FloatingAction;
+import com.kooo.evcam.button.ButtonAction;
 import com.kooo.evcam.service.RecordingFloatingService;
 import com.kooo.evcam.zeekr.DiagnosticsActivity;
 import com.kooo.evcam.zeekr.RearViewMirrorService;
@@ -1456,10 +1456,9 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                     });
         }
 
-        bindFloatingAction("pref_floating_tap", appConfig.getFloatingTapAction(),
-                value -> appConfig.setFloatingTapAction(value));
-        bindFloatingAction("pref_floating_long_press", appConfig.getFloatingLongPressAction(),
-                value -> appConfig.setFloatingLongPressAction(value));
+        bindFloatingAction("pref_floating_tap", appConfig::getFloatingTapAction, appConfig::setFloatingTapAction);
+        bindFloatingAction("pref_floating_long_press", appConfig::getFloatingLongPressAction,
+                appConfig::setFloatingLongPressAction);
 
         ValueActionPreference appearance = findPreference("pref_floating_appearance");
         if (appearance != null) {
@@ -1559,30 +1558,28 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     }
 
     /**
-     * 单击 / 长按能选哪几件事。
-     *
-     * <p>选项文字在 strings.xml，存下去的是 {@link FloatingAction} 里那几个 key，
-     * 两边靠同一个数组下标对上 —— 所以这里必须一起写，不能一边加一边忘。</p>
+     * 点击 / 长按做什么：和灵动贴的单击、双击从同一份动作列表里选、同一套选法（{@link ButtonActionPicker}，
+     * 项目所有者 2026-11-15）。存的是 {@link ButtonAction} 的 key；原来存的悬浮按钮那几个 key 照样认，
+     * 认不出来的当「打开主界面」（{@link ButtonAction#forFloating}）。
      */
-    private void bindFloatingAction(String key, String current, StringSetter onPick) {
+    private void bindFloatingAction(String key, java.util.function.Supplier<String> current, StringSetter onPick) {
         Preference pref = findPreference(key);
-        if (!(pref instanceof ListPreference)) {
+        if (pref == null) {
             return;
         }
-        ListPreference list = (ListPreference) pref;
-        FloatingAction[] actions = FloatingAction.values();
-        String[] values = new String[actions.length];
-        String[] labels = new String[actions.length];
-        for (int i = 0; i < actions.length; i++) {
-            values[i] = actions[i].key;
-            labels[i] = getString(actions[i].labelRes());
-        }
-        list.setEntries(labels);
-        list.setEntryValues(values);
-        list.setValue(FloatingAction.fromKey(current).key);
-        list.setSummaryProvider(p -> ((ListPreference) p).getEntry());
-        list.setOnPreferenceChangeListener((p, value) -> {
-            onPick.set(String.valueOf(value));
+        // 当前选的放行尾（和原来的下拉一样）
+        PreferenceRows.markValue(pref);
+        pref.setSummary(ButtonAction.forFloating(current.get()).label(requireContext()));
+        pref.setOnPreferenceClickListener(p -> {
+            Context context = getContext();
+            if (context == null) {
+                return true;
+            }
+            ButtonActionPicker.show(context, p.getTitle(), ButtonAction.forFloating(current.get()), picked -> {
+                onPick.set(picked.key);
+                p.setSummary(picked.label(context));
+                com.kooo.evcam.blackbox.BlackBox.noteImportant("开关变更: " + key + " → " + picked.key);
+            });
             return true;
         });
     }

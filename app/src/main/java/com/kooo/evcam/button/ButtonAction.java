@@ -19,9 +19,10 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * 灵动贴单击、双击能选的动作，分组（ui-spec §十一）：
+ * 按键动作：悬浮按钮的点击 / 长按、灵动贴的单击 / 双击从这同一份里选（项目所有者 2026-11-15：两边合成一份列表，
+ * 原有的全部保留），分组（ui-spec §十一）：
  * <ul>
- *   <li>不使用；悬浮按钮能选的全部（「应用功能」，项目所有者 2026-10-30）；驾驶模式三项、手排模式（2026-10-31：驾驶模式向上、向下，
+ *   <li>不使用；应用功能（原来悬浮按钮的那几样，项目所有者 2026-10-30）；驾驶模式三项、手排模式（2026-10-31：驾驶模式向上、向下，
  *       升挡、降挡）。</li>
  *   <li>2026-11-04 项目所有者定加上这些（2026-11-05 起）：一键运动、语音与媒体、座椅与方向盘、空调、
  *       车身、灯光与香氛、场景。写车的那些怎么做在 {@link CarMoves}，不碰车的在 {@link MediaMove}。这台车没有的功能也留着，
@@ -30,12 +31,13 @@ import java.util.List;
  *       没有电动门的车用不了，选项照留，给有电动门的车用（{@link CarMoves#closeDoors}）。</li>
  * </ul>
  *
- * <p>悬浮按钮那几项直接从 {@link FloatingAction} 长出来，存的也是它的 key：悬浮按钮加一个动作，灵动贴跟着就有，
- * 做的也是同一件事（{@code overlay.QuickActions}）。升挡、降挡只改模拟声浪的转速和声音（{@code sound.DriveSound#shift}），不碰车。</p>
+ * <p>应用功能那几项从 {@link FloatingAction} 长出来，存的也是它的 key（悬浮按钮原来存的就是这些 key，合成一份后照样认）。
+ * 按下去怎么做在 {@link ButtonActions}（两边同一份）。升挡、降挡只改模拟声浪的转速和声音（{@code sound.DriveSound#shift}），不碰车。</p>
  *
- * <p>存的是 key，认不出来的一律当「不使用」：配置是可以被手改的，按一下不该做出没选过的事。</p>
+ * <p>存的是 key：配置是可以被手改的，按一下不该做出没选过的事。灵动贴认不出来的当「不使用」（{@link #fromKey}），
+ * 悬浮按钮认不出来的当「打开主界面」（{@link #forFloating}，悬浮按钮原来的默认）。</p>
  */
-public final class SmartButtonAction {
+public final class ButtonAction {
 
     /** 设置里选动作时的组（先选组，再在组里选）。 */
     public enum Group {
@@ -56,12 +58,12 @@ public final class SmartButtonAction {
     }
 
     /** 不使用：按了什么都不做（刚绑定的灵动贴两种按法都是它）。不在哪一组里。 */
-    public static final SmartButtonAction NONE = new SmartButtonAction("none", null, R.string.smart_button_action_none);
+    public static final ButtonAction NONE = new ButtonAction("none", null, R.string.smart_button_action_none);
 
     /** 驾驶模式从低到高（{@link #nextDriveMode}）。 */
     private static final int[] DRIVE_MODES = {Signal.DRIVE_MODE_COMFORT, Signal.DRIVE_MODE_STANDARD, Signal.DRIVE_MODE_SPORT};
 
-    private static final List<SmartButtonAction> ALL = build();
+    private static final List<ButtonAction> ALL = build();
 
     public final String key;
     /** 在哪一组；「不使用」是 null。 */
@@ -81,7 +83,7 @@ public final class SmartButtonAction {
     /** 不碰车的媒体、语音（{@link MediaMove}）；别的是 null。 */
     final MediaMove media;
 
-    private SmartButtonAction(String key, Group group, int labelRes, FloatingAction floating, int driveMode,
+    private ButtonAction(String key, Group group, int labelRes, FloatingAction floating, int driveMode,
                               int driveModeStep, int gearStep, CarMoves.Job car, MediaMove media) {
         this.key = key;
         this.group = group;
@@ -94,34 +96,34 @@ public final class SmartButtonAction {
         this.media = media;
     }
 
-    private SmartButtonAction(String key, Group group, int labelRes) {
+    private ButtonAction(String key, Group group, int labelRes) {
         this(key, group, labelRes, null, 0, 0, 0, null, null);
     }
 
-    private static SmartButtonAction car(String key, Group group, int labelRes, CarMoves.Job job) {
-        return new SmartButtonAction(key, group, labelRes, null, 0, 0, 0, job, null);
+    private static ButtonAction car(String key, Group group, int labelRes, CarMoves.Job job) {
+        return new ButtonAction(key, group, labelRes, null, 0, 0, 0, job, null);
     }
 
-    private static SmartButtonAction media(String key, int labelRes, MediaMove move) {
-        return new SmartButtonAction(key, Group.MEDIA, labelRes, null, 0, 0, 0, null, move);
+    private static ButtonAction media(String key, int labelRes, MediaMove move) {
+        return new ButtonAction(key, Group.MEDIA, labelRes, null, 0, 0, 0, null, move);
     }
 
-    private static List<SmartButtonAction> build() {
-        List<SmartButtonAction> all = new ArrayList<>();
+    private static List<ButtonAction> build() {
+        List<ButtonAction> all = new ArrayList<>();
         all.add(NONE);
         for (FloatingAction action : FloatingAction.values()) {
-            all.add(new SmartButtonAction(action.key, Group.APP, 0, action, 0, 0, 0, null, null));
+            all.add(new ButtonAction(action.key, Group.APP, 0, action, 0, 0, 0, null, null));
         }
 
         // 驾驶：驾驶模式三项、手排模式（2026-10-30、31），一键运动（超级省电时不执行）
-        all.add(new SmartButtonAction("drive_mode_comfort", Group.DRIVE, 0, null, Signal.DRIVE_MODE_COMFORT, 0, 0, null, null));
-        all.add(new SmartButtonAction("drive_mode_standard", Group.DRIVE, 0, null, Signal.DRIVE_MODE_STANDARD, 0, 0, null, null));
-        all.add(new SmartButtonAction("drive_mode_sport", Group.DRIVE, 0, null, Signal.DRIVE_MODE_SPORT, 0, 0, null, null));
-        all.add(new SmartButtonAction("drive_mode_up", Group.DRIVE, R.string.smart_button_action_drive_up, null, 0, 1, 0, null, null));
-        all.add(new SmartButtonAction("drive_mode_down", Group.DRIVE, R.string.smart_button_action_drive_down, null, 0, -1, 0, null, null));
+        all.add(new ButtonAction("drive_mode_comfort", Group.DRIVE, 0, null, Signal.DRIVE_MODE_COMFORT, 0, 0, null, null));
+        all.add(new ButtonAction("drive_mode_standard", Group.DRIVE, 0, null, Signal.DRIVE_MODE_STANDARD, 0, 0, null, null));
+        all.add(new ButtonAction("drive_mode_sport", Group.DRIVE, 0, null, Signal.DRIVE_MODE_SPORT, 0, 0, null, null));
+        all.add(new ButtonAction("drive_mode_up", Group.DRIVE, R.string.smart_button_action_drive_up, null, 0, 1, 0, null, null));
+        all.add(new ButtonAction("drive_mode_down", Group.DRIVE, R.string.smart_button_action_drive_down, null, 0, -1, 0, null, null));
         all.add(car("sport_one_touch", Group.DRIVE, R.string.smart_button_action_sport, CarMoves.saving(CarMoves.sport())));
-        all.add(new SmartButtonAction("gear_up", Group.DRIVE, R.string.smart_button_action_gear_up, null, 0, 0, 1, null, null));
-        all.add(new SmartButtonAction("gear_down", Group.DRIVE, R.string.smart_button_action_gear_down, null, 0, 0, -1, null, null));
+        all.add(new ButtonAction("gear_up", Group.DRIVE, R.string.smart_button_action_gear_up, null, 0, 0, 1, null, null));
+        all.add(new ButtonAction("gear_down", Group.DRIVE, R.string.smart_button_action_gear_down, null, 0, 0, -1, null, null));
 
         // 语音与媒体（音量在超级省电时不执行）
         all.add(media("voice_assistant", R.string.smart_button_action_voice, MediaMove.VOICE));
@@ -209,14 +211,14 @@ public final class SmartButtonAction {
     }
 
     /** 能选的全部，按设置里列出的先后（「不使用」最前，后面按组）。 */
-    public static List<SmartButtonAction> all() {
+    public static List<ButtonAction> all() {
         return ALL;
     }
 
     /** 一组里能选的，按列出的先后。 */
-    public static List<SmartButtonAction> of(Group group) {
-        List<SmartButtonAction> out = new ArrayList<>();
-        for (SmartButtonAction action : ALL) {
+    public static List<ButtonAction> of(Group group) {
+        List<ButtonAction> out = new ArrayList<>();
+        for (ButtonAction action : ALL) {
             if (action.group == group) {
                 out.add(action);
             }
@@ -224,10 +226,16 @@ public final class SmartButtonAction {
         return out;
     }
 
+    /** 悬浮按钮存的 key → 动作：选了「不使用」就是它，认不出来的（含没存过）回到「打开主界面」。 */
+    public static ButtonAction forFloating(String key) {
+        ButtonAction action = fromKey(key);
+        return action != NONE || NONE.key.equals(key) ? action : fromKey(FloatingAction.OPEN_APP.key);
+    }
+
     /** 存下的 key → 动作；认不出来的是 {@link #NONE}。 */
-    public static SmartButtonAction fromKey(String key) {
+    public static ButtonAction fromKey(String key) {
         if (key != null) {
-            for (SmartButtonAction action : ALL) {
+            for (ButtonAction action : ALL) {
                 if (action.key.equals(key)) {
                     return action;
                 }
