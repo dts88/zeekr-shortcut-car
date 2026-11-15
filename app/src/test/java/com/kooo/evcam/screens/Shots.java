@@ -69,6 +69,15 @@ public final class Shots {
         settle();
         Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
         root.draw(new Canvas(bitmap));
+        try {
+            return save(bitmap, name);
+        } finally {
+            bitmap.recycle();
+        }
+    }
+
+    /** 已经画好的一张图（信息条这种不在界面上的）存成 {@code name.png}；图归叫的人管。 */
+    public static File save(Bitmap bitmap, String name) {
         File out = new File(FOLDER, name + ".png");
         //noinspection ResultOfMethodCallIgnored
         FOLDER.mkdirs();
@@ -76,8 +85,6 @@ public final class Shots {
             bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream);
         } catch (IOException e) {
             throw new IllegalStateException("无法写入截图 " + out, e);
-        } finally {
-            bitmap.recycle();
         }
         return out;
     }
