@@ -149,6 +149,15 @@ public class AppConfig {
     private static final String KEY_ALERTS_STRAIGHTEN = "alerts_straighten";  // 发之前掰直
     private static final String KEY_ALERTS_COMMANDS = "alerts_commands";   // 回应 Telegram 里的命令
     private static final String KEY_ALERTS_COMMAND_OFFSET = "alerts_command_offset";  // 轮询到哪一条（运行状态）
+    // ntfy（开发者选项里才选得了；规格见 docs/ntfy/）：走哪条路、服务器、档位、话题、令牌、风险提示的接受记录。
+    // ntfy (selectable only under developer options; see docs/ntfy/): route, server, tier, topic, token,
+    // and the record of the accepted free-topic warning.
+    private static final String KEY_ALERTS_TRANSPORT = "alerts_transport";  // "telegram" / "ntfy"（DEVELOPER_KEYS）
+    private static final String KEY_ALERTS_NTFY_SERVER = "alerts_ntfy_server";  // 空 = https://ntfy.sh
+    private static final String KEY_ALERTS_NTFY_TIER = "alerts_ntfy_tier";  // "free" / "paid"
+    private static final String KEY_ALERTS_NTFY_RISK_ACK = "alerts_ntfy_risk_ack";  // 版本|话题末八位
+    private static final String KEY_ALERTS_NTFY_TOPIC = "alerts_ntfy_topic";   // 存在凭据文件里（是钥匙）
+    private static final String KEY_ALERTS_NTFY_TOKEN = "alerts_ntfy_token";   // 存在凭据文件里
 
     // 亮度/降噪调节配置
     private static final String KEY_IMAGE_ADJUST_ENABLED = "image_adjust_enabled";  // 是否启用亮度/降噪调节
@@ -749,6 +758,11 @@ public class AppConfig {
                 KEY_SIDE_VIEW_UP,
                 KEY_SIDE_VIEW_FOV,
                 KEY_VEHICLE_STATUS,                   // 主界面的车辆状态面板 → 关（2026-10-23 挪进开发者选项）
+                // ntfy 警报（2026-11-15）：开发者选项里才选得了，关着时按 telegram 算 ——
+                // 免费话题是公开的，先只给开发者用，等实测过再说（docs/ntfy/DECISIONS.md D14）
+                // ntfy alerts: selectable only under developer options; reads as telegram when closed.
+                // A free topic is public, so this stays developer-only until it has been tested.
+                KEY_ALERTS_TRANSPORT,
                 // 4.0（项目所有者 2026-11-12）：当初两种做法都做出来、上车比了再定的两项，对所有人固定为默认的那一种，
                 // 另一种只在开发者选项「声音」一组里选得到。同一次收进来的听感、转速变化方式、变速箱 4.1.1 放回
                 // 「通用 → 模拟声浪」，所有人都能选（项目所有者 2026-11-13）
@@ -2121,6 +2135,153 @@ public class AppConfig {
         // 会话号也是身份：只记末四位，完整的不落日志
         AppLog.i(TAG, "Telegram 会话号" + (clean.isEmpty() ? "已清空"
                 : "已填写（末四位 " + clean.substring(Math.max(0, clean.length() - 4)) + "）"));
+    }
+
+    // ==================== ntfy 警报（开发者选项里才选得了） ====================
+
+    /**
+     * 存着的「走哪条路」：{@code telegram} 或 {@code ntfy}。
+     *
+     * <p>设置里那个开关显示的是这个值，不是生效的值 —— 开发者选项关着时两者不同，
+     * 开关要如实显示「存着什么」，否则重新打开开发者选项就看不见自己上次选的那一条了。</p>
+     *
+     * The stored route. The developer switch shows this, not the effective value: with developer
+     * options closed the two differ, and the switch must show what is stored or the previous choice
+     * becomes invisible when developer options are reopened.
+     */
+    public String getAlertsTransportStored() {
+        return com.kooo.evcam.alarm.NtfyGate.stored(
+                prefs.getString(KEY_ALERTS_TRANSPORT, com.kooo.evcam.alarm.NtfyGate.TELEGRAM));
+    }
+
+    /**
+     * 真正在用的那条路。开发者选项关着时一律 telegram（{@link com.kooo.evcam.alarm.NtfyGate#effective}）。
+     *
+     * <p>发送、界面上的状态行都读这一个值 —— 两处读同一个函数，说法就不会打架。</p>
+     *
+     * The route actually in use: telegram whenever developer options are closed. The sender and the
+     * status row both read this one function, so they cannot disagree.
+     */
+    public String getAlertsTransport() {
+        return com.kooo.evcam.alarm.NtfyGate.effective(
+                com.kooo.evcam.settings.DeveloperMode.isUnlocked(), getAlertsTransportStored());
+    }
+
+    /**
+     * 换一条路。只写这一个键，另一边的设置一个字都不动（{@code docs/ntfy/DECISIONS.md} D14）。
+     *
+     * Switch routes. Writes this one key and touches nothing on the other side.
+     */
+    public void setAlertsTransport(String value) {
+        String clean = com.kooo.evcam.alarm.NtfyGate.stored(value);
+        prefs.edit().putString(KEY_ALERTS_TRANSPORT, clean).apply();
+        AppLog.i(TAG, "警报出口设为 " + clean);
+    }
+
+    /** 现在是不是走 ntfy。Whether the effective route is ntfy. */
+    public boolean isAlertsNtfy() {
+        return com.kooo.evcam.alarm.NtfyGate.NTFY.equals(getAlertsTransport());
+    }
+
+    /** ntfy 服务器地址；空表示用默认的 ntfy.sh。The ntfy server; empty means the default. */
+    public String getAlertsNtfyServer() {
+        String raw = readString(KEY_ALERTS_NTFY_SERVER, "");
+        return raw == null ? "" : raw.trim();
+    }
+
+    public void setAlertsNtfyServer(String value) {
+        String clean = value == null ? "" : value.trim();
+        prefs.edit().putString(KEY_ALERTS_NTFY_SERVER, clean).apply();
+        AppLog.i(TAG, "ntfy 服务器" + (clean.isEmpty() ? "已清空（用默认）" : "已填写"));
+    }
+
+    /**
+     * 免费档还是付费档。图的上限、能不能保护话题，都看这一个值。
+     *
+     * Free tier or paid: the picture ceiling and whether a topic can be protected hang off this.
+     */
+    public boolean isAlertsNtfyPaid() {
+        return "paid".equals(readString(KEY_ALERTS_NTFY_TIER, "free"));
+    }
+
+    public void setAlertsNtfyPaid(boolean paid) {
+        prefs.edit().putString(KEY_ALERTS_NTFY_TIER, paid ? "paid" : "free").apply();
+        AppLog.i(TAG, "ntfy 档位设为 " + (paid ? "付费" : "免费"));
+    }
+
+    /**
+     * ntfy 话题名。<b>它就是钥匙</b>：和令牌一起存在凭据文件里，不进设置导出、不进诊断报告、
+     * 不进黑匣子；界面上只露末四位。
+     *
+     * The ntfy topic name. It <b>is</b> the key, so it lives with the token in the secrets file: not in
+     * the settings export, not in diagnostics, not in the blackbox; the screen shows the last four
+     * characters only.
+     */
+    public String getAlertsNtfyTopic() {
+        String raw = secrets().getString(KEY_ALERTS_NTFY_TOPIC, "");
+        return raw == null ? "" : raw.trim();
+    }
+
+    public void setAlertsNtfyTopic(String value) {
+        // 话题名只允许字母、数字、下划线、横线；粘贴带进来的引号、空格、零宽字符一律丢掉。
+        // Only letters, digits, underscore and dash; anything a paste brings along is dropped.
+        StringBuilder kept = new StringBuilder();
+        if (value != null) {
+            for (int i = 0; i < value.length(); i++) {
+                char c = value.charAt(i);
+                boolean ok = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+                        || c == '_' || c == '-';
+                if (ok) {
+                    kept.append(c);
+                }
+            }
+        }
+        String clean = kept.length() > 64 ? kept.substring(0, 64) : kept.toString();
+        secrets().edit().putString(KEY_ALERTS_NTFY_TOPIC, clean).apply();
+        AppLog.i(TAG, "ntfy 话题" + (clean.isEmpty() ? "已清空"
+                : "已填写（末四位 " + clean.substring(Math.max(0, clean.length() - 4)) + "）"));
+    }
+
+    /**
+     * ntfy 访问令牌（付费档才用得上）。<b>绝不进日志</b>：只记「填了还是清空了」。
+     *
+     * The ntfy access token, only needed on a paid plan. Never logged: only "filled" or "cleared".
+     */
+    public String getAlertsNtfyToken() {
+        String raw = secrets().getString(KEY_ALERTS_NTFY_TOKEN, "");
+        return raw == null ? "" : raw.trim();
+    }
+
+    public void setAlertsNtfyToken(String value) {
+        StringBuilder kept = new StringBuilder();
+        if (value != null) {
+            for (int i = 0; i < value.length(); i++) {
+                char c = value.charAt(i);
+                if (c > ' ' && c != 127) {
+                    kept.append(c);
+                }
+            }
+        }
+        String clean = kept.toString();
+        secrets().edit().putString(KEY_ALERTS_NTFY_TOKEN, clean).apply();
+        AppLog.i(TAG, "ntfy 令牌" + (clean.isEmpty() ? "已清空" : "已填写"));
+    }
+
+    /** 免费话题的风险提示接受记录：{@code 版本|话题末八位}（{@link com.kooo.evcam.alarm.NtfyRisk}）。 */
+    public String getAlertsNtfyRiskAck() {
+        String raw = readString(KEY_ALERTS_NTFY_RISK_ACK, "");
+        return raw == null ? "" : raw.trim();
+    }
+
+    public void setAlertsNtfyRiskAck(String value) {
+        String clean = value == null ? "" : value.trim();
+        prefs.edit().putString(KEY_ALERTS_NTFY_RISK_ACK, clean).apply();
+        AppLog.i(TAG, "免费话题风险提示" + (clean.isEmpty() ? "已清除" : "已接受"));
+    }
+
+    /** ntfy 这条路配好了没有：有没有一个像样的话题名。Whether ntfy has a usable topic yet. */
+    public boolean hasAlertsNtfyConfig() {
+        return com.kooo.evcam.alarm.NtfyRequest.looksLikeTopic(getAlertsNtfyTopic());
     }
 
     /** 发一张 2×2，还是勾选的那几路各一张（{@link com.kooo.evcam.alarm.AlertPicture}）。 */
