@@ -1390,14 +1390,12 @@ Kalau lupa: %3$s</string>
     <string name="set_group_alerts_checks">Semakan</string>
     <string name="set_alerts_cameras_none">Tiada yang ditanda, jadi semua empat dihantar</string>
 
-    <!-- ntfy (eksperimen, hanya di bawah pilihan pembangun; lihat docs/ntfy/) -->
-    <string name="set_group_alerts_ntfy">ntfy (eksperimen)</string>
+    <!-- ntfy (dipilih dari bahagian Amaran; lihat docs/ntfy/) -->
+    <string name="set_group_alerts_ntfy">ntfy</string>
     <string name="set_alerts_channel_status_title">Amaran dihantar ke</string>
     <string name="set_alerts_channel_status_telegram">Amaran dihantar ke: Telegram</string>
     <string name="set_alerts_channel_status_ntfy_public">Amaran dihantar ke: ntfy (topik awam)</string>
     <string name="set_alerts_channel_status_ntfy_protected">Amaran dihantar ke: ntfy (terlindung)</string>
-    <string name="set_alerts_telegram_inactive">Tidak digunakan: amaran ke ntfy. Tetapan ini disimpan.</string>
-    <string name="set_alerts_ntfy_inactive">Tidak digunakan: amaran ke Telegram. Tetapan ini disimpan.</string>
     <string name="set_alerts_ntfy_setup_title">Sediakan ntfy</string>
     <string name="set_alerts_ntfy_setup_summary">Buat topik, imbas, sahkan satu sampai</string>
     <string name="set_alerts_ntfy_topic_title">Topik</string>
@@ -1405,6 +1403,7 @@ Kalau lupa: %3$s</string>
     <string name="set_alerts_ntfy_topic_set">Sudah disediakan (akhir %1$s)</string>
     <string name="set_alerts_ntfy_paid_title">Akaun ntfy saya pelan berbayar</string>
     <string name="set_alerts_ntfy_paid_summary">Pelan percuma boleh; pelan berbayar menerima gambar lebih besar dan boleh melindungi topik</string>
+    <string name="set_alerts_ntfy_public_warning">Pada pelan percuma topik ini terbuka: sesiapa yang tahu nama itu boleh lihat gambar dan amaran dari kereta.</string>
     <string name="set_alerts_ntfy_token_title">Token akses</string>
     <string name="set_alerts_ntfy_token_summary">Pelan berbayar sahaja: buat di ntfy.sh bawah Account → Access tokens</string>
     <string name="set_alerts_ntfy_token_empty">Kosong (tidak perlu pada pelan percuma)</string>
@@ -1412,7 +1411,7 @@ Kalau lupa: %3$s</string>
     <string name="set_alerts_channel_status_ntfy_paid">Amaran dihantar ke: ntfy (pelan berbayar)</string>
     <string name="set_alerts_ntfy_server_title">Pelayan</string>
     <string name="set_alerts_ntfy_server_summary">Ubah hanya untuk pelayan sendiri; selain itu kekalkan ntfy.sh</string>
-    <string name="set_dev_alerts_ntfy_title">Amaran melalui ntfy (eksperimen)</string>
+    <string name="set_dev_alerts_ntfy_title">Amaran melalui ntfy</string>
     <string name="set_dev_alerts_ntfy_off">Sedang menghantar ke Telegram. Hidupkan untuk guna ntfy.</string>
     <string name="set_dev_alerts_ntfy_on">Sedang menghantar ke ntfy. Matikan untuk kembali ke Telegram; kedua-dua tetapan disimpan.</string>
     <string name="set_dev_alerts_ntfy_needs_setup">ntfy belum disediakan. Menghidupkan suis ini akan membimbing anda dahulu.</string>

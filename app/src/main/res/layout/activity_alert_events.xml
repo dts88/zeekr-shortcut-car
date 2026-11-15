@@ -3,14 +3,60 @@
   车能发给机器人的每一条消息：系统自带的两行列表就够了（标题 + 描述），
   这一屏不是拿来看的，是拿来点一条发一条的。
 
+  标题区自己画：主题是 NoActionBar（Base.Theme.Cam 的 parent），原来靠 setDisplayHomeAsUpEnabled
+  摆出来的返回箭头根本没有动作栏可放 —— 车上就没有返回的路。所以返回按钮做成真正的控件，
+  放在第一行最左，点击在 AlertEventsActivity 里接 finish()。
+  The title bar is ours: the theme has no ActionBar, so the up arrow had nothing to live in and the
+  car had no way back. A real back button sits first, wired to finish().
+
   Every message the car can send, as a plain two-line list: the screen is not for looking at,
   it is for tapping one and seeing what arrives.
 -->
-<ListView xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/alert_events_list"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:divider="?android:attr/listDivider"
-    android:dividerHeight="1dp"
-    android:paddingStart="8dp"
-    android:paddingEnd="8dp" />
+    android:background="@color/bg"
+    android:orientation="vertical">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/title_bar_height"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="10dp"
+        android:paddingEnd="16dp">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/alert_events_back"
+            style="@style/Widget.Cam.IconButton"
+            android:layout_width="@dimen/icon_button_size"
+            android:layout_height="@dimen/icon_button_size"
+            android:contentDescription="@string/action_back"
+            app:icon="@drawable/ic_back" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="14dp"
+            android:text="@string/alerts_events_title"
+            android:textAppearance="@style/TextAppearance.Cam.Title"
+            android:textColor="@color/text_primary"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/line" />
+
+    <ListView
+        android:id="@+id/alert_events_list"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:divider="?android:attr/listDivider"
+        android:dividerHeight="1dp"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp" />
+</LinearLayout>

@@ -1414,14 +1414,12 @@ If I forget: %3$s</string>
     <string name="set_group_alerts_checks">Checks</string>
     <string name="set_alerts_cameras_none">Nothing ticked, so all four are sent</string>
 
-    <!-- ntfy (experimental, selectable only under developer options; see docs/ntfy/) -->
-    <string name="set_group_alerts_ntfy">ntfy (experimental)</string>
+    <!-- ntfy (selectable from the Alerts section; see docs/ntfy/) -->
+    <string name="set_group_alerts_ntfy">ntfy</string>
     <string name="set_alerts_channel_status_title">Alerts go to</string>
     <string name="set_alerts_channel_status_telegram">Alerts go to: Telegram</string>
     <string name="set_alerts_channel_status_ntfy_public">Alerts go to: ntfy (public topic)</string>
     <string name="set_alerts_channel_status_ntfy_protected">Alerts go to: ntfy (protected)</string>
-    <string name="set_alerts_telegram_inactive">Not in use: alerts go to ntfy. These settings are kept.</string>
-    <string name="set_alerts_ntfy_inactive">Not in use: alerts go to Telegram. These settings are kept.</string>
     <string name="set_alerts_ntfy_setup_title">Set up ntfy</string>
     <string name="set_alerts_ntfy_setup_summary">Make a topic, scan it, confirm one arrived</string>
     <string name="set_alerts_ntfy_topic_title">Topic</string>
@@ -1429,6 +1427,7 @@ If I forget: %3$s</string>
     <string name="set_alerts_ntfy_topic_set">Set up (ends in %1$s)</string>
     <string name="set_alerts_ntfy_paid_title">My ntfy account is on a paid plan</string>
     <string name="set_alerts_ntfy_paid_summary">The free plan works; a paid one takes bigger pictures and can protect the topic</string>
+    <string name="set_alerts_ntfy_public_warning">On the free plan the topic is public: anyone who knows the name can see the photos and alerts the car sends.</string>
     <string name="set_alerts_ntfy_token_title">Access token</string>
     <string name="set_alerts_ntfy_token_summary">Paid plans only: make one on ntfy.sh under Account → Access tokens</string>
     <string name="set_alerts_ntfy_token_empty">Empty (not needed on the free plan)</string>
@@ -1436,7 +1435,7 @@ If I forget: %3$s</string>
     <string name="set_alerts_channel_status_ntfy_paid">Alerts go to: ntfy (paid plan)</string>
     <string name="set_alerts_ntfy_server_title">Server</string>
     <string name="set_alerts_ntfy_server_summary">Only change this for your own server; otherwise keep ntfy.sh</string>
-    <string name="set_dev_alerts_ntfy_title">Alerts via ntfy (experimental)</string>
+    <string name="set_dev_alerts_ntfy_title">Alerts via ntfy</string>
     <string name="set_dev_alerts_ntfy_off">Sending to Telegram now. Turn on to use ntfy.</string>
     <string name="set_dev_alerts_ntfy_on">Sending to ntfy now. Turning it off goes back to Telegram; both sides keep their settings.</string>
     <string name="set_dev_alerts_ntfy_needs_setup">ntfy is not set up yet. Turning this on walks you through it first.</string>

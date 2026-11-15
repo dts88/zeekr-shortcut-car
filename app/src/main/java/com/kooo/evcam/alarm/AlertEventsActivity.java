@@ -8,6 +8,7 @@
 package com.kooo.evcam.alarm;
 
 import android.os.Bundle;
+import android.view.View;
 import android.widget.ListView;
 import android.widget.SimpleAdapter;
 import android.widget.Toast;
@@ -50,10 +51,13 @@ public class AlertEventsActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setTitle(R.string.alerts_events_title);
         setContentView(R.layout.activity_alert_events);
-        // 左上角那个返回箭头：这一屏只有一个入口，回得去设置才顺手（车主 2026-11-15）。
-        // The up arrow: this screen has one entry, and going back to settings has to be one tap.
-        if (getSupportActionBar() != null) {
-            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        // 标题区里那个返回箭头是真正的按钮：主题没有动作栏（Base.Theme.Cam 是 NoActionBar），
+        // onSupportNavigateUp 在这辆车上按不到（车主 2026-11-15）。
+        // A real back button: the theme has no ActionBar, so the up arrow never had anything to sit in,
+        // and onSupportNavigateUp was unreachable on the car.
+        View back = findViewById(R.id.alert_events_back);
+        if (back != null) {
+            back.setOnClickListener(view -> finish());
         }
 
         for (AlertEvent event : AlertEvent.values()) {

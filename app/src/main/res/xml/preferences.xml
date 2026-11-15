@@ -103,48 +103,21 @@
             android:title="@string/set_alerts_on_title"
             android:summary="@string/set_alerts_on_summary" />
 
+        <!--
+          警报发到哪儿（车主 2026-11-15 从开发者选项搬到这里）：这一栏最上面的一行，先选路，
+          下面各组按选中的那条路出现。
+          Where alerts go: the first row under the master switch, so the exit is chosen before the details.
+        -->
+        <ListPreference
+            android:key="pref_alerts_transport"
+            android:title="@string/set_alerts_transport_title"
+            android:summary="@string/set_alerts_transport_summary" />
+
         <!-- 真的发到哪儿（D11 的状态行）：读生效的出口，不是存着的值 -->
         <Preference
             android:key="pref_alerts_channel_status"
             android:selectable="false"
             android:title="@string/set_alerts_channel_status_title" />
-
-        <!--
-          ntfy（试验）：整组只在开发者选项里那个开关打开时出现；关着时话题、令牌这些行全在，只是不显示
-          （规格见 docs/ntfy/DECISIONS.md D11/D14）。
-        -->
-        <PreferenceCategory
-            android:key="cat_alerts_ntfy"
-            android:title="@string/set_group_alerts_ntfy">
-
-            <Preference
-                android:key="pref_alerts_ntfy_inactive"
-                android:selectable="false"
-                android:summary="@string/set_alerts_ntfy_inactive" />
-
-            <Preference
-                android:key="pref_alerts_ntfy_setup"
-                android:title="@string/set_alerts_ntfy_setup_title"
-                android:summary="@string/set_alerts_ntfy_setup_summary" />
-
-            <Preference
-                android:key="pref_alerts_ntfy_topic"
-                android:title="@string/set_alerts_ntfy_topic_title" />
-
-            <SwitchPreferenceCompat
-                android:key="pref_alerts_ntfy_paid"
-                android:title="@string/set_alerts_ntfy_paid_title"
-                android:summary="@string/set_alerts_ntfy_paid_summary" />
-
-            <Preference
-                android:key="pref_alerts_ntfy_token"
-                android:title="@string/set_alerts_ntfy_token_title" />
-
-            <Preference
-                android:key="pref_alerts_ntfy_server"
-                android:title="@string/set_alerts_ntfy_server_title"
-                android:summary="@string/set_alerts_ntfy_server_summary" />
-        </PreferenceCategory>
 
         <PreferenceCategory
             android:key="cat_alerts_when"
@@ -219,15 +192,14 @@
                 android:summary="@string/set_alerts_clip_data_note" />
         </PreferenceCategory>
 
+        <!--
+          Telegram 那一组：只在「警报发到哪儿」选的是 Telegram 时出现（规则在 SettingsPreferenceFragment
+          .showAlertsRows），和下面的 ntfy 组二选一。
+          The Telegram block: shown only while the transport is Telegram; one of the two exclusive blocks.
+        -->
         <PreferenceCategory
             android:key="cat_alerts_telegram"
             android:title="@string/set_group_alerts_telegram">
-
-            <!-- 另一条路在用时的说明：这一组照样能改，设置不会被换出口擦掉 -->
-            <Preference
-                android:key="pref_alerts_telegram_inactive"
-                android:selectable="false"
-                android:summary="@string/set_alerts_telegram_inactive" />
 
             <Preference
                 android:key="pref_alerts_token"
@@ -241,11 +213,6 @@
                 android:key="pref_alerts_find_chat"
                 android:title="@string/set_alerts_find_title"
                 android:summary="@string/set_alerts_find_summary" />
-
-            <ListPreference
-                android:key="pref_alerts_transport"
-                android:title="@string/set_alerts_transport_title"
-                android:summary="@string/set_alerts_transport_summary" />
 
             <SwitchPreferenceCompat
                 android:key="pref_alerts_commands"
@@ -268,12 +235,46 @@
                 android:title="@string/set_alerts_guard_everywhere_title"
                 android:summary="@string/set_alerts_guard_everywhere_summary"
                 android:defaultValue="false" />
+        </PreferenceCategory>
 
-            <!-- 车能发给机器人的每一条消息：一行一条，点一条发一条真的（车主 2026-11-15） -->
+        <!--
+          ntfy：同样只在「警报发到哪儿」选的是 ntfy 时出现，紧跟在 Telegram 组后面，两组不会同时在屏上
+          （规格见 docs/ntfy/DECISIONS.md D11/D14）。
+          The ntfy block, right after the Telegram one; the two never show at the same time.
+        -->
+        <PreferenceCategory
+            android:key="cat_alerts_ntfy"
+            android:title="@string/set_group_alerts_ntfy">
+
             <Preference
-                android:key="pref_alerts_events"
-                android:title="@string/alerts_events_title"
-                android:summary="@string/alerts_events_summary" />
+                android:key="pref_alerts_ntfy_setup"
+                android:title="@string/set_alerts_ntfy_setup_title"
+                android:summary="@string/set_alerts_ntfy_setup_summary" />
+
+            <Preference
+                android:key="pref_alerts_ntfy_topic"
+                android:title="@string/set_alerts_ntfy_topic_title" />
+
+            <SwitchPreferenceCompat
+                android:key="pref_alerts_ntfy_paid"
+                android:title="@string/set_alerts_ntfy_paid_title"
+                android:summary="@string/set_alerts_ntfy_paid_summary" />
+
+            <!-- 免费档的实话：名字就是地址，知道名字的人就能看（付费开关开着时这一行不出现） -->
+            <Preference
+                android:key="pref_alerts_ntfy_public_warning"
+                android:selectable="false"
+                android:title="@string/set_alerts_ntfy_risk_title"
+                android:summary="@string/set_alerts_ntfy_public_warning" />
+
+            <Preference
+                android:key="pref_alerts_ntfy_token"
+                android:title="@string/set_alerts_ntfy_token_title" />
+
+            <Preference
+                android:key="pref_alerts_ntfy_server"
+                android:title="@string/set_alerts_ntfy_server_title"
+                android:summary="@string/set_alerts_ntfy_server_summary" />
         </PreferenceCategory>
 
         <PreferenceCategory
@@ -289,6 +290,14 @@
                 android:key="pref_alerts_diagnostics"
                 android:title="@string/set_diagnostics_title"
                 android:summary="@string/set_diagnostics_summary" />
+
+            <!-- 车能发给机器人的每一条消息：一行一条，点一条发一条真的（车主 2026-11-15）。
+                 两条出口都能看，所以它不跟着 Telegram 那一组走。
+                 Every message the car can send; it belongs to neither exit, so it stays here. -->
+            <Preference
+                android:key="pref_alerts_events"
+                android:title="@string/alerts_events_title"
+                android:summary="@string/alerts_events_summary" />
         </PreferenceCategory>
     </PreferenceScreen>
 

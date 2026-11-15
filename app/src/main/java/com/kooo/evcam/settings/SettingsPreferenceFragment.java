@@ -1059,21 +1059,24 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         boolean perCamera = com.kooo.evcam.alarm.AlertPicture.layout(appConfig.getAlertsLayout())
                 == com.kooo.evcam.alarm.AlertPicture.Layout.SEPARATE;
         boolean clipOn = appConfig.getAlertsClipSeconds() > 0;
+        boolean quietOn = appConfig.isAlertsQuietEnabled();
         // 总开关关着时整组收起来：只留总开关和「检查」，
-        // 不要留下一排空的分组标题。
+        // 不要留下一排空的分组标题。两条出口各自的组按选中的那条路出现，规则在 showAlertsRows。
+        // With the master switch off the groups collapse; which exit group shows is decided in
+        // showAlertsRows, from the transport.
         for (String key : new String[] {"cat_alerts_when", "cat_alerts_picture",
-                "cat_alerts_clip", "cat_alerts_telegram"}) {
+                "cat_alerts_clip"}) {
             show(key, alertsOn);
         }
         show("pref_alerts_motion_sensitivity", alertsOn && shownTriggers.has(
                 com.kooo.evcam.alarm.TriggerSet.MOTION));
         show("pref_alerts_arm_delay", alertsOn);
-        // 起止时刻跟着总开关，不跟着「安静时段」那个开关：先挑时间再打开才顺手，
-        // 藏在开关后面就成了「点了没反应」。
-        // The two times follow the master switch, not the quiet-hours switch: setting the window before
-        // turning it on is the natural order, and hiding them behind the switch reads as "nothing happens".
-        show("pref_alerts_quiet_start", alertsOn);
-        show("pref_alerts_quiet_end", alertsOn);
+        // 起止时刻只看「安静时段」那个开关（车主 2026-11-15）：安静时段关着时两行收起来，
+        // 打开才出现；行尾的时刻在 showAlertsRows 里写，出现时总是当前值。
+        // The two times follow the quiet-hours switch: visible only while quiet hours are on, and their
+        // summaries are written in showAlertsRows so they are current whenever they appear.
+        show("pref_alerts_quiet_start", alertsOn && quietOn);
+        show("pref_alerts_quiet_end", alertsOn && quietOn);
         show("pref_alerts_cameras", alertsOn && perCamera);
         show("pref_alerts_clip_audio", alertsOn && clipOn);
         show("pref_alerts_clip_data", alertsOn && clipOn);
@@ -1086,17 +1089,6 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         show("pref_alerts_guard", guardRows);
         show("pref_alerts_guard_home", guardRows);
         show("pref_alerts_guard_everywhere", guardRows);
-
-        Preference quietStart = findPreference("pref_alerts_quiet_start");
-        if (quietStart != null) {
-            quietStart.setSummary(com.kooo.evcam.alarm.QuietHours.format(
-                    appConfig.getAlertsQuietStart()));
-        }
-        Preference quietEnd = findPreference("pref_alerts_quiet_end");
-        if (quietEnd != null) {
-            quietEnd.setSummary(com.kooo.evcam.alarm.QuietHours.format(
-                    appConfig.getAlertsQuietEnd()));
-        }
 
         Preference triggersRow = findPreference("pref_alerts_triggers");
         if (triggersRow != null) {
@@ -1267,17 +1259,37 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             }
         }
 
-        // ntfy 整组只在它生效时出现（开发者选项里那个开关）；两边各自的「现在没用」说明反而只看生效值。
-        // The ntfy group only appears while it is effective; each side's "not in use" note follows the
-        // same effective value.
+        // 两条出口各自的组二选一（车主 2026-11-15）：选 Telegram 时那一组全在、ntfy 组收起来，反过来也一样；
+        // 总开关关着时两组都不在。组里那两个“现在没用”的说明因此不再需要，随组一起去掉了。
+        // The two exit blocks are exclusive: the chosen transport's block shows and the other one is
+        // gone; with the master switch off neither shows.
+        boolean alertsOn = appConfig.isAlertsEnabled();
         boolean ntfy = appConfig.isAlertsNtfy();
-        show("cat_alerts_ntfy", ntfy);
-        show("pref_alerts_telegram_inactive", ntfy);
-        show("pref_alerts_ntfy_inactive", !ntfy);
+        show("cat_alerts_telegram", alertsOn && !ntfy);
+        show("cat_alerts_ntfy", alertsOn && ntfy);
         show("pref_alerts_ntfy_topic", ntfy);
         show("pref_alerts_ntfy_paid", ntfy);
+        // 免费档的话题名就是地址：付费开关关着时把这一点写在付费开关下面，开着就不用说了。
+        // On the free plan the topic name is the address; say so under the paid switch while it is off.
+        show("pref_alerts_ntfy_public_warning", ntfy && !appConfig.isAlertsNtfyPaid());
         show("pref_alerts_ntfy_token", ntfy && appConfig.isAlertsNtfyPaid());
         show("pref_alerts_ntfy_server", ntfy);
+
+        // 起止时刻：安静时段开着才出现，行尾写着的总是当前值（改完时间也走这里刷新）。
+        // Quiet hours: the two time rows appear only while quiet hours are on, with their current value.
+        boolean quietOn = alertsOn && appConfig.isAlertsQuietEnabled();
+        show("pref_alerts_quiet_start", quietOn);
+        show("pref_alerts_quiet_end", quietOn);
+        Preference quietStart = findPreference("pref_alerts_quiet_start");
+        if (quietStart != null) {
+            quietStart.setSummary(com.kooo.evcam.alarm.QuietHours.format(
+                    appConfig.getAlertsQuietStart()));
+        }
+        Preference quietEnd = findPreference("pref_alerts_quiet_end");
+        if (quietEnd != null) {
+            quietEnd.setSummary(com.kooo.evcam.alarm.QuietHours.format(
+                    appConfig.getAlertsQuietEnd()));
+        }
 
         Preference ntfyTopic = findPreference("pref_alerts_ntfy_topic");
         if (ntfyTopic != null) {
