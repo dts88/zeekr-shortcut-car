@@ -373,6 +373,69 @@ public final class AlertPicture {
         return smallest;
     }
 
+    /**
+     * 把一行字盖在图的左下角（{@code AlertPicture.stamped}）：那一刻的时间戳跟着图走，图转手几道也还在。
+     *
+     * <p>画在<b>新</b>的一张上，源图不动也不回收 —— 同一张源图后面几路还要再读。白字配一层深色影子，
+     * 影子是偏移着重画一遍而不是模糊的，压成 JPEG 之后边缘还在。边距取宽度的 2%，字号取高度的 3.5%，
+     * 缩到手机上看仍然读得出来。</p>
+     *
+     * @param source 源图，可以是不可变的
+     * @param text   要盖的字；{@code null} 或空串就只是复制一张
+     * @return 一张新图；源图为空或已回收时返回 {@code null}
+     *
+     * <p>Draw one line into the picture's bottom-left corner ({@code AlertPicture.stamped}): the
+     * timestamp then travels with the picture through every hand-off.</p>
+     *
+     * <p>It draws onto a <b>new</b> bitmap; the source is neither changed nor recycled -- later
+     * lanes may still read it. White text carries a dark shadow drawn as an offset second pass
+     * rather than a blur, so the edge survives JPEG. The margin is 2% of the width and the text
+     * size 3.5% of the height, still readable once shrunk onto a phone.</p>
+     *
+     * @param source the source picture, which may be immutable
+     * @param text   the line to stamp; {@code null} or empty just copies the picture
+     * @return a new picture; {@code null} when the source is null or recycled
+     */
+    public static Bitmap stamped(Bitmap source, String text) {
+        if (source == null || source.isRecycled()) {
+            return null;
+        }
+        int width = source.getWidth();
+        int height = source.getHeight();
+        if (width <= 0 || height <= 0) {
+            return null;
+        }
+        try {
+            android.graphics.Bitmap out = android.graphics.Bitmap.createBitmap(
+                    width, height, android.graphics.Bitmap.Config.ARGB_8888);
+            android.graphics.Canvas canvas = new android.graphics.Canvas(out);
+            canvas.drawBitmap(source, 0f, 0f, null);
+            if (text == null || text.isEmpty()) {
+                return out;
+            }
+            float margin = width * 0.02f;
+            float size = height * 0.035f;
+            android.graphics.Paint paint = new android.graphics.Paint(
+                    android.graphics.Paint.ANTI_ALIAS_FLAG);
+            paint.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+            paint.setTextSize(size);
+            float baseline = height - margin;
+            // 影子单独画一遍：模糊的 setShadowLayer 压过 JPEG 就糊成一片，偏移的硬边不会。
+            // The shadow is its own pass: a blurred setShadowLayer smears away under JPEG, an
+            // offset hard edge does not.
+            float offset = Math.max(1f, size * 0.08f);
+            android.graphics.Paint shadow = new android.graphics.Paint(paint);
+            shadow.setColor(android.graphics.Color.argb(220, 0, 0, 0));
+            canvas.drawText(text, margin + offset, baseline + offset, shadow);
+            paint.setColor(android.graphics.Color.WHITE);
+            canvas.drawText(text, margin, baseline, paint);
+            return out;
+        } catch (RuntimeException | OutOfMemoryError e) {
+            AppLog.w(TAG, "could not stamp the moment onto the picture: " + e);
+            return null;
+        }
+    }
+
     public static byte[] jpeg(Bitmap bitmap) {
         if (bitmap == null || bitmap.isRecycled()) {
             return null;
