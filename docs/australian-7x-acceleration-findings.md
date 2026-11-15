@@ -5,7 +5,7 @@ tested through App Lab on one Australian-market ZEEKR 7X, reported firmware **2.
 3 November 2026. The App Lab version was not recorded.
 Zeekr Shortcut's ECARX integration was the starting point for a separate diagnostic APK.
 
-This follows the distinction in [the platform notes](zeekr-platform-notes.md):
+This follows the distinction in the platform notes:
 **on-car observation**, **implementation inspection**, and **inference / unverified behaviour**.
 
 ## 1. Result and requested default
@@ -160,7 +160,7 @@ binaries and decompiled source are not included in this documentation change.
   built into Zeekr Shortcut's upcoming geofence feature (project owner, 2026-11-06).
 
 **Already verified by Zeekr Shortcut** on its own 7X (Singapore), from black-box recordings; details are in
-[the platform notes](zeekr-platform-notes.md) section 3.6 and the [lifecycle spec](lifecycle-spec.md). They answer
+the [lifecycle spec](lifecycle-spec.md). They answer
 the long-sleep and restart questions above for an App Lab app, though not for this command itself:
 
 - Parked, the head unit is in deep sleep most of the time (20.8 of 26 hours in one record). It falls asleep about 6 s

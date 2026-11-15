@@ -101,6 +101,5 @@ section 8). If your project uses its code, modified or not, you must:
 Please also put the same credit near the top of your README, and name the version or commit you started
 from. Code from EVCam or a contributor keeps its own credits too (see [NOTICE.md](NOTICE.md)).
 
-Findings first published here, such as the [platform notes](docs/zeekr-platform-notes.md), can't be
-licensed. Crediting them the same way is a request — the same courtesy this project gives the sources it
-learned from.
+Findings first published here can't be licensed. Crediting them the same way is a request — the same
+courtesy this project gives the sources it learned from.

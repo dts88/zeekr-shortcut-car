@@ -16,7 +16,7 @@ import android.graphics.Matrix;
  *
  * <p>超级镜子、盲区画面、主界面预览、视频回看都走这一套。几处的共同点是：画面在一个普通的
  * TextureView 里，相机（或解码器）那一头不动，能动的只有「父容器怎么把它画出来」。
- * 为什么预览不上 GL，见 docs/zeekr-platform-notes.md §2.1。</p>
+ * 为什么预览不上 GL，见 docs/local/zeekr-platform-notes.md §2.1。</p>
  *
  * <h3>做法</h3>
  *

@@ -5,7 +5,7 @@ tested through App Lab on one Australian-market ZEEKR 7X, reported firmware **2.
 31 October-3 November 2026. The App Lab version was not recorded.
 Zeekr Shortcut's ECARX integration was the starting point for a separate, small diagnostic APK.
 
-This follows the distinction in [the platform notes](zeekr-platform-notes.md):
+This follows the distinction in the platform notes:
 **on-car observation**, **implementation inspection**, and **inference / unverified behaviour**.
 The car results below come from that diagnostic, not a Zeekr Shortcut release.
 
