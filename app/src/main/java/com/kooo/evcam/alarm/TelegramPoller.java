@@ -304,8 +304,14 @@ public final class TelegramPoller {
         long retryMs = 0;
         while (running || restartWanted) {
             drainBetweenPolls();
-            if (!running) {
+            if (!running && restartWanted) {
+                // 断气前被重新打开：接着在这条线程上问，不起第二条（一个机器人一个轮询者）。
+                // 收手的念头来自开关，不来自这条线程，所以这里只把两份状态摆平，接着跑。
+                running = true;
                 restartWanted = false;
+                BlackBox.note("alerts: poller resumed on the same thread (restart landed during a poll)");
+            }
+            if (!running) {
                 return;
             }
             String token = config.getAlertsTelegramToken();
