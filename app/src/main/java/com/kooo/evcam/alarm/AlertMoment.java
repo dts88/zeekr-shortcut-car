@@ -83,6 +83,11 @@ public final class AlertMoment {
      * log timestamp is not worth crashing the alert path for.</p>
      */
     public static String iso(long wallMs) {
+        // 0 是「没有时刻」，不是 1970 年：宁可空着，也不在图上印一个假日期。
+        // Zero means "no moment", not 1970: an empty string beats a false date printed on the picture.
+        if (wallMs <= 0) {
+            return "";
+        }
         try {
             return format("yyyy-MM-dd'T'HH:mm:ssXXX", wallMs, null);
         } catch (RuntimeException e) {

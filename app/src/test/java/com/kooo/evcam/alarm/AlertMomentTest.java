@@ -50,7 +50,10 @@ public class AlertMomentTest {
                 iso.matches("\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d[+-]\\d\\d:\\d\\d"));
         // 纪元那一刻、冬天、夏天都只要求形状对：偏移随机器变。
         // Epoch, winter and summer only need the right shape: the offset varies by machine.
-        for (long wallMs : new long[]{0L, 1_700_000_000_000L, today(0, 0, 0)}) {
+        // 0 是「没有时刻」，不印 1970：返回空串。
+        // Zero means "no moment"; it must not print 1970.
+        assertTrue(AlertMoment.iso(0L).isEmpty());
+        for (long wallMs : new long[]{1L, 1_700_000_000_000L, today(0, 0, 0)}) {
             assertTrue(AlertMoment.iso(wallMs),
                     AlertMoment.iso(wallMs).matches(
                             "\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d[+-]\\d\\d:\\d\\d"));

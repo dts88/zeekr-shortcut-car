@@ -283,6 +283,10 @@ public final class SentryAlerts implements Telemetry.Listener {
      * have two {@code getUpdates}). Written from off the main thread, so volatile.
      */
     private volatile TelegramPoller poller;
+    /** ntfy 那一路的短时收命令：发完一条警报开五分钟，自己停。 */
+    private volatile NtfyCommandPoller ntfyPoller;
+    /** 发一条警报后听命令的时长。 */
+    static final long NTFY_COMMAND_WINDOW_MS = 5 * 60_000L;
     /**
      * 开 / 关轮询线程的活在这条线程上做。
      *
@@ -1522,7 +1526,13 @@ public final class SentryAlerts implements Telemetry.Listener {
             // 时刻印在画面上（车主 2026-11-15）：那张图以后被翻出来时，自己带着是哪一刻。
             // The moment is drawn onto the picture: whenever it is looked at again, it carries when it was.
             if (picture != null) {
-                Bitmap stamped = AlertPicture.stamped(picture, AlertMoment.iso(alertWallMs));
+                // 防一手：哪条路忘了先记时刻，就用现在这一刻，绝不在图上印 1970。
+                // Belt and braces: if a path forgot to record its moment, stamp this instant — never 1970.
+                if (alertWallMs <= 0) {
+                    alertWallMs = System.currentTimeMillis();
+                }
+                String stamp = AlertMoment.iso(alertWallMs);
+                Bitmap stamped = stamp.isEmpty() ? null : AlertPicture.stamped(picture, stamp);
                 if (stamped != null && stamped != picture) {
                     if (picture != grid && !picture.isRecycled()) {
                         picture.recycle();
@@ -1627,6 +1637,10 @@ public final class SentryAlerts implements Telemetry.Listener {
             // 视频不再跟着照片一起发：「要哪一路的片段」是照片下面的一颗按钮（车主 2026-11-15）。
             // No clip rides along with the picture any more: "a clip of which camera" is a button under
             // it (the owner, 2026-11-15).
+            if (outcome.ok && config.isAlertsNtfy()) {
+                // ntfy 没有回程：发完这一条之后开五分钟窗口，靠轮询话题把命令读回来。
+                startNtfyCommands();
+            }
             if (!outcome.ok) {
                 BlackBox.note("alerts: send failed via " + channel.name() + " ("
                         + outcome.kind + " " + outcome.display() + ")");
@@ -2625,6 +2639,42 @@ public final class SentryAlerts implements Telemetry.Listener {
                 BlackBox.note("alerts: guard send failed (" + result.display() + ")");
             }
         });
+    }
+
+    /** 发完一条 ntfy 警报后开五分钟的命令窗口，每 30 秒问一趟话题。 */
+    private void startNtfyCommands() {
+        if (!config.isAlertsCommands() || !config.isAlertsNtfy()) {
+            return;
+        }
+        NtfyCommandPoller existing = ntfyPoller;
+        if (existing == null) {
+            existing = new NtfyCommandPoller(config.getAlertsNtfyServer(),
+                    config.getAlertsNtfyTopic(), config.getAlertsNtfyToken(), this::onNtfyCommand);
+            ntfyPoller = existing;
+        }
+        existing.start(NTFY_COMMAND_WINDOW_MS);
+        BlackBox.note("alerts: ntfy command window open for 5 min");
+    }
+
+    /** 从 ntfy 话题读回一条命令，和 Telegram 走同一批处理。 */
+    private void onNtfyCommand(TelegramCommand command) {
+        if (command == null) {
+            return;
+        }
+        BlackBox.note("alerts: ntfy command " + command.verb);
+        switch (command.verb) {
+            case PICTURE:
+                requestPicture(command.lane, command.timeWord, System.currentTimeMillis());
+                return;
+            case STATUS:
+                requestStatus();
+                return;
+            case GUARD:
+                onGuardCommand(command.guard, System.currentTimeMillis());
+                return;
+            default:
+                deliverText(channel(), app.getString(R.string.alert_cmd_help));
+        }
     }
 
     /** 这一项关掉、或者不再监听：定时器、号、状态一起清干净。 */
