@@ -166,7 +166,11 @@ public class CarMovesTest {
     private final Map<String, Integer> memory = new HashMap<>();
 
     private CarMoves.Result run(FakeCar fake, CarMoves.Job job) {
-        CarMoves.Car car = new CarMoves.Car(fake, NAMES, ms -> { }, new CarMoves.Memory() {
+        return run(fake, job, ms -> { });
+    }
+
+    private CarMoves.Result run(FakeCar fake, CarMoves.Job job, CarMoves.Sleeper sleeper) {
+        CarMoves.Car car = new CarMoves.Car(fake, NAMES, sleeper, new CarMoves.Memory() {
             @Override
             public int get(String key, int fallback) {
                 Integer v = memory.get(key);
@@ -511,6 +515,22 @@ public class CarMovesTest {
         assertEquals(DOOR + "@" + Signal.DOOR_REAR_LEFT.zone + "=0", car.writes.get(1));
     }
 
+    /** 几扇一起关：一扇一扇写，两扇之间隔 200 ms（车自己的设置页逐扇关就是这样）。 */
+    @Test
+    public void doorsAreWrittenOneAtATime() {
+        FakeCar car = new FakeCar();
+        car.set(DOOR, Signal.DOOR_DRIVER.zone, 1);
+        car.set(DOOR, Signal.DOOR_PASSENGER.zone, 0);
+        car.set(DOOR, Signal.DOOR_REAR_LEFT.zone, 1);
+        car.set(DOOR, Signal.DOOR_REAR_RIGHT.zone, 1);
+        assertEquals(CarMoves.Result.DONE, run(car, allDoors(), ms -> car.writes.add("sleep " + ms)));
+        assertEquals(DOOR + "@" + Signal.DOOR_DRIVER.zone + "=0", car.writes.get(0));
+        assertEquals("sleep " + CarMoves.DOOR_GAP_MS, car.writes.get(1));
+        assertEquals(DOOR + "@" + Signal.DOOR_REAR_LEFT.zone + "=0", car.writes.get(2));
+        assertEquals("sleep " + CarMoves.DOOR_GAP_MS, car.writes.get(3));
+        assertEquals(DOOR + "@" + Signal.DOOR_REAR_RIGHT.zone + "=0", car.writes.get(4));
+    }
+
     /** 都关着：一个都不写，算做成（按了没事可做）。 */
     @Test
     public void closedDoorsNeedNothing() {
@@ -588,6 +608,26 @@ public class CarMovesTest {
         stuck.set(DOOR, Signal.DOOR_TRUNK.zone, 1);
         assertEquals(CarMoves.Result.NO_CHANGE, run(stuck, CarMoves.closeDoors(Signal.DOOR_TRUNK)));
         assertEquals(1, stuck.writes.size());
+    }
+
+    /** 关到一半受阻、停在半路（读到号加 1）：到时是做不了，不说「此车可能没有该功能」。 */
+    @Test
+    public void aDoorThatStopsHalfwayIsUnavailable() {
+        FakeCar car = new FakeCar() {
+            @Override
+            public boolean write(int id, int zone, int value) {
+                writes.add(id + "@" + zone + "=" + value);
+                set(id, zone, id + 1);
+                return true;
+            }
+        };
+        car.set(DOOR, Signal.DOOR_TRUNK.zone, 1);
+        assertEquals(CarMoves.Result.UNAVAILABLE, run(car, CarMoves.closeDoors(Signal.DOOR_TRUNK)));
+        assertEquals(1, car.writes.size());
+        car.writes.clear();
+        assertEquals("停在半路的再按一下再写一次关", CarMoves.Result.UNAVAILABLE,
+                run(car, CarMoves.closeDoors(Signal.DOOR_TRUNK)));
+        assertEquals(DOOR + "@" + Signal.DOOR_TRUNK.zone + "=0", car.writes.get(0));
     }
 
     /** 车机不受理写：做不了。 */
