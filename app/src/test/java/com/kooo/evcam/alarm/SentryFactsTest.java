@@ -18,6 +18,10 @@ import org.junit.Test;
 /**
  * 停车警报怎么读车辆信号（{@link SentryFacts}）：只有「锁着、布防」（哨兵 2）才算数，
  * 所以车主解锁回来那一下之后的亮屏、亮灯都不会发出去。
+ *
+ * How parked-car alerts read the vehicle signals ({@link SentryFacts}): only
+ * "locked and armed" (sentry 2) counts, so the screen and lamps that light up
+ * right after the owner unlocks and comes back are never sent.
  */
 public class SentryFactsTest {
 
@@ -32,6 +36,8 @@ public class SentryFactsTest {
     @Test
     public void theOwnerComingBackDropsOutOfArmedBeforeAnythingLightsUp() {
         // 平台笔记：解锁时哨兵 2 → 1，10 毫秒后防盗位才跟着动；屏幕和车灯是更晚的事。
+        // Platform note: on unlock, sentry goes 2 → 1 and the anti-theft bit
+        // follows 10 ms later; the screen and lamps are even later.
         assertTrue(SentryFacts.armed(2));
         assertFalse(SentryFacts.armed(1));
     }

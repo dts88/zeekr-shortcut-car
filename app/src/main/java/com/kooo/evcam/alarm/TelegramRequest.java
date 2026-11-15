@@ -24,24 +24,50 @@ import java.util.Map;
  * 日志行都可能把它带出去。这个类只在一处拼它（{@link #methodUrl}），其余地方拿到的字符串
  * 都先过 {@link #redact(String)}，把 {@code <token>} 换掉。日志、故障报告、
  * 本地通知都只能用擦过的那一份。</p>
+ *
+ * One request sent to Telegram; build the URL, build the form, redact the token. Pure strings and
+ * bytes, easy to unit-test.
+ *
+ * <h3>The token appears in one place only</h3>
+ *
+ * <p>The Bot API puts the token in the path ({@code /bot<token>/sendPhoto}), so any URL, exception
+ * message, or log line could leak it. This class builds it in one spot ({@link #methodUrl}); every
+ * other string passes through {@link #redact(String)} first, which replaces {@code <token>}. Logs,
+ * fault reports, and local notifications may only use the redacted copy.</p>
  */
 public final class TelegramRequest {
 
-    /** 会话号 / 令牌都不该出现在日志里，擦成这个。 */
+    /**
+     * 会话号 / 令牌都不该出现在日志里，擦成这个。
+     *
+     * Chat ids and tokens must not appear in logs; they are redacted to this.
+     */
     public static final String REDACTED = "<token>";
 
-    /** 令牌外形：数字，冒号，然后是一串字母数字下划线横线。 */
+    /**
+     * 令牌外形：数字，冒号，然后是一串字母数字下划线横线。
+     *
+     * Token shape: digits, a colon, then a run of letters, digits, underscores, and dashes.
+     */
     private static final String TOKEN_SHAPE = "\\d{5,}:[A-Za-z0-9_-]{25,}";
 
     private TelegramRequest() {
     }
 
-    /** 令牌看起来像不像真的。填错了当场说，而不是等一次 404。 */
+    /**
+     * 令牌看起来像不像真的。填错了当场说，而不是等一次 404。
+     *
+     * Whether the token looks real. A typo is caught immediately instead of waiting for a 404.
+     */
     public static boolean looksLikeToken(String token) {
         return token != null && token.trim().matches(TOKEN_SHAPE);
     }
 
-    /** 会话号像个不像：一串十进制数字，群组是负数。 */
+    /**
+     * 会话号像个不像：一串十进制数字，群组是负数。
+     *
+     * Whether the chat id looks right: a run of decimal digits, negative for groups.
+     */
     public static boolean looksLikeChatId(String chatId) {
         if (chatId == null) {
             return false;
@@ -68,6 +94,11 @@ public final class TelegramRequest {
      * 把令牌擦掉。任何要记下来的字符串都先过这里。
      *
      * <p>认不出来的部分原样留下 —— 宁可能少擦，也不能把整条信息擦没了。</p>
+     *
+     * Redact the token. Any string that is to be recorded goes through here first.
+     *
+     * <p>Unrecognized parts are left as-is; better to redact too little than to wipe the whole
+     * message.</p>
      */
     public static String redact(String text) {
         if (text == null || text.isEmpty()) {
@@ -76,22 +107,38 @@ public final class TelegramRequest {
         return text.replaceAll(TOKEN_SHAPE, REDACTED);
     }
 
-    /** {@code sendPhoto} 的完整地址。这个方法的返回值<b>不能</b>进日志。 */
+    /**
+     * {@code sendPhoto} 的完整地址。这个方法的返回值<b>不能</b>进日志。
+     *
+     * The full {@code sendPhoto} URL. The return value of this method must <b>not</b> go into a log.
+     */
     public static String methodUrl(String token, String method) {
         return "https://api.telegram.org/bot" + token.trim() + "/" + method;
     }
 
-    /** 取机器人的名字，用来在设置里确认「填对了」。 */
+    /**
+     * 取机器人的名字，用来在设置里确认「填对了」。
+     *
+     * Fetch the bot's name, used in settings to confirm "filled in correctly".
+     */
     public static String meUrl(String token) {
         return methodUrl(token, "getMe");
     }
 
-    /** 取最近的会话，用来从车机上自动找到会话号。 */
+    /**
+     * 取最近的会话，用来从车机上自动找到会话号。
+     *
+     * Fetch recent chats, used to auto-find the chat id from the head unit.
+     */
     public static String updatesUrl(String token) {
         return methodUrl(token, "getUpdates");
     }
 
-    /** {@code getUpdates} 只看最近这么多条。 */
+    /**
+     * {@code getUpdates} 只看最近这么多条。
+     *
+     * {@code getUpdates} only looks at this many recent entries.
+     */
     public static String updatesUrl(String token, int limit) {
         return updatesUrl(token) + "?limit=" + Math.max(1, Math.min(100, limit));
     }
@@ -102,12 +149,22 @@ public final class TelegramRequest {
      * @param headline 触发原因（已翻好）
      * @param sentry   哨兵模式的状态文字
      * @param time     本地时间 {@code HH:mm}
+     *
+     * Text for the photo message.
+     *
+     * @param headline the trigger reason (already translated)
+     * @param sentry   the sentry-mode status text
+     * @param time     local time {@code HH:mm}
      */
     public static String caption(String headline, String sentry, String time) {
         return caption(headline, "", sentry, time);
     }
 
-    /** 带一行“要求于几点”的配文：车睡了一阵才醒过来时用。 */
+    /**
+     * 带一行“要求于几点”的配文：车睡了一阵才醒过来时用。
+     *
+     * The caption with a "requested at" line: used when the car woke up after sleeping a while.
+     */
     public static String caption(String headline, String late, String sentry, String time) {
         StringBuilder out = new StringBuilder();
         out.append(headline == null ? "" : headline.trim());
@@ -129,6 +186,12 @@ public final class TelegramRequest {
      * <p>按钮不回调、不发请求：按下去就是把这段文字当成一条普通消息发出去，
      * 所以车那边照 {@link TelegramCommand} 解析就行，不用另做一套回调查询。
      * {@code is_persistent} 让它在聊天里常驻，而不是每次发完消息就被收起。</p>
+     *
+     * The row of buttons in the chat (Telegram's reply keyboard).
+     *
+     * <p>The buttons make no callback and send no request: pressing one sends that text as an ordinary
+     * message, so the car can parse it with {@link TelegramCommand}; no separate callback-query flow.
+     * {@code is_persistent} keeps it pinned in the chat instead of collapsing after each message.</p>
      */
     public static String keyboardMarkup() {
         return "{\"keyboard\":[[{\"text\":\"pic\"},{\"text\":\"status\"}]],"
@@ -140,6 +203,10 @@ public final class TelegramRequest {
      * 表单里的普通字段。
      *
      * <p>顺序固定（{@link LinkedHashMap}），写出来的字节才可预期，测试也才对得上。</p>
+     *
+     * The ordinary fields of the form.
+     *
+     * <p>Order is fixed ({@link LinkedHashMap}) so the bytes written are predictable and tests match.</p>
      */
     public static Map<String, String> fields(String chatId, String caption) {
         Map<String, String> fields = new LinkedHashMap<>();
@@ -154,6 +221,11 @@ public final class TelegramRequest {
      * 拼 multipart 表单：先普通字段，再一次一个文件。
      *
      * <p>只有一份文件（这一张照片），所以不追求通用，够用、字节可预期就好。</p>
+     *
+     * Build the multipart form: ordinary fields first, then one file at a time.
+     *
+     * <p>There is only one file (this one photo), so it does not aim to be general; good enough and
+     * byte-predictable is enough.</p>
      */
     public static void writeMultipart(OutputStream out, String boundary, Map<String, String> fields,
                                       String fileField, String fileName, byte[] file,
@@ -177,7 +249,11 @@ public final class TelegramRequest {
         out.flush();
     }
 
-    /** 拼好的一整份表单，给测试和「大小合不合适」的检查用。 */
+    /**
+     * 拼好的一整份表单，给测试和「大小合不合适」的检查用。
+     *
+     * The fully built form, for tests and the "is the size right" check.
+     */
     public static byte[] multipartBytes(String boundary, Map<String, String> fields,
                                         String fileField, String fileName, byte[] file,
                                         String contentType) throws IOException {

@@ -20,6 +20,14 @@ import org.junit.Test;
  *
  * <p>位图那部分（切格子、掰直、压缩）要 Robolectric 的原生绘图，这里只钉读写的规矩 ——
  * 一串设置值无论怎么写坏，落到「要发哪几路」上都必须是能发出去的那几路。</p>
+ *
+ * How many pictures an alert sends, and which lanes it sends them to
+ * ({@link AlertPicture}): how the layout and the checked boxes are stored.
+ *
+ * The bitmap part (splitting the grid, straightening, compressing) needs
+ * Robolectric's native drawing, so here we only pin the read/write rules; no
+ * matter how a settings value is mangled, when it lands on "which lanes to send"
+ * it must resolve to lanes that can actually be sent.
  */
 public class AlertPictureTest {
 
@@ -59,6 +67,8 @@ public class AlertPictureTest {
     @Test
     public void quadrantsMatchTheSavedGridOrder() {
         // 2×2 四宫格的座次：左上 0 前、右上 1 后、左下 2 左、右下 3 右（CompositeBitmapComposer 的默认排列）
+        // 2×2 grid seating: top-left 0 front, top-right 1 rear, bottom-left 2 left,
+        // bottom-right 3 right (CompositeBitmapComposer's default layout)
         assertEquals(2, AlertPicture.COLUMNS);
         assertEquals(2, AlertPicture.ROWS);
         assertEquals(4, AlertPicture.LANES);

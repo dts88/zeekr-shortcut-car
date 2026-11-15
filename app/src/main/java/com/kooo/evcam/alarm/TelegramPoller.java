@@ -34,38 +34,95 @@ import org.json.JSONObject;
  *       所以车上只有这一条线程，别处（脚本、Home Assistant）不能再轮询同一个机器人。</li>
  *   <li><b>不拦着睡觉</b>：车机睡了，进程没了，这条线程自然停；不为它拿唤醒锁。</li>
  * </ul>
+ *
+ * The thread that asks Telegram "did anyone message me?".
+ *
+ * <h3>Why the car asks</h3>
+ *
+ * <p>The car sits behind the carrier's NAT, so nothing can reach it; but it can reach out.
+ * {@code getUpdates} is long polling: the car holds the request for up to 25 seconds, and the owner's
+ * message rides back in that request's reply.</p>
+ *
+ * <h3>A few hard rules</h3>
+ *
+ * <ul>
+ *   <li><b>Only the configured chat</b> ({@link TelegramCommand#fromOwner}). Anyone else gets no reply,
+ *       only a line in the black box; replying would turn the car into a camera anyone could ask for
+ *       photos.</li>
+ *   <li><b>Handled once, never again</b>: each update's {@code update_id} is saved to settings (the
+ *       run-state tier), so after a restart {@code offset} resumes from the next one; yesterday's
+ *       commands are not run again.</li>
+ *   <li><b>One poller per bot</b>: Telegram returns 409 for concurrent polling of the same bot. So the
+ *       car runs only this one thread; nothing else (scripts, Home Assistant) may poll the same bot.</li>
+ *   <li><b>Never blocks sleep</b>: when the head unit sleeps the process goes away and this thread stops
+ *       with it; no wake lock is taken for it.</li>
+ * </ul>
  */
 public final class TelegramPoller {
 
     private static final String TAG = "TelegramPoller";
 
-    /** 一次长轮询挂多久。Telegram 允许到 50，25 足够灵敏又不浪费。 */
+    /**
+     * 一次长轮询挂多久。Telegram 允许到 50，25 足够灵敏又不浪费。
+     *
+     * How long one long poll hangs. Telegram allows up to 50; 25 is responsive without waste.
+     */
     private static final int POLL_SECONDS = 25;
 
-    /** 网络出问题时的重试间隔：从 5 秒翻倍，最多 60 秒。 */
+    /**
+     * 网络出问题时的重试间隔：从 5 秒翻倍，最多 60 秒。
+     *
+     * Retry interval when the network fails: doubles from 5 seconds up to 60 seconds.
+     */
     private static final long RETRY_MIN_MS = 5_000L;
     private static final long RETRY_MAX_MS = 60_000L;
 
-    /** 409（别处也在轮询）时歇久一点，别把 409 刷成日志海。 */
+    /**
+     * 409（别处也在轮询）时歇久一点，别把 409 刷成日志海。
+     *
+     * On 409 (something else is polling too) pause longer, so 409 does not flood the log.
+     */
     private static final long CONFLICT_PAUSE_MS = 60_000L;
 
-    /** 超过这么久的命令不再执行：车睡了一夜醒来，不该突然拍一张几小时前要的照片。 */
+    /**
+     * 超过这么久的命令不再执行：车睡了一夜醒来，不该突然拍一张几小时前要的照片。
+     *
+     * Commands older than this are not run: a car that slept overnight should not suddenly take a
+     * photo requested hours ago.
+     */
     private static final long MAX_COMMAND_AGE_MS = 10 * 60_000L;
 
-    /** 陌生会话的记事先去重：同一个会话一小时只记一行，免得刷爆黑匣子。 */
+    /**
+     * 陌生会话的记事先去重：同一个会话一小时只记一行，免得刷爆黑匣子。
+     *
+     * Notes about foreign chats are deduplicated: one line per chat per hour, so the black box is not
+     * flooded.
+     */
     private static final long FOREIGN_NOTE_MIN_MS = 60 * 60_000L;
 
-    /** 收到一条命令之后交给谁。 */
+    /**
+     * 收到一条命令之后交给谁。
+     *
+     * Who to hand a command to after it is received.
+     */
     public interface Handler {
         /**
          * @param lane        0 前、1 后、2 左、3 右；{@link TelegramCommand#ANY_LANE} 表示按设置
          * @param requestedAt 车主发命令的时刻（毫秒）；0 表示不知道
+         *
+         * @param lane        0 front, 1 rear, 2 left, 3 right; {@link TelegramCommand#ANY_LANE} means per
+         *                    the settings
+         * @param requestedAt when the owner sent the command (milliseconds); 0 means unknown
          */
         void onPicture(int lane, long requestedAt);
 
         void onStatus(long requestedAt);
 
-        /** 认不出来的话（但确实是车主发的）：回一句怎么用。 */
+        /**
+         * 认不出来的话（但确实是车主发的）：回一句怎么用。
+         *
+         * On a message that is not recognized (but really is from the owner): reply with how to use it.
+         */
         void onHelp();
     }
 
@@ -73,9 +130,17 @@ public final class TelegramPoller {
     private final Handler handler;
     private Thread thread;
     private volatile boolean running;
-    /** 最近一次问成了的时刻（壁钟，0 = 这轮还没成功过）。 */
+    /**
+     * 最近一次问成了的时刻（壁钟，0 = 这轮还没成功过）。
+     *
+     * Time of the last successful poll (wall clock, 0 = not yet succeeded this run).
+     */
     private volatile long lastOkAt;
-    /** 最近一次失败的原因（已擦令牌），空串表示没失败过。 */
+    /**
+     * 最近一次失败的原因（已擦令牌），空串表示没失败过。
+     *
+     * Reason for the last failure (token already redacted); empty string means no failure yet.
+     */
     private volatile String lastError = "";
     private volatile long lastErrorAt;
     private String lastForeignChat;
@@ -90,12 +155,20 @@ public final class TelegramPoller {
         return running;
     }
 
-    /** 最近一次问成的时刻；0 表示这轮还没成功过。 */
+    /**
+     * 最近一次问成的时刻；0 表示这轮还没成功过。
+     *
+     * Time of the last successful poll; 0 means not yet succeeded this run.
+     */
     public long lastOkAt() {
         return lastOkAt;
     }
 
-    /** 最近一次失败的一句话（已擦令牌）；空串表示没失败过。 */
+    /**
+     * 最近一次失败的一句话（已擦令牌）；空串表示没失败过。
+     *
+     * One line describing the last failure (token already redacted); empty string means no failure yet.
+     */
     public String lastError() {
         return lastError;
     }
@@ -104,7 +177,12 @@ public final class TelegramPoller {
         return lastErrorAt;
     }
 
-    /** 开始问。已经在问就什么都不做（旧线程还活着也一样：同一个机器人不能有两个轮询者）。 */
+    /**
+     * 开始问。已经在问就什么都不做（旧线程还活着也一样：同一个机器人不能有两个轮询者）。
+     *
+     * Start polling. If already polling, do nothing (same if the old thread is still alive: one bot must
+     * not have two pollers).
+     */
     public void start() {
         if (running || (thread != null && thread.isAlive())) {
             return;
@@ -121,6 +199,13 @@ public final class TelegramPoller {
      * <p>只把 {@code running} 置假是不够的：线程还挂在一条 25 秒的长轮询上，
      * 这时候重新打开开关就会起第二条 —— 同一个机器人同时两个 {@code getUpdates}，
      * Telegram 回 409，两条都拿不到消息。所以这里打断它、等它退出，最多等 3 秒。</p>
+     *
+     * Stop and wait until that thread really lets go.
+     *
+     * <p>Just setting {@code running} to false is not enough: the thread is still parked on a 25-second
+     * long poll, so flipping the switch back on would start a second one; two concurrent
+     * {@code getUpdates} on the same bot, Telegram answers 409, and neither gets messages. So here it
+     * interrupts it and waits for it to exit, at most 3 seconds.</p>
      */
     public void stop() {
         running = false;
@@ -145,7 +230,10 @@ public final class TelegramPoller {
             String ownerId = config.getAlertsOwnerId();
             if (!TelegramRequest.looksLikeToken(token) || !TelegramRequest.looksLikeChatId(chatId)) {
                 // 令牌填得不对时不能就这么退出：running 会一直是真的，改好令牌也不会再起来。
+                // When the token is wrong we must not just exit: running would stay true and a token fixed
+                // later would never restart the poller.
                 // 什么都不问，隔一会儿再看一眼设置。
+                // Ask nothing, and check the settings again after a while.
                 sleep(RETRY_MAX_MS);
                 continue;
             }
@@ -156,6 +244,8 @@ public final class TelegramPoller {
                 lastOkAt = System.currentTimeMillis();
                 if (!lastError.isEmpty()) {
                     // 恢复了：这一行是线索 —— “远处不回应、回家就好”就是这样看出来的
+                    // Recovered: this line is the clue; "no answer while away, fine once home" is read
+                    // from exactly this.
                     BlackBox.note("alerts: Telegram polling recovered");
                     lastError = "";
                 }
@@ -177,6 +267,8 @@ public final class TelegramPoller {
                 lastErrorAt = System.currentTimeMillis();
                 if (first) {
                     // 只记头一次：没网的时候每半分钟一条会把黑匣子刷满
+                    // Log only the first one: without network, one line every half minute would fill the
+                    // black box.
                     BlackBox.note("alerts: Telegram poll failed, "
                             + (conflict ? "别处也在轮询同一个机器人" : lastError)
                             + "；" + (retryMs / 1000) + " 秒后再问");
@@ -192,7 +284,12 @@ public final class TelegramPoller {
         }
     }
 
-    /** 一条一批更新：先推 offset（不管认不认，处理过就算过），再按命令干活。 */
+    /**
+     * 一条一批更新：先推 offset（不管认不认，处理过就算过），再按命令干活。
+     *
+     * One batch of updates: push the offset first (recognized or not, handled is handled), then act on
+     * commands.
+     */
     private void dispatch(JSONObject reply, String token, String chatId, String ownerId) {
         if (!running) {
             return;
@@ -209,6 +306,7 @@ public final class TelegramPoller {
             }
             long updateId = update.optLong("update_id", 0L);
             // 只认普通消息：编辑过的、频道帖子、回调查询都不算
+            // Only plain messages count: edits, channel posts, and callback queries do not.
             JSONObject message = update.optJSONObject("message");
             if (message == null) {
                 offset = Math.max(offset, updateId + 1);
@@ -224,6 +322,8 @@ public final class TelegramPoller {
             PollerGate.Verdict verdict = PollerGate.verdict(chatType, fromChat, fromUserId,
                     chatId, ownerId, sentAt, System.currentTimeMillis(), command);
             // 先把这一条记成「处理过了」再动手：命令半路把进程弄崩了，重启后也不会把同一张照片再发一遍。
+            // Mark this one as handled before acting: if the command crashes the process midway, after a
+            // restart the same photo is not sent again.
             offset = Math.max(offset, updateId + 1);
             config.setAlertsCommandOffset(offset);
             if (verdict == PollerGate.Verdict.NOT_PRIVATE
@@ -250,12 +350,16 @@ public final class TelegramPoller {
                         break;
                     default:
                         // 车主发的、但认不出来：回一句怎么用。不回的话，
+                        // From the owner but not recognized: reply with how to use it. Without a reply,
                         // “发了没反应”和“发错了”就分不出来。
+                        // "sent but nothing happened" and "sent it wrong" cannot be told apart.
                         handler.onHelp();
                         break;
                 }
             } catch (RuntimeException | OutOfMemoryError e) {
                 // 一条命令出错不能把整辆车带走：记下来，线程接着问下一条。
+                // One bad command must not take down the whole car: log it, and the thread keeps polling
+                // the next one.
                 AppLog.w(TAG, "command failed: " + TelegramRequest.redact(String.valueOf(e)));
                 BlackBox.noteImportant("alerts: command failed ("
                         + TelegramRequest.redact(String.valueOf(e)) + "）");
@@ -264,7 +368,11 @@ public final class TelegramPoller {
         config.setAlertsCommandOffset(offset);
     }
 
-    /** 陌生会话只记一行：同一小时同一个会话不重复记。 */
+    /**
+     * 陌生会话只记一行：同一小时同一个会话不重复记。
+     *
+     * Foreign chats get one line: the same chat is not logged twice within one hour.
+     */
     private void noteForeign(String chatId, String type) {
         long now = System.currentTimeMillis();
         String masked = mask(chatId);
@@ -277,7 +385,12 @@ public final class TelegramPoller {
                 + (type.isEmpty() ? "" : "，" + type) + "）");
     }
 
-    /** 会话号只留末四位：黑匣子会随诊断报告出门，没必要带着完整的 id。 */
+    /**
+     * 会话号只留末四位：黑匣子会随诊断报告出门，没必要带着完整的 id。
+     *
+     * Keep only the last four digits of the chat id: the black box travels with the diagnostic report, so
+     * the full id need not go along.
+     */
     private static String mask(String chatId) {
         if (chatId == null || chatId.length() <= 4) {
             return "…";
@@ -285,7 +398,11 @@ public final class TelegramPoller {
         return "…" + chatId.substring(chatId.length() - 4);
     }
 
-    /** 可被打断的等待：{@link #stop()} 之后最迟一秒内就能退出。 */
+    /**
+     * 可被打断的等待：{@link #stop()} 之后最迟一秒内就能退出。
+     *
+     * An interruptible wait: after {@link #stop()} it exits within one second at the latest.
+     */
     private void sleep(long millis) {
         long until = System.currentTimeMillis() + millis;
         while (running && System.currentTimeMillis() < until) {

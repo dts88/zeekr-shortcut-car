@@ -22,6 +22,13 @@ import org.robolectric.RobolectricTestRunner;
  * <p>跑在 Robolectric 上：org.json 在纯 JVM 单测里只有空实现，解析出来全是 null。
  * 这不是在测网络，测的是「拿到状态码和原文之后得什么结论」——
  * 界面上的每一句话、重试与否，都是从这一份结论出来的。</p>
+ *
+ * How to read one Telegram reply ({@code TelegramSender.parse}).
+ *
+ * Runs under Robolectric: org.json in a plain JVM test is only a stub, so
+ * parsing yields nothing but nulls. This is not testing the network; it tests
+ * "what conclusion to draw from the status code and the raw text"; every line
+ * in the UI and the retry decision come from that one conclusion.
  */
 @RunWith(RobolectricTestRunner.class)
 public class TelegramReplyTest {

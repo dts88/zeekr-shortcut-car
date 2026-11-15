@@ -18,6 +18,12 @@ import org.junit.Test;
  * 人从 Telegram 要照片的频率上限（{@link RequestPolicy}）：30 秒一张，一小时 6 张。
  *
  * <p>和警报那套分开：警报要停着并且布防，人自己要是坐在车里、哨兵只开没布防也该给一张。</p>
+ *
+ * The rate cap on a person asking Telegram for a picture ({@link RequestPolicy}):
+ * one per 30 seconds, six per hour.
+ *
+ * Separate from the alert rules: alerts require parked and armed, but a person
+ * sitting in the car with sentry on and not armed should still get a picture.
  */
 public class RequestPolicyTest {
 

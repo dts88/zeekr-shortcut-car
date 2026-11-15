@@ -14,6 +14,9 @@ import org.junit.Test;
 
 /**
  * 停车警报什么时候发（{@link AlertPolicy}）：只要停着、哨兵开着，还要等冷却、守每小时的上限。
+ *
+ * When a parked-car alert is sent ({@link AlertPolicy}): only while parked and
+ * sentry is on, and it still must respect the cooldown and the hourly cap.
  */
 public class AlertPolicyTest {
 
@@ -101,6 +104,8 @@ public class AlertPolicyTest {
     public void aFailedSendDoesNotStartTheCooldown() {
         AlertPolicy policy = ready();
         // 发失败了就不该调 noteSent：下一次事件马上能重试，不用干等一分钟。
+        // A failed send must not call noteSent: the next event can retry right
+        // away instead of waiting a full minute.
         assertEquals(AlertPolicy.Decision.ALLOW, policy.decide(1_000L));
         assertEquals(AlertPolicy.Decision.ALLOW, policy.decide(2_000L));
     }

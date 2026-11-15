@@ -16,6 +16,9 @@ import org.junit.Test;
 
 /**
  * 安静时段（{@link QuietHours}）：22:00 → 07:00 是一段，跨午夜也对；零长的窗口不是“全天安静”。
+ *
+ * Quiet hours ({@link QuietHours}): 22:00 → 07:00 is one window, crossing
+ * midnight is fine too; a zero-length window is not "quiet all day".
  */
 public class QuietHoursTest {
 

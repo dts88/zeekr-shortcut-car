@@ -16,6 +16,9 @@ import org.junit.Test;
 
 /**
  * 车主发来的一句话怎么读（{@link TelegramCommand}）：只认配好的那个会话，只认四种命令和四个方向。
+ *
+ * How to read a message the owner sends ({@link TelegramCommand}): only the
+ * configured chat counts, only four commands and four directions are recognized.
  */
 public class TelegramCommandTest {
 

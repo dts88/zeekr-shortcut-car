@@ -17,6 +17,13 @@ import org.junit.Test;
  *
  * <p>钉住的是那次真事：群里任何人按一下机器人那排按钮，车周围的照片就会发到群里 ——
  * 只比会话号是挡不住的。</p>
+ *
+ * Whether an update should be handled ({@link PollerGate}): it must be a private
+ * chat, from that person, not stale, and a command; all four gates.
+ *
+ * This pins down the real incident: anyone in the group who tapped the bot's
+ * button row would get the car's surroundings sent to the group; comparing only
+ * the chat id cannot stop that.
  */
 public class PollerGateTest {
 
@@ -30,6 +37,8 @@ public class PollerGateTest {
     private static PollerGate.Verdict verdict(String type, String chatId, String fromId,
                                               long sentAt, TelegramCommand command) {
         // 没记下车主号时：只认私聊里的本人（会话号 == 用户号）
+        // When the owner id is not recorded: only accept the owner in a private
+        // chat (chat id == user id)
         return PollerGate.verdict(type, chatId, fromId, OWNER, "", sentAt, NOW, command);
     }
 
@@ -54,6 +63,9 @@ public class PollerGateTest {
     @Test
     public void aGroupIsRefusedUntilTheOwnerIdIsKnown() {
         // 还不知道车主是谁时，群聊一律不认：否则群里任何人按一下就能拿走车周围的照片。
+        // When the owner's identity is not known yet, group chats are always
+        // refused: otherwise anyone in the group could tap once and take the
+        // photos around the car.
         assertEquals(PollerGate.Verdict.NOT_OWNER, verdict("group", OWNER, "42", NOW, pic()));
         assertEquals(PollerGate.Verdict.NOT_OWNER, verdict("group", OWNER, OWNER, NOW, pic()));
         assertEquals(PollerGate.Verdict.NOT_OWNER, verdict("supergroup", OWNER, OWNER, NOW, pic()));

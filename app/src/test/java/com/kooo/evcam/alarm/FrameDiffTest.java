@@ -16,6 +16,9 @@ import org.junit.Test;
 
 /**
  * 画面里有没有东西在动（{@link FrameDiff}）：三道过滤 —— 曝光跳变、平均差、显著变化占比。
+ *
+ * Whether anything is moving in the picture ({@link FrameDiff}): three filters —
+ * exposure jumps, mean difference, and the share of significant change.
  */
 public class FrameDiffTest {
 
@@ -35,6 +38,7 @@ public class FrameDiffTest {
         int[] before = flat(90, 9216);
         int[] after = flat(90, 9216);
         // 一块 30x20 的区域变了 120 个灰度级：占画面 6.5%
+        // A 30x20 region changed by 120 gray levels: 6.5% of the picture
         for (int y = 10; y < 30; y++) {
             for (int x = 20; x < 50; x++) {
                 after[y * 128 + x] = 210;
@@ -47,6 +51,8 @@ public class FrameDiffTest {
     @Test
     public void anExposureJumpIsNotMovement() {
         // 整幅从 60 跳到 200：平均亮度变了 0.55，超过 EXPOSURE_JUMP
+        // The whole picture jumps from 60 to 200: mean brightness changes by 0.55,
+        // beyond EXPOSURE_JUMP
         assertEquals(0.0, FrameDiff.score(flat(60, 9216), flat(200, 9216)), 0.0);
     }
 
@@ -61,6 +67,7 @@ public class FrameDiffTest {
     @Test
     public void aDimUniformChangeUnderTheExposureLimitStillNeedsArea() {
         // 每个像素都只差 10：不算显著变化，也不算移动
+        // Every pixel differs by only 10: not a significant change, not movement
         assertEquals(0.0, FrameDiff.score(flat(100, 9216), flat(110, 9216)), 0.0);
     }
 

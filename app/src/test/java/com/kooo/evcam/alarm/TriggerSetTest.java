@@ -18,13 +18,21 @@ import java.util.LinkedHashSet;
 
 /**
  * 车主选了哪几项算「有事」（{@link TriggerSet}）：存的是名字，读错、写坏都不能变成「一项都没有」。
+ *
+ * Which items the owner picked count as "something happened" ({@link TriggerSet}):
+ * what is stored are names, and a misread or corrupted value must never become
+ * "not a single item".
  */
 public class TriggerSetTest {
 
     @Test
     public void theDefaultIsWhatTheCarItselfDoes() {
         // 默认只开车自己会做的：闪双闪、亮灯、亮屏。
+        // The default only enables what the car itself does: flash hazards, light
+        // up lamps, light up the screen.
         // 移动 / 远光 / 车门默认关，留给车主自己选。
+        // Motion / high beam / doors are off by default, left for the owner to
+        // choose.
         TriggerSet set = TriggerSet.parse(TriggerSet.DEFAULT);
         assertTrue(set.has(TriggerSet.HAZARD));
         assertTrue(set.has(TriggerSet.LAMPS));
@@ -34,6 +42,8 @@ public class TriggerSetTest {
         assertFalse(set.has(TriggerSet.DOORS));
         assertEquals(3, set.size());
         // 存坏了（空串 / 认不出来的名字）仍然按全开算 —— 那是安全网，不是默认值
+        // A corrupted value (empty string / unrecognized names) still means all
+        // on; that is a safety net, not the default.
         assertEquals(TriggerSet.ALL.length, TriggerSet.parse(null).size());
     }
 
@@ -50,6 +60,8 @@ public class TriggerSetTest {
     @Test
     public void somethingBrokenMeansAllOnRatherThanSilence() {
         // 存坏了的设置不该把警报变成哑巴：认不出来按全开算
+        // A corrupted setting must not turn the alert mute: unrecognized input
+        // means all on
         assertEquals(TriggerSet.ALL.length, TriggerSet.parse(",,").size());
         assertEquals(TriggerSet.ALL.length, TriggerSet.parse("???,").size());
     }

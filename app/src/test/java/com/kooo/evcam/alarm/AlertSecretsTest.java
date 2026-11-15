@@ -32,6 +32,16 @@ import java.util.Iterator;
  * <p>{@link SettingsBackup#snapshot(Context)} 把 {@code app_config} 里的每一个键都写进备份文件，
  * 未知的键按“要导出”算。所以凭据另存一份（{@link AppConfig#SECRETS_PREF_NAME}），
  * 这条测试就是钉住这件事：填了令牌之后，整份导出的设置里一个字都找不到它。</p>
+ *
+ * The token must not leave with the settings ({@link AppConfig}, parked-car
+ * alerts): the exported settings, the diagnostics report, and the black box must
+ * never contain it.
+ *
+ * {@link SettingsBackup#snapshot(Context)} writes every key in {@code app_config}
+ * into the backup file, and unknown keys count as "export". So the credential is
+ * stored separately ({@link AppConfig#SECRETS_PREF_NAME}), and this test pins
+ * that down: after the token is filled in, not one character of it appears
+ * anywhere in the whole exported settings.
  */
 @RunWith(RobolectricTestRunner.class)
 public class AlertSecretsTest {
@@ -50,6 +60,8 @@ public class AlertSecretsTest {
         JSONObject snapshot = new JSONObject(SettingsBackup.snapshot(context).toString());
         assertFalse("导出的设置里不能有令牌", holds(snapshot, TOKEN));
         // 会话号也是身份：跟着令牌一起放在单独的文件里，同样不进导出
+        // The chat id is also an identity: it lives in the same separate file as
+        // the token, and also stays out of the export.
         assertFalse("导出的设置里不能有会话号", holds(snapshot, "123456789"));
     }
 
@@ -89,7 +101,11 @@ public class AlertSecretsTest {
         assertFalse(config.hasAlertsTelegramConfig());
     }
 
-    /** 这棵 JSON 里有没有哪个字符串值正好是它。 */
+    /**
+     * 这棵 JSON 里有没有哪个字符串值正好是它。
+     *
+     * Whether any string value in this JSON tree is exactly the wanted one.
+     */
     private static boolean holds(Object node, String wanted) throws org.json.JSONException {
         if (node instanceof JSONObject) {
             JSONObject object = (JSONObject) node;

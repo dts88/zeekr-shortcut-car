@@ -36,6 +36,20 @@ import java.nio.file.Files;
  *
  * <p>\u4e0d\u9760\u7cfb\u7edf\u201c\u5206\u4eab\u201d\uff1a\u8f66\u673a\u4e0a\u6ca1\u6709\u80fd\u63a5\u6536\u5206\u4eab\u7684\u5e94\u7528\uff08{@code DiagnosticsActivity} \u5f53\u5e74\u5c31\u662f\u8fd9\u4e48\u5220\u7684\uff09\u3002
  * \u6240\u4ee5\u8fd9\u91cc\u53ea\u7559\u4e09\u6837\uff1a\u590d\u5236\u3001\u5b58\u5230\u5b58\u50a8\u3001\u5173\u95ed\u3002</p>
+ *
+ * A debug page for parking alerts (developer option): one screen of JSON plus the
+ * latest black box, with options to screenshot, copy, or save to a USB drive.
+ *
+ * <h3>Why JSON</h3>
+ *
+ * <p>"Why didn't it send" must be readable at a glance: whether alerts are on, whether
+ * it is listening, whether the poll loop ran, what the sentry and gear read, how many
+ * samples the picture took, and why the last send failed. The copy on screen truncates
+ * very long strings so it can scroll; the complete copy is in the saved file.</p>
+ *
+ * <p>No reliance on the system "share" sheet: the head unit has no app that can receive
+ * a share ({@code DiagnosticsActivity} was removed for exactly this reason). So here
+ * there are only three actions: copy, save to storage, close.</p>
  */
 public class AlertsDebugActivity extends AppCompatActivity {
 

@@ -16,6 +16,10 @@ import org.junit.Test;
 
 /**
  * 锁车之后等多久才发（{@link ArmDelay}）：等的那一分钟是自己走开的时间，不是把真事吞掉的时间。
+ *
+ * How long after locking the car to wait before sending ({@link ArmDelay}):
+ * that waiting minute is time for you to walk away, not time that swallows a
+ * real event.
  */
 public class ArmDelayTest {
 
@@ -42,6 +46,9 @@ public class ArmDelayTest {
     @Test
     public void notKnowingHowLongItHasBeenLockedDoesNotSilenceTheCar() {
         // 进程刚起来、车本来就锁着：不知道等了多久，宁可偶尔吵一下，也不能吞掉真事
+        // The process just started and the car was already locked: we don't know
+        // how long it has been, so it is better to occasionally sound off than to
+        // swallow a real event.
         assertTrue(ArmDelay.allows(3, -1));
         assertEquals(0, ArmDelay.remainingMs(3, -1));
     }

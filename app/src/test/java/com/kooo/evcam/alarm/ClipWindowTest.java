@@ -16,10 +16,17 @@ import org.junit.Test;
 
 /**
  * 从已编码的样本里切最后几秒（{@link ClipWindow}）：开头必须是关键帧，声音跟着画面走。
+ *
+ * Cut the last few seconds from an encoded sample ({@link ClipWindow}): the
+ * start must be a keyframe, and the audio follows the video.
  */
 public class ClipWindowTest {
 
-    /** 1 fps 的画面，关键帧每秒一个：0、1 s、2 s…… */
+    /**
+     * 1 fps 的画面，关键帧每秒一个：0、1 s、2 s……
+     *
+     * 1 fps pictures with one keyframe per second: 0, 1 s, 2 s, and so on.
+     */
     private static long[] pictures(int count) {
         long[] pts = new long[count];
         for (int i = 0; i < count; i++) {
@@ -44,6 +51,8 @@ public class ClipWindowTest {
         ClipWindow.Cut cut = ClipWindow.choose(pts, allKeyframes(60), noAudio(60),
                 59_000_000L, 5_000_000L);
         // 窗口起点是 54 s：从不晚于它的那个关键帧开始，宁可比 5 秒多一帧
+        // The window starts at 54 s: it begins at the keyframe no later than that,
+        // preferring one frame more than 5 seconds.
         assertEquals(54, cut.from);
         assertEquals("到最后", 60, cut.to);
         assertEquals(pts[54], cut.baseUs);
@@ -52,6 +61,8 @@ public class ClipWindowTest {
     @Test
     public void aWindowWithoutAnInsideKeyframeStartsAtTheFirstKeyframeInstead() {
         // 只有最后一帧是关键帧：往里找不到，只能从它开始（宁可比 5 秒短）
+        // Only the last frame is a keyframe: nothing inside qualifies, so it must
+        // start there (preferring shorter than 5 seconds).
         long[] pts = pictures(60);
         boolean[] keys = new boolean[60];
         keys[59] = true;
@@ -71,6 +82,7 @@ public class ClipWindowTest {
     @Test
     public void audioSamplesInTheWindowRideAlong() {
         // 30 帧画面，每帧后面跟一个声音样本
+        // 30 video frames, each followed by one audio sample
         long[] pts = new long[60];
         boolean[] keys = new boolean[60];
         boolean[] audio = new boolean[60];
@@ -82,6 +94,8 @@ public class ClipWindowTest {
         }
         ClipWindow.Cut cut = ClipWindow.choose(pts, keys, audio, 29_000_000L, 5_000_000L);
         // 窗口起点 24 s：画面索引 48（第 24 帧），声音跟在后面
+        // The window starts at 24 s: video index 48 (frame 24), with the audio
+        // following behind it.
         assertEquals(48, cut.from);
         assertEquals("最后一帧画面在 58，它后面那个声音样本不算", 59, cut.to);
         assertTrue(ClipWindow.hasAudio(java.util.Arrays.asList(

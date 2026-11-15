@@ -1,10 +1,21 @@
 # 停车警报（Telegram）
 
+Parking Alerts (Telegram)
+
 > 原创设计与实现：Fab (Fabbbrrr) — https://github.com/Fabbbrrr。首次发布于 PR #211；按本仓库的惯例，引用这份规格里的事实时请标注来源。
+
+> Original design and implementation: Fab (Fabbbrrr) — https://github.com/Fabbbrrr. First released in PR #211; per this repo's convention, cite the source when referencing facts from this spec.
 
 
 车停着、哨兵模式开着的时候，车上的动静把四个摄像头的一张照片发到车主配好的 Telegram 会话。
 这一份写清楚**什么会触发、什么不会**、发到哪、以及令牌存在哪。改动只许照着这里写。
+
+##### English
+
+When the car is parked with sentry mode armed, activity in the car sends one photo from the four
+cameras to the owner's configured Telegram chat. This document spells out **what triggers an alert
+and what does not**, where it goes, and where the token lives. Changes must follow what is written
+here.
 
 ## 1. 做什么
 
@@ -23,6 +34,26 @@
 每小时最多 6 条。冷却和上限是为了让「一次事件触发好几个信号」变成一条消息，
 也是为了压住误判（夜里双闪被反复拨、门开着又关）。
 
+##### English
+
+When all four hold at once — the car is parked, **sentry mode is armed (i.e. locked, reading 2)**,
+the "Parking alerts" setting is on, and the token and chat id are filled in — any one of the
+following events sends one message: one photo from the four cameras with a line of "what happened +
+time + sentry mode state".
+
+| Trigger | Signal | Note |
+|---|---|---|
+| Hazard lights turn on | `Signal.INDICATOR == 3` (rising edge) | The car flashes when it alarms |
+| High beam flashes once | `Signal.HIGH_BEAM_FLASH` (rising edge) | Stalk flash |
+| Door / frunk / tailgate opens from closed | `Signal.DOOR_*` (rising edge) | Each of the six doors counts on its own |
+| Lights turn on by themselves | `DRL` / `FRONT_POSITION_LAMP` / `REAR_POSITION_LAMP` / `LOW_BEAM` (any from off to on) | These should be off after parking and locking |
+| Center screen turns on | `SCREEN_POWER_EVENT == 0` (from off to on) | The screen turns on when sentry fires — and when the owner returns |
+
+The decision lives in `alarm.AlertPolicy` (pure logic, `AlertPolicyTest`): it sends only when parked
+and sentry is on; 60 seconds of silence after one message; at most 6 messages per hour. The cooldown
+and cap turn "one event firing several signals" into a single message, and also suppress false
+positives (hazards toggled repeatedly at night, a door opened and closed).
+
 ## 1.5 车主自己选哪几项算「有事」
 
 设置 → 停车警报 →「什么算有事」里勾。存的是名字（`alarm.TriggerSet`），认不出来的名字当没写，
@@ -37,6 +68,21 @@
 | `lamps` | 车灯自己亮起 | `DRL` / 位置灯 / 近光 |
 | `screen` | 中控屏亮起 | `SCREEN_POWER_EVENT` |
 
+##### English
+
+Checkboxes under Settings → Parking alerts → "what counts as an event". Names are stored
+(`alarm.TriggerSet`); an unrecognized name counts as not written, and when nothing is left
+everything is treated as on — a broken setting must not silence the alerts.
+
+| Name | Shown in the UI as | Where it comes from |
+|---|---|---|
+| `motion` | Something is moving in the frame | GL readback from the encoder (see §1.6) |
+| `hazard` | Hazard lights turn on | `INDICATOR == 3` |
+| `flash` | High beam flashes once | `HIGH_BEAM_FLASH` |
+| `doors` | Door / frunk / tailgate opens | `DOOR_*` |
+| `lamps` | Lights turn on by themselves | `DRL` / position lamps / low beam |
+| `screen` | Center screen turns on | `SCREEN_POWER_EVENT` |
+
 ## 1.6 画面移动：从编码器里读，而不是再拍一张
 
 环视的每一帧都经过 `EglSurfaceEncoder` 的 GL 上下文。每 250 ms 把当前帧画进一张 128×72 的离屏缓冲，
@@ -44,6 +90,17 @@
 显著变化像素占比。任何一步出错就把这条采样彻底关掉 —— 它是附加功能，不能因为它把录像折了。
 
 只在**停着、布防、在录、且 `motion` 选中**时取样：开车时画面本来就在动。
+
+##### English
+
+Every surround-view frame passes through the GL context of `EglSurfaceEncoder`. Every 250 ms the
+current frame is drawn into a 128×72 off-screen buffer, `glReadPixels` reads the brightness back,
+and `alarm.FrameDiff` runs three checks: whole-frame average brightness jump (as exposure), mean
+difference, and the share of significantly changed pixels. Any error turns this sampling off
+entirely — it is an add-on and must not break recording because of it.
+
+Sampling happens only when **parked, armed, recording, and `motion` is selected**: the frame moves
+anyway while driving.
 
 ## 1.7 锁车之后等一会儿
 
@@ -53,6 +110,19 @@
 判断依据是「这一次布防从什么时候开始」：看到哨兵从没布防变成布防那一刻起算；进程刚起来、车本来就锁着时
 用信号变化的记录（`SignalAges`），仍然不知道就**照常发** —— 宁可偶尔吵一下，也不能因为不知道就把真事吞掉。
 被这一段挡下的警报在黑匣子里写一行（`alerts: armed N s ago, waiting for M min`）。
+
+##### English
+
+In the minute after locking, closing the door, and walking away from the space, the car turns on
+lights, the screen lights up, and people keep moving in the frame — all the owner. So the alerts
+wait a bit before starting: the setting offers **immediately / 1 minute / 3 minutes**, default
+1 minute (`alarm.ArmDelay`).
+
+The basis is "when this arming started": count from the moment sentry is seen to change from
+unarmed to armed; when the process just started and the car was already locked, use the record of
+signal changes (`SignalAges`), and if still unknown, **send as usual** — better to occasionally be
+noisy than to swallow a real event because it was unknown. Alerts blocked by this wait write one
+line in the black box (`alerts: armed N s ago, waiting for M min`).
 
 ## 2. 不做什么（车上看不到的信号）
 
@@ -66,6 +136,21 @@
 
 照片是环视四路重排成的 2×2（`zeekr.CompositeBitmapComposer#toGrid`），不是前 / 后座舱摄像头。
 
+##### English
+
+This car's vehicle interface has no impact, airbag, horn, or anti-theft / tilt / vibration trigger
+signals, so `telemetry.Signal` has none of these entries (the comment in `storage/AutoLock.java`
+also notes the horn cannot be read). Therefore:
+
+- "Someone bumped the car without turning on the hazards or opening a door" — **cannot be seen**,
+  not sent in this version.
+- Pixel-level motion detection is a next step, not part of this change: getting frames requires
+  reading pixels back on the encoding GL thread, which is a separate change to be measured on the
+  car.
+
+The photo is the surround-view four channels rearranged into 2×2
+(`zeekr.CompositeBitmapComposer#toGrid`), not the front / rear cabin cameras.
+
 ## 3. 照片从哪来
 
 `alarm.SnapshotTaker` 走的是拍照键那条路：`CameraKeeper#takePhoto` →
@@ -76,6 +161,19 @@
 那张环视图（文件名带时间戳，后缀 `CameraSlots.suffixFor(KEY_SURROUND)`），找不到就退回只发文字。
 照片写到 1280 px 宽、JPEG 80 再发；超过 9 MB 不发（Telegram `sendPhoto` 上限 10 MB）。
 
+##### English
+
+`alarm.SnapshotTaker` uses the same path as the shutter button: `CameraKeeper#takePhoto` →
+`MultiCameraManager#takePhoto` → each `SingleCamera#takePicture` → written to disk as
+`<timestamp>_surround.jpg`. It does not reopen the camera or restart recording.
+
+`PhotoCallback#onPhotoResult` only reports how many channels were saved, not the file name, so
+after the shot the code looks in the photo directory for **the one newly written this round**
+surround view (the file name carries a timestamp, suffix
+`CameraSlots.suffixFor(KEY_SURROUND)`); if not found it falls back to text only. The photo is
+written 1280 px wide, JPEG 80, then sent; over 9 MB is not sent (Telegram `sendPhoto` limit is
+10 MB).
+
 ## 3.5 发几张、哪几路、掰不掰直
 
 - **一张 2×2**（默认）：四个画面在一起，一眼看全。
@@ -84,6 +182,18 @@
   默认关。
 - 每张压到 900 kB 以下（80 → 70 → 60 → 50 一档档降），车上 4G 上传越小越不容易被掐断。
 - 四张分开发时一条条按顺序发，不并发，免得撞上 Telegram 的频率限制。
+
+##### English
+
+- **One 2×2** (default): all four views together, the whole picture at a glance.
+- **One per channel**: cropped out of the 2×2 and sent separately, each fills the phone screen; the
+  channels checked in settings are sent, and with none checked all four are sent.
+- **Dewarp**: the same fisheye correction as the playback screen (`FisheyeCorrector.correctGrid`,
+  field of view and projection follow the "Super mirror" item), off by default.
+- Each photo is compressed to under 900 kB (80 → 70 → 60 → 50 step by step); over the car's 4G,
+  smaller uploads are less likely to be cut off.
+- When four photos go out separately they are sent one by one in order, not concurrently, to avoid
+  Telegram's rate limit.
 
 ## 4. 发到哪
 
@@ -94,6 +204,18 @@ Telegram Bot API，`api.telegram.org`，不需要自建服务器、不需要公�
 - 会话号：`getUpdates` 里最近给机器人发过话的会话；设置有「找会话号」自动取，多个会话时让车主选。
 - 发不出去时：黑匣子记一行，本地通知说一次（同一句 10 分钟内不重复），照片发不成就只发文字。
 
+##### English
+
+Telegram Bot API, `api.telegram.org` — no self-hosted server and no public address needed; the car
+just sends out over 4G (the car is behind the carrier's NAT, so nothing could reach in anyway).
+
+- Token: from @BotFather; `alarm.TelegramRequest#looksLikeToken` only accepts the shape
+  "digits:some characters".
+- Chat id: the chat that most recently messaged the bot in `getUpdates`; settings has "find chat
+  id" to fetch it automatically, and with several chats the owner picks one.
+- When sending fails: one line in the black box, one local notification (the same message not
+  repeated within 10 minutes), and if the photo fails, text only is sent.
+
 ## 5. 令牌存在哪
 
 **单独一个 SharedPreferences 文件**：`AppConfig.SECRETS_PREF_NAME`（`app_config_secrets`）。
@@ -103,12 +225,32 @@ Telegram Bot API，`api.telegram.org`，不需要自建服务器、不需要公�
 任何要写下来的字符串先过 `TelegramRequest#redact`：Bot API 把令牌放在路径里，
 异常和日志最容易把它带出去。`AlertSecretsTest` 钉住两件事：导出里没有令牌；令牌不在 `app_config` 里。
 
+##### English
+
+**A single separate SharedPreferences file**: `AppConfig.SECRETS_PREF_NAME`
+(`app_config_secrets`). It does not go into `app_config`, so it is not in the settings export
+(`SettingsBackup.snapshot` reads only `app_config`), not in diagnostic reports, not in the black
+box. The settings page shows only the last four characters.
+
+Any string to be written down first passes through `TelegramRequest#redact`: the Bot API puts the
+token in the path, where exceptions and logs most easily carry it out. `AlertSecretsTest` pins two
+things: no token in the export; the token is not in `app_config`.
+
 ## 6. 什么时候不发
 
 - 设置在「停车警报」里关着，或者令牌 / 会话号缺一个：`AlertPolicy.Decision.OFF`，什么都不做。
 - 车不在 P 挡：`NOT_PARKED`。
 - 哨兵模式没开（`Signal.SENTRY_MODE` 是 0 或者读不到）：`NOT_ARMED`。
 - 60 秒冷却里，或者这一小时已经 6 条：`COOLDOWN` / `HOURLY_CAP`。这些都在黑匣子里记一行，只是不发。
+
+##### English
+
+- The setting is off under "Parking alerts", or the token / chat id is missing:
+  `AlertPolicy.Decision.OFF`, do nothing.
+- The car is not in P: `NOT_PARKED`.
+- Sentry mode is off (`Signal.SENTRY_MODE` is 0 or unreadable): `NOT_ARMED`.
+- Inside the 60-second cooldown, or this hour already has 6: `COOLDOWN` / `HOURLY_CAP`. These all
+  write a line in the black box but send nothing.
 
 ## 6.5 车主自己回来不发：解锁会先把「布防」打掉
 
@@ -126,6 +268,26 @@ Telegram Bot API，`api.telegram.org`，不需要自建服务器、不需要公�
 
 **还不采用的**：`0x20240300`（VSTD_ALRM_STS）据称是“锁车后进入防盗”，解锁 1 → 0，但平台笔记里
 只有一次观察、主项目明确没采用。等有交叉验证再拿它当第二重证据。
+
+##### English
+
+`Signal.SENTRY_MODE` is 0 off, 1 on, 2 armed. The order recorded in the platform notes
+(`docs/zeekr-platform-notes.md`):
+
+- Sentry on 0 → 1; **locked**, a minute and a half later 1 → 2;
+- **Unlock** 2 → 1 (10 ms before `0x20240300`);
+- Shift to D 1 → 0.
+
+So the check accepts only 2 (`alarm.SentryFacts#armed`, pinned by `SentryFactsTest`). At the
+unlock when the owner returns, before the screen or lights have turned on, the reading is already
+1, so all the rising edges after that land on "not armed" and nothing is sent. When someone
+touches the car it is still locked, 2 holds, and the lights / screen / hazards turn on — send.
+
+That is the point of the fact "locked means armed", not an extra guess we added.
+
+**Not adopted yet**: `0x20240300` (VSTD_ALRM_STS) is said to be "entered anti-theft after locking",
+1 → 0 on unlock, but the platform notes have only a single observation and the main project
+explicitly did not adopt it. It will become a second line of evidence only after cross-validation.
 
 ## 6.6 反向命令：给机器人发 pic
 
@@ -149,6 +311,34 @@ Telegram Bot API，`api.telegram.org`，不需要自建服务器、不需要公�
 （要一个常驻的免费 Worker，已经有了雏形），或者拿住唤醒锁不让车机睡（12 V 电池的账要算，
 最多加时长上限）。哨兵模式开着时不需要任何一条 —— 车机本来就醒着。
 
+##### English
+
+After "Respond to Telegram commands" is enabled in settings, the car asks Telegram "has anyone
+messaged me" — long polling (`getUpdates`, one request every 25 seconds). The car sits behind the
+carrier's NAT so nothing can reach in, but it can send out; messages come back inside the reply to
+that request.
+
+- `pic` / `photo` / `snap`: take one now, following the "how many to send" setting; may be
+  followed by `front` / `rear` / `left` / `right` to shoot only that channel.
+- `status`: reply with the sentry state and gear, no photo.
+- **Replies only while sentry mode is on**: sentry mode is the only reason the head unit stays
+  awake (platform notes §3.6). Once sentry is off the head unit powers down and the process ends,
+  so it can neither be asked nor take a photo then — so the polling stops on the spot when sentry
+  turns off, leaving no thread that is bound to die.
+- **Only the configured chat is honored**: messages from any other chat get no reply, only a line
+  in the black box. Replying to everyone would make it a camera that anyone could ask for photos.
+- **Takes a photo only when parked** (gear P), one every 30 seconds, 6 per hour (`RequestPolicy`).
+- **Processed means never processed again**: `update_id` is saved in settings (runtime state), so
+  a restart does not replay the last command.
+- **One poller per bot**: Telegram returns 409 for concurrent polling of the same bot. Nothing else
+  (scripts, Home Assistant) may poll the same bot, or the car's poller keeps backing off.
+
+**To wake a sleeping car** there are only two routes, neither in this version: have the car's own
+cloud send a remote command to wake it (needs an always-on free Worker, a prototype already
+exists), or hold a wake lock to keep the head unit from sleeping (the 12 V battery cost has to be
+accounted, at most add a time limit). With sentry mode on neither is needed — the head unit is
+already awake.
+
 ## 6.7 短视频：数据量
 
 `alerts_clip_seconds` 为 5 或 10 时，照片发出去之后再发一段同样长度的短视频，取的是环里已经编码好的样本
@@ -157,6 +347,18 @@ Telegram Bot API，`api.telegram.org`，不需要自建服务器、不需要公�
 
 每次警报的数据量：照片 < 1 MB；5 秒约 2–4 MB；10 秒约 5–8 MB。全部走车的 4G。Telegram 的上限是 50 MB，
 所以尺寸不是问题，**弱网才是**：所以照片永远是第一条，视频是附加的，上传失败只记一行、不重试到天亮。
+
+##### English
+
+When `alerts_clip_seconds` is 5 or 10, after the photo is sent a short video of the same length
+goes out, taken from samples already encoded in the ring (`ClipWindow` picks the window,
+`CodecVideoRecorder.writeClipSeconds` muxes it itself) — no camera reopen, no re-encode, no
+touching the file being written. Sound follows the picture; `alerts_clip_audio` off means silent.
+
+Data volume per alert: photo < 1 MB; 5 seconds about 2–4 MB; 10 seconds about 5–8 MB. All of it
+goes over the car's 4G. Telegram's limit is 50 MB, so size is not the issue, **weak network is**:
+so the photo is always first, the video is an add-on, and a failed upload writes one line and does
+not retry all night.
 
 ## 7. 人为的悬崖
 
@@ -167,3 +369,18 @@ Telegram Bot API，`api.telegram.org`，不需要自建服务器、不需要公�
   他可以调 `getUpdates` 读到**发给这个机器人的每一条消息**（包括你发的 `pic` / `status`，以及机器人被拉进的群里别人发的内容），
   也可以冒充机器人往那个会话发消息。所以：机器人只给这辆车用，令牌不进设置导出、不进诊断报告、不进日志、
   不在屏幕上显示；APK 一旦外流就换一个令牌。谁能读到这辆车的应用数据，谁就有这个机器人。
+
+##### English
+
+- The surround channel's JPEG output is the first thing given up when the session configuration
+  fails (`camera/ChannelRules.java` `onConfigFailed`). In that state taking a photo falls back to
+  preview capture, which needs the main UI in the foreground — sentry recording with the screen off
+  for a long time can hit it, and the photo may not come out. If it doesn't, send text only, never
+  pretend a photo was sent.
+- The token is stored in plaintext in the app's private directory (no encryption library was
+  introduced, and no fake encryption either). **Whoever gets the token can do more than "send a few
+  messages"**: they can call `getUpdates` to read **every message sent to this bot** (including
+  your `pic` / `status`, and what others post in groups the bot was added to), and can impersonate
+  the bot to send messages to that chat. So: the bot serves only this car, the token never enters
+  the settings export, diagnostic reports, logs, or the screen; if the APK ever leaks, replace the
+  token. Whoever can read this car's app data owns this bot.

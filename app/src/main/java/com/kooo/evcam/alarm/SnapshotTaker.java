@@ -39,12 +39,35 @@ import java.io.File;
  * 文件名是 {@code <时间戳>_<后缀>.jpg}、后缀固定（{@link CameraSlots#suffixFor(String)}），
  * 所以存完在照片目录里找<b>这一趟新写下的</b>那张环视图 —— 时间戳由拍照那一刻决定，
  * 比按修改时间宽泛地「找最新的」靠谱。</p>
+ *
+ * Take a photo from all four cameras and compress it into a JPEG that can be sent.
+ *
+ * <h3>Why borrow the photo path</h3>
+ *
+ * <p>The surround view is a long strip assembled from four frames; the rearrangement into 2×2 is
+ * done at the save step ({@code CompositeBitmapComposer}). The photo path already runs the whole
+ * sequence: press the shutter, split, rearrange, overlay the corner badge, write to disk; and it
+ * <b>does not touch the running recording</b>: the camera is not reopened and encoding is not
+ * restarted. Building a separate frame-capture path would mean writing that whole sequence again
+ * and competing with recording for the same cameras.</p>
+ *
+ * <h3>The file is guessed, not handed to us</h3>
+ *
+ * <p>{@link MultiCameraManager.PhotoCallback#onPhotoResult} only reports "how many feeds were
+ * saved", not the file name. The name is {@code <timestamp>_<suffix>.jpg} with a fixed suffix
+ * ({@link CameraSlots#suffixFor(String)}), so after saving we look in the photo directory for
+ * <b>the surround image written by this run</b>; the timestamp is decided at the moment the
+ * photo is taken, which is more reliable than loosely "finding the newest" by modification time.</p>
  */
 public final class SnapshotTaker {
 
     private static final String TAG = "SnapshotTaker";
 
-    /** 发出去的照片长边上限：1280 够看清人和车，也稳在 Telegram 的尺寸里。 */
+    /** 发出去的照片长边上限：1280 够看清人和车，也稳在 Telegram 的尺寸里。
+     *
+     * Long-edge limit for the photo we send: 1280 is enough to see the person and car, and stays
+     * within Telegram's size limits.
+     */
     private static final int MAX_WIDTH = 1280;
 
     /**
@@ -52,15 +75,33 @@ public final class SnapshotTaker {
      *
      * <p>2 秒就够了（一张 JPEG 120–200 ms，加写盘）；窗口开得越大，
      * 附近恰好又有一张别人拍的照片时越容易拿错。</p>
+     *
+     * Allowed time difference (milliseconds) between the photo being written to disk and our
+     * callback.
+     *
+     * <p>2 seconds is enough (one JPEG 120–200 ms, plus the write); the wider the window, the more
+     * likely we are to pick up the wrong photo when someone else's photo happens to land nearby.</p>
      */
     private static final long FILE_SLACK_MS = 2_000L;
 
-    /** 结果。给的是四宫格位图：怎么切、要不要掰直、压多大由 {@link AlertPicture} 决定。 */
+    /** 结果。给的是四宫格位图：怎么切、要不要掰直、压多大由 {@link AlertPicture} 决定。
+     *
+     * The result. It provides a 2×2 grid bitmap: how to crop, whether to straighten, and how much
+     * to compress are decided by {@link AlertPicture}.
+     */
     public interface Callback {
-        /** @param grid 2×2 四宫格（已经缩到长边上限）；不会为空 */
+        /**
+         * @param grid 2×2 四宫格（已经缩到长边上限）；不会为空
+         *
+         * @param grid 2×2 grid (already scaled down to the long-edge limit); never null
+         */
         void onPicture(Bitmap grid);
 
-        /** @param reason 一句短话，可以显示给车主 */
+        /**
+         * @param reason 一句短话，可以显示给车主
+         *
+         * @param reason a short phrase that can be shown to the owner
+         */
         void onFailed(String reason);
     }
 
@@ -75,6 +116,13 @@ public final class SnapshotTaker {
      * <p>拍照本身要主线程（{@link CameraKeeper#takePhoto} 会自己转过去），
      * 找文件和压缩挪到后台线程 —— 一张 2×2 的解码加压缩是几十毫秒的事，
      * 但没必要占着主线程。</p>
+     *
+     * Take a photo. May be called from any thread; results come back on the main thread.
+     *
+     * <p>Taking the photo itself needs the main thread ({@link CameraKeeper#takePhoto} switches
+     * over itself); finding the file and compressing are moved to a background thread; decoding
+     * and compressing one 2×2 image is tens of milliseconds, but there is no reason to occupy the
+     * main thread.</p>
      */
     public static void take(Context context, Callback callback) {
         if (context == null || callback == null) {
@@ -98,6 +146,8 @@ public final class SnapshotTaker {
             }
             if (pipeline == null) {
                 // 熄屏停录、管线被放掉的时候就是这样：不是崩溃，是这会儿没有相机
+                // This is what it looks like when the screen is off, recording stops, and the
+                // pipeline is released: not a crash, just no camera right now.
                 fail(callback, "cameras not ready");
                 return;
             }
@@ -123,12 +173,18 @@ public final class SnapshotTaker {
             });
             if (!accepted) {
                 // 上一张还在拍：这一次没人会回调，必须自己说一声，否则警报会静悄悄地没有照片
+                // The previous shot is still being taken: nothing will call back this time, so we
+                // must say so ourselves, otherwise the alert silently ends up with no photo.
                 fail(callback, "camera busy");
             }
         });
     }
 
-    /** 所有失败都排到主线程：调用方（设置里的提示、Toast）只能在主线程上收尾。 */
+    /** 所有失败都排到主线程：调用方（设置里的提示、Toast）只能在主线程上收尾。
+     *
+     * All failures are posted to the main thread: the caller (settings hints, Toasts) can only
+     * finish on the main thread.
+     */
     private static void fail(Callback callback, String reason) {
         MAIN.post(() -> callback.onFailed(reason));
     }
@@ -147,7 +203,11 @@ public final class SnapshotTaker {
         MAIN.post(() -> callback.onPicture(grid));
     }
 
-    /** 这一趟新写下的环视图。名字里带时间戳，按名字取最大的那张就是最新的。 */
+    /** 这一趟新写下的环视图。名字里带时间戳，按名字取最大的那张就是最新的。
+     *
+     * The surround image written by this run. The name carries a timestamp; the one with the
+     * largest name is the newest.
+     */
     private static File newestSurroundPhoto(File dir, long startedAt) {
         String suffix = "_" + CameraSlots.suffixFor(CameraSlots.KEY_SURROUND) + ".jpg";
         File[] files = dir.listFiles();
@@ -169,7 +229,11 @@ public final class SnapshotTaker {
         return newest;
     }
 
-    /** 解码到合适大小：先按 2 的幂降采样，避免整张大图进内存；宽了再缩到长边上限。 */
+    /** 解码到合适大小：先按 2 的幂降采样，避免整张大图进内存；宽了再缩到长边上限。
+     *
+     * Decode to a suitable size: first downsample by powers of two to avoid loading the whole
+     * large image into memory; if it is still wider, scale down to the long-edge limit.
+     */
     private static Bitmap decode(File file) {
         BitmapFactory.Options bounds = new BitmapFactory.Options();
         bounds.inJustDecodeBounds = true;

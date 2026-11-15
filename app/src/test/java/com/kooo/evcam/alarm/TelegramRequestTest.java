@@ -22,6 +22,13 @@ import java.util.Map;
  * 拼往 Telegram 的那一次请求（{@link TelegramRequest}）：地址怎么拼、令牌怎么擦、表单怎么写、令牌和会话号的形状。
  *
  * <p>令牌在路径里，所以“擦干净”不是讲究而是必须：异常、日志、故障报告都可能带出整条 URL。</p>
+ *
+ * Building the one request sent to Telegram ({@link TelegramRequest}): how the
+ * address is assembled, how the token is scrubbed, how the form is written, and
+ * the shape of the token and chat id.
+ *
+ * The token sits in the path, so "scrub it clean" is a requirement, not a
+ * nicety: exceptions, logs, and failure reports can all leak the whole URL.
  */
 public class TelegramRequestTest {
 
@@ -103,6 +110,8 @@ public class TelegramRequestTest {
         assertTrue(text.contains("Content-Type: image/jpeg"));
         assertTrue(text.endsWith("--BOUND--\r\n"));
         // 文件字节原样在中间：JPEG 不能被当成文本处理
+        // The file bytes sit in the middle unchanged: a JPEG must not be treated
+        // as text
         int at = text.indexOf("image/jpeg\r\n\r\n");
         assertEquals(1, body[at + "image/jpeg\r\n\r\n".getBytes(StandardCharsets.UTF_8).length]);
     }

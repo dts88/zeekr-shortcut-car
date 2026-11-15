@@ -17,6 +17,15 @@ package com.kooo.evcam.alarm;
  *
  * <p>1 = 最不敏敏（只有大动静才响），10 = 最敏敏（远处有人走过也响，
  * 但雨、飞虫、树叶也更容易带进来）。默认 5。</p>
+ *
+ * Motion-detection sensitivity: a 1–10 level converted into the two {@link FrameDiff} thresholds.
+ *
+ * <p>Why one level instead of two sliders: the car owner answers only one question; "is it too
+ * sensitive or too dull". The two thresholds move together, so you never get the "one is loosened
+ * but the other is still stuck" situation where nothing you adjust is right.</p>
+ *
+ * <p>1 = least sensitive (only big motion fires), 10 = most sensitive (a person walking far away
+ * fires, but rain, flying bugs, and leaves come in more easily too). Default 5.</p>
  */
 public final class MotionSensitivity {
 
@@ -24,18 +33,34 @@ public final class MotionSensitivity {
     public static final int MAX = 10;
     public static final int DEFAULT = 5;
 
-    /** 最不敏敏时的平均差阈值。 */
+    /**
+     * 最不敏敏时的平均差阈值。
+     *
+     * Average-difference threshold at the least sensitive end.
+     */
     private static final double COARSE_THRESHOLD = 0.030;
-    /** 最敏敏时的平均差阈值。 */
+    /**
+     * 最敏敏时的平均差阈值。
+     *
+     * Average-difference threshold at the most sensitive end.
+     */
     private static final double FINE_THRESHOLD = 0.004;
-    /** 两端的“显著变化像素占比”。 */
+    /**
+     * 两端的“显著变化像素占比”。
+     *
+     * The "fraction of significantly changed pixels" at the two ends.
+     */
     private static final double COARSE_FRACTION = 0.020;
     private static final double FINE_FRACTION = 0.004;
 
     private MotionSensitivity() {
     }
 
-    /** 把任何读数夹到合法范围；读不到时用默认。 */
+    /**
+     * 把任何读数夹到合法范围；读不到时用默认。
+     *
+     * Clamp any reading to the legal range; use the default when nothing is read.
+     */
     public static int clamp(int level) {
         if (level < MIN) {
             return MIN;
@@ -43,12 +68,20 @@ public final class MotionSensitivity {
         return Math.min(level, MAX);
     }
 
-    /** 平均差阈值：档位越高越小（越灵敏）。 */
+    /**
+     * 平均差阈值：档位越高越小（越灵敏）。
+     *
+     * Average-difference threshold: the higher the level, the smaller it is (more sensitive).
+     */
     public static double threshold(int level) {
         return lerp(COARSE_THRESHOLD, FINE_THRESHOLD, clamp(level));
     }
 
-    /** 显著变化像素占比阈值，同样随档位走。 */
+    /**
+     * 显著变化像素占比阈值，同样随档位走。
+     *
+     * Fraction-of-significantly-changed-pixels threshold, also follows the level.
+     */
     public static double fraction(int level) {
         return lerp(COARSE_FRACTION, FINE_FRACTION, clamp(level));
     }
