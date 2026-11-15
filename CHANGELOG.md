@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [4.5.0-alpha] - 2026-11-15
+
+- Smart buttons: new Body actions to close all doors, the driver door, the passenger door, the rear left door, the rear right door or the tailgate. They only work on power-operated doors and need the car to be stationary.
+- About: lists the open-source components the app uses and their licenses; lelelolo added to the contributors.
+- About: the Diagnostics path now reads Settings → General → Diagnostics.
+
 ## [4.4.2-beta] - 2026-11-14
 
 Apart from X knob support, everything is essentially ready. This is a milestone release, and the last beta before X knob support.
