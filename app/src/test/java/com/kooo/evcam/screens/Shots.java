@@ -8,6 +8,7 @@
 package com.kooo.evcam.screens;
 
 import android.app.Activity;
+import android.app.Dialog;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.os.Looper;
@@ -67,6 +68,24 @@ public final class Shots {
                 View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY));
         root.layout(0, 0, width, height);
         settle();
+        Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+        root.draw(new Canvas(bitmap));
+        try {
+            return save(bitmap, name);
+        } finally {
+            bitmap.recycle();
+        }
+    }
+
+    /** 弹着的对话框存成 {@code name.png}：只画对话框窗口那一块（照它自己排出来的大小），不带后面的界面。 */
+    public static File save(Dialog dialog, String name) {
+        settle();
+        View root = dialog.getWindow().getDecorView();
+        int width = root.getWidth();
+        int height = root.getHeight();
+        if (width <= 0 || height <= 0) {
+            throw new IllegalStateException("对话框还没排好：" + width + " × " + height);
+        }
         Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
         root.draw(new Canvas(bitmap));
         try {
