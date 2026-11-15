@@ -26,6 +26,8 @@ import java.util.List;
  *   <li>2026-11-04 项目所有者定加上这些（2026-11-05 起）：一键运动、语音与媒体、座椅与方向盘、空调、
  *       车身、灯光与香氛、场景。写车的那些怎么做在 {@link CarMoves}，不碰车的在 {@link MediaMove}。这台车没有的功能也留着，
  *       给别的地区的车用（项目所有者）。</li>
+ *   <li>2026-11-15 项目所有者要了关门六项（「车身」）：关闭所有车门、四扇各一项、关闭后备箱。只关不开；
+ *       没有电动门的车用不了，选项照留，给有电动门的车用（{@link CarMoves#closeDoors}）。</li>
  * </ul>
  *
  * <p>悬浮按钮那几项直接从 {@link FloatingAction} 长出来，存的也是它的 key：悬浮按钮加一个动作，灵动贴跟着就有，
@@ -163,9 +165,22 @@ public final class SmartButtonAction {
         all.add(car("defrost_rear", Group.CLIMATE, R.string.smart_button_action_defrost_rear,
                 CarMoves.toggle("IHvac", "HVAC_FUNC_DEFROST_REAR", CarNames.ROW_1_CENTER)));
 
-        // 车身（后视镜、充电口盖要车停稳，我们加的）
+        // 车身（关门、后视镜、充电口盖要车停稳；关后备箱、后视镜、充电口盖的是我们加的）
         all.add(car("central_lock", Group.BODY, R.string.smart_button_action_central_lock,
                 CarMoves.toggleAny("SETTING_FUNC_CENTRAL_LOCK", CarNames.ALL, "IVehicle", "ISafety")));
+        all.add(car("close_all_doors", Group.BODY, R.string.smart_button_action_close_all_doors,
+                CarMoves.standstill(CarMoves.closeDoors(Signal.DOOR_DRIVER, Signal.DOOR_PASSENGER,
+                        Signal.DOOR_REAR_LEFT, Signal.DOOR_REAR_RIGHT))));
+        all.add(car("close_driver_door", Group.BODY, R.string.smart_button_action_close_driver_door,
+                CarMoves.standstill(CarMoves.closeDoors(Signal.DOOR_DRIVER))));
+        all.add(car("close_passenger_door", Group.BODY, R.string.smart_button_action_close_passenger_door,
+                CarMoves.standstill(CarMoves.closeDoors(Signal.DOOR_PASSENGER))));
+        all.add(car("close_rear_left_door", Group.BODY, R.string.smart_button_action_close_rear_left_door,
+                CarMoves.standstill(CarMoves.closeDoors(Signal.DOOR_REAR_LEFT))));
+        all.add(car("close_rear_right_door", Group.BODY, R.string.smart_button_action_close_rear_right_door,
+                CarMoves.standstill(CarMoves.closeDoors(Signal.DOOR_REAR_RIGHT))));
+        all.add(car("close_tailgate", Group.BODY, R.string.smart_button_action_close_tailgate,
+                CarMoves.standstill(CarMoves.closeDoors(Signal.DOOR_TRUNK))));
         all.add(car("mirror_fold", Group.BODY, R.string.smart_button_action_mirrors,
                 CarMoves.standstill(CarMoves.mirrors())));
         all.add(car("charging_cap", Group.BODY, R.string.smart_button_action_charging_cap,
