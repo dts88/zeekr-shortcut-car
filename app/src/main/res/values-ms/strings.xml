@@ -60,7 +60,7 @@
     <string name="set_alerts_probe_gear">Gear: %1$s</string>
     <string name="set_alerts_probe_offset">Diproses hingga: %1$s</string>
     <string name="set_alerts_arm_delay_title">Mula selepas berkunci</string>
-    <string name="set_alerts_arm_delay_summary">Mengunci kereta dan berjalan pergi itu anda, bukan orang asing; tunggu sebentar supaya tidak dapat gambar diri sendiri</string>
+    <string name="set_alerts_arm_delay_summary">Tunggu sekejap selepas kunci; anda berjalan bukan peristiwa</string>
     <string name="opt_alerts_arm_now">Serta-merta</string>
     <string name="opt_alerts_arm_1">1 minit</string>
     <string name="opt_alerts_arm_3">3 minit</string>
@@ -160,7 +160,10 @@ Kalau lupa: %3$s</string>
     <string name="alert_event_picture_title">Ambil gambar sekarang</string>
     <string name="alert_event_picture">Betul dihantar bila: anda hantar pic. Ini gambar amaran: bawah 100 kB, dengan butang HD dan klip</string>
     <string name="alert_event_hd">Betul dihantar bila: anda tekan HD. Tahap 400-600 kB, plat lebih jelas</string>
-    <string name="alert_event_clip_front_title">Klip depan</string>
+        <string name="alert_btn_clip_surround">Klip gabungan</string>
+    <string name="alert_event_clip_surround_title">Klip gabungan, empat kamera</string>
+    <string name="alert_event_clip_surround">Betul dihantar bila: anda tekan Klip gabungan. Empat kamera dipotong bersama</string>
+<string name="alert_event_clip_front_title">Klip depan</string>
     <string name="alert_event_clip_rear_title">Klip belakang</string>
     <string name="alert_event_clip_left_title">Klip kiri</string>
     <string name="alert_event_clip_right_title">Klip kanan</string>
@@ -1430,7 +1433,7 @@ Kalau lupa: %3$s</string>
     <string name="set_alerts_ntfy_risk_accept">Saya faham, risiko saya tanggung, guna juga</string>
     <string name="set_alerts_ntfy_risk_decline">Guna akaun saya</string>
     <string name="set_alerts_ntfy_qr_title">Dapatkan amaran di telefon</string>
-    <string name="set_alerts_ntfy_qr_body">1. Pasang "ntfy" di telefon: cari di gedung app, atau imbas kod di atas\n2. Halakan kamera telefon pada kod ini\n3. Tekan di bawah bila ia sudah ada dalam app</string>
+    <string name="set_alerts_ntfy_qr_body">1. Pasang "ntfy" di telefon: cari di gedung app, atau imbas kod di atas\n2. Halakan kamera telefon pada kod ini\n3. Tekan di bawah bila ia sudah ada dalam app Pasang aplikasi ntfy dahulu (cari ntfy di App Store atau Play Store). Kod QR hanya melanggan topik; tanpa aplikasi itu anda tidak akan nampak satu amaran pun.</string>
     <string name="set_alerts_ntfy_qr_open">Sudah dipasang</string>
     <string name="set_alerts_ntfy_code_title">Adakah notifikasi sampai?</string>
     <string name="set_alerts_ntfy_code_body">Saya baru hantar satu. Ada empat nombor di dalamnya. Taip di sini supaya saya tahu ia berjaya.</string>
@@ -1440,4 +1443,8 @@ Kalau lupa: %3$s</string>
     <string name="set_alerts_ntfy_code_none">Tiada? Buka app ntfy di telefon, pastikan topik itu ada, kemudian tekan "Hantar lagi".</string>
     <string name="set_alerts_ntfy_resend">Hantar lagi</string>
     <string name="set_alerts_ntfy_need_topic">Buat topik dalam tetapan dahulu</string>
+    <string name="set_alerts_transport_title">Ke mana amaran dihantar</string>
+    <string name="set_alerts_transport_summary">Bot Telegram, atau topik ntfy</string>
+    <string name="set_alerts_transport_telegram">Telegram</string>
+    <string name="set_alerts_transport_ntfy">ntfy</string>
 </resources>

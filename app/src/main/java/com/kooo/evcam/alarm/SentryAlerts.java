@@ -1471,7 +1471,8 @@ public final class SentryAlerts implements Telemetry.Listener {
                             continue;
                         }
                         byte[] jpeg = highQuality
-                                ? AlertPicture.jpeg(cell)
+                                ? AlertPicture.jpegAt(cell, AlertPicture.HIGH_QUALITY,
+                                        PictureBudget.HIGH_BYTES)
                                 : AlertPicture.jpegUnder(cell, PictureBudget.ALERT_BYTES);
                         cell.recycle();
                         if (jpeg != null && jpeg.length > 0) {
@@ -1481,7 +1482,8 @@ public final class SentryAlerts implements Telemetry.Listener {
                     }
                 } else {
                     byte[] jpeg = highQuality
-                            ? AlertPicture.jpeg(picture)
+                            ? AlertPicture.jpegAt(picture, AlertPicture.HIGH_QUALITY,
+                                    PictureBudget.HIGH_BYTES)
                             : AlertPicture.jpegUnder(picture, PictureBudget.ALERT_BYTES);
                     if (jpeg != null && jpeg.length > 0) {
                         photos.add(jpeg);
@@ -1763,6 +1765,10 @@ public final class SentryAlerts implements Telemetry.Listener {
                 sendHighQualityPicture();
                 reportQueued(callback);
                 return;
+            case CLIP_SURROUND:
+                sendClipForSurround();
+                reportQueued(callback);
+                return;
             case CLIP_FRONT:
             case CLIP_REAR:
             case CLIP_LEFT:
@@ -1862,6 +1868,10 @@ public final class SentryAlerts implements Telemetry.Listener {
         labels.add(app.getString(R.string.alert_btn_hd));
         datas.add(AlertButton.data(AlertButton.ACTION_HIGH, alertToken));
         if (config.getAlertsClipSeconds() > 0) {
+            // 四路拼一张的片段排在最前：那是最常要的那一段，单路是少数。
+            // The stitched surround clip comes first: it is what most requests want; one lane is the exception.
+            labels.add(app.getString(R.string.alert_btn_clip_surround));
+            datas.add(AlertButton.data(AlertButton.ACTION_CLIP_SURROUND, alertToken));
             for (int lane = 0; lane < 4; lane++) {
                 labels.add(app.getString(R.string.alert_btn_clip, CameraNames.ofLane(app, lane)));
                 datas.add(AlertButton.data(AlertButton.clipAction(lane), alertToken));
@@ -1891,6 +1901,10 @@ public final class SentryAlerts implements Telemetry.Listener {
         if (AlertButton.ACTION_HIGH.equals(action)) {
             BlackBox.note("alerts: a high-quality picture was asked for");
             sendHighQualityPicture();
+            return;
+        }
+        if (AlertButton.ACTION_CLIP_SURROUND.equals(action)) {
+            sendClipForSurround();
             return;
         }
         int lane = AlertButton.laneOf(action);
@@ -1932,7 +1946,21 @@ public final class SentryAlerts implements Telemetry.Listener {
      * on the recording side — the sentry / screen-off frame-rate setting is the knob that keeps it
      * manageable — and anything over 10 MB is refused with the real number instead of a silent failure.</p>
      */
+    private void sendClipForSurround() {
+        clipFor(com.kooo.evcam.camera.CameraSlots.KEY_SURROUND,
+                app.getString(R.string.alert_btn_clip_surround));
+    }
+
     private void sendClipForLane(int lane) {
+        clipFor(cameraKeyOfLane(lane), CameraNames.ofLane(app, lane));
+    }
+
+    /**
+     * 切一段那一路的视频发出去（{@code cameraKey} 是录制那边的槽，{@code camera} 是给人看的名字）。
+     *
+     * @param cameraKey {@code front} / {@code back} / {@code left} / {@code right}；四路拼一张是 {@code front}
+     */
+    private void clipFor(String cameraKey, String camera) {
         int seconds = config.getAlertsClipSeconds();
         String token = config.getAlertsTelegramToken();
         String chatId = config.getAlertsTelegramChatId();
@@ -1944,11 +1972,10 @@ public final class SentryAlerts implements Telemetry.Listener {
             return;
         }
         java.io.File file = new java.io.File(app.getCacheDir(),
-                "alert_clip_" + lane + "_" + System.currentTimeMillis() + ".mp4");
-        String camera = CameraNames.ofLane(app, lane);
+                "alert_clip_" + cameraKey + "_" + System.currentTimeMillis() + ".mp4");
         BlackBox.note("alerts: clip asked for, " + camera + ", " + seconds + " s");
         CameraKeeper.get(app).writeClip(file, seconds, config.isAlertsClipAudio(),
-                cameraKeyOfLane(lane), ok -> {
+                cameraKey, ok -> {
             clipBusy.set(false);
             if (!ok || !file.isFile() || file.length() == 0) {
                 BlackBox.note("alerts: no clip for " + camera + " (ring holds too little video)");
@@ -2121,6 +2148,13 @@ public final class SentryAlerts implements Telemetry.Listener {
 
     /** 问一句，带两颗按钮。 */
     private void guardAsk(long nowMs, GuardPolicy.Mode mode) {
+        if (guardLeftAtMs <= 0) {
+            // 样例是当场问的：这一问本身就当作「离开那一刻」，按钮才有三分钟可用。
+            // A sample asks right now, so this ask is the leaving moment: its buttons get the window.
+            guardLeftAtMs = nowMs;
+        }
+        guardActed = false;
+        guardVetoed = false;
         guardToken = GuardToken.mint(nowMs);
         guardAskedAtMs = nowMs;
         String markup = TelegramRequest.inlineKeyboard(
@@ -2256,7 +2290,11 @@ public final class SentryAlerts implements Telemetry.Listener {
             return;
         }
         long now = SystemClock.elapsedRealtime();
-        if (!GuardPolicy.stillActionable(guardLeftAtMs, now)) {
+        // 手里没有那一次「离开」的时刻（测试屏发的样例、或者上一次已经收工）：这就不再是「晚不晚」的问题，
+        // 而是车主当场按了一颗按钮 —— 照做。
+        // With no leaving moment in hand (a sample from the events screen, or a reminder that already
+        // finished) the question is not "too late" any more: the owner pressed a button now, so do it.
+        if (guardLeftAtMs > 0 && !GuardPolicy.stillActionable(guardLeftAtMs, now)) {
             BlackBox.note("alerts: button pressed after the window ("
                     + (now - guardLeftAtMs) / 1000 + " s)");
             guardSend(app.getString(R.string.alert_guard_late), "");

@@ -195,6 +195,17 @@ public final class NtfySetupDialog {
         LinearLayout column = new LinearLayout(fragment.requireContext());
         column.setOrientation(LinearLayout.VERTICAL);
         column.setPadding(pad, pad / 2, pad, 0);
+        // 四位数摆在输入框上面，大一号：它是给隔壁屏幕上的 ntfy 打字用的，不是说明文字。
+        // The four digits sit above the input, larger: they are typed into the ntfy app on the phone,
+        // they are not prose.
+        TextView big = new TextView(fragment.requireContext());
+        big.setText(code);
+        big.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 44f);
+        big.setTypeface(android.graphics.Typeface.MONOSPACE, android.graphics.Typeface.BOLD);
+        big.setGravity(android.view.Gravity.CENTER);
+        big.setLetterSpacing(0.25f);
+        column.addView(big, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         TextView body = new TextView(fragment.requireContext());
         body.setText(R.string.set_alerts_ntfy_code_body);
         body.setLineSpacing(0f, 1.15f);

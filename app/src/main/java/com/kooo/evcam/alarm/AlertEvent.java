@@ -43,6 +43,7 @@ public enum AlertEvent {
     /* ---- 照片与片段：按需才发 / picture and clips, on demand ---- */
     PICTURE(R.string.alert_event_picture_title, R.string.alert_event_picture),
     HD_PICTURE(R.string.alert_btn_hd, R.string.alert_event_hd),
+    CLIP_SURROUND(R.string.alert_event_clip_surround_title, R.string.alert_event_clip_surround),
     CLIP_FRONT(R.string.alert_event_clip_front_title, R.string.alert_event_clip_front),
     CLIP_REAR(R.string.alert_event_clip_rear_title, R.string.alert_event_clip_rear),
     CLIP_LEFT(R.string.alert_event_clip_left_title, R.string.alert_event_clip_left),

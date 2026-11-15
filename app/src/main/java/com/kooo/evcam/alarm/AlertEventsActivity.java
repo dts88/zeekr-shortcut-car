@@ -50,6 +50,11 @@ public class AlertEventsActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setTitle(R.string.alerts_events_title);
         setContentView(R.layout.activity_alert_events);
+        // 左上角那个返回箭头：这一屏只有一个入口，回得去设置才顺手（车主 2026-11-15）。
+        // The up arrow: this screen has one entry, and going back to settings has to be one tap.
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        }
 
         for (AlertEvent event : AlertEvent.values()) {
             Map<String, Object> row = new HashMap<>();
@@ -64,6 +69,21 @@ public class AlertEventsActivity extends AppCompatActivity {
         ListView list = findViewById(R.id.alert_events_list);
         list.setAdapter(adapter);
         list.setOnItemClickListener((parent, view, position, id) -> trigger(rows.get(position)));
+    }
+
+    @Override
+    public boolean onSupportNavigateUp() {
+        finish();
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(android.view.MenuItem item) {
+        if (item.getItemId() == android.R.id.home) {
+            finish();
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
     }
 
     private void trigger(Map<String, Object> row) {

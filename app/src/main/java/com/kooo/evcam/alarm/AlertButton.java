@@ -33,6 +33,9 @@ public final class AlertButton {
     /** 要哪一路的视频：{@link #ACTION_CLIP} + 路号。Which camera's clip: {@link #ACTION_CLIP} plus the lane. */
     public static final String ACTION_CLIP = "c";
 
+    /** 四路拼成一张的那个片段：大多数时候要看的是这个。The stitched four-camera clip: what most requests want. */
+    public static final String ACTION_CLIP_SURROUND = "cs";
+
     private static final String PREFIX = "a";
 
     private AlertButton() {
@@ -78,7 +81,7 @@ public final class AlertButton {
             return null;
         }
         String action = parts[1];
-        if (ACTION_HIGH.equals(action)) {
+        if (ACTION_HIGH.equals(action) || ACTION_CLIP_SURROUND.equals(action)) {
             return action;
         }
         return laneOf(action) == TelegramCommand.ANY_LANE ? null : action;

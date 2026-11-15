@@ -60,7 +60,7 @@
     <string name="set_alerts_probe_gear">Gear: %1$s</string>
     <string name="set_alerts_probe_offset">Handled up to: %1$s</string>
     <string name="set_alerts_arm_delay_title">Start after locking</string>
-    <string name="set_alerts_arm_delay_summary">Locking the car and walking away is you, not a stranger; wait a moment so you do not get a picture of yourself</string>
+    <string name="set_alerts_arm_delay_summary">Wait a moment after locking; you walking away is not an event</string>
     <string name="opt_alerts_arm_now">Right away</string>
     <string name="opt_alerts_arm_1">1 minute</string>
     <string name="opt_alerts_arm_3">3 minutes</string>
@@ -160,7 +160,10 @@ If I forget: %3$s</string>
     <string name="alert_event_picture_title">Take a picture now</string>
     <string name="alert_event_picture">Really goes out when: you send pic. This is the alert picture: under 100 kB, with the HD and clip buttons</string>
     <string name="alert_event_hd">Really goes out when: you press HD picture under it. The 400-600 kB ladder, for readable plates</string>
-    <string name="alert_event_clip_front_title">Front clip</string>
+        <string name="alert_btn_clip_surround">Surround clip</string>
+    <string name="alert_event_clip_surround_title">Surround clip, four cameras</string>
+    <string name="alert_event_clip_surround">Really goes out when: you press Surround clip. The four cameras cut together, which is what most requests want</string>
+<string name="alert_event_clip_front_title">Front clip</string>
     <string name="alert_event_clip_rear_title">Rear clip</string>
     <string name="alert_event_clip_left_title">Left clip</string>
     <string name="alert_event_clip_right_title">Right clip</string>
@@ -1454,7 +1457,7 @@ If I forget: %3$s</string>
     <string name="set_alerts_ntfy_risk_accept">I understand, the risk is mine, use it anyway</string>
     <string name="set_alerts_ntfy_risk_decline">Use my account instead</string>
     <string name="set_alerts_ntfy_qr_title">Get alerts on your phone</string>
-    <string name="set_alerts_ntfy_qr_body">1. Install "ntfy" on your phone: search your app store, or scan the code above\n2. Point your phone camera at this code\n3. Tap below when it is in the app</string>
+    <string name="set_alerts_ntfy_qr_body">1. Install "ntfy" on your phone: search your app store, or scan the code above\n2. Point your phone camera at this code\n3. Tap below when it is in the app Install the ntfy app first (search for ntfy in the App Store or Play Store). The QR code only subscribes the topic; without that app you will not see a single alert.</string>
     <string name="set_alerts_ntfy_qr_open">It is installed</string>
     <string name="set_alerts_ntfy_code_title">Did a notification arrive?</string>
     <string name="set_alerts_ntfy_code_body">I just sent one. It has four numbers in it. Type them here and I know the path works.</string>
@@ -1464,4 +1467,8 @@ If I forget: %3$s</string>
     <string name="set_alerts_ntfy_code_none">Nothing? Open the ntfy app on your phone, check the topic is there, then tap "Send again".</string>
     <string name="set_alerts_ntfy_resend">Send again</string>
     <string name="set_alerts_ntfy_need_topic">Make a topic in the settings first</string>
+    <string name="set_alerts_transport_title">Where alerts go</string>
+    <string name="set_alerts_transport_summary">A Telegram bot, or an ntfy topic</string>
+    <string name="set_alerts_transport_telegram">Telegram</string>
+    <string name="set_alerts_transport_ntfy">ntfy</string>
 </resources>

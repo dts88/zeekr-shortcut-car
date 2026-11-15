@@ -74,7 +74,7 @@
     <string name="set_alerts_probe_gear">挡位：%1$s</string>
     <string name="set_alerts_probe_offset">已处理到：%1$s</string>
     <string name="set_alerts_arm_delay_title">锁车后等多久</string>
-    <string name="set_alerts_arm_delay_summary">锁车、走开那一会儿都是自己人；等一下再开始报，就不会收到一张自己的照片</string>
+    <string name="set_alerts_arm_delay_summary">锁车后等一会儿再开始，走开那一下不算</string>
     <string name="opt_alerts_arm_now">立刻</string>
     <string name="opt_alerts_arm_1">1 分钟</string>
     <string name="opt_alerts_arm_3">3 分钟</string>
@@ -174,7 +174,10 @@
     <string name="alert_event_picture_title">现在就拍一张</string>
     <string name="alert_event_picture">真的会发：你在聊天里发 pic。这张就是警报那张，压到 100 kB 以下，带 HD 和片段按钮</string>
     <string name="alert_event_hd">真的会发：你点照片下面的「HD 一张」。400–600 kB 那一档，车牌更清楚</string>
-    <string name="alert_event_clip_front_title">前路片段</string>
+        <string name="alert_btn_clip_surround">四路拼一张的片段</string>
+    <string name="alert_event_clip_surround_title">四路拼一张的片段</string>
+    <string name="alert_event_clip_surround">真的会发：你点照片下面的「四路拼一张」。这一段是四路一起切下来的，最常要的就是它</string>
+<string name="alert_event_clip_front_title">前路片段</string>
     <string name="alert_event_clip_rear_title">后路片段</string>
     <string name="alert_event_clip_left_title">左路片段</string>
     <string name="alert_event_clip_right_title">右路片段</string>
@@ -1446,7 +1449,7 @@
     <string name="set_alerts_ntfy_risk_accept">我明白，风险由我承担，还是用</string>
     <string name="set_alerts_ntfy_risk_decline">改用账号</string>
     <string name="set_alerts_ntfy_qr_title">在手机上收警报</string>
-    <string name="set_alerts_ntfy_qr_body">1. 在手机上装「ntfy」：应用商店搜 ntfy，或扫上面的码\n2. 用手机相机扫这个二维码\n3. 扫好之后点下面</string>
+    <string name="set_alerts_ntfy_qr_body">1. 在手机上装「ntfy」：应用商店搜 ntfy，或扫上面的码\n2. 用手机相机扫这个二维码\n3. 扫好之后点下面 扫码之前先装好 ntfy 应用（App Store / Play 商店搜 ntfy）。二维码只负责把话题订阅上，没有那个应用就看不到任何一条警报。</string>
     <string name="set_alerts_ntfy_qr_open">装好了</string>
     <string name="set_alerts_ntfy_code_title">收到一条通知了吗</string>
     <string name="set_alerts_ntfy_code_body">我刚发了一条，里面有四个数字。填进来，我就知道路通了。</string>
@@ -1456,4 +1459,8 @@
     <string name="set_alerts_ntfy_code_none">没收到：先在手机的 ntfy app 里看一眼有没有这个话题，再点「重发一条」。</string>
     <string name="set_alerts_ntfy_resend">重发一条</string>
     <string name="set_alerts_ntfy_need_topic">先在设置里生成一个话题</string>
+    <string name="set_alerts_transport_title">警报发到哪儿</string>
+    <string name="set_alerts_transport_summary">Telegram 机器人，或者 ntfy 话题</string>
+    <string name="set_alerts_transport_telegram">Telegram</string>
+    <string name="set_alerts_transport_ntfy">ntfy</string>
 </resources>

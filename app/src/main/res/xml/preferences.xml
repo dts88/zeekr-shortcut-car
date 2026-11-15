@@ -242,6 +242,11 @@
                 android:title="@string/set_alerts_find_title"
                 android:summary="@string/set_alerts_find_summary" />
 
+            <ListPreference
+                android:key="pref_alerts_transport"
+                android:title="@string/set_alerts_transport_title"
+                android:summary="@string/set_alerts_transport_summary" />
+
             <SwitchPreferenceCompat
                 android:key="pref_alerts_commands"
                 android:title="@string/set_alerts_commands_title"
@@ -624,11 +629,6 @@
           ntfy alerts toggle: the transport selector AND the feature gate. Its key is in
           DEVELOPER_KEYS, so closing developer options reads as telegram; switching erases nothing.
         -->
-        <SwitchPreferenceCompat
-            android:key="pref_dev_alerts_ntfy"
-            android:title="@string/set_dev_alerts_ntfy_title"
-            android:summary="@string/set_dev_alerts_ntfy_off" />
-
         <Preference
             android:key="pref_permissions"
             android:title="@string/dev_permissions_title"

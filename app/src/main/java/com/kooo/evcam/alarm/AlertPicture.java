@@ -306,6 +306,33 @@ public final class AlertPicture {
      * <p>Compress into the budget: quality first, then scale, until it fits ({@link PictureBudget}). If no
      * step fits, the smallest one tried is returned — too small beats over budget.</p>
      */
+    /** 「HD」那一档先用这个画质：同一张图上比 70 明显清楚，又还在 900 kB 以内。 */
+    public static final int HIGH_QUALITY = 92;
+
+    /**
+     * 按一个固定画质压一张，管到多大就用 {@link #jpegUnder} 兜回去。
+     *
+     * <p>「HD 一张」不能只是「预算大一点」：夜里那张四宫格 q80 本来就只有 158 kB，预算放到 900 kB
+     * 也一样是 158 kB —— 看着和 100 kB 那张没区别。所以先按 {@link #HIGH_QUALITY} 压，超过
+     * {@code maxBytes} 才退回一档档降的那条路。</p>
+     *
+     * <p>"HD" cannot just mean "a bigger budget": the night-time four-up is 158 kB at q80, and a 900 kB
+     * budget would still produce 158 kB — indistinguishable from the 100 kB one. So it encodes at
+     * {@link #HIGH_QUALITY} first and only falls back to the ladder when that is over {@code maxBytes}.</p>
+     */
+    public static byte[] jpegAt(Bitmap bitmap, int quality, int maxBytes) {
+        if (bitmap == null || bitmap.isRecycled()) {
+            return null;
+        }
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        bitmap.compress(Bitmap.CompressFormat.JPEG, quality, bytes);
+        byte[] encoded = bytes.toByteArray();
+        if (encoded.length > 0 && encoded.length <= maxBytes) {
+            return encoded;
+        }
+        return jpegUnder(bitmap, maxBytes);
+    }
+
     public static byte[] jpegUnder(Bitmap bitmap, int maxBytes) {
         if (bitmap == null || bitmap.isRecycled()) {
             return null;

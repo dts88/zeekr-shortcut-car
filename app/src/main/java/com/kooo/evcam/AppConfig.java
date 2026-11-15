@@ -2167,8 +2167,11 @@ public class AppConfig {
      * status row both read this one function, so they cannot disagree.
      */
     public String getAlertsTransport() {
-        return com.kooo.evcam.alarm.NtfyGate.effective(
-                com.kooo.evcam.settings.DeveloperMode.isUnlocked(), getAlertsTransportStored());
+        // 2026-11-15：这一项从开发者选项搬到「停车警报」里，成了车主的普通选择，
+        // 所以不再跟着开发者选项开关走；存坏的值仍然按 telegram 算（NtfyGate.stored）。
+        // 2026-11-15: the choice moved out of Developer options into the alerts section, so it no longer
+        // follows that switch; a stored value that makes no sense still reads as telegram.
+        return com.kooo.evcam.alarm.NtfyGate.stored(getAlertsTransportStored());
     }
 
     /**

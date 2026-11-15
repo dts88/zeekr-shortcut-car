@@ -1067,10 +1067,13 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         }
         show("pref_alerts_motion_sensitivity", alertsOn && shownTriggers.has(
                 com.kooo.evcam.alarm.TriggerSet.MOTION));
-        boolean quietOn = appConfig.isAlertsQuietEnabled();
         show("pref_alerts_arm_delay", alertsOn);
-        show("pref_alerts_quiet_start", alertsOn && quietOn);
-        show("pref_alerts_quiet_end", alertsOn && quietOn);
+        // 起止时刻跟着总开关，不跟着「安静时段」那个开关：先挑时间再打开才顺手，
+        // 藏在开关后面就成了「点了没反应」。
+        // The two times follow the master switch, not the quiet-hours switch: setting the window before
+        // turning it on is the natural order, and hiding them behind the switch reads as "nothing happens".
+        show("pref_alerts_quiet_start", alertsOn);
+        show("pref_alerts_quiet_end", alertsOn);
         show("pref_alerts_cameras", alertsOn && perCamera);
         show("pref_alerts_clip_audio", alertsOn && clipOn);
         show("pref_alerts_clip_data", alertsOn && clipOn);
@@ -1207,6 +1210,28 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                         toast(text.replace('\n', ' '));
                     }
                 });
+                return true;
+            });
+        }
+
+        // 警报发到哪儿：Telegram 或者 ntfy（2026-11-15 从开发者选项搬到这里，成了车主的普通选择）。
+        // Where alerts go: Telegram or ntfy. Moved out of Developer options on 2026-11-15.
+        androidx.preference.ListPreference transport = findPreference("pref_alerts_transport");
+        if (transport != null) {
+            transport.setPersistent(false);
+            transport.setEntries(new CharSequence[] {
+                    getString(R.string.set_alerts_transport_telegram),
+                    getString(R.string.set_alerts_transport_ntfy)});
+            transport.setEntryValues(new CharSequence[] {
+                    com.kooo.evcam.alarm.NtfyGate.TELEGRAM,
+                    com.kooo.evcam.alarm.NtfyGate.NTFY});
+            transport.setValue(appConfig.getAlertsTransport());
+            transport.setOnPreferenceChangeListener((preference, newValue) -> {
+                String chosen = String.valueOf(newValue);
+                appConfig.setAlertsTransport(chosen);
+                com.kooo.evcam.blackbox.BlackBox.noteImportant(
+                        "设置变更: pref_alerts_transport → " + chosen);
+                showAlertsRows();
                 return true;
             });
         }
@@ -1519,57 +1544,8 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
      * The ntfy switch: it switches exits, it does not toggle a feature. Turning it on with no topic
      * walks through setup first; leaving setup puts it back to off.
      */
-    private void bindNtfyToggle() {
-        SwitchPreferenceCompat toggle = findPreference("pref_dev_alerts_ntfy");
-        if (toggle == null) {
-            return;
-        }
-        toggle.setPersistent(false);
-        toggle.setChecked(com.kooo.evcam.alarm.NtfyGate.NTFY.equals(appConfig.getAlertsTransportStored()));
-        toggle.setSummary(toggle.isChecked()
-                ? R.string.set_dev_alerts_ntfy_on : R.string.set_dev_alerts_ntfy_off);
-        toggle.setOnPreferenceChangeListener((preference, newValue) -> {
-            boolean wantsNtfy = Boolean.TRUE.equals(newValue);
-            if (!wantsNtfy) {
-                // 关：只写这一个键。Telegram 那边的令牌、会话号一个字都不动。
-                // Off: one key. Nothing on the Telegram side is touched.
-                appConfig.setAlertsTransport(com.kooo.evcam.alarm.NtfyGate.TELEGRAM);
-                com.kooo.evcam.blackbox.BlackBox.noteImportant("开关变更: pref_dev_alerts_ntfy → 关（发到 Telegram）");
-                finishNtfyToggle(preference, false);
-                return true;
-            }
-            if (appConfig.hasAlertsNtfyConfig()) {
-                appConfig.setAlertsTransport(com.kooo.evcam.alarm.NtfyGate.NTFY);
-                com.kooo.evcam.blackbox.BlackBox.noteImportant("开关变更: pref_dev_alerts_ntfy → 开（发到 ntfy）");
-                finishNtfyToggle(preference, true);
-                return true;
-            }
-            // 还没话题：先配。配完（且风险被接受）才算打开；中途退出就回到关着。
-            // No topic yet: set it up first. It only turns on once setup finished and the warning was
-            // accepted; leaving setup puts it back to off.
-            toast(getString(R.string.set_dev_alerts_ntfy_needs_setup));
-            NtfySetupDialog.show(this, appConfig, () -> {
-                boolean ready = appConfig.hasAlertsNtfyConfig()
-                        && com.kooo.evcam.alarm.NtfyRisk.accepted(appConfig.getAlertsNtfyTopic(),
-                                appConfig.getAlertsNtfyRiskAck());
-                appConfig.setAlertsTransport(ready
-                        ? com.kooo.evcam.alarm.NtfyGate.NTFY : com.kooo.evcam.alarm.NtfyGate.TELEGRAM);
-                com.kooo.evcam.blackbox.BlackBox.noteImportant("开关变更: pref_dev_alerts_ntfy → "
-                        + (ready ? "开（发到 ntfy）" : "关（设置没完成）"));
-                finishNtfyToggle(preference, ready);
-            });
-            return false;
-        });
-    }
 
     /** 开关之后的共同收尾：把勾选状态、行尾说明、发送那边一起对齐。 */
-    private void finishNtfyToggle(androidx.preference.Preference preference, boolean on) {
-        if (preference instanceof SwitchPreferenceCompat) {
-            ((SwitchPreferenceCompat) preference).setChecked(on);
-        }
-        preference.setSummary(on ? R.string.set_dev_alerts_ntfy_on : R.string.set_dev_alerts_ntfy_off);
-        afterNtfyChange();
-    }
 
     private void editAlertsToken() {
         showTextDialog("pref_alerts_token", getString(R.string.set_alerts_token_title),
@@ -2772,7 +2748,6 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         // 于是下面四个入口一个都没接上，点了毫无反应，也不报错。
         // ntfy 的出口开关（2026-11-15）：换出口，不擦设置（D14）
         // The ntfy exit switch: switches exits and erases nothing (D14)
-        bindNtfyToggle();
 
         onClick("pref_alerts_debug", pref -> startActivity(
                 new Intent(getContext(), com.kooo.evcam.alarm.AlertsDebugActivity.class)));
