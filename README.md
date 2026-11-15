@@ -139,9 +139,6 @@ Optional, in the same section:
   switches it on 60 s later unless you say no. It only works while the car is awake — about five
   minutes — so a button refuses politely after three. "Also at home" makes it apply everywhere.
 - **Quiet hours**: no alerts between two times, for the nights the car is at home.
-- **Forgot Sentry**: park away from home with Sentry Mode off and the car asks in the chat, then switches
-  it on 60 s later unless you say no. It only works while the car is awake, about five minutes; the
-  buttons stop working after three minutes.
 
 **What it cannot see.** The car reports no impact, horn or tamper signal, so a knock that lights nothing
 and opens nothing stays invisible. Cameras also need Sentry Mode to keep the head unit awake.
@@ -149,6 +146,12 @@ and opens nothing stays invisible. Cameras also need Sentry Mode to keep the hea
 ![Sentry alerts settings](docs/screenshots/alerts-settings-en.png)
 
 ![How it works](docs/screenshots/alerts-how-it-works.png)
+
+Forgot Sentry, on a real car outside a petrol station: the ask arrives, nobody answers, so it switches
+Sentry Mode on one minute later and reads the new state back from the car; then `pic` on demand returns
+the four cameras as one picture.
+
+![Forgot Sentry and a picture on request](docs/screenshots/alerts-forgot-sentry-chat.jpg)
 
 ### Experimental
 

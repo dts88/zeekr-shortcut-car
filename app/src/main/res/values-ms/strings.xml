@@ -135,10 +135,8 @@ Kereta hanya menjawab beberapa minit, selepas itu ia tidur</string>
     <string name="alert_guard_btn_no">Biarkan tutup</string>
     <string name="alert_guard_btn_off">Tutupkan</string>
     <string name="alert_guard_btn_state">Status</string>
-    <string name="alert_guard_on">%1$s
-Ini bacaan kereta</string>
-    <string name="alert_guard_off">%1$s
-Ini bacaan kereta</string>
+    <string name="alert_guard_on">%1$s\nIni bacaan kereta</string>
+    <string name="alert_guard_off">%1$s\nIni bacaan kereta</string>
     <string name="alert_guard_off_armed">Kereta sudah berjaga, jadi tidak boleh ditutup. Buka kunci sekali, kemudian cuba lagi</string>
     <string name="alert_guard_late">Terlambat: kereta sudah tidur dan tidak boleh menghidupkan apa-apa. Ia menjawab semula apabila pintu dibuka</string>
     <string name="alert_guard_veto">Baik, Mod Sentri dibiarkan tutup</string>

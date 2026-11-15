@@ -116,7 +116,7 @@ outcome arrives as a normal message.
 
 | Unknown | Test | If it fails |
 |---|---|---|
-| The car accepts `VSTD_MODE_STS = 1` while locked and arms to 2 | 20 minutes on the car: park with sentry off, `/guard on`, watch the value | Mode degrades to Ask only, and the copy says so |
+| The car accepts `VSTD_MODE_STS = 1` while locked and arms to 2 | **half answered, 2026-11-15:** parked outside a petrol station with sentry off, the owner walked away; the ask went out, nobody pressed, the timeout wrote the value and the receipt read back "Sentry Mode: on". Arms-to-2 at that moment is still unseen | If a later sample refuses, the copy says so and the mode degrades to Ask only |
 | The head unit grants location at all (`LocationSource.java:21-26` says this is unmeasured) | one drive with the info bar on | Home gate stays `UNKNOWN`; asking continues, silent auto-on needs a home set by hand |
 | Whether the picture path still works right after a remote enable | send a test picture with the receipt | Alerts keep working, the guard is a drain only |
 | Cost of a whole night in sentry | one overnight sample with `Signal.BATTERY` in the heartbeat | add an hours cap, default 10 h |

@@ -155,6 +155,15 @@ line in the black box (`alerts: armed N s ago, waiting for M min`).
 这一件事是「车主自己忘了」，按那套算只会让该说的话不说。它要的是 Telegram 那条路：按钮是回调
 （`callback_query`），别的传输方式没有回程，这一版只做 Telegram（`DECISIONS.md` D8）。
 
+实测（2026-11-15，车上，加油站外）：离开家以后车机还醒着的时候，这个写是被受理的 ——
+问出去没人按，60 秒后自己开，回执读回来是「Sentry Mode: on」；随后 `pic` 取回四路一张图。
+截图见 `docs/screenshots/alerts-forgot-sentry-chat.jpg`。**还没测到的**：那一刻读数有没有走到 2（布防），
+以及离车更久、车机睡过一轮之后再写会怎样。
+
+###### 图片
+
+![忘了开哨兵与按需取图](screenshots/alerts-forgot-sentry-chat.jpg)
+
 已知的两条限：
 
 - 进程那一刻没在跑，就没有提醒 —— 提醒是应用进程里的一段代码（`DECISIONS.md` D7）。
@@ -196,6 +205,12 @@ This is **not an AlertPolicy alert**: no armed gate, no cooldown, and quiet hour
 three were written for "someone touched the car", and this one is "the owner forgot". It needs the
 Telegram transport: the buttons are callbacks (`callback_query`), the other transport has no return
 path, so this version is Telegram only (`DECISIONS.md` D8).
+
+Measured (2026-11-15, in the car, outside a petrol station): while the head unit is still awake after
+the owner leaves, the write is accepted — nobody pressed the button, it switched on by itself 60 s later,
+and the receipt reads back "Sentry Mode: on"; `pic` then returned the four cameras as one picture. The
+screenshot is `docs/screenshots/alerts-forgot-sentry-chat.jpg`. **Still unmeasured**: whether the value
+reached 2 (armed) at that moment, and what the write does once the head unit has slept and woken again.
 
 Two known limits:
 

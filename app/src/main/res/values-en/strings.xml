@@ -135,10 +135,8 @@ The car answers for a few minutes only, then it sleeps</string>
     <string name="alert_guard_btn_no">Leave it off</string>
     <string name="alert_guard_btn_off">Turn it off</string>
     <string name="alert_guard_btn_state">Status</string>
-    <string name="alert_guard_on">%1$s
-Read back from the car</string>
-    <string name="alert_guard_off">%1$s
-Read back from the car</string>
+    <string name="alert_guard_on">%1$s\nRead back from the car</string>
+    <string name="alert_guard_off">%1$s\nRead back from the car</string>
     <string name="alert_guard_off_armed">The car is armed, so it will not switch Sentry Mode off. Unlock it once, then try again</string>
     <string name="alert_guard_late">Too late: the car is asleep and cannot switch anything on. It answers again when a door opens</string>
     <string name="alert_guard_veto">Leaving Sentry Mode off</string>

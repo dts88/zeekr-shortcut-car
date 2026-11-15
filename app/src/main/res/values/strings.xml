@@ -149,10 +149,8 @@
     <string name="alert_guard_btn_no">别开</string>
     <string name="alert_guard_btn_off">关掉</string>
     <string name="alert_guard_btn_state">状态</string>
-    <string name="alert_guard_on">%1$s
-这是车读回来的</string>
-    <string name="alert_guard_off">%1$s
-这是车读回来的</string>
+    <string name="alert_guard_on">%1$s\n这是车读回来的</string>
+    <string name="alert_guard_off">%1$s\n这是车读回来的</string>
     <string name="alert_guard_off_armed">车已经布防了，这样关不掉。解一次锁，再关</string>
     <string name="alert_guard_late">太晚了：车机已经睡了，什么也开不了。开门时它会再应答</string>
     <string name="alert_guard_veto">好，哨兵模式不开</string>
