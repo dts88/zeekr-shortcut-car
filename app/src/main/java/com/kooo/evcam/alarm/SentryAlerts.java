@@ -259,9 +259,13 @@ public final class SentryAlerts implements Telemetry.Listener {
             });
 
     /**
-     * 去问「有人找我吗」的那条线程；关着时是 null。从主线程之外写，所以 volatile。
+     * 去问「有人找我吗」的那条线程。整个进程就这一个轮询者：关的时候也留着它，
+     * 开开关关都是在它身上按（一个机器人不许有两个 {@code getUpdates}）。
+     * 从主线程之外写，所以 volatile。
      *
-     * The thread that asks "does anyone want me?"; null when off. Written from off the main thread, so volatile.
+     * The thread that asks "does anyone want me?". One poller for the whole process: it is kept
+     * even while off, and turning it on and off both press on that same one (one bot must never
+     * have two {@code getUpdates}). Written from off the main thread, so volatile.
      */
     private volatile TelegramPoller poller;
     /**
@@ -371,7 +375,10 @@ public final class SentryAlerts implements Telemetry.Listener {
 
     private SentryAlerts(Context context) {
         this.app = context.getApplicationContext();
-        motion.setListener(score -> onMotion(score));
+        // 编码器把分数从它自己的 GL 线程送上来（MotionTap 是直接调的）。判断挪到主线程做：
+        // 这样 AlertPolicy 和上面那些 last* 字段只有一条线程写。拍照、压缩、发送本来
+        // 就不在这儿，它们在 {@link #sender} 那条线程上。
+        motion.setListener(score -> app.getMainExecutor().execute(() -> onMotion(score)));
         this.config = new AppConfig(this.app);
         this.policy = new AlertPolicy(config.isAlertsEnabled());
     }
@@ -496,10 +503,9 @@ public final class SentryAlerts implements Telemetry.Listener {
         // The on/off action (especially the join inside stop) must not occupy the main thread
         pollerLifecycle.execute(() -> {
             if (!pollerWanted) {
-                TelegramPoller stopping = poller;
-                poller = null;
-                if (stopping != null) {
-                    stopping.stop();
+                // 引用留着：下次打开还在它身上按 start，不拿这条拿那条
+                if (poller != null) {
+                    poller.stop();
                 }
                 return;
             }
@@ -540,8 +546,9 @@ public final class SentryAlerts implements Telemetry.Listener {
                         onGuardCommand(action, requestedAt);
                     }
                 });
-                poller.start();
             }
+            // 它自己知道手里那条线程还活着没有（TelegramPoller.start）：活着就等它落地，不再起一条
+            poller.start();
         });
     }
 
@@ -584,6 +591,18 @@ public final class SentryAlerts implements Telemetry.Listener {
         if (!requests.allows(now)) {
             long wait = Math.max(1, requests.cooldownLeftMs(now) / 1000);
             deliverText(channel, app.getString(R.string.alert_cmd_too_soon, wait));
+            return;
+        }
+        if (!sentryOn()) {
+            // 命令这一路不能只把它吃掉：status 会回话，pic 一声不响就像消息丢了。
+            // 哨兵没开就是拍不了（车机要睡了，{@code SnapshotTaker} 那条路也十有八九拿不到相机），
+            // 所以这里直接回一句，不进 {@link #deliver} —— 那道判断留给警报和设置里的测试按钮。
+            // The command path must not swallow it: status answers, but a silent pic looks like a
+            // lost message. Sentry off means no picture (the head unit is going to sleep, and
+            // {@code SnapshotTaker} would very likely get no camera either), so answer here and do
+            // not enter {@link #deliver}; that gate is for alerts and the test button in settings.
+            BlackBox.note("alerts: pic asked, sentry gone, answered instead");
+            deliverText(channel, app.getString(R.string.alert_cmd_no_sentry));
             return;
         }
         requests.noteSent(now);
@@ -931,32 +950,45 @@ public final class SentryAlerts implements Telemetry.Listener {
             callback.onFailed(app.getString(R.string.set_alerts_need_token));
             return;
         }
-        sender.execute(() -> {
-            try {
-                List<TelegramSender.Chat> chats = TelegramSender.recentChats(token);
-                if (chats.isEmpty()) {
-                    // 历史空了不等于没配好：轮询线程会把消息一条条吃掉（getUpdates 带 offset）。
-                    // 那时去问一句已配的会话还认不认，比“机器人没收到消息”有用得多。
-                    // An empty history does not mean misconfigured: the polling thread consumes
-                    // messages one by one (getUpdates carries an offset).
-                    // Then asking whether the already-configured chat is still accepted is far more
-                    // useful than "the bot received no message".
-                    String configured = config.getAlertsTelegramChatId();
-                    if (!configured.isEmpty()) {
-                        String title = TelegramSender.chatTitle(token, configured);
-                        if (!title.isEmpty()) {
-                            chats = java.util.Collections.singletonList(
-                                    new TelegramSender.Chat(configured, title, config.getAlertsOwnerId()));
-                        }
+        Runnable lookup = () -> lookupChats(token, callback);
+        // 同一时刻只许一个 getUpdates（D-14）：轮询者手上挂着一条 25 秒的长轮询，
+        // 这份就排到它两轮之间跑，最长等一轮。只有它确实不在跑的时候才当场问。
+        // Only one getUpdates at a time (D-14): the poller holds a 25-second long poll, so this
+        // lookup queues between two of its rounds and waits one round at most. It asks straight
+        // away only when the poller really is not running.
+        TelegramPoller p = poller;
+        if (p != null && p.isRunning()) {
+            p.runBetweenPolls(lookup);
+        } else {
+            sender.execute(lookup);
+        }
+    }
+
+    private void lookupChats(String token, ChatListCallback callback) {
+        try {
+            List<TelegramSender.Chat> chats = TelegramSender.recentChats(token);
+            if (chats.isEmpty()) {
+                // 历史空了不等于没配好：轮询线程会把消息一条条吃掉（getUpdates 带 offset）。
+                // 那时去问一句已配的会话还认不认，比“机器人没收到消息”有用得多。
+                // An empty history does not mean misconfigured: the polling thread consumes
+                // messages one by one (getUpdates carries an offset).
+                // Then asking whether the already-configured chat is still accepted is far more
+                // useful than "the bot received no message".
+                String configured = config.getAlertsTelegramChatId();
+                if (!configured.isEmpty()) {
+                    String title = TelegramSender.chatTitle(token, configured);
+                    if (!title.isEmpty()) {
+                        chats = java.util.Collections.singletonList(
+                                new TelegramSender.Chat(configured, title, config.getAlertsOwnerId()));
                     }
                 }
-                List<TelegramSender.Chat> found = chats;
-                app.getMainExecutor().execute(() -> callback.onChats(found));
-            } catch (TelegramSender.ChatListException e) {
-                String message = e.getMessage() == null ? "" : e.getMessage();
-                app.getMainExecutor().execute(() -> callback.onFailed(message));
             }
-        });
+            List<TelegramSender.Chat> found = chats;
+            app.getMainExecutor().execute(() -> callback.onChats(found));
+        } catch (TelegramSender.ChatListException e) {
+            String message = e.getMessage() == null ? "" : e.getMessage();
+            app.getMainExecutor().execute(() -> callback.onFailed(message));
+        }
     }
 
     // ------------------------------------------------------------------ 信号
@@ -1091,16 +1123,16 @@ public final class SentryAlerts implements Telemetry.Listener {
             BlackBox.note("alerts: " + headline + " seen, quiet hours");
             return;
         }
-        AlertPolicy.Decision decision = policy.decide(now);
+        AlertPolicy.Decision decision = policy.reserve(now);
         if (decision != AlertPolicy.Decision.ALLOW) {
             BlackBox.note("alerts: " + headline + " seen, not sent (" + decision + ")");
             return;
         }
         BlackBox.note("alerts: " + headline);
-        // 冷却和每小时上限只在真的发出去之后才算数：发失败不该把这一小时的话都堵死
-        // Cooldown and the per-hour cap count only after actually sending: a failed send must not
-        // block this hour's alerts
-        fire(headline, () -> policy.noteSent(SystemClock.elapsedRealtime()));
+        // 判断这一步就把这一格占掉（D-03）：冷却与每小时上限当场算。发不出去再补一次失败退避。
+        // The decision takes the slot right here (D-03): the cooldown and the hourly cap count at
+        // once. A send that fails then adds the failure backoff.
+        fire(headline, this::noteSendFailure);
     }
 
     /**
@@ -1216,13 +1248,13 @@ public final class SentryAlerts implements Telemetry.Listener {
             BlackBox.note("alerts: motion seen, quiet hours");
             return;
         }
-        AlertPolicy.Decision decision = policy.decide(now);
+        AlertPolicy.Decision decision = policy.reserve(now);
         if (decision != AlertPolicy.Decision.ALLOW) {
             BlackBox.note("alerts: motion seen, not sent (" + decision + ")");
             return;
         }
         BlackBox.note("alerts: " + headline + " (" + Math.round(score * 100) + "%)");
-        fire(headline, () -> policy.noteSent(SystemClock.elapsedRealtime()));
+        fire(headline, this::noteSendFailure);
     }
 
     /**
@@ -1299,7 +1331,7 @@ public final class SentryAlerts implements Telemetry.Listener {
     // ------------------------------------------------------------------ 拍照与发送
     // ------------------------------------------------------------------ photo and send
 
-    private void fire(String headline, Runnable onDelivered) {
+    private void fire(String headline, Runnable onSendFailure) {
         AlertChannel channel = channel();
         if (!channel.ready()) {
             blockedChannel(channel);
@@ -1310,7 +1342,7 @@ public final class SentryAlerts implements Telemetry.Listener {
         SnapshotTaker.take(app, new SnapshotTaker.Callback() {
             @Override
             public void onPicture(Bitmap grid) {
-                deliver(channel, grid, caption, TelegramCommand.ANY_LANE, false, null, onDelivered);
+                deliver(channel, grid, caption, TelegramCommand.ANY_LANE, false, null, onSendFailure);
             }
 
             @Override
@@ -1319,9 +1351,20 @@ public final class SentryAlerts implements Telemetry.Listener {
                 // Photo not taken, still send text: the owner should at least know "someone just touched the car".
                 BlackBox.note("alerts: no picture (" + reason + "), text only");
                 notifyFailure(app.getString(R.string.alert_no_storage));
-                deliverText(channel, caption + "\n" + app.getString(R.string.alert_no_storage));
+                deliverText(channel, caption + "\n" + app.getString(R.string.alert_no_storage),
+                        onSendFailure);
             }
         });
+    }
+
+    /**
+     * 警报这一步发不出去：记下这次失败，接下来的五分钟不再为同一个会话重试（D-12）。
+     *
+     * An alert step failed to send: record the failure, and stop retrying the same chat for the
+     * next five minutes (D-12).
+     */
+    private void noteSendFailure() {
+        policy.noteFailure(SystemClock.elapsedRealtime());
     }
 
     /**
@@ -1389,8 +1432,8 @@ public final class SentryAlerts implements Telemetry.Listener {
      * several times a night and must not leak memory.</p>
      */
     private void deliver(AlertChannel channel, Bitmap grid, String caption, int onlyLane,
-                         boolean ownerAsked, Callback callback, Runnable onDelivered) {
-        deliver(channel, grid, caption, onlyLane, ownerAsked, false, callback, onDelivered);
+                         boolean ownerAsked, Callback callback, Runnable onSendFailure) {
+        deliver(channel, grid, caption, onlyLane, ownerAsked, false, callback, onSendFailure);
     }
 
     /**
@@ -1398,10 +1441,15 @@ public final class SentryAlerts implements Telemetry.Listener {
      *
      * @param ownerAsked  车主自己开口要的（测试按钮、聊天里的 pic）
      * @param highQuality 「HD」那一档：900 kB 而不是 100 kB
+     *
+     * Send one picture.
+     *
+     * @param ownerAsked  the owner asked for it himself (the test button, {@code pic} in the chat)
+     * @param highQuality the "HD" step: 900 kB instead of 100 kB
      */
     private void deliver(AlertChannel channel, Bitmap grid, String caption, int onlyLane,
                          boolean ownerAsked, boolean highQuality, Callback callback,
-                         Runnable onDelivered) {
+                         Runnable onSendFailure) {
         sender.execute(() -> {
             // 掰直、切图、压缩都在这一条线程上：一张 2×2 的校正要翻一百六十万像素，
             // 放在主线程上就是和相机、和设置界面抢那几十毫秒。
@@ -1491,9 +1539,6 @@ public final class SentryAlerts implements Telemetry.Listener {
             }
             final int photoBytes = biggestPhoto;
             final AlertChannel.Result outcome = last;
-            if (outcome.ok && onDelivered != null) {
-                onDelivered.run();
-            }
             // 视频不再跟着照片一起发：「要哪一路的片段」是照片下面的一颗按钮（车主 2026-11-15）。
             // No clip rides along with the picture any more: "a clip of which camera" is a button under
             // it (the owner, 2026-11-15).
@@ -1501,6 +1546,12 @@ public final class SentryAlerts implements Telemetry.Listener {
                 BlackBox.note("alerts: send failed via " + channel.name() + " ("
                         + outcome.kind + " " + outcome.display() + ")");
                 notifyFailure(failureText(outcome));
+                // 发不出去才知道那一格没兑现：记一次退避（D-12）。
+                // Only now, on a failure, is it known the slot was not delivered: record the
+                // backoff (D-12).
+                if (onSendFailure != null) {
+                    onSendFailure.run();
+                }
             }
             if (callback != null) {
                 String message;
@@ -1552,12 +1603,24 @@ public final class SentryAlerts implements Telemetry.Listener {
      * When there is no photo, send only one line (Telegram's sendMessage).
      */
     private void deliverText(AlertChannel channel, String text) {
+        deliverText(channel, text, null);
+    }
+
+    /**
+     * 同上，但带上一句「发失败了怎么补」：警报那条路在这里记失败退避（D-12）。
+     *
+     * Same, plus what to do when it fails: the alert path records the failure backoff here (D-12).
+     */
+    private void deliverText(AlertChannel channel, String text, Runnable onSendFailure) {
         sender.execute(() -> {
             AlertChannel.Result result = channel.sendText(text);
             if (!result.ok) {
                 BlackBox.note("alerts: text send failed via " + channel.name() + " ("
                         + result.kind + " " + result.display() + ")");
                 notifyFailure(failureText(result));
+                if (onSendFailure != null) {
+                    onSendFailure.run();
+                }
             }
         });
     }
