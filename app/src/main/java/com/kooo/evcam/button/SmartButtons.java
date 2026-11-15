@@ -59,11 +59,17 @@ import java.util.TreeSet;
  * <ul>
  *   <li>扫描按名字过滤（{@link SmartButtonAd#NAME}），结果用 PendingIntent 由系统交给 {@link ScanReceiver}：应用在后台、被系统收掉了也送得到。
  *       低延迟、积极匹配、每包都报、只收传统广播。</li>
- *   <li>按名字过滤以后只有按下时才有广播，平时没有是正常的；带过滤的扫描安卓也不会因为扫得久就降级。所以扫描开着就不动（车主 2026-11-01：
- *       不反复强行启动），只在这些时候停、开：灵动贴的开关、绑定（一台都没绑时）、蓝牙开关、车机睡醒、扫描起不来、退出、连接重试（见下），
- *       还有车机的蓝牙搜索停了以后（{@link #DISCOVERY_SETTLE_MS} 后重开一次，见下一条）。</li>
+ *   <li>按名字过滤以后只有按下时才有广播，平时没有是正常的。扫描开着就不动（车主 2026-11-01：不反复强行启动），只在这些时候停、开：
+ *       灵动贴的开关、绑定（一台都没绑时）、蓝牙开关、车机睡醒、扫描起不来、退出、连接重试（见下），
+ *       车机的蓝牙搜索停了以后（{@link #DISCOVERY_SETTLE_MS} 后重开一次，见下一条），还有开满 {@link #RENEW_MS}。</li>
+ *   <li>开满 {@link #RENEW_MS} 重开一次：安卓 12 一次扫描开满 30 分钟，过滤条件没交给蓝牙芯片去筛的，就降成「顺带」——
+ *       只有别的程序也在扫时才收得到。按名字过滤也逃不掉（2026-11-15 车主的报告：最后一次开扫描之后一路开车、31 分钟后按键没反应，
+ *       关开一次就好）。3.4.0 以为带过滤就不降级，把 2.93.4 的 25 分钟重开去掉了，这里补回来；车机醒来开始听那一行记着芯片能不能接手过滤
+ *       （{@link ScanProbe#scanFacts}）。</li>
  *   <li>车机的蓝牙搜索（经典蓝牙的搜索设备）停了（搜完了、或者被取消），已经开着的扫描在这台车上就收不到东西了（登记还在），
  *       重新登记才好（车主 2026-11-08：车机「搜索蓝牙」页在搜时灵动贴有效，停了就失效，再搜又好）。取消时没在搜，也会走一遍「搜索结束」（安卓的做法）。
+ *       这多半就是上一条的「顺带」：降了的扫描只在别人扫（搜索设备也扫）时收得到；重开一次也把 30 分钟清零。车上确认 25 分钟重开管用以后，
+ *       这一条留不留再定。
  *       搜索停了从三处看：系统的通知（{@link #adapterState}；App Lab 里蓝牙的通知没收到过，收到也算）；每 {@link #WATCH_MS} 看一眼在不在搜，
  *       在搜变成不搜；手机跟车机的蓝牙连上了（{@link PhoneLink#joined}）：连之前要先取消搜索（CarPlay 每次用蓝牙连 iPhone 之前都取消一次），
  *       当时没在搜的话，App Lab 里只有这一处看得出来。</li>
@@ -116,6 +122,8 @@ public final class SmartButtons {
     static final long WATCH_MS = 2_000L;
     /** 车机的蓝牙搜索停了以后隔这么久重开一次扫描（{@link #discoveryStopped}）。 */
     static final long DISCOVERY_SETTLE_MS = 200L;
+    /** 扫描开满这么久重开一次（{@link #renew}）：赶在安卓 12 把开满 30 分钟的扫描降成「顺带」之前。 */
+    static final long RENEW_MS = 25 * 60_000L;
     /** {@code BluetoothProfile.HEADSET_CLIENT}、{@code A2DP_SINK}（系统 API，公开 SDK 里没有）：车机这一端的蓝牙电话、音乐。 */
     private static final int PROFILE_HEADSET_CLIENT = 16;
     private static final int PROFILE_A2DP_SINK = 11;
@@ -882,6 +890,7 @@ public final class SmartButtons {
             BlackBox.note("灵动贴：开始听；phone " + phoneSeen.words());
         }
         bt.postDelayed(watch, WATCH_MS);
+        bt.postDelayed(renew, RENEW_MS);
     }
 
     private void stopScan() {
@@ -890,6 +899,7 @@ public final class SmartButtons {
         bt.removeCallbacks(retry);
         bt.removeCallbacks(watch);
         bt.removeCallbacks(relisten);
+        bt.removeCallbacks(renew);
         if (maybeScanning) {
             stopIntentScan();
             maybeScanning = false;
@@ -979,6 +989,15 @@ public final class SmartButtons {
     /** 搜索停了以后重开一次扫描（{@link #discoveryStopped}）：这时还在扫才重开。 */
     private final Runnable relisten = () -> {
         if (scanning) {
+            stopScan();
+            ensureScan();
+        }
+    };
+
+    /** 这一轮扫描开满 {@link #RENEW_MS}（{@link #startNow} 排上，{@link #stopScan} 撤掉）：照搜索停了那样重开一次。 */
+    private final Runnable renew = () -> {
+        if (scanning) {
+            BlackBox.note("灵动贴：扫描开满 " + RENEW_MS / 60_000L + " 分钟，重开一次（安卓开满 30 分钟会降级）");
             stopScan();
             ensureScan();
         }

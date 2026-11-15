@@ -86,6 +86,13 @@ public class SmartButtonsListenTest {
         assertEquals(200L, SmartButtons.DISCOVERY_SETTLE_MS);
     }
 
+    /** 扫描开满 25 分钟重开一次，赶在安卓 30 分钟降级之前。 */
+    @Test
+    public void renewBeforeAndroidDowngradesAfterThirtyMinutes() {
+        assertEquals(25 * 60_000L, SmartButtons.RENEW_MS);
+        assertTrue(SmartButtons.RENEW_MS < 30 * 60_000L);
+    }
+
     /** 手机跟车机的蓝牙：这次连着的设备里有上次没连着的才算连上（连之前会取消搜索）；电话、音乐变了、断开的、读不到的不算。 */
     @Test
     public void phoneLinkJoinsAreSeen() {

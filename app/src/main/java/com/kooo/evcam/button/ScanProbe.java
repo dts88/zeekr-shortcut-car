@@ -53,9 +53,21 @@ final class ScanProbe {
         return "GATT via adapter: " + viaAdapter(adapter) + "; via service manager: " + viaServiceManager();
     }
 
-    /** 此刻会影响扫描的几件事：定位、屏幕、在不在搜索设备、配对过的连着几台。都是只读；有的走隐藏接口，不让看就说不让看，不抛。 */
+    /**
+     * 此刻会影响扫描的几件事：定位、屏幕、在不在搜索设备、配对过的连着几台、蓝牙芯片能不能接手过滤（不能的话，开满 30 分钟的扫描
+     * 一定会被安卓降成「顺带」，见 {@link SmartButtons#RENEW_MS}）。都是只读；有的走隐藏接口，不让看就说不让看，不抛。
+     */
     static String scanFacts(Context context, BluetoothAdapter adapter) {
-        return "location " + location(context) + ", displays on " + displaysOn(context) + ", " + links(adapter);
+        return "location " + location(context) + ", displays on " + displaysOn(context) + ", " + links(adapter)
+                + ", filter offload " + filterOffload(adapter);
+    }
+
+    private static String filterOffload(BluetoothAdapter adapter) {
+        try {
+            return String.valueOf(adapter.isOffloadedFilteringSupported());
+        } catch (Throwable e) {
+            return "? (" + e + ")";
+        }
     }
 
     private static String location(Context context) {
