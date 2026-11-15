@@ -264,16 +264,11 @@
                 android:summary="@string/set_alerts_guard_everywhere_summary"
                 android:defaultValue="false" />
 
+            <!-- 车能发给机器人的每一条消息：一行一条，点一条发一条真的（车主 2026-11-15） -->
             <Preference
-                android:key="pref_alerts_test"
-                android:title="@string/set_alerts_test_title"
-                android:summary="@string/set_alerts_test_summary" />
-
-            <!-- 高清那一张：警报第一张压到 100 kB，这一行发的就是老样子的 400–600 kB（车主 2026-11-15） -->
-            <Preference
-                android:key="pref_alerts_test_hq"
-                android:title="@string/set_alerts_test_hq_title"
-                android:summary="@string/set_alerts_test_hq_summary" />
+                android:key="pref_alerts_events"
+                android:title="@string/alerts_events_title"
+                android:summary="@string/alerts_events_summary" />
         </PreferenceCategory>
 
         <PreferenceCategory

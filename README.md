@@ -117,7 +117,8 @@ Off by default. Settings → **Alerts**.
    shows only whether it is set, never the token.
 4. **Let the car find the chat.** Tap **Find chat id**. The car asks Telegram which chat last messaged
    the bot and fills it in. If the bot has been quiet, send it another message and tap again.
-5. **Prove the path.** Tap **Send a test picture**. If a photo arrives on your phone, everything works:
+5. **Prove the path.** Open **Events the car can send** and tap any row: every message the bot can
+   receive is listed with when it really goes out, and each one sends for real when tapped. If a photo arrives on your phone, everything works:
    the car, its 4G, the bot, the chat.
 6. **Choose what counts** under **What counts as something**: movement in view, hazards, high beams, a
    door, the car lights, the centre screen. By default only the three the car itself reacts with are on.

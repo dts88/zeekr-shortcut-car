@@ -256,6 +256,25 @@ the picture: cutting one needs that camera's recorder, and on demand is when it 
 size is decided on the recording side — the sentry frame-rate setting is the knob — and nothing is
 re-encoded. One clip at a time, because the sample ring is shared.
 
+## 1.10 事件清单：每一项都能当场发一条
+
+设置 → 停车警报 → **事件清单**（`alarm.AlertEventsActivity`）把车能发给机器人的**每一条消息**列成一张表，
+一行一条，下面一句写清楚「真的什么时候会发」，点一下就用真的发送路发一条出去。触发器是人点的，消息本身
+不是假的：一样的照片、一样的按钮、一样的文案。
+
+覆盖：六项触发器各自那一条警报（双闪 / 远光 / 车门 / 车灯 / 中控屏 / 画面移动）、`pic` 那一张、HD 那一张、
+四路片段、忘了开哨兵的五条（问、开了的回执、关掉的回执、按得太晚、已布防关不掉）、状态一句话、帮助。
+表在 `alarm.AlertEvent` 里（标题 + 描述各一个字符串资源），`AlertEventTest` 钉住「每行都有自己的一句」和
+「六项触发器一行不少」。
+
+###### English
+
+**Events the car can send** (Settings → Alert parking → Events, `alarm.AlertEventsActivity`) lists every
+message the car can send, one row each, with a line saying when it really goes out; a tap sends that exact
+message through the real path. Only the trigger is simulated — same picture, same buttons, same wording.
+The table lives in `alarm.AlertEvent`, and `AlertEventTest` pins one description per row and all six
+triggers present.
+
 ## 2. 不做什么（车上看不到的信号）
 
 这台车的车辆接口没有撞击、气囊、喇叭、防盗 / 倾斜 / 震动触发的信号，

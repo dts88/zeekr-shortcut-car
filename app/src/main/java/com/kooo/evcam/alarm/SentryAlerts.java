@@ -1659,6 +1659,121 @@ public final class SentryAlerts implements Telemetry.Listener {
      * rate-limit once more ourselves.</p>
      */
 
+
+    // ================================================================= 事件清单 (every message, on demand)
+
+    /**
+     * 照着 {@link AlertEvent} 发一条真的：真照片、真按钮、真回话，只有触发器是人点的。
+     *
+     * <p>测试那一屏就是这么来的。发警报那几条走的是真的发送路（{@link #deliver}），照片下面照样带
+     * HD 和片段按钮；文字那几条用的是真的文案，所以车主看到什么，真事发生时就长什么样。</p>
+     *
+     * <p>Sends one real message per {@link AlertEvent}: real picture, real buttons, real wording; only the
+     * trigger is a finger. The alert rows go through the real send path, so what arrives is what a real
+     * event looks like.</p>
+     */
+    public void sendEventSample(AlertEvent event, Callback callback) {
+        if (event == null) {
+            return;
+        }
+        AlertChannel channel = channel();
+        if (!channel.ready()) {
+            blockedChannel(channel);
+            if (callback != null) {
+                callback.onResult(false, blockedText(channel.blockedReason()));
+            }
+            return;
+        }
+        switch (event) {
+            case HAZARD:
+            case FLASH:
+            case DOORS:
+            case LAMPS:
+            case SCREEN:
+            case MOTION:
+                fireSample(app.getString(event.titleRes), callback);
+                return;
+            case PICTURE:
+                sendTestPicture(callback);
+                return;
+            case HD_PICTURE:
+                sendHighQualityPicture();
+                reportQueued(callback);
+                return;
+            case CLIP_FRONT:
+            case CLIP_REAR:
+            case CLIP_LEFT:
+            case CLIP_RIGHT:
+                sendClipForLane(event.lane());
+                reportQueued(callback);
+                return;
+            case GUARD_ASK:
+                guardAsk(SystemClock.elapsedRealtime(), GuardPolicy.Mode.ASK);
+                reportQueued(callback);
+                return;
+            case GUARD_ON:
+                guardSend(app.getString(R.string.alert_guard_on,
+                        app.getString(R.string.alert_sentry_on)), guardReceiptMarkup(true));
+                reportQueued(callback);
+                return;
+            case GUARD_OFF:
+                guardSend(app.getString(R.string.alert_guard_off,
+                        app.getString(R.string.alert_sentry_off)), guardReceiptMarkup(false));
+                reportQueued(callback);
+                return;
+            case GUARD_LATE:
+                guardSend(app.getString(R.string.alert_guard_late), "");
+                reportQueued(callback);
+                return;
+            case GUARD_ARMED:
+                guardSend(app.getString(R.string.alert_guard_off_armed), "");
+                reportQueued(callback);
+                return;
+            case STATUS:
+                guardSend(guardReport(), "");
+                reportQueued(callback);
+                return;
+            case HELP:
+            default:
+                guardSend(app.getString(R.string.alert_cmd_help), "");
+                reportQueued(callback);
+        }
+    }
+
+    /** 一条警报的样例：和真的一样拍、一样压、一样带按钮，只是不等车上的信号。 */
+    private void fireSample(String headline, Callback callback) {
+        AlertChannel channel = channel();
+        if (!channel.ready()) {
+            blockedChannel(channel);
+            return;
+        }
+        String caption = TelegramRequest.caption(headline, sentryLine(sentryValue()), time());
+        SnapshotTaker.take(app, new SnapshotTaker.Callback() {
+            @Override
+            public void onPicture(Bitmap grid) {
+                deliver(channel, grid, caption, TelegramCommand.ANY_LANE, true, false, callback, null);
+            }
+
+            @Override
+            public void onFailed(String reason) {
+                BlackBox.note("alerts: sample picture failed (" + reason + ")");
+                if (callback != null) {
+                    app.getMainExecutor().execute(() -> callback.onResult(false,
+                            app.getString(R.string.set_alerts_failed, reason)));
+                }
+            }
+        });
+    }
+
+    /** 「发出去了」这一句：切片段、发文字都是排到别的线程上，这里只说已经排上了。 */
+    private void reportQueued(Callback callback) {
+        if (callback == null) {
+            return;
+        }
+        app.getMainExecutor().execute(() -> callback.onResult(true,
+                app.getString(R.string.alert_event_sent)));
+    }
+
     // ================================================================= 照片下面的按钮 (buttons under the picture)
 
     /**

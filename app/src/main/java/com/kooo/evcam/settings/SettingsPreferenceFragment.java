@@ -1211,22 +1211,14 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             });
         }
 
-        Preference test = findPreference("pref_alerts_test");
-        if (test != null) {
-            test.setPersistent(false);
-            test.setOnPreferenceClickListener(preference -> {
-                sendAlertsTest(false);
-                return true;
-            });
-        }
-
-        // 高清那一张：同一个动作，按 900 kB 那一档压。警报自己发的是 100 kB 那一张。
-        // The high-quality one: same action, compressed at the 900 kB budget; alerts send the 100 kB one.
-        Preference testHq = findPreference("pref_alerts_test_hq");
-        if (testHq != null) {
-            testHq.setPersistent(false);
-            testHq.setOnPreferenceClickListener(preference -> {
-                sendAlertsTest(true);
+        // 车能发给机器人的每一条消息：一行一条，点一条发一条真的。
+        // Every message the car can send: one row each, and a tap sends that exact one.
+        Preference events = findPreference("pref_alerts_events");
+        if (events != null) {
+            events.setPersistent(false);
+            events.setOnPreferenceClickListener(preference -> {
+                startActivity(new android.content.Intent(requireContext(),
+                        com.kooo.evcam.alarm.AlertEventsActivity.class));
                 return true;
             });
         }

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  车能发给机器人的每一条消息：系统自带的两行列表就够了（标题 + 描述），
+  这一屏不是拿来看的，是拿来点一条发一条的。
+
+  Every message the car can send, as a plain two-line list: the screen is not for looking at,
+  it is for tapping one and seeing what arrives.
+-->
+<ListView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/alert_events_list"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:divider="?android:attr/listDivider"
+    android:dividerHeight="1dp"
+    android:paddingStart="8dp"
+    android:paddingEnd="8dp" />
