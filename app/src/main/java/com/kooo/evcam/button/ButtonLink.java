@@ -30,8 +30,8 @@ import java.util.UUID;
  * 之后一直连着：灵动贴最后一下按完 15 秒自己断开（Lab findings §2.61、§2.93 车上又看到一次）。我们不主动断开，
  * 除了出错、蓝牙关了、车机要睡、退出、关了灵动贴、删了它、要连另一台。
  *
- * <p>顺序（Lab findings §2.93）：连上 → 找服务 → 隔 {@link #SUBSCRIBE_DELAY_MS} 订 0x2A60 的通知（订上算连好，绑定在这一刻算成）
- * → 查版本 → 订电量通知、读一次电量 → 查序列号；两条查询之前各隔 {@link #QUERY_GAP_MS}。只写查询和蓝牙标准的订阅，不写别的。</p>
+ * <p>顺序（Lab findings §2.93）：连上 → 找服务 → 隔一会儿订 0x2A60 的通知（订上算连好，绑定在这一刻算成）
+ * → 查版本 → 订电量通知、读一次电量 → 查序列号；两条查询之前各隔 {@link #QUERY_GAP_MS}。</p>
  *
  * <p>安卓的 GATT 同时只做一件事：一件做完（它的回调来了）再做下一件，回调要对得上是哪一种、而且这件真的开始了才算；
  * 排不上（方法回 false，多半是 GATT 还忙）隔 {@link #BUSY_RETRY_MS} 再排，{@link #BUSY_TRIES} 次为止；一件 {@link #OP_TIMEOUT_MS}
@@ -52,8 +52,6 @@ final class ButtonLink {
     static final long OP_TIMEOUT_MS = 3_000L;
     static final long BUSY_RETRY_MS = 200L;
     static final int BUSY_TRIES = 3;
-    /** 连上、找到服务以后隔这么久再订按键通知。 */
-    static final long SUBSCRIBE_DELAY_MS = 100L;
     /** 每条查询之前隔这么久（一条一条来）。 */
     static final long QUERY_GAP_MS = 150L;
 
@@ -105,6 +103,9 @@ final class ButtonLink {
     }
 
     final String address;
+    final Accessory kind;
+    boolean boosted;
+    private int tint = -1;
     /** 这是在绑新的（订上通知就算绑上）。 */
     final boolean binding;
     /** 连了几次。 */
@@ -132,11 +133,13 @@ final class ButtonLink {
     private long lastAttemptAt;
     private long startedAt;
 
-    ButtonLink(Context app, Handler bt, BluetoothAdapter adapter, String address, boolean binding, Listener listener) {
+    ButtonLink(Context app, Handler bt, BluetoothAdapter adapter, String address, Accessory kind, boolean binding,
+               Listener listener) {
         this.app = app;
         this.bt = bt;
         this.adapter = adapter;
         this.address = address;
+        this.kind = kind;
         this.binding = binding;
         this.listener = listener;
     }
@@ -406,7 +409,7 @@ final class ButtonLink {
             return;
         }
         BluetoothGattCharacteristic ch = notifyCh;
-        enqueue(new Op(LABEL_SUBSCRIBE, Op.DESCRIPTOR, SUBSCRIBE_DELAY_MS, () -> subscribe(ch)));
+        enqueue(new Op(LABEL_SUBSCRIBE, Op.DESCRIPTOR, kind.subscribeDelayMs, () -> subscribe(ch)));
     }
 
     /** 按键通知订上了：算连好了，接着查版本、读电量、查序列号。 */
@@ -416,18 +419,79 @@ final class ButtonLink {
         if (closed) {
             return;
         }
+        long first = Math.max(QUERY_GAP_MS, kind.firstQueryDelayMs);
+        if (kind.serialFirst) {
+            askSerial(first);
+            askVersion(QUERY_GAP_MS);
+            readBattery();
+        } else {
+            askVersion(first);
+            readBattery();
+            askSerial(QUERY_GAP_MS);
+        }
+    }
+
+    void boost(boolean on, int rgb) {
+        if (!ready || closed || writeCh == null) {
+            return;
+        }
+        if (on == boosted) {
+            if (on) {
+                tint(rgb);
+            }
+            return;
+        }
+        boosted = on;
+        if (on) {
+            send("awake", SmartButtonAd.awakeTS(true));
+            send("light steady", SmartButtonAd.lightTS(true));
+            tint(rgb);
+            return;
+        }
+        send("light off", SmartButtonAd.lightTS(false));
+        send("awake off", SmartButtonAd.awakeTS(false));
+        if (tint >= 0) {
+            tint = -1;
+            send("follow off", SmartButtonAd.follow(false));
+        }
+    }
+
+    void tint(int rgb) {
+        if (!boosted || !ready || closed || writeCh == null || rgb == tint || rgb == CarMoves.KEEP_TINT) {
+            return;
+        }
+        tint = rgb;
+        if (rgb < 0) {
+            send("follow off", SmartButtonAd.follow(false));
+            return;
+        }
+        send("tint", SmartButtonAd.tintTS(rgb));
+        send("follow on", SmartButtonAd.follow(true));
+    }
+
+    private void send(String label, byte[] frame) {
+        enqueue(new Op(label, Op.WRITE, QUERY_GAP_MS, () -> write(frame)));
+    }
+
+    private void askVersion(long delay) {
         if (writeCh != null) {
             byte[] ask = SmartButtonAd.askVersion();
-            enqueue(new Op("ask version", Op.WRITE, QUERY_GAP_MS, () -> write(ask)));
+            enqueue(new Op("ask version", Op.WRITE, delay, () -> write(ask)));
         }
+    }
+
+    private void askSerial(long delay) {
+        if (writeCh != null) {
+            byte[] ask = SmartButtonAd.askSerial();
+            enqueue(new Op("ask serial", Op.WRITE, delay, () -> write(ask)));
+        }
+    }
+
+    private void readBattery() {
         if (batteryCh != null) {
             BluetoothGattCharacteristic ch = batteryCh;
             enqueue(new Op("subscribe 0x2A19", Op.DESCRIPTOR, 0, () -> subscribe(ch)));
             enqueue(new Op("read 0x2A19", Op.READ, 0, () -> read(ch)));
-        }
-        if (writeCh != null) {
-            byte[] ask = SmartButtonAd.askSerial();
-            enqueue(new Op("ask serial", Op.WRITE, QUERY_GAP_MS, () -> write(ask)));
         }
     }
 

@@ -49,11 +49,11 @@ public class SmartButtonAdTest {
 
     @Test
     public void gesturesComeFromTheSeventhByte() {
-        assertEquals(SmartButtonAd.SINGLE, SmartButtonAd.parse(advert(0x02, 0x01, 0x00, 0)).gesture);
-        assertEquals(SmartButtonAd.DOUBLE, SmartButtonAd.parse(advert(0x02, 0x01, 0x02, 0)).gesture);
-        assertEquals(SmartButtonAd.LONG, SmartButtonAd.parse(advert(0x02, 0x01, 0x01, 0x32)).gesture);
+        assertEquals(SmartButtonAd.SINGLE, SmartButtonAd.parse(advert(0x02, 0x01, 0x00, 0), Accessory.BUTTON).gesture);
+        assertEquals(SmartButtonAd.DOUBLE, SmartButtonAd.parse(advert(0x02, 0x01, 0x02, 0), Accessory.BUTTON).gesture);
+        assertEquals(SmartButtonAd.LONG, SmartButtonAd.parse(advert(0x02, 0x01, 0x01, 0x32), Accessory.BUTTON).gesture);
         // 没见过的按法：照样认出是一包按键广播（计数照算），按法是 0、不做事
-        SmartButtonAd.Advert unknown = SmartButtonAd.parse(advert(0x02, 0x01, 0x07, 0));
+        SmartButtonAd.Advert unknown = SmartButtonAd.parse(advert(0x02, 0x01, 0x07, 0), Accessory.BUTTON);
         assertNotNull(unknown);
         assertEquals(0, unknown.gesture);
     }
@@ -61,7 +61,7 @@ public class SmartButtonAdTest {
     /** 计数是整个字节（车上 00 → 01 → 10 → 11 → 00）；版本是后三个字节。 */
     @Test
     public void counterAndVersionAreReadAsIs() {
-        SmartButtonAd.Advert ad = SmartButtonAd.parse(advert(0x03, 0x10, 0x00, 0));
+        SmartButtonAd.Advert ad = SmartButtonAd.parse(advert(0x03, 0x10, 0x00, 0), Accessory.BUTTON);
         assertEquals(0x10, ad.counter);
         assertEquals("1.2.1", ad.version);
     }
@@ -69,22 +69,22 @@ public class SmartButtonAdTest {
     /** 电量：25 的倍数、又不是 0 才算带了（平时是 0，长按那一下带 0x32 = 50）。 */
     @Test
     public void batteryOnlyWhenItIsAMultipleOfTwentyFive() {
-        assertEquals(50, SmartButtonAd.parse(advert(0x02, 0x01, 0x01, 0x32)).battery);
-        assertEquals(100, SmartButtonAd.parse(advert(0x02, 0x01, 0x00, 0x64)).battery);
-        assertEquals(-1, SmartButtonAd.parse(advert(0x02, 0x01, 0x00, 0)).battery);
-        assertEquals(-1, SmartButtonAd.parse(advert(0x02, 0x01, 0x00, 0x31)).battery);
-        assertEquals(-1, SmartButtonAd.parse(advert(0x02, 0x01, 0x00, 0xC8)).battery);
+        assertEquals(50, SmartButtonAd.parse(advert(0x02, 0x01, 0x01, 0x32), Accessory.BUTTON).battery);
+        assertEquals(100, SmartButtonAd.parse(advert(0x02, 0x01, 0x00, 0x64), Accessory.BUTTON).battery);
+        assertEquals(-1, SmartButtonAd.parse(advert(0x02, 0x01, 0x00, 0), Accessory.BUTTON).battery);
+        assertEquals(-1, SmartButtonAd.parse(advert(0x02, 0x01, 0x00, 0x31), Accessory.BUTTON).battery);
+        assertEquals(-1, SmartButtonAd.parse(advert(0x02, 0x01, 0x00, 0xC8), Accessory.BUTTON).battery);
     }
 
     /** 装按键数据的那段不在见过的位置、不够 12 字节：不认（按法会写车，读错了不如不读）。 */
     @Test
     public void otherLayoutsAreNotRead() {
-        assertNull(SmartButtonAd.parse(null));
-        assertNull(SmartButtonAd.parse(new byte[11]));
-        assertNull(SmartButtonAd.parse(advert(0x09, 0x01, 0x00, 0)));
+        assertNull(SmartButtonAd.parse(null, Accessory.BUTTON));
+        assertNull(SmartButtonAd.parse(new byte[11], Accessory.BUTTON));
+        assertNull(SmartButtonAd.parse(advert(0x09, 0x01, 0x00, 0), Accessory.BUTTON));
         byte[] notFf = advert(0x02, 0x01, 0x00, 0);
         notFf[5] = 0x0F;
-        assertNull(SmartButtonAd.parse(notFf));
+        assertNull(SmartButtonAd.parse(notFf, Accessory.BUTTON));
     }
 
     /** 计数跟上次记下的不一样才算新的一下；0xFE 不算；没记下（-1）的哪个都算。 */
@@ -135,6 +135,88 @@ public class SmartButtonAdTest {
         assertArrayEquals(new byte[]{(byte) 0xA5, (byte) 0xA5, 0x03, 0x06, 0x01, 0x54}, SmartButtonAd.askVersion());
         assertArrayEquals(new byte[]{(byte) 0xA5, (byte) 0xA5, 0x03, 0x06, 0x03, 0x56}, SmartButtonAd.askSerial());
         assertEquals("A5 A5 03 06 01 54", SmartButtonAd.hex(SmartButtonAd.askVersion()));
+    }
+
+    private static byte[] knobAdvert(int counter, int keyCode, int steps) {
+        byte[] name = "ZEEKR_knob".getBytes(StandardCharsets.US_ASCII);
+        byte[] raw = new byte[3 + 10 + 2 + name.length + 8];
+        int i = 0;
+        raw[i++] = 0x02;
+        raw[i++] = 0x01;
+        raw[i++] = 0x06;
+        raw[i++] = 0x09;
+        raw[i++] = 0x02;
+        raw[i++] = (byte) 0xFF;
+        raw[i++] = (byte) counter;
+        raw[i++] = (byte) keyCode;
+        raw[i++] = 0;
+        raw[i++] = 0x01;
+        raw[i++] = 0x02;
+        raw[i++] = 0x01;
+        raw[i++] = (byte) steps;
+        raw[i++] = (byte) (name.length + 1);
+        raw[i++] = 0x09;
+        System.arraycopy(name, 0, raw, i, name.length);
+        return raw;
+    }
+
+    @Test
+    public void knobAdvertsCarryKeyCodesAndSteps() {
+        SmartButtonAd.Advert right = SmartButtonAd.parse(knobAdvert(0x10, '5', 3), Accessory.KNOB);
+        assertEquals(SmartButtonAd.CLOCKWISE, right.gesture);
+        assertEquals(3, right.steps);
+        assertEquals(0x10, right.counter);
+        assertEquals("1.2.1", right.version);
+
+        SmartButtonAd.Advert left = SmartButtonAd.parse(knobAdvert(0x11, '6', 0), Accessory.KNOB);
+        assertEquals(SmartButtonAd.ANTICLOCKWISE, left.gesture);
+        assertEquals(1, left.steps);
+
+        SmartButtonAd.Advert click = SmartButtonAd.parse(knobAdvert(0x12, '1', 7), Accessory.KNOB);
+        assertEquals(SmartButtonAd.SINGLE, click.gesture);
+        assertEquals(1, click.steps);
+        assertEquals(SmartButtonAd.DOUBLE, SmartButtonAd.parse(knobAdvert(0x13, '2', 0), Accessory.KNOB).gesture);
+        assertEquals(SmartButtonAd.RELEASE, SmartButtonAd.parse(knobAdvert(0x14, '4', 0), Accessory.KNOB).gesture);
+        assertEquals(0, SmartButtonAd.parse(knobAdvert(0x15, '9', 0), Accessory.KNOB).gesture);
+
+        assertEquals(0, SmartButtonAd.parse(knobAdvert(0x10, '5', 3), Accessory.BUTTON).gesture);
+        assertNull(SmartButtonAd.parse(knobAdvert(0x10, '5', 3), null));
+    }
+
+    @Test
+    public void knobNotificationsCarryStepsVersionAndSerial() {
+        SmartButtonAd.Reply right = SmartButtonAd.parseNotification(new byte[]{0x35, 0x02});
+        assertEquals(SmartButtonAd.CLOCKWISE, right.gesture);
+        assertEquals(2, right.steps);
+        SmartButtonAd.Reply left = SmartButtonAd.parseNotification(new byte[]{0x36, (byte) 0xFF});
+        assertEquals(SmartButtonAd.ANTICLOCKWISE, left.gesture);
+        assertEquals(1, left.steps);
+        assertEquals(1, SmartButtonAd.parseNotification(new byte[]{0x35}).steps);
+        assertEquals(1, SmartButtonAd.parseNotification(new byte[]{0x31, 0x05}).steps);
+
+        assertEquals("1.2.1", SmartButtonAd.parseNotification("zk_knob_v_1_2_1".getBytes(StandardCharsets.US_ASCII)).version);
+        assertEquals("CCK10Z1A0000000001",
+                SmartButtonAd.parseNotification("CCK10Z1A0000000001".getBytes(StandardCharsets.US_ASCII)).serial);
+    }
+
+    @Test
+    public void knobLightFrames() {
+        assertArrayEquals(new byte[]{(byte) 0xA5, (byte) 0xA5, 0x01, 0x06, 0x03, 0x54}, SmartButtonAd.lightTS(true));
+        assertArrayEquals(new byte[]{(byte) 0xA5, (byte) 0xA5, 0x01, 0x06, 0x00, 0x51}, SmartButtonAd.lightTS(false));
+        assertArrayEquals(new byte[]{(byte) 0xA5, (byte) 0xA5, 0x07, 0x06, 0x00, 0x57}, SmartButtonAd.awakeTS(true));
+        assertArrayEquals(new byte[]{(byte) 0xA5, (byte) 0xA5, 0x07, 0x06, 0x0F, 0x66}, SmartButtonAd.awakeTS(false));
+        assertArrayEquals(new byte[]{(byte) 0xA5, (byte) 0xA5, 0x06, 0x06, 0x01, 0x57}, SmartButtonAd.follow(true));
+        assertArrayEquals(new byte[]{(byte) 0xA5, (byte) 0xA5, 0x06, 0x06, 0x00, 0x56}, SmartButtonAd.follow(false));
+        assertArrayEquals(new byte[]{(byte) 0xA5, (byte) 0xA5, 0x05, 0x09, 0x00, 0x00, (byte) 0xFF, (byte) 0xCB, 0x22},
+                SmartButtonAd.tintTS(0x00FFCB));
+    }
+
+    @Test
+    public void turnStepsOnlyCountForTurns() {
+        assertEquals(4, SmartButtonAd.turnTS(SmartButtonAd.CLOCKWISE, 4));
+        assertEquals(1, SmartButtonAd.turnTS(SmartButtonAd.ANTICLOCKWISE, 0));
+        assertEquals(1, SmartButtonAd.turnTS(SmartButtonAd.ANTICLOCKWISE, -1));
+        assertEquals(1, SmartButtonAd.turnTS(SmartButtonAd.SINGLE, 4));
     }
 
     @Test

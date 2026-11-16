@@ -40,9 +40,15 @@ public final class CarNames {
     public static final String ROW_2_LEFT = "ROW_2_LEFT";
     public static final String ROW_2_RIGHT = "ROW_2_RIGHT";
     public static final String ROW_2 = "ROW_2_ALL";
+    static final String WINDOW_CLASS = "com.ecarx.xui.adaptapi.vehicle.VehicleWindow";
+    public static final String WINDOW_ROW_1_LEFT = "WINDOW_ROW_1_LEFT";
+    public static final String WINDOW_ROW_1_RIGHT = "WINDOW_ROW_1_RIGHT";
+    public static final String WINDOW_ROW_2_LEFT = "WINDOW_ROW_2_LEFT";
+    public static final String WINDOW_ROW_2_RIGHT = "WINDOW_ROW_2_RIGHT";
 
     /** 车上没有区域那个类时用的值：ECARX 自己的应用里打包的那一份（Lab {@code EcarxSweep}）。 */
     private static final Map<String, Integer> FALLBACK_ZONES = new HashMap<>();
+    private static final Map<String, Integer> FALLBACK_WINDOWS = new HashMap<>();
 
     static {
         FALLBACK_ZONES.put(DRIVER, 0x1);
@@ -53,6 +59,10 @@ public final class CarNames {
         FALLBACK_ZONES.put(ROW_2_RIGHT, 0x40);
         FALLBACK_ZONES.put(ROW_2, 0x80);
         FALLBACK_ZONES.put(ALL, 0x80000000);
+        FALLBACK_WINDOWS.put(WINDOW_ROW_1_LEFT, 0x10);
+        FALLBACK_WINDOWS.put(WINDOW_ROW_1_RIGHT, 0x20);
+        FALLBACK_WINDOWS.put(WINDOW_ROW_2_LEFT, 0x100);
+        FALLBACK_WINDOWS.put(WINDOW_ROW_2_RIGHT, 0x200);
     }
 
     /** 找过的：「接口.常量」→ 号；找不到的存 null。 */
@@ -89,6 +99,19 @@ public final class CarNames {
             return value;
         }
         Integer fallback = FALLBACK_ZONES.get(name);
+        return fallback == null ? 0 : fallback;
+    }
+
+    public static synchronized int window(String name) {
+        String key = "VehicleWindow." + name;
+        if (!FOUND.containsKey(key)) {
+            FOUND.put(key, constant(WINDOW_CLASS, name));
+        }
+        Integer value = FOUND.get(key);
+        if (value != null) {
+            return value;
+        }
+        Integer fallback = FALLBACK_WINDOWS.get(name);
         return fallback == null ? 0 : fallback;
     }
 

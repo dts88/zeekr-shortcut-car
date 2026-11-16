@@ -1284,7 +1284,7 @@ public final class DiagnosticsCollector {
      * 绑定的每一台（单击 / 双击选的动作、电量和记下的时刻、版本、序列号、这次进程里按过几下、最后一下）。
      */
     private static void appendSmartButtons(StringBuilder sb, Context context) {
-        sb.append("## 5.3 灵动贴（试验性）").append('\n');
+        sb.append("## 5.3 灵动贴、X旋钮（试验性）").append('\n');
         com.kooo.evcam.button.SmartButtons buttons = com.kooo.evcam.button.SmartButtons.get();
         com.kooo.evcam.AppConfig config = new com.kooo.evcam.AppConfig(context);
         if (buttons == null) {
@@ -1292,7 +1292,8 @@ public final class DiagnosticsCollector {
             return;
         }
         String detail = buttons.listenDetail();
-        sb.append("  开关=").append(config.isSmartButtonsEnabled() ? "开" : "关")
+        sb.append("  灵动贴开关=").append(config.isAccessoryEnabled(com.kooo.evcam.button.Accessory.BUTTON) ? "开" : "关")
+                .append("  X旋钮开关=").append(config.isAccessoryEnabled(com.kooo.evcam.button.Accessory.KNOB) ? "开" : "关")
                 .append("  听=").append(listenName(buttons.listen())).append(detail.isEmpty() ? "" : "（" + detail + "）")
                 .append("  在绑定=").append(buttons.binding() ? "是" : "否")
                 .append("  连着=").append(buttons.connecting() == null ? "没有" : buttons.connecting()).append('\n');
@@ -1308,22 +1309,49 @@ public final class DiagnosticsCollector {
                 .append("  开得太勤等过 ").append(buttons.throttled()).append(" 回")
                 .append("  换过 GATT 服务 ").append(buttons.gattReplaced()).append(" 次")
                 .append('\n');
-        java.util.List<String> addresses = config.getSmartButtons();
-        if (addresses.isEmpty()) {
-            sb.append("  还没有绑定的灵动贴").append('\n');
-        }
         java.text.SimpleDateFormat day = new java.text.SimpleDateFormat("MM-dd HH:mm", java.util.Locale.US);
         java.text.SimpleDateFormat time = new java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US);
+        for (com.kooo.evcam.button.Accessory kind : com.kooo.evcam.button.Accessory.values()) {
+            appendAccessories(sb, buttons, config, kind, day, time);
+        }
+        sb.append('\n');
+    }
+
+    private static void appendAccessories(StringBuilder sb, com.kooo.evcam.button.SmartButtons buttons,
+                                          com.kooo.evcam.AppConfig config, com.kooo.evcam.button.Accessory kind,
+                                          java.text.SimpleDateFormat day, java.text.SimpleDateFormat time) {
+        java.util.List<String> addresses = config.getAccessories(kind);
+        String label = kind == com.kooo.evcam.button.Accessory.KNOB ? "X旋钮" : "灵动贴";
+        if (addresses.isEmpty()) {
+            sb.append("  还没有绑定的").append(label).append('\n');
+        }
         for (String address : addresses) {
             int battery = buttons.battery(address);
             long batteryAt = buttons.batteryReadAt(address);
             String version = buttons.version(address);
             String serial = buttons.serial(address);
             com.kooo.evcam.button.SmartButtons.Pressed pressed = buttons.pressed(address);
-            sb.append("  ").append(address)
-                    .append("  单击=").append(config.getSmartButtonAction(address, com.kooo.evcam.button.SmartButtonAd.SINGLE))
-                    .append("  双击=").append(config.getSmartButtonAction(address, com.kooo.evcam.button.SmartButtonAd.DOUBLE))
-                    .append("  电量=").append(battery < 0 ? "没有过"
+            sb.append("  ").append(label).append(' ').append(address);
+            for (int gesture : kind.actionGestures()) {
+                if (com.kooo.evcam.button.Accessory.isTurn(gesture)) {
+                    continue;
+                }
+                sb.append("  ").append(gestureName(gesture)).append('=')
+                        .append(config.getAccessoryAction(kind, address, gesture));
+            }
+            if (kind == com.kooo.evcam.button.Accessory.KNOB) {
+                sb.append("  转动=").append(config.getKnobTurn(address).key);
+                if (config.isKnobExclusive(address)) {
+                    java.util.List<String> keys = new java.util.ArrayList<>();
+                    for (com.kooo.evcam.button.KnobTurn turn : config.getKnobHome(address)) {
+                        keys.add(turn.key);
+                    }
+                    sb.append("  专属模式=开（").append(String.join(",", keys)).append("）");
+                } else {
+                    sb.append("  专属模式=关");
+                }
+            }
+            sb.append("  电量=").append(battery < 0 ? "没有过"
                             : battery + "%" + (batteryAt > 0 ? "（" + day.format(new java.util.Date(batteryAt)) + " 记下）" : ""))
                     .append("  版本=").append(version == null ? "没有过" : version)
                     .append("  序列号=").append(serial == null ? "没查到过" : serial)
@@ -1332,7 +1360,6 @@ public final class DiagnosticsCollector {
                             + " " + gestureName(pressed.lastGesture) + (pressed.viaNotification ? "（通知）" : ""))
                     .append('\n');
         }
-        sb.append('\n');
     }
 
     private static String gestureName(int gesture) {
@@ -1345,6 +1372,10 @@ public final class DiagnosticsCollector {
                 return "长按";
             case com.kooo.evcam.button.SmartButtonAd.RELEASE:
                 return "长按松开";
+            case com.kooo.evcam.button.SmartButtonAd.CLOCKWISE:
+                return "正转";
+            case com.kooo.evcam.button.SmartButtonAd.ANTICLOCKWISE:
+                return "反转";
             default:
                 return "认不出";
         }
@@ -1353,7 +1384,7 @@ public final class DiagnosticsCollector {
     private static String listenName(com.kooo.evcam.button.SmartButtons.Listen listen) {
         switch (listen) {
             case DISABLED:
-                return "不扫（灵动贴关着）";
+                return "不扫（灵动贴、X旋钮都关着）";
             case EXITED:
                 return "不扫（用户退出了）";
             case IDLE:

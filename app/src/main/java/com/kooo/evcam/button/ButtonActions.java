@@ -37,6 +37,7 @@ public final class ButtonActions {
 
     /** 连按驾驶模式向上、向下时，这么久（毫秒）之内接着上一次的目标算。 */
     static final long DRIVE_TARGET_MS = 2000L;
+    static final int MAX_STEPS = 10;
 
     /** 刚要切到的驾驶模式、什么时候要的（{@link #stepDriveMode}）；0 = 没有。只在主线程上碰。 */
     private static int driveTarget;
@@ -47,6 +48,11 @@ public final class ButtonActions {
 
     /** 做一件。{@code why} 说是谁按的（{@link CameraKeeper.Why#FLOATING} 悬浮按钮、{@link CameraKeeper.Why#BUTTON} 灵动贴）。 */
     public static void perform(Context app, ButtonAction action, CameraKeeper.Why why) {
+        perform(app, action, why, 1);
+    }
+
+    public static void perform(Context app, ButtonAction action, CameraKeeper.Why why, int steps) {
+        int n = action.stepwise() ? Math.max(1, Math.min(MAX_STEPS, steps)) : 1;
         if (action.floating != null) {
             try {
                 QuickActions.perform(app, action.floating, why);
@@ -57,14 +63,25 @@ public final class ButtonActions {
         } else if (action.driveMode != 0) {
             writeDriveMode(app, action.driveMode, why);
         } else if (action.driveModeStep != 0) {
-            stepDriveMode(app, action.driveModeStep, why);
+            stepDriveMode(app, action.driveModeStep * n, why);
         } else if (action.gearStep != 0) {
-            DriveSound.shift(action.gearStep);
+            for (int i = 0; i < n; i++) {
+                DriveSound.shift(action.gearStep);
+            }
+        } else if (action.stepCar != null) {
+            String label = action.label(app);
+            CarMoves.run(app, why, action.key, action.stepCar.apply(n), result -> carResult(app, label, result));
         } else if (action.car != null) {
             String label = action.label(app);
             CarMoves.run(app, why, action.key, action.car, result -> carResult(app, label, result));
-        } else if (action.media != null && !action.media.perform(app)) {
-            Toast.makeText(app, app.getString(R.string.msg_car_action_unavailable, action.label(app)), Toast.LENGTH_SHORT).show();
+        } else if (action.media != null) {
+            for (int i = 0; i < n; i++) {
+                if (!action.media.perform(app)) {
+                    Toast.makeText(app, app.getString(R.string.msg_car_action_unavailable, action.label(app)),
+                            Toast.LENGTH_SHORT).show();
+                    return;
+                }
+            }
         }
     }
 

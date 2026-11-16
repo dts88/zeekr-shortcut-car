@@ -28,8 +28,7 @@ import java.util.Locale;
  * <h3>连着时</h3>
  * <p>服务 0x1820 的 0x2A60 推通知：按法是 ASCII 的 '1' 单击、'2' 双击、'3' 长按、'4' 长按松开（车上只见过 31、32）；
  * 也回查询的结果：{@code zk_v_1_2_1} 是固件版本，{@code psn=…} 或 {@code CSB10Z1A…} 开头的是序列号。
- * 查询写到 0x2A70：{@code A5 A5 类型 总长 参数 校验}，校验 = 前面各字节相加的低 8 位。只查版本、查序列号，
- * 不写背光、睡眠这些（车主 2026-11-04）。</p>
+ * 查询写到 0x2A70：{@code A5 A5 类型 总长 参数 校验}，校验 = 前面各字节相加的低 8 位。</p>
  *
  * <p>全是纯函数（{@code SmartButtonAdTest}）。</p>
  */
@@ -43,9 +42,8 @@ public final class SmartButtonAd {
     public static final int LONG = 3;
     /** 长按松开：只在连着时从通知来，不做事。 */
     public static final int RELEASE = 4;
-
-    /** 广播里的名字：扫描按它过滤（整个比、分大小写）。 */
-    public static final String NAME = "ZEEKR_button";
+    public static final int CLOCKWISE = 5;
+    public static final int ANTICLOCKWISE = 6;
 
     /** 不算的计数。 */
     static final int COUNTER_IGNORED = 0xFE;
@@ -53,9 +51,9 @@ public final class SmartButtonAd {
     static final long SAME_PRESS_MS = 1_500L;
     static final long SAME_LONG_MS = 5_000L;
 
-    /** 序列号回话不带 {@code psn=} 时的开头（灵动贴的型号）。 */
-    private static final String SERIAL_PREFIX = "CSB10Z1A";
-    private static final String VERSION_PREFIX = "zk_v_";
+    private static final String[] VERSION_PREFIXES = {"zk_knob_v_", "zk_v_"};
+    /** 序列号回话不带 {@code psn=} 时的开头。 */
+    private static final String[] SERIAL_PREFIXES = {"CSB10Z1A", "CCK10Z1A"};
     private static final String PSN_PREFIX = "psn=";
 
     private SmartButtonAd() {
@@ -67,22 +65,24 @@ public final class SmartButtonAd {
         public final int counter;
         /** {@link #SINGLE} / {@link #DOUBLE} / {@link #LONG}；不认识的是 0。 */
         public final int gesture;
+        public final int steps;
         /** 带的电量（%）；没带是 -1。 */
         public final int battery;
         /** 固件版本，「1.2.1」。 */
         public final String version;
 
-        Advert(int counter, int gesture, int battery, String version) {
+        Advert(int counter, int gesture, int steps, int battery, String version) {
             this.counter = counter;
             this.gesture = gesture;
+            this.steps = steps;
             this.battery = battery;
             this.version = version;
         }
     }
 
     /** 一份广播；不到 12 字节、或者装按键数据的那段不在见过的位置，返回 null。 */
-    public static Advert parse(byte[] raw) {
-        if (raw == null || raw.length < 12) {
+    public static Advert parse(byte[] raw, Accessory kind) {
+        if (raw == null || raw.length < 12 || kind == null) {
             return null;
         }
         int type = raw[4] & 0xFF;
@@ -91,7 +91,9 @@ public final class SmartButtonAd {
         }
         int battery = raw[8] & 0xFF;
         String version = String.format(Locale.US, "%d.%d.%d", raw[9] & 0xFF, raw[10] & 0xFF, raw[11] & 0xFF);
-        return new Advert(raw[6] & 0xFF, gestureOfAdvert(raw[7] & 0xFF),
+        int gesture = kind == Accessory.KNOB ? gestureOfCode(raw[7] & 0xFF) : gestureOfAdvert(raw[7] & 0xFF);
+        int steps = turnTS(gesture, raw.length > 12 ? raw[12] & 0xFF : 0);
+        return new Advert(raw[6] & 0xFF, gesture, steps,
                 battery > 0 && battery <= 100 && battery % 25 == 0 ? battery : -1, version);
     }
 
@@ -107,6 +109,14 @@ public final class SmartButtonAd {
             default:
                 return 0;
         }
+    }
+
+    static int gestureOfCode(int code) {
+        return code >= '1' && code <= '6' ? code - '0' : 0;
+    }
+
+    static int turnTS(int gesture, int count) {
+        return Accessory.isTurn(gesture) && count > 0 ? count : 1;
     }
 
     /**
@@ -134,41 +144,37 @@ public final class SmartButtonAd {
         public final String serial;
         /** 按法；不是按法、认不出是 0。 */
         public final int gesture;
+        public final int steps;
 
-        Reply(String version, String serial, int gesture) {
+        Reply(String version, String serial, int gesture, int steps) {
             this.version = version;
             this.serial = serial;
             this.gesture = gesture;
+            this.steps = steps;
         }
     }
 
     /** 拆一条通知：先当字符串看是不是版本、序列号，不是的话第 0 个字节是按法。 */
     static Reply parseNotification(byte[] value) {
         if (value == null || value.length == 0) {
-            return new Reply(null, null, 0);
+            return new Reply(null, null, 0, 1);
         }
         String text = new String(value, StandardCharsets.US_ASCII).trim();
-        if (text.startsWith(VERSION_PREFIX)) {
-            return new Reply(text.substring(VERSION_PREFIX.length()).replace('_', '.'), null, 0);
+        for (String prefix : VERSION_PREFIXES) {
+            if (text.startsWith(prefix)) {
+                return new Reply(text.substring(prefix.length()).replace('_', '.'), null, 0, 1);
+            }
         }
         if (text.startsWith(PSN_PREFIX)) {
-            return new Reply(null, text.substring(PSN_PREFIX.length()), 0);
+            return new Reply(null, text.substring(PSN_PREFIX.length()), 0, 1);
         }
-        if (text.startsWith(SERIAL_PREFIX)) {
-            return new Reply(null, text, 0);
+        for (String prefix : SERIAL_PREFIXES) {
+            if (text.startsWith(prefix)) {
+                return new Reply(null, text, 0, 1);
+            }
         }
-        switch (value[0]) {
-            case '1':
-                return new Reply(null, null, SINGLE);
-            case '2':
-                return new Reply(null, null, DOUBLE);
-            case '3':
-                return new Reply(null, null, LONG);
-            case '4':
-                return new Reply(null, null, RELEASE);
-            default:
-                return new Reply(null, null, 0);
-        }
+        int gesture = gestureOfCode(value[0] & 0xFF);
+        return new Reply(null, null, gesture, turnTS(gesture, value.length > 1 ? value[1] : 0));
     }
 
     /** 查固件版本：{@code A5 A5 03 06 01 54}。 */
@@ -181,9 +187,33 @@ public final class SmartButtonAd {
         return query(0x03);
     }
 
+    static byte[] lightTS(boolean steady) {
+        return frame(0x01, steady ? 0x03 : 0x00);
+    }
+
+    static byte[] awakeTS(boolean on) {
+        return frame(0x07, on ? 0x00 : 0x0F);
+    }
+
+    static byte[] tintTS(int rgb) {
+        return sum(new byte[] {(byte) 0xA5, (byte) 0xA5, 0x05, 0x09, 0x00,
+                (byte) (rgb >> 16), (byte) (rgb >> 8), (byte) rgb, 0});
+    }
+
+    static byte[] follow(boolean on) {
+        return frame(0x06, on ? 0x01 : 0x00);
+    }
+
     /** 查询（类型 03）：{@code A5 A5 03 06 参数 校验}。 */
     private static byte[] query(int what) {
-        byte[] out = {(byte) 0xA5, (byte) 0xA5, 0x03, 0x06, (byte) what, 0};
+        return frame(0x03, what);
+    }
+
+    private static byte[] frame(int type, int what) {
+        return sum(new byte[] {(byte) 0xA5, (byte) 0xA5, (byte) type, 0x06, (byte) what, 0});
+    }
+
+    private static byte[] sum(byte[] out) {
         int sum = 0;
         for (int i = 0; i < out.length - 1; i++) {
             sum += out[i] & 0xFF;

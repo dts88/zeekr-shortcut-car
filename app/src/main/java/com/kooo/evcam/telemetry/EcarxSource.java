@@ -155,6 +155,8 @@ final class EcarxSource {
     private Method setFunctionValueZoned;
     /** 车机说某个号某个区域现在能不能用：关门前问（{@link CarAccess#status}）。 */
     private Method isFunctionSupportedZoned;
+    private Method getCustomizeZoned;
+    private Method setCustomizeZoned;
     /** 连着时给灵动贴读写用的那一份（{@link #access}）；没连上、断了、停了是 null。 */
     private volatile CarAccess access;
     private Method getSensorEvent;
@@ -478,6 +480,8 @@ final class EcarxSource {
                 setFunctionValue = findMethod(function, "setFunctionValue", int.class, int.class);
                 setFunctionValueZoned = findMethod(function, "setFunctionValue", int.class, int.class, int.class);
                 isFunctionSupportedZoned = findMethod(function, "isFunctionSupported", int.class, int.class);
+                getCustomizeZoned = findMethod(function, "getCustomizeFunctionValue", int.class, int.class);
+                setCustomizeZoned = findMethod(function, "setCustomizeFunctionValue", int.class, int.class, float.class);
             }
             if (sensor != null) {
                 getSensorEvent = findMethod(sensor, "getSensorEvent", int.class);
@@ -508,8 +512,11 @@ final class EcarxSource {
                 return;
             }
             sleptAtLastPass = sleptMs();
+            Object carInfo = call(car, "getCarInfoManager");
+            Method queryConfig = carInfo == null ? null : findMethod(carInfo, "queryCarConfig", int.class);
             access = new Access(function, getFunctionValue, getFunctionValueZoned, setFunctionValue, setFunctionValueZoned,
-                    isFunctionSupportedZoned, sensor, getSensorLatestValue);
+                    isFunctionSupportedZoned, getCustomizeZoned, setCustomizeZoned, sensor, getSensorLatestValue,
+                    carInfo, queryConfig);
             status = String.format(Locale.US,
                     "connected in %d ms; function=%s zoned=%s sensorEvent=%s sensorValue=%s; driver %s; %s",
                     SystemClock.elapsedRealtime() - start, getFunctionValue != null, getFunctionValueZoned != null,
@@ -1444,19 +1451,28 @@ final class EcarxSource {
         private final Method set;
         private final Method setZoned;
         private final Method supportedZoned;
+        private final Method getFloatZoned;
+        private final Method setFloatZoned;
         private final Object sensor;
         private final Method sensorValue;
+        private final Object carInfo;
+        private final Method queryConfig;
 
         Access(Object function, Method get, Method getZoned, Method set, Method setZoned, Method supportedZoned,
-               Object sensor, Method sensorValue) {
+               Method getFloatZoned, Method setFloatZoned, Object sensor, Method sensorValue, Object carInfo,
+               Method queryConfig) {
             this.function = function;
             this.get = get;
             this.getZoned = getZoned;
             this.set = set;
             this.setZoned = setZoned;
             this.supportedZoned = supportedZoned;
+            this.getFloatZoned = getFloatZoned;
+            this.setFloatZoned = setFloatZoned;
             this.sensor = sensor;
             this.sensorValue = sensorValue;
+            this.carInfo = carInfo;
+            this.queryConfig = queryConfig;
         }
 
         @Override
@@ -1477,6 +1493,29 @@ final class EcarxSource {
         @Override
         public boolean write(int id, int zone, int value) {
             return accepted(setZoned, id, zone, value);
+        }
+
+        @Override
+        public Float readFloat(int id, int zone) {
+            if (getFloatZoned == null || function == null) {
+                return null;
+            }
+            try {
+                Object v = getFloatZoned.invoke(function, id, zone);
+                return v instanceof Number ? Signal.floatOrNull(((Number) v).floatValue()) : null;
+            } catch (Throwable t) {
+                return null;
+            }
+        }
+
+        @Override
+        public boolean writeFloat(int id, int zone, float value) {
+            return accepted(setFloatZoned, id, zone, value);
+        }
+
+        @Override
+        public Integer config(int n) {
+            return number(queryConfig, carInfo, n);
         }
 
         /** 回的是 ECARX 的 {@code FunctionStatus}，写成它自己的名字（同 {@link DarkScreenProbes#status}）。 */
