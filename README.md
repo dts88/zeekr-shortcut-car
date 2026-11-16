@@ -108,6 +108,9 @@ Off by default. Settings → **Alerts**.
 
 #### Setting up the Telegram bot, step by step
 
+The car has two guided wizards — Telegram and ntfy — and every screen of both, with one picture per step,
+is in **[docs/setup-wizards.md](docs/setup-wizards.md)**. The list below is the same path written out.
+
 1. **Make a bot.** In Telegram, open **@BotFather**, send `/newbot`, give it a name and a user name
    ending in `bot`. BotFather replies with a token that looks like `123456789:AAH...` — that string is
    the bot.

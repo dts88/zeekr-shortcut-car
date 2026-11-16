@@ -265,7 +265,8 @@ re-encoded. One clip at a time, because the sample ring is shared.
 覆盖：六项触发器各自那一条警报（双闪 / 远光 / 车门 / 车灯 / 中控屏 / 画面移动）、`pic` 那一张、HD 那一张、
 四路片段、忘了开哨兵的五条（问、开了的回执、关掉的回执、按得太晚、已布防关不掉）、状态一句话、帮助。
 表在 `alarm.AlertEvent` 里（标题 + 描述各一个字符串资源），`AlertEventTest` 钉住「每行都有自己的一句」和
-「六项触发器一行不少」。
+「六项触发器一行不少」。表是配好之后「它到底发什么」；配好之前那三步（令牌 → 找到聊天 → 试一张）
+每一屏的截图在 `docs/setup-wizards.md`。
 
 ###### English
 
@@ -273,7 +274,8 @@ re-encoded. One clip at a time, because the sample ring is shared.
 message the car can send, one row each, with a line saying when it really goes out; a tap sends that exact
 message through the real path. Only the trigger is simulated — same picture, same buttons, same wording.
 The table lives in `alarm.AlertEvent`, and `AlertEventTest` pins one description per row and all six
-triggers present.
+triggers present. It answers "what does it send" once configured; the three setup steps before that
+(token → find the chat → one picture) are in `docs/setup-wizards.md`, one picture per screen.
 
 ## 2. 不做什么（车上看不到的信号）
 
@@ -353,6 +355,7 @@ Telegram Bot API，`api.telegram.org`，不需要自建服务器、不需要公�
 
 - 令牌：@BotFather 给的，`alarm.TelegramRequest#looksLikeToken` 只认「数字:一串字符」的外形。
 - 会话号：`getUpdates` 里最近给机器人发过话的会话；设置有「找会话号」自动取，多个会话时让车主选。
+  那三步（令牌 → 找到聊天 → 试一张）每一屏的截图在 `docs/setup-wizards.md`。
 - 发不出去时：黑匣子记一行，本地通知说一次（同一句 10 分钟内不重复），照片发不成就只发文字。
 
 ##### English
@@ -363,7 +366,8 @@ just sends out over 4G (the car is behind the carrier's NAT, so nothing could re
 - Token: from @BotFather; `alarm.TelegramRequest#looksLikeToken` only accepts the shape
   "digits:some characters".
 - Chat id: the chat that most recently messaged the bot in `getUpdates`; settings has "find chat
-  id" to fetch it automatically, and with several chats the owner picks one.
+  id" to fetch it automatically, and with several chats the owner picks one. Screenshots of the three
+  steps (token → find the chat → one picture) are in `docs/setup-wizards.md`.
 - When sending fails: one line in the black box, one local notification (the same message not
   repeated within 10 minutes), and if the photo fails, text only is sent.
 
