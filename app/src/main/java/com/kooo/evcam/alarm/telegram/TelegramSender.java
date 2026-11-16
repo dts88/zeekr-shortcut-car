@@ -9,16 +9,12 @@
 package com.kooo.evcam.alarm.telegram;
 
 import com.kooo.evcam.AppLog;
+import com.kooo.evcam.alarm.net.HttpCall;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -65,9 +61,6 @@ public final class TelegramSender {
      * (saves a wasted trip).
      */
     public static final int MAX_PHOTO_BYTES = 9 * 1024 * 1024;
-
-    private static final int CONNECT_TIMEOUT_MS = 15_000;
-    private static final int READ_TIMEOUT_MS = 30_000;
 
     /**
      * 一次发送的结果。{@link #error} 已经擦过令牌，可以直接显示。
@@ -232,10 +225,12 @@ public final class TelegramSender {
                 }
             }
             try {
-                Result result = post(token, boundary, body);
-                if (result != null) {
-                    return result;
-                }
+                // 拿到状态码就结束（成功或失败都算答过了）；一次都没拿到才会抛出来进 catch，
+                // 那时候才重试 —— 已经答过的重试会变成重复消息。
+                // A status code ends it, success or failure: it was answered. Only "no answer at all"
+                // throws into the catch, and only then is it retried — retrying one that already got an
+                // answer would send a duplicate message.
+                return multipart(token, "sendPhoto", boundary, body);
             } catch (IOException e) {
                 last = e;
                 AppLog.w(TAG, "photo upload attempt " + (attempt + 1) + " failed: "
@@ -248,60 +243,35 @@ public final class TelegramSender {
     }
 
     /**
-     * 真正发一次。
+     * 真正发一次 multipart。
      *
-     * @return 拿到状态码的结果；一次都没拿到时返回 {@code null}，让外面重试
+     * <p>照片和视频只有字段名不一样、只有一处写法：传进来的 {@code method} 决定发到哪个接口。
+     * 这里和 {@code sendMessage} 不是一回事：multipart 不报长度，见下面那一段。</p>
      *
-     * Really send once.
+     * @return 拿到状态码的结果；一次都没拿到时抛出去，让外面重试
      *
-     * @return the result when a status code was received; {@code null} when none was received, so the
-     *         caller retries
+     * Really send one multipart request. A photo and a clip differ only in the field name and in which
+     * endpoint {@code method} points at. Not the same thing as {@code sendMessage}: multipart declares
+     * no length, see below.
+     *
+     * @return the result when a status code was received; thrown when none was received, so the caller
+     *         retries
      */
-    private static Result postMultipart(String token, String method, String boundary, byte[] body)
+    private static Result multipart(String token, String method, String boundary, byte[] body)
             throws IOException {
-        HttpURLConnection connection = null;
-        try {
-            connection = open(TelegramRequest.methodUrl(token, method));
-            connection.setRequestMethod("POST");
-            connection.setDoOutput(true);
-            connection.setRequestProperty("Content-Type",
-                    "multipart/form-data; boundary=" + boundary);
-            connection.setRequestProperty("Connection", "close");
-            try (OutputStream out = connection.getOutputStream()) {
-                out.write(body);
-            }
-            return read(connection);
-        } finally {
-            if (connection != null) {
-                connection.disconnect();
-            }
-        }
-    }
-
-    private static Result post(String token, String boundary, byte[] body) throws IOException {
-        HttpURLConnection connection = null;
-        try {
-            connection = open(TelegramRequest.methodUrl(token, "sendPhoto"));
-            connection.setRequestMethod("POST");
-            connection.setDoOutput(true);
-            connection.setRequestProperty("Content-Type",
-                    "multipart/form-data; boundary=" + boundary);
-            // 不设固定长度：让实现自己缓冲好再发。一边写一边发时，对面提前关连接就只剩一句「closed」，
-            // No fixed length: let the implementation buffer before sending. Streaming while writing means an
-            // early close by the peer leaves only "closed",
-            // 既看不出是网络还是内容被拒；这条请求最多几 MB，内存吃得下。
-            // with no way to tell network from rejected content; this request is a few MB at most, which
-            // memory can afford.
-            connection.setRequestProperty("Connection", "close");
-            try (OutputStream out = connection.getOutputStream()) {
-                out.write(body);
-            }
-            return read(connection);
-        } finally {
-            if (connection != null) {
-                connection.disconnect();
-            }
-        }
+        // 不设固定长度：让实现自己缓冲好再发。一边写一边发时，对面提前关连接就只剩一句「closed」，
+        // No fixed length: let the implementation buffer before sending. Streaming while writing means an
+        // early close by the peer leaves only "closed",
+        // 既看不出是网络还是内容被拒；这条请求最多几 MB，内存吃得下。
+        // with no way to tell network from rejected content; this request is a few MB at most, which
+        // memory can afford.
+        return read(HttpCall.request("POST", TelegramRequest.methodUrl(token, method))
+                .noRedirects()
+                .noCaches()
+                .header("Content-Type", "multipart/form-data; boundary=" + boundary)
+                .header("Connection", "close")
+                .bufferedBody(body)
+                .send());
     }
 
     /**
@@ -370,7 +340,7 @@ public final class TelegramSender {
                 }
             }
             try {
-                Result result = postMultipart(token, "sendVideo", boundary, body);
+                Result result = multipart(token, "sendVideo", boundary, body);
                 if (result != null) {
                     return result;
                 }
@@ -424,25 +394,16 @@ public final class TelegramSender {
             body += "&reply_markup=" + formEncode(replyMarkup);
         }
         byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
-        HttpURLConnection connection = null;
         try {
-            connection = open(TelegramRequest.methodUrl(token, "sendMessage"));
-            connection.setRequestMethod("POST");
-            connection.setDoOutput(true);
-            connection.setRequestProperty("Content-Type",
-                    "application/x-www-form-urlencoded; charset=UTF-8");
-            connection.setFixedLengthStreamingMode(bytes.length);
-            try (OutputStream out = connection.getOutputStream()) {
-                out.write(bytes);
-            }
-            return read(connection);
+            return read(HttpCall.request("POST", TelegramRequest.methodUrl(token, "sendMessage"))
+                    .noRedirects()
+                    .noCaches()
+                    .header("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
+                    .body(bytes)
+                    .send());
         } catch (IOException e) {
             AppLog.w(TAG, "send text failed: " + TelegramRequest.redact(String.valueOf(e)));
             return Result.fail(TelegramRequest.redact(String.valueOf(e)), 0);
-        } finally {
-            if (connection != null) {
-                connection.disconnect();
-            }
         }
     }
 
@@ -482,25 +443,17 @@ public final class TelegramSender {
             body += "&text=" + formEncode(text.length() > 200 ? text.substring(0, 200) : text);
         }
         byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
-        HttpURLConnection connection = null;
         try {
-            connection = open(TelegramRequest.methodUrl(token, "answerCallbackQuery"));
-            connection.setRequestMethod("POST");
-            connection.setDoOutput(true);
-            connection.setRequestProperty("Content-Type",
-                    "application/x-www-form-urlencoded; charset=UTF-8");
-            connection.setFixedLengthStreamingMode(bytes.length);
-            try (OutputStream out = connection.getOutputStream()) {
-                out.write(bytes);
-            }
-            return read(connection);
+            return read(HttpCall.request("POST",
+                            TelegramRequest.methodUrl(token, "answerCallbackQuery"))
+                    .noRedirects()
+                    .noCaches()
+                    .header("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
+                    .body(bytes)
+                    .send());
         } catch (IOException e) {
             AppLog.w(TAG, "callback answer failed: " + TelegramRequest.redact(String.valueOf(e)));
             return Result.fail(TelegramRequest.redact(String.valueOf(e)), 0);
-        } finally {
-            if (connection != null) {
-                connection.disconnect();
-            }
         }
     }
 
@@ -640,24 +593,21 @@ public final class TelegramSender {
     }
 
     static JSONObject get(String url) throws ChatListException {
-        HttpURLConnection connection = null;
         try {
-            connection = open(url);
-            connection.setRequestMethod("GET");
             // 一次请求只读一次回复体：读完再读一次，Android 的实现会抛 IOException("closed")。
             // Read the reply body once per request: reading it again makes Android's implementation throw
             // IOException("closed").
-            Reply reply = exchange(connection);
+            HttpCall.Reply raw = HttpCall.request("GET", url)
+                    .noRedirects()
+                    .noCaches()
+                    .send();
+            Reply reply = parse(raw.code, raw.body);
             if (reply.ok()) {
                 return reply.json;
             }
             throw new ChatListException(reply.failureText(), reply.retryAfterMs());
         } catch (IOException e) {
             throw new ChatListException(TelegramRequest.redact(String.valueOf(e)));
-        } finally {
-            if (connection != null) {
-                connection.disconnect();
-            }
         }
     }
 
@@ -681,15 +631,6 @@ public final class TelegramSender {
         }
     }
 
-    private static HttpURLConnection open(String url) throws IOException {
-        HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
-        connection.setConnectTimeout(CONNECT_TIMEOUT_MS);
-        connection.setReadTimeout(READ_TIMEOUT_MS);
-        connection.setInstanceFollowRedirects(false);
-        connection.setUseCaches(false);
-        return connection;
-    }
-
     /**
      * 一次回复：状态码、原文、解析出来的 JSON。读一次就够，谁也别再读第二次。
      *
@@ -706,7 +647,7 @@ public final class TelegramSender {
         }
 
         boolean ok() {
-            return code == HttpURLConnection.HTTP_OK && json != null && json.optBoolean("ok", false);
+            return code == 200 && json != null && json.optBoolean("ok", false);
         }
 
         /**
@@ -763,23 +704,16 @@ public final class TelegramSender {
         }
     }
 
-    private static Reply exchange(HttpURLConnection connection) throws IOException {
-        int code = connection.getResponseCode();
-        // 只读一次：读完再读一次，Android 的实现会抛 IOException("closed")。
-        // Read once: reading again makes Android's implementation throw IOException("closed").
-        return parse(code, readText(connection));
-    }
-
     /**
      * 把一次回复的状态码和原文翻成 {@link Reply}。纯函数，单测直接调（{@code TelegramReplyTest}）。
      *
-     * <p>这里不读网络：“只读一次”那个修复在 {@link #exchange} 里，
+     * <p>这里不读网络：“只读一次”那条规矩在 {@link HttpCall} 里，
      * 可测的是它交出来的结论 —— 这就是界面和重试看得到的那一份。</p>
      *
      * Turn one reply's status code and raw text into a {@link Reply}. Pure function, called directly by
      * unit tests ({@code TelegramReplyTest}).
      *
-     * <p>No network is read here: the "read once" fix lives in {@link #exchange}; what is testable is the
+     * <p>No network is read here: the "read once" rule lives in {@link HttpCall}; what is testable is the
      * conclusion it hands out; the one the UI and the retry logic see.</p>
      */
     static Reply parse(int code, String text) {
@@ -799,35 +733,11 @@ public final class TelegramSender {
      * Read one reply: return it if good enough, otherwise turn Telegram's wording into one short
      * sentence.
      */
-    private static Result read(HttpURLConnection connection) throws IOException {
-        Reply reply = exchange(connection);
+    private static Result read(HttpCall.Reply raw) {
+        Reply reply = parse(raw.code, raw.body);
         if (reply.ok()) {
             return Result.ok();
         }
         return Result.fail(reply.failureText(), reply.code);
-    }
-
-    private static String readText(HttpURLConnection connection) throws IOException {
-        InputStream stream;
-        try {
-            stream = connection.getInputStream();
-        } catch (IOException e) {
-            stream = connection.getErrorStream();
-            if (stream == null) {
-                throw e;
-            }
-        }
-        try (InputStream in = stream) {
-            ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-            byte[] chunk = new byte[4096];
-            int read;
-            while ((read = in.read(chunk)) > 0) {
-                buffer.write(chunk, 0, read);
-                if (buffer.size() > 4 * 1024 * 1024) {
-                    break;
-                }
-            }
-            return new String(buffer.toByteArray(), StandardCharsets.UTF_8);
-        }
     }
 }

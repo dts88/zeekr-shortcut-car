@@ -9,16 +9,12 @@ package com.kooo.evcam.alarm.ntfy;
 
 import org.json.JSONObject;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.nio.charset.StandardCharsets;
 
 import com.kooo.evcam.alarm.AlertChannel;
 import com.kooo.evcam.alarm.SentryAlerts;
+import com.kooo.evcam.alarm.net.HttpCall;
 
 /**
  * 和 ntfy 说话的那一头：发一句话、发一张图、问账号、问话题保护没保护上。
@@ -75,9 +71,6 @@ public final class NtfySender {
      * measured here; if the server ignored it, all that is lost is this reinforcement.</p>
      */
     public static final String MARKER_TAG = "car";
-
-    private static final int CONNECT_TIMEOUT_MS = 15_000;
-    private static final int READ_TIMEOUT_MS = 30_000;
 
     private NtfySender() {
     }
@@ -149,7 +142,7 @@ public final class NtfySender {
     public static Account account(String server, String token) {
         String url = NtfyRequest.accountUrl(server);
         try {
-            Reply reply = call("GET", url, null, token, null, null);
+            HttpCall.Reply reply = call("GET", url, null, token, null, null);
             if (reply.code != 200) {
                 return Account.failed(kind(reply.code), NtfyRequest.redact(reply.body, token));
             }
@@ -178,7 +171,7 @@ public final class NtfySender {
     public static Boolean protectedTopic(String server, String topic) {
         String url = NtfyRequest.probePublishUrl(server, topic);
         try {
-            Reply reply = call("POST", url, null, null, null, null);
+            HttpCall.Reply reply = call("POST", url, null, null, null, null);
             if (reply.code == 403) {
                 return Boolean.TRUE;
             }
@@ -195,7 +188,7 @@ public final class NtfySender {
     private static AlertChannel.Result publish(String method, String url, byte[] body, String token,
                                                String title, String tags) {
         try {
-            Reply reply = call(method, url, body, token, title, tags);
+            HttpCall.Reply reply = call(method, url, body, token, title, tags);
             if (reply.code == 200) {
                 return AlertChannel.Result.ok();
             }
@@ -235,65 +228,36 @@ public final class NtfySender {
      * 一次请求。头里的 {@code Authorization} 是令牌唯一的落点；异常信息里不会有它，
      * 因为 URL 里本来就没有。
      *
+     * <p>连接、超时、读一次回复都在 {@link HttpCall} 里，这一层只管 ntfy 该带什么头。</p>
+     *
      * One request. The {@code Authorization} header is the token's only landing place, and no exception
-     * text carries it because the URL never does.
+     * text carries it because the URL never does. Connecting, timing out and reading the reply once live
+     * in {@link HttpCall}; this method only decides which headers ntfy wants.
      */
-    private static Reply call(String method, String url, byte[] body, String token, String title,
-                              String tags)
+    private static HttpCall.Reply call(String method, String url, byte[] body, String token,
+                                       String title, String tags)
             throws IOException {
-        HttpURLConnection connection = null;
-        try {
-            connection = (HttpURLConnection) new URL(url).openConnection();
-            connection.setRequestMethod(method);
-            connection.setConnectTimeout(CONNECT_TIMEOUT_MS);
-            connection.setReadTimeout(READ_TIMEOUT_MS);
-            connection.setDoInput(true);
-            connection.setRequestProperty("Accept", "application/json");
-            if (title != null && !title.isEmpty()) {
-                // 标题不能带非 ASCII：不是每个实现都按 UTF-8 发头。非 ASCII 由说明正文承担。
-                // A title must stay ASCII: not every stack sends headers as UTF-8; the caption carries
-                // any non-ASCII text.
-                connection.setRequestProperty("X-Title", ascii(title));
-            }
-            if (tags != null && !tags.trim().isEmpty()) {
-                // 标签只带 ASCII：和标题同一个理由。Tags stay ASCII, same reason as the title.
-                connection.setRequestProperty("X-Tags", ascii(tags.trim()));
-            }
-            if (token != null && !token.trim().isEmpty()) {
-                connection.setRequestProperty("Authorization", "Bearer " + token.trim());
-            }
-            if (body != null) {
-                connection.setDoOutput(true);
-                connection.setRequestProperty("Content-Type",
-                        "PUT".equals(method) ? "image/jpeg" : "text/plain; charset=utf-8");
-                connection.setFixedLengthStreamingMode(body.length);
-                try (OutputStream out = connection.getOutputStream()) {
-                    out.write(body);
-                }
-            }
-            int code = connection.getResponseCode();
-            InputStream stream = code >= 400 ? connection.getErrorStream() : connection.getInputStream();
-            return new Reply(code, read(stream));
-        } finally {
-            if (connection != null) {
-                connection.disconnect();
-            }
+        HttpCall.Request request = HttpCall.request(method, url)
+                .header("Accept", "application/json");
+        if (title != null && !title.isEmpty()) {
+            // 标题不能带非 ASCII：不是每个实现都按 UTF-8 发头。非 ASCII 由说明正文承担。
+            // A title must stay ASCII: not every stack sends headers as UTF-8; the caption carries
+            // any non-ASCII text.
+            request.header("X-Title", ascii(title));
         }
-    }
-
-    private static String read(InputStream stream) throws IOException {
-        if (stream == null) {
-            return "";
+        if (tags != null && !tags.trim().isEmpty()) {
+            // 标签只带 ASCII：和标题同一个理由。Tags stay ASCII, same reason as the title.
+            request.header("X-Tags", ascii(tags.trim()));
         }
-        try (InputStream input = stream) {
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            byte[] buffer = new byte[4096];
-            int read;
-            while ((read = input.read(buffer)) >= 0) {
-                out.write(buffer, 0, read);
-            }
-            return out.toString("UTF-8");
+        if (token != null && !token.trim().isEmpty()) {
+            request.header("Authorization", "Bearer " + token.trim());
         }
+        if (body != null) {
+            request.header("Content-Type",
+                    "PUT".equals(method) ? "image/jpeg" : "text/plain; charset=utf-8");
+            request.body(body);
+        }
+        return request.send();
     }
 
     /** 只留 ASCII：头的值不保证按 UTF-8 出门。Keep ASCII only: header values are not guaranteed UTF-8. */
@@ -313,16 +277,6 @@ public final class NtfySender {
         }
         String oneLine = body.replace('\n', ' ').replace('\r', ' ').trim();
         return oneLine.length() <= 160 ? oneLine : oneLine.substring(0, 160);
-    }
-
-    private static final class Reply {
-        final int code;
-        final String body;
-
-        Reply(int code, String body) {
-            this.code = code;
-            this.body = body == null ? "" : body;
-        }
     }
 
     /**
