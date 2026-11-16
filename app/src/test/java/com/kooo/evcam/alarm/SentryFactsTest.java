@@ -35,9 +35,9 @@ public class SentryFactsTest {
 
     @Test
     public void theOwnerComingBackDropsOutOfArmedBeforeAnythingLightsUp() {
-        // 平台笔记：解锁时哨兵 2 → 1，10 毫秒后防盗位才跟着动；屏幕和车灯是更晚的事。
-        // Platform note: on unlock, sentry goes 2 → 1 and the anti-theft bit
-        // follows 10 ms later; the screen and lamps are even later.
+        // 车上记录的：解锁时防盗位 0x20240300 先 1 → 0，10 毫秒后哨兵 2 → 1；屏幕和车灯是更晚的事。
+        // On the car: the anti-theft bit 0x20240300 goes 1 → 0 first, sentry 2 → 1 ten
+        // milliseconds later; the screen and lamps are even later.
         assertTrue(SentryFacts.armed(2));
         assertFalse(SentryFacts.armed(1));
     }

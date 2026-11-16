@@ -12,7 +12,8 @@ package com.kooo.evcam.alarm;
  *
  * <h3>为什么是「车主离开的那一刻」</h3>
  *
- * <p>哨兵没开时车机在车主离车四到六分钟后下电，进程再活三到五秒（{@code docs/zeekr-platform-notes.md} §「车主离车之后」）。
+ * <p>哨兵没开时车机在车主离车四到六分钟后下电，进程再活三到五秒（测量时刻与日期见
+ * {@code docs/sentry-alerts-spec.md} §7「测量出处」）。
  * 那就是按钮的全部寿命：晚一点发出去的消息没人按得到。所以判断挂在离开的那一刻，而不是「停了十分钟还没开」——
  * 十分钟后连发消息的进程都不在了。</p>
  *
@@ -23,9 +24,10 @@ package com.kooo.evcam.alarm;
  *
  * <h3>This is the whole decision</h3>
  *
- * <p>The head unit is gone four to six minutes after the owner leaves, so the reminder is tied to the
- * leaving moment and every deadline is shorter than the measured window: asking is worth nothing if
- * the car is asleep by the time the answer arrives.</p>
+ * <p>The head unit is gone four to six minutes after the owner leaves (times and dates in
+ * {@code docs/sentry-alerts-spec.md} §7, "where the numbers come from"), so the reminder is tied to
+ * the leaving moment and every deadline is shorter than the measured window: asking is worth nothing
+ * if the car is asleep by the time the answer arrives.</p>
  */
 public final class GuardPolicy {
 

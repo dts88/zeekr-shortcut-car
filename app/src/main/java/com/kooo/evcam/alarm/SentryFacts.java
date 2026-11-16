@@ -15,8 +15,8 @@ import com.kooo.evcam.telemetry.Signal;
  *
  * <h3>「布防」就是「锁着」</h3>
  *
- * <p>{@link Signal#SENTRY_MODE} 是 0 关、1 开、2 <b>布防</b>。平台笔记（{@code docs/zeekr-platform-notes.md}）
- * 记的是：开哨兵 0 → 1；<b>锁车</b>一分半后 1 → 2；<b>解锁</b> 2 → 1（比 0x20240300 晚 10 毫秒）；挂 D 1 → 0。
+ * <p>{@link Signal#SENTRY_MODE} 是 0 关、1 开、2 <b>布防</b>。车上记下来的顺序（2026-10-03 / 10-12，
+ * {@code docs/sentry-alerts-spec.md} §7「测量出处」）：开哨兵 0 → 1；<b>锁车</b>一分半后 1 → 2；<b>解锁</b> 2 → 1（比 0x20240300 晚 10 毫秒）；挂 D 1 → 0。
  * 所以「车主回来了」在总线上就是 2 → 1 —— 车主还没走到车边、屏幕和车灯还没亮，它已经先说了。</p>
  *
  * <p>警报只认 2。这不是保守，是唯一分得开两种情况的读法：</p>
@@ -26,16 +26,17 @@ import com.kooo.evcam.telemetry.Signal;
  *   <li>车主自己回来：解锁那一下 2 → 1，之后屏幕才亮、车灯才亮 —— 不发。</li>
  * </ul>
  *
- * <p>另有 {@code 0x20240300}（VSTD_ALRM_STS）据称是「锁车后进入防盗」，解锁时 1 → 0，但平台笔记里
- * 只有一次观察、主项目明确没采用。这里也不采用；等到有交叉验证再说。</p>
+ * <p>另有 {@code 0x20240300}（VSTD_ALRM_STS）据称是「锁车后进入防盗」，解锁时 1 → 0，但只有一次观察
+ * （2026-10-03，{@code docs/sentry-alerts-spec.md} §7）、主项目明确没采用。这里也不采用；等到有交叉验证再说。</p>
  *
  * How to interpret the few vehicle-signal readings that matter to the parking alarm; pure
  * functions, easy to unit test.
  *
  * <h3>"Armed" means "locked"</h3>
  *
- * <p>{@link Signal#SENTRY_MODE} is 0 off, 1 on, 2 <b>armed</b>. The platform notes
- * ({@code docs/zeekr-platform-notes.md}) record: turning sentry on 0 → 1; <b>locking the car</b>
+ * <p>{@link Signal#SENTRY_MODE} is 0 off, 1 on, 2 <b>armed</b>. Readings recorded on the car
+ * (2026-10-03 / 10-12, {@code docs/sentry-alerts-spec.md} §7, "where the numbers come from"):
+ * turning sentry on 0 → 1; <b>locking the car</b>
  * and a minute and a half later 1 → 2; <b>unlocking</b> 2 → 1 (10 milliseconds after 0x20240300);
  * shifting into D 1 → 0. So "the owner is back" appears on the bus as 2 → 1; before the owner
  * even reaches the car, before the screen and lights come on, it has already said so.</p>
@@ -51,8 +52,8 @@ import com.kooo.evcam.telemetry.Signal;
  * </ul>
  *
  * <p>There is also {@code 0x20240300} (VSTD_ALRM_STS), reportedly "enters anti-theft after
- * locking" with 1 → 0 on unlock, but the platform notes have only one observation and the main
- * project explicitly does not use it. This code does not use it either; revisit once there is
+ * locking" with 1 → 0 on unlock, but there is only one observation (2026-10-03,
+ * {@code docs/sentry-alerts-spec.md} §7) and the main project explicitly does not use it. This code does not use it either; revisit once there is
  * cross-validation.</p>
  */
 public final class SentryFacts {
