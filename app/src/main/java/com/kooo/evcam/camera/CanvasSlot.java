@@ -23,8 +23,9 @@ import com.kooo.evcam.AppLog;
  * <p>让了之后什么时候再试，时机照旧：那一方到点说（{@link #retry}：超级镜子重新打开、亮屏、放回来、点击恢复；
  * 盲区画面这一段结束）；换了一份管线时管家自己再试哪几样，照 {@link ChannelRules#retryOnNewPipeline}。</p>
  *
- * <p>换了一份管线（{@link CameraKeeper} 看着）：管家先把交着的画布声明到新的一份上，再告诉每一方（{@link Listener#onRebuilt}），
- * 要相机的照自己的规矩再登记 —— 两件在同一下做完，新的一份第一轮就都带着（以前超级镜子、盲区画面各自挂着做这一下）。</p>
+ * <p>建了一份管线（冷启动的第一份、换了一份，{@link CameraKeeper} 看着）：管家等它建好，先把交着的画布声明到它上面，再告诉每一方
+ * （{@link Listener#onRebuilt}），要相机的照自己的规矩再登记 —— 两件在同一下做完，新的一份第一轮就都带着。那一方拿不到相机时
+ * 不用自己隔一会儿再交（以前超级镜子、盲区画面各自挂着看门狗和重试做这一下，项目所有者 2026-11-16 删了）。</p>
  *
  * <p>只在主线程上用。</p>
  */
@@ -34,7 +35,10 @@ public final class CanvasSlot {
 
     /** 交的结果（{@link #offer}）。 */
     public enum Offer {
-        /** 这一路此刻没有相机（管线还没建好、这一份里没有这一路）：没声明，交上来的记着；那一方照旧过一会儿再交。 */
+        /**
+         * 这一路此刻没有相机（管线还没建好、这一份里没有这一路）：没声明，交上来的记着 —— 管线建好时管家照它声明、再叫那一方
+         * （{@link Listener#onRebuilt}），那一方不用自己隔一会儿再交。
+         */
         NO_CAMERA,
         /** 这一回不带它（{@link #refused}）：没声明，等再试。 */
         REFUSED,
@@ -44,7 +48,7 @@ public final class CanvasSlot {
         UNCHANGED
     }
 
-    /** 那一方要知道的两件事（主线程上叫）。 */
+    /** 那一方要知道的三件事（主线程上叫）。 */
     public interface Listener {
         /** 声明到了这一路相机上（第一次、换了一块画布、管线换了）：照它摆画面（拨回缓冲区尺寸、画面尺寸）。 */
         void onBound(SingleCamera camera);
@@ -53,7 +57,8 @@ public final class CanvasSlot {
         void onRefused();
 
         /**
-         * 管线换了一份、建好了，交着的画布已经声明上去（{@link CameraKeeper} 看着）：照这一方的规矩再对一次 —— 看得见、亮着屏就再交、
+         * 建了一份管线、建好了（冷启动的第一份、换的每一份），交着的画布已经声明上去（{@link CameraKeeper} 看着）：照这一方的规矩再对一次 ——
+         * 看得见、亮着屏就再交、
          * 再登记（交的时候这一路还没有相机，那时没登记上）。和声明在同一下（主线程），新的一份第一轮就带着它。
          */
         void onRebuilt();
@@ -65,7 +70,7 @@ public final class CanvasSlot {
     private final Listener listener;
     /**
      * 那一方交上来的画布（和预览那一格的视图）：撤回、交给管线留着时清。声明不上（这一路没有相机、这一回不带它）时也记着 ——
-     * 管线换了，管家照它重新交（{@link #onNewPipeline}）。
+     * 管线建好了（冷启动的第一份、换的每一份），管家照它重新交（{@link #onNewPipeline}）。
      */
     private SurfaceTexture offered;
     private TextureView offeredView;
@@ -85,7 +90,7 @@ public final class CanvasSlot {
     }
 
     /**
-     * 画布就绪了，交给相机。同一块画布再交一次什么都不变、不叫醒调度 —— 看门狗每两秒、亮屏、放回来都会再交一次。
+     * 画布就绪了，交给相机。同一块画布再交一次什么都不变、不叫醒调度 —— 管线建好、亮屏、放回来都会再交一次。
      * 声明在当下那一份管线的这一路上（还没有管线就建）；换了一路相机（管线换了）或者换了一块画布，先从原来那里撤回。
      *
      * @param texture 画布（输出的身份）
@@ -206,7 +211,7 @@ public final class CanvasSlot {
     // ------------------------------------------------------------------ 管家用
 
     /**
-     * 管线换了一份、建好了（{@link CameraKeeper} 看着）：交上来的画布声明到新的一份上 —— 不等那一方的看门狗那两秒，新的一份开相机时
+     * 建了一份管线、建好了（冷启动的第一份、换了一份，{@link CameraKeeper} 看着）：交上来的画布声明到它上面 —— 新的一份开相机时
      * 会话里就带着它。这一回不带它的，照 {@link ChannelRules#retryOnNewPipeline} 定再不再试 —— 撤回了的也一样（超级镜子换出
      * 「后视 + 后座舱」再换回来，后座舱照常再交）。新的一份里没有这一路的不动。之后管家叫 {@link #rebuilt}。
      */
@@ -230,7 +235,7 @@ public final class CanvasSlot {
         }
     }
 
-    /** 管线换好了、各块画布都声明过了（{@link #onNewPipeline}）：告诉那一方（{@link Listener#onRebuilt}）。关掉了的不叫。 */
+    /** 管线建好了、各块画布都声明过了（{@link #onNewPipeline}）：告诉那一方（{@link Listener#onRebuilt}）。关掉了的不叫。 */
     void rebuilt() {
         if (!closed) {
             listener.onRebuilt();

@@ -73,10 +73,6 @@ public class RearViewMirrorService extends Service {
     /** 设置页要能改到正在显示的那个窗口。 */
     private static volatile RearViewMirrorService instance;
 
-    /** 拿不到环视那一路（冷启动时管线可能还没建好）时的重试间隔与上限。 */
-    private static final long RETRY_DELAY_MS = 500L;
-    private static final int MAX_RETRY = 20;
-
     private final Handler handler = new Handler(Looper.getMainLooper());
     private AppConfig appConfig;
     private RearViewMirrorView mirrorView;
@@ -84,9 +80,6 @@ public class RearViewMirrorService extends Service {
     private final MirrorCanvas surround = new MirrorCanvas(CameraSlots.KEY_SURROUND, false);
     /** 后座舱那块画布：切换范围是「后视 + 后座舱」时声明（{@link #bindCabin}，见类说明）。 */
     private final MirrorCanvas cabin = new MirrorCanvas(CameraSlots.KEY_CABIN_REAR, true);
-    private int retryCount;
-    private Runnable retryRunnable;
-    private Runnable watchdog;
     /** 点了「点击恢复」之后多久看一次画面回来没有（开相机、加输出都是调度异步做的，当场问一定还没好）。 */
     private static final long EXPLAIN_AFTER_MS = 2500L;
     /**
@@ -97,8 +90,6 @@ public class RearViewMirrorService extends Service {
     /** 最近一次点「点击恢复」的时刻（uptime）。 */
     private long explainSince;
     private final Runnable explainRunnable = this::explainIfStillDark;
-    /** 看门狗间隔：管线换了（换车型）、冷启动时还没建好，都能在两秒内重新声明、重新登记上。 */
-    private static final long WATCHDOG_INTERVAL_MS = 2000L;
 
     public static void start(Context context) {
         context.startService(new Intent(context, RearViewMirrorService.class));
@@ -200,8 +191,7 @@ public class RearViewMirrorService extends Service {
                 + " inSession=" + svc.surround.inSession()
                 + " showingCabin=" + view.isShowingCabin()
                 + " cabinCamera=" + (cabinCamera != null ? cabinCamera.getCameraId() : "none")
-                + " cabinInSession=" + svc.cabin.inSession()
-                + " bindRetries=" + svc.retryCount;
+                + " cabinInSession=" + svc.cabin.inSession();
     }
 
     /**
@@ -308,10 +298,12 @@ public class RearViewMirrorService extends Service {
         takeBackKeptCanvas();
         // 看不见的那块画布不会自己建、也就不会来 onSurfaceTextureAvailable（停在后座舱上打开时环视那块）：现在就对一次
         ensureStillBound();
-        startWatchdog();
     }
 
-    /** 窗口问的两件事：画布在不在出画面（换到另一台摄像头时）、画布刚可见（缓冲区尺寸要拨回去）。 */
+    /**
+     * 窗口问的三件事：画布在不在出画面（换到另一台摄像头时）、画布刚可见（缓冲区尺寸要拨回去）、要画了（画面尺寸还没交给窗口的，
+     * 相机已经知道了就现在交）。
+     */
     private final RearViewMirrorView.CanvasHost canvasHost = new RearViewMirrorView.CanvasHost() {
         @Override
         public boolean streaming(boolean onCabin) {
@@ -321,6 +313,14 @@ public class RearViewMirrorService extends Service {
         @Override
         public void shown(boolean onCabin) {
             (onCabin ? cabin : surround).restoreOnFrame = true;
+        }
+
+        @Override
+        public void beforeDraw(boolean onCabin) {
+            MirrorCanvas canvas = onCabin ? cabin : surround;
+            if (canvas.source == null) {
+                canvas.syncSource(canvas.slot.camera());
+            }
         }
     };
 
@@ -349,37 +349,19 @@ public class RearViewMirrorService extends Service {
         surround.takeBack();
     }
 
-    /** 每隔几秒重新声明、重新登记一次（见 {@link #ensureStillBound}）。 */
-    private void startWatchdog() {
-        cancelWatchdog();
-        watchdog = new Runnable() {
-            @Override
-            public void run() {
-                ensureStillBound();
-                handler.postDelayed(this, WATCHDOG_INTERVAL_MS);
-            }
-        };
-        handler.postDelayed(watchdog, WATCHDOG_INTERVAL_MS);
-    }
-
-    private void cancelWatchdog() {
-        if (watchdog != null) {
-            handler.removeCallbacks(watchdog);
-            watchdog = null;
-        }
-    }
-
     /**
      * 声明后视镜输出、登记 MIRROR —— 只做这两件事（大纲 §2 阶段 4b）。
      *
      * <p>两道守卫留着：屏幕黑着不登记（见 {@link #screenListener}）；贴边收起不登记（那条窄边上只写名字，
-     * 不该为它要一路画面）。通往这里的路不止一条（画布准备好、接回上一个窗口留下的画布、看门狗到点、放回来、亮屏、
-     * 点「点击恢复」、管线换了），所以守在入口，而不是守在每一个调用方。</p>
+     * 不该为它要一路画面）。通往这里的路不止一条（画布准备好、接回上一个窗口留下的画布、放回来、亮屏、
+     * 点「点击恢复」、管线建好或换了一份），所以守在入口，而不是守在每一个调用方。</p>
      *
-     * <p>同一块画布再声明一次、同一项再登记一次都不算变化：看门狗每 2 秒走到这里一次，什么都没变就什么都不做、
+     * <p>同一块画布再声明一次、同一项再登记一次都不算变化：什么都没变就什么都不做、
      * 不写日志、不叫醒调度。声明变了叫醒这一份管线的调度；登记变了，登记表的监听自己会叫醒它。</p>
      *
-     * <p>拿不到环视那一路（冷启动、管线还没建好）要重试，而不是一次不成就放弃 —— 那样后视镜会永远黑着。</p>
+     * <p>拿不到环视那一路（冷启动、管线还没建好）就先不登记、也不自己隔一会儿再试：管线建好时相机管家把交着的画布声明上去，
+     * 再叫这里对一次（{@link MirrorCanvas#onRebuilt}）。项目所有者 2026-11-16：相机相关的管理、动作都归相机管家，
+     * 以前的重试（每半秒、20 次）和看门狗（每 2 秒）删了。</p>
      */
     private void bindCamera(SurfaceTexture surfaceTexture) {
         if (com.kooo.evcam.screen.ScreenState.dark()) {
@@ -393,19 +375,18 @@ public class RearViewMirrorService extends Service {
             AppLog.i(TAG, "后视镜处于贴边状态，暂不登记相机");
             return;
         }
-        // 交给相机管家：声明在当下那一份管线的环视上（还没有管线就建）；这一回不带它的不声明。拿不到环视就过一会儿再交
+        // 交给相机管家：声明在当下那一份管线的环视上（还没有管线就建）；这一回不带它的不声明。拿不到环视就先不登记：
+        // 管线建好时管家把交着的画布声明上去，再叫这里对一次（MirrorCanvas.onRebuilt）
         CanvasSlot.Offer offer = surround.offer(surfaceTexture);
         if (offer == CanvasSlot.Offer.NO_CAMERA) {
-            scheduleRetry(surfaceTexture);
             return;
         }
-        retryCount = 0;
         boolean declared = offer == CanvasSlot.Offer.DECLARED;
         CameraKeeper keeper = CameraKeeper.get(this);
         boolean claimed = !keeper.needs(CameraKeeper.Use.MIRROR);
         keeper.need(CameraKeeper.Use.MIRROR);
         if (claimed) {
-            // 只在登记上的那一刻开始盯：看门狗每 2 秒都走到这里，每次都重新开始盯的话宽限期永远过不完
+            // 只在登记上的那一刻开始盯：这里会被叫很多次，每次都重新开始盯的话宽限期永远过不完
             StallWatch.armMirror(true);
         }
         if (declared || claimed) {
@@ -418,7 +399,7 @@ public class RearViewMirrorService extends Service {
                     + "，预览尺寸 " + (camera != null ? camera.getPreviewSize() : null)
                     + "，缓冲区 " + (camera != null ? camera.getPreviewBufferSize() : null) + "）");
         }
-        // 后座舱那块跟着走：通往这里的每一条路（画布准备好、接回、看门狗、放回来、亮屏、点恢复）后座舱都要同样对一次
+        // 后座舱那块跟着走：通往这里的每一条路（画布准备好、接回、管线建好、放回来、亮屏、点恢复）后座舱都要同样对一次
         syncCabin();
     }
 
@@ -441,7 +422,7 @@ public class RearViewMirrorService extends Service {
      * （bindCamera 登记，它最后会叫到这里；后座舱的画布先准备好时也照样先声明，等登记上了调度才加进会话）。
      *
      * <p>管线里还没有后座舱这一路（刚换到这一档、管线正在重建）就不声明、不重试：新的一份建好时相机管家叫环视那块再对一次
-     * （{@link MirrorCanvas#onRebuilt}），这里跟着当场声明上去，看门狗每两秒也会走到。</p>
+     * （{@link MirrorCanvas#onRebuilt}），这里跟着当场声明上去。</p>
      */
     private void bindCabin(SurfaceTexture surfaceTexture) {
         if (com.kooo.evcam.screen.ScreenState.dark() || mirrorView == null || mirrorView.isDocked()
@@ -471,11 +452,11 @@ public class RearViewMirrorService extends Service {
     }
 
     /**
-     * 看门狗：重新声明、重新登记 —— 只做这两件（大纲 §2 阶段 4b）。
+     * 再对一次：环视那块重新声明、重新登记 —— 只做这两件（大纲 §2 阶段 4b），不看相机开没开、更不去开：开不开、什么时候开由通道调度定。
+     * 窗口刚挂上、管线建好或换了一份（相机管家叫 {@link MirrorCanvas#onRebuilt}）时叫；什么都没变就什么都不做。
      *
-     * <p>不再看相机开没开、更不去开：开不开、什么时候开由通道调度定。它还要管的只剩两种情形：
-     * 管线换了（换车型时 CameraManagerHolder 重建了一份，后视镜得声明到新那份的环视上），
-     * 和冷启动时管线还没建好、重试用完了。两种都由 {@link #bindCamera} 自己认出来；什么都没变就什么都不做。</p>
+     * <p>以前还有一个看门狗每 2 秒叫这里（管线换了、冷启动时管线还没建好、重试用完了）。项目所有者 2026-11-16：相机相关的管理、
+     * 动作都归相机管家 —— 这几种情形管家建好管线时都会叫 onRebuilt，看门狗删了。</p>
      *
      * <p>贴边收起、屏幕黑着时不登记，本来就是故意的，别把它又登记回去。深睡醒来亮屏广播不来的那种，
      * ScreenState 自己每两秒问一次系统，亮了会叫 onScreenOn 登记回来。</p>
@@ -489,26 +470,7 @@ public class RearViewMirrorService extends Service {
         }
         SurfaceTexture canvas = surround.canvas();
         if (canvas != null) {
-            retryCount = 0;
             bindCamera(canvas);
-        }
-    }
-
-    private void scheduleRetry(SurfaceTexture surfaceTexture) {
-        if (retryCount >= MAX_RETRY) {
-            AppLog.w(TAG, "相机始终不可用，后视镜放弃绑定");
-            return;
-        }
-        retryCount++;
-        cancelRetry();
-        retryRunnable = () -> bindCamera(surfaceTexture);
-        handler.postDelayed(retryRunnable, RETRY_DELAY_MS);
-    }
-
-    private void cancelRetry() {
-        if (retryRunnable != null) {
-            handler.removeCallbacks(retryRunnable);
-            retryRunnable = null;
         }
     }
 
@@ -566,7 +528,6 @@ public class RearViewMirrorService extends Service {
             AppLog.w(TAG, "后视镜画布还没准备好，暂不登记相机");
             return;
         }
-        retryCount = 0;
         bindCamera(canvas);
         if (explainIfItFails) {
             // 开相机、加输出都是调度异步做的，当场问一定还没好。等两秒半再看；连着点只留最后那一次
@@ -646,7 +607,6 @@ public class RearViewMirrorService extends Service {
      * 环视还有别人要（在录、主界面在前）就什么都不动；没人要了照登记表的规矩保持或者关。</p>
      */
     private void unbindCamera() {
-        cancelRetry();
         CameraKeeper.get(this).release(CameraKeeper.Use.MIRROR);
         StallWatch.armMirror(false);
     }
@@ -656,7 +616,7 @@ public class RearViewMirrorService extends Service {
     /**
      * 超级镜子的一块画布，和它声明在哪一路相机上 —— 环视一块，后座舱一块（切换范围「后视 + 后座舱」），同一套做法：
      * 声明 / 撤回、拨回缓冲区尺寸、看不见时自己建、窗口移走时交给管线留着、新窗口接回。两块不同的只有三处：
-     * 声明是谁叫的（环视那块的 {@link #bindCamera} 同时登记 MIRROR、拿不到相机会重试；后座舱那块的 {@link #bindCabin}
+     * 声明是谁叫的（环视那块的 {@link #bindCamera} 同时登记 MIRROR，拿不到相机等管家建好管线再叫；后座舱那块的 {@link #bindCabin}
      * 照切换范围）、画面尺寸怎么交给窗口、环视那块被收走时顺带放开登记（那是整个窗口要走了）。
      */
     private final class MirrorCanvas implements CanvasSlot.Listener {
@@ -668,7 +628,7 @@ public class RearViewMirrorService extends Service {
          */
         CanvasSlot slot;
         /**
-         * 已经交给窗口的画面尺寸。看门狗每 2 秒重新声明一次，尺寸没变就不再交 —— 交一次窗口就重算一次取景、写一行日志、
+         * 已经交给窗口的画面尺寸。声明时、窗口每次画之前（还没交过时）都会再对，尺寸没变就不再交 —— 交一次窗口就重算一次取景、写一行日志、
          * 重画一次。换了窗口（{@link #attach}）、撤回输出时清掉。
          */
         Size source;
@@ -703,7 +663,7 @@ public class RearViewMirrorService extends Service {
         /**
          * 相机层这一回不带这块画布（录像中会话配不上，它在 JPEG、盲区画面之后让路）：相机管家记下、撤回，再试之前不再声明 ——
          * 不然调度会一直想把它加回去、一次次重建那一路的会话。重新打开窗口、亮屏、放回来、点「点击恢复」时再试
-         * （{@link #clearRefusals}），管线换了相机管家自己再试；看门狗不试。
+         * （{@link #clearRefusals}），管线换了相机管家自己再试。
          */
         @Override
         public void onRefused() {
@@ -713,7 +673,7 @@ public class RearViewMirrorService extends Service {
         }
 
         /**
-         * 管线换了一份、建好了（相机管家已经把交着的画布声明上去）：环视那块照旧再对一次
+         * 建了一份管线、建好了（冷启动的第一份、换的每一份；相机管家已经把交着的画布声明上去）：环视那块照旧再对一次
          * （{@link RearViewMirrorService#ensureStillBound}：看得见、没贴边、亮着屏才交、才登记 MIRROR，后座舱跟着对）。
          * 后座舱那块跟着环视走，这里不动。
          */
@@ -823,7 +783,7 @@ public class RearViewMirrorService extends Service {
             return result;
         }
 
-        /** 画面尺寸变了就交给窗口：看门狗每 2 秒都走到这里，尺寸没变不再交。 */
+        /** 画面尺寸变了就交给窗口：声明时、窗口画之前（{@link RearViewMirrorView.CanvasHost#beforeDraw}）都走到这里，尺寸没变不再交。 */
         void syncSource(SingleCamera to) {
             Size preview = to != null ? to.getPreviewSize() : null;
             RearViewMirrorView window = mirrorView;
@@ -833,7 +793,8 @@ public class RearViewMirrorService extends Service {
                     window.setCabinSource(preview.getWidth(), preview.getHeight(), to.laneRotation(),
                             to.isSourceMirrored());
                 } else {
-                    // 几何按合成流的真实尺寸算，不是按缓冲区尺寸。这一路不在相机列表里时尺寸要等它回来才算得出，看门狗到时候补上
+                    // 几何按合成流的真实尺寸算，不是按缓冲区尺寸。声明时还算不出来的（管线刚建好、这一路不在相机列表里），
+                    // 窗口画第一帧之前补上
                     window.setSourceSize(preview);
                 }
                 source = preview;
@@ -945,7 +906,7 @@ public class RearViewMirrorService extends Service {
          * （{@link #takeBack}）。</p>
          *
          * <p>服务退出时 {@link #onDestroy} 已经放开登记、撤回过了（窗口随后当场移走）；服务还在而窗口被拆的，这里先撤回 ——
-         * 环视那块还放开登记、取消重试（整个窗口要走了；排着的那一次拿的是这块画布）。
+         * 环视那块还放开登记（整个窗口要走了）。
          * 退出、换车型时管线已经放了、它的调度还在按次序关：会话里还带着这块画布的，照样交给那一份的调度，随那一路关了再放
          * （2.11.4 R1：会话里的画布只由通道调度放，{@link MultiCameraManager#ownerOf}）。哪一份都不带着它、也没有这一路时
          * 照旧让 TextureView 放，叫醒调度 —— 这个回调返回之后 TextureView 才放，post 出去的那一轮看到的就是此刻的样子。</p>
@@ -954,9 +915,6 @@ public class RearViewMirrorService extends Service {
          */
         boolean handToPipeline(SurfaceTexture st) {
             restoreOnFrame = false;
-            if (!cabin) {
-                cancelRetry();
-            }
             if (st == slot.texture()) {
                 if (!cabin) {
                     unbindCamera();
@@ -981,8 +939,6 @@ public class RearViewMirrorService extends Service {
         com.kooo.evcam.blackbox.BlackBox.noteImportant("RearViewMirrorService onDestroy");
         instance = null;
         com.kooo.evcam.screen.ScreenState.removeListener(screenListener);
-        cancelRetry();
-        cancelWatchdog();
         handler.removeCallbacks(explainRunnable);
         // 服务退出：放开登记、撤回输出。窗口接着当场移走（RearViewMirrorView.hide），画布要被收走的那一下
         // （onSurfaceTextureDestroyed → MirrorCanvas.handToPipeline）交给管线留着，那一路不动（大纲 §7.7）

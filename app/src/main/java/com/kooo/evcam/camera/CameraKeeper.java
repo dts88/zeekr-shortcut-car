@@ -213,8 +213,6 @@ public final class CameraKeeper {
         // （应用一起来就装上了，装过了什么都不做）：没装上时挂的会丢
         ChannelFacts.install(this.context);
         ChannelScheduler.setSurroundVerdictListener(() -> main.post(this::onChannelVerdict));
-        // 管线被放掉重建了：新的一份建好，把交着的画布声明到它上面（3c 第二步，见 canvasesOnNewPipeline）。进程里只有一份管家，挂一次
-        CameraManagerHolder.getInstance().addReplacedListener(canvasesOnNewPipeline);
     }
 
     // ================================================================= 请求
@@ -385,24 +383,32 @@ public final class CameraKeeper {
     private final List<CanvasSlot> canvases = new ArrayList<>();
 
     /**
-     * 管线被放掉重建了（换车型、上一次列相机出错、超级镜子要后座舱而管线里没有）：新的一份建好，就把交着的画布声明到它上面
-     * （{@link CanvasSlot#onNewPipeline}），再告诉各方（{@link CanvasSlot.Listener#onRebuilt}）照自己的规矩再登记 —— 两件在同一下
-     * 做完，不等各方的看门狗那两秒，新的一份开相机时会话里就带着它们，不用随后再改一次输出。以前超级镜子、盲区画面各自挂着做这件事；
-     * 主界面换管线时还要把界面的回调接到新的一份上，那一半照旧是它自己的。
+     * 建了一份管线（冷启动的第一份，换车型、上一次列相机出错、超级镜子要后座舱而管线里没有时放掉重建的那一份，都算）：建好了就把交着的画布
+     * 声明到它上面（{@link CanvasSlot#onNewPipeline}），再告诉各方（{@link CanvasSlot.Listener#onRebuilt}）照自己的规矩再登记 ——
+     * 两件在同一下做完，新的一份开相机时会话里就带着它们，不用随后再改一次输出。主界面换管线时还要把界面的回调接到新的一份上，
+     * 那一半照旧是它自己的。
+     *
+     * <p>以前超级镜子、盲区画面各自挂着看门狗每 2 秒、拿不到相机时每半秒重试来补这一下（冷启动时管线还没建好、换了一份管线）。
+     * 项目所有者 2026-11-16：相机相关的管理、动作都归相机管家 —— 看门狗和重试删了，两种情形都由这里接上。</p>
+     *
+     * <p>建的那一刻（{@link #pipelineCreated}）管线还没交给 CameraManagerHolder：排到主线程上再挂，轮到时它已经是当下那一份。
+     * 等着的时候又换了一份的不叫（{@code whenBuilt} 不叫、或者这里认出来），那一份自己会来。</p>
      */
-    private final Runnable canvasesOnNewPipeline = () -> {
+    private void offerCanvasesWhenBuilt(MultiCameraManager manager) {
         CameraManagerHolder holder = CameraManagerHolder.getInstance();
-        holder.whenBuilt(holder.getCameraManager(), built -> main.post(() -> {
-            MultiCameraManager pipeline = holder.getCameraManager();
+        main.post(() -> holder.whenBuilt(manager, built -> main.post(() -> {
+            if (holder.getCameraManager() != manager || manager.isReleased()) {
+                return;
+            }
             List<CanvasSlot> slots = new ArrayList<>(canvases);
             for (CanvasSlot slot : slots) {
-                slot.onNewPipeline(pipeline);
+                slot.onNewPipeline(manager);
             }
             for (CanvasSlot slot : slots) {
                 slot.rebuilt();
             }
-        }));
-    };
+        })));
+    }
 
     /**
      * 一块画布的位置：哪一种输出（{@link ChannelRules.Kind#PREVIEW}、{@link ChannelRules.Kind#MIRROR}、盲区画面三块）、
@@ -691,7 +697,8 @@ public final class CameraKeeper {
     // ================================================================= 事实
 
     /**
-     * 建了一份新的相机管线（CameraManagerHolder 建的那一刻）：交给这里接上录像的回调。录着的时候换了一份（配置变了、旧的那份被释放重建）：
+     * 建了一份新的相机管线（CameraManagerHolder 开始建的那一刻，还没建好）：交给这里接上录像的回调，等它建好把交着的画布声明上去
+     * （{@link #offerCanvasesWhenBuilt}）。录着的时候换了一份（配置变了、旧的那份被释放重建）：
      * 旧的那份上的录像到头了，按「录制器自己停了」走停录那条路，收拾完、查过盘在新的这一份上自动接回。
      */
     public void pipelineCreated(MultiCameraManager manager) {
@@ -708,6 +715,7 @@ public final class CameraKeeper {
         }
         cameraManager = manager;
         wire(manager);
+        offerCanvasesWhenBuilt(manager);
         if (isRecording() && attemptManager != null && attemptManager != manager) {
             BlackBox.noteImportant("录着的那一份相机管线换掉了：这一段到头，收拾完在新的管线上自动接回");
             end(RecordStop.UNKNOWN);

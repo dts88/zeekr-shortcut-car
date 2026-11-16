@@ -90,11 +90,6 @@ public class SideViewService extends Service {
     private static final String TAG = "SideViewSvc";
     private static final String TELEMETRY_USER = "side-view";
 
-    /** 拿不到环视那一路（冷启动时管线可能还没建好）时的重试间隔与上限。 */
-    private static final long RETRY_DELAY_MS = 500L;
-    private static final int MAX_RETRY = 20;
-    /** 看门狗间隔：管线换了（换车型）、冷启动时还没建好，都能在两秒内重新声明、重新登记上（同超级镜子）。 */
-    private static final long WATCHDOG_INTERVAL_MS = 2000L;
     /** HUD 那块屏多久重新问一次系统：读数每 200 ms 来一次，不必每次都问。 */
     private static final long HUD_CHECK_MS = 2000L;
 
@@ -115,7 +110,6 @@ public class SideViewService extends Service {
     private boolean refusalShown;
     /** 环视出不了画面的这一阵里，打灯时已经提示过一次。环视能显示了才重新算（{@link #noteSurroundUnavailable}）。 */
     private boolean unavailableShown;
-    private Runnable watchdog;
     /** HUD 那块屏（{@link HudScreen}）：上一次问系统的时刻和结果。 */
     private long hudCheckedAt;
     private Display hudDisplay;
@@ -219,18 +213,6 @@ public class SideViewService extends Service {
         hud.open();
         instance = this;
         ScreenState.addListener(screenListener);
-    }
-
-    /**
-     * 窗口挂着、亮着屏、画布在：几个出口各自再声明一次（看门狗到点走这里）。管线换了一份时，相机管家把交着的画布
-     * 声明到新的一份上，再叫各出口自己对一次（{@link Output#onRebuilt}），不等看门狗那两秒。
-     */
-    private void rebindIfAttached() {
-        if (!destroyed) {
-            center.rebindIfAttached();
-            centerSecond.rebindIfAttached();
-            hud.rebindIfAttached();
-        }
     }
 
     @Override
@@ -460,29 +442,6 @@ public class SideViewService extends Service {
         }
     }
 
-    /** 每隔几秒重新声明、重新登记一次：管线换了、冷启动时还没建好都能接上（同超级镜子的看门狗）。挂着窗口时一直跑。 */
-    private void startWatchdog() {
-        if (watchdog != null) {
-            return;
-        }
-        watchdog = new Runnable() {
-            @Override
-            public void run() {
-                rebindIfAttached();
-                handler.postDelayed(this, WATCHDOG_INTERVAL_MS);
-            }
-        };
-        handler.postDelayed(watchdog, WATCHDOG_INTERVAL_MS);
-    }
-
-    /** 两个出口都没有窗口了：看门狗停下。 */
-    private void stopWatchdogIfIdle() {
-        if (watchdog != null && center.window == null && centerSecond.window == null && hud.window == null) {
-            handler.removeCallbacks(watchdog);
-            watchdog = null;
-        }
-    }
-
     @Override
     public void onDestroy() {
         BlackBox.noteImportant("后台服务 SideViewService onDestroy");
@@ -511,7 +470,7 @@ public class SideViewService extends Service {
     /**
      * 盲区画面的一个出口：中控屏第一块、中控屏第二块、或者 HUD（{@link #kind}）。窗口、画布在环视上的声明、这一段带不带它
      * 各管各的；判定是服务的（中控屏两块共用一份，{@link #centerTrigger}），这里照它显示自己管的那几侧。
-     * 登记表、看门狗、提示是服务一份。
+     * 登记表、提示是服务一份。
      */
     private final class Output implements CanvasSlot.Listener {
 
@@ -525,8 +484,6 @@ public class SideViewService extends Service {
         boolean restoreBufferOnFrame;
         /** 登记表上 SIDE_VIEW 算它一份：声明着画布。 */
         boolean claimed;
-        int retryCount;
-        Runnable retryRunnable;
         /** 这一次显示的时刻、第一帧来没来：黑匣子里看「打灯后多久出画面」。 */
         long shownAtMs;
         boolean firstFrameSeen;
@@ -833,7 +790,6 @@ public class SideViewService extends Service {
                 return;
             }
             takeBackKeptCanvas();
-            startWatchdog();
         }
 
         /**
@@ -871,7 +827,6 @@ public class SideViewService extends Service {
          * @return true：画布交给管线了（回调返回 false）；false：照旧让 TextureView 放
          */
         private boolean handCanvasToPipeline(SurfaceTexture st) {
-            cancelRetry();
             restoreBufferOnFrame = false;
             if (st == slot.texture()) {
                 unbindCamera();
@@ -887,14 +842,12 @@ public class SideViewService extends Service {
 
         /** 移走窗口：放开登记、撤回输出，再当场移走（画布在移走那一下交给管线，见 {@link #handCanvasToPipeline}）。 */
         void detach() {
-            cancelRetry();
             edgeLeft = SideViewAlert.NONE;
             edgeRight = SideViewAlert.NONE;
             SideViewOutputWindow w = window;
             if (w == null) {
                 unbindCamera();
                 slot.withdraw();
-                stopWatchdogIfIdle();
                 return;
             }
             if (w.isShowing()) {
@@ -910,7 +863,6 @@ public class SideViewService extends Service {
             if (orphan != null && !orphan.isReleased() && !handCanvasToPipeline(orphan)) {
                 orphan.release();
             }
-            stopWatchdogIfIdle();
         }
 
         private void noteShown() {
@@ -972,8 +924,9 @@ public class SideViewService extends Service {
         /**
          * 声明这一处的画布、登记 SIDE_VIEW —— 只做这两件事（同超级镜子的 {@code bindCamera}）。
          *
-         * <p>同一块画布再声明一次、同一项再登记一次都不算变化：看门狗每 2 秒走到这里一次，什么都没变就什么都不做。
-         * 拿不到环视那一路（冷启动、管线还没建好）要重试。</p>
+         * <p>同一块画布再声明一次、同一项再登记一次都不算变化：什么都没变就什么都不做。
+         * 拿不到环视那一路（冷启动、管线还没建好）就先不登记：管线建好时相机管家把交着的画布声明上去，再叫这里对一次
+         * （{@link #onRebuilt}），不用自己隔一会儿再试。</p>
          */
         private void bindCamera(SurfaceTexture surfaceTexture) {
             SideViewOutputWindow w = window;
@@ -982,13 +935,11 @@ public class SideViewService extends Service {
                 return;
             }
             // 交给相机管家：声明在当下那一份管线的环视上（还没有管线就建；换了一路相机或者一块画布，它先从原来那里撤回）。
-            // 拿不到环视就过一会儿再交
+            // 拿不到环视就先不登记，管线建好时管家再叫这里（onRebuilt）
             CanvasSlot.Offer offer = slot.offer(surfaceTexture, null);
             if (offer == CanvasSlot.Offer.NO_CAMERA) {
-                scheduleRetry(surfaceTexture);
                 return;
             }
-            retryCount = 0;
             if (offer == CanvasSlot.Offer.REFUSED) {
                 return;   // 这一段不带它：窗口那时已经移走了，走不到这里
             }
@@ -1037,8 +988,9 @@ public class SideViewService extends Service {
         }
 
         /**
-         * 管线换了一份、建好了（相机管家已经把交着的画布声明上去）：窗口挂着、亮着屏就再对一次、登记 SIDE_VIEW
-         * （{@link #rebindIfAttached}；画布交的时候这一路还没有相机，那时没登记上）。这一段不带它的照旧不交。
+         * 建了一份管线、建好了（冷启动的第一份、换的每一份；相机管家已经把交着的画布声明上去）：窗口挂着、亮着屏就再对一次、
+         * 登记 SIDE_VIEW（{@link #rebindIfAttached}；画布交的时候这一路还没有相机，那时没登记上）。这一段不带它的照旧不交。
+         * 以前的看门狗（每 2 秒）和重试删了（项目所有者 2026-11-16：相机相关的管理、动作都归相机管家）。
          */
         @Override
         public void onRebuilt() {
@@ -1074,27 +1026,8 @@ public class SideViewService extends Service {
             return slot.inSession();
         }
 
-        private void scheduleRetry(SurfaceTexture surfaceTexture) {
-            if (retryCount >= MAX_RETRY) {
-                AppLog.w(TAG, "环视始终拿不到，盲区画面" + label() + "放弃绑定（看门狗接着试）");
-                return;
-            }
-            retryCount++;
-            cancelRetry();
-            retryRunnable = () -> bindCamera(surfaceTexture);
-            handler.postDelayed(retryRunnable, RETRY_DELAY_MS);
-        }
-
-        private void cancelRetry() {
-            if (retryRunnable != null) {
-                handler.removeCallbacks(retryRunnable);
-                retryRunnable = null;
-            }
-        }
-
         /** 放开这一处的登记份额；两处都放开了才真放开（{@link #releaseClaimIfUnused}）。 */
         private void unbindCamera() {
-            cancelRetry();
             claimed = false;
             releaseClaimIfUnused();
         }
