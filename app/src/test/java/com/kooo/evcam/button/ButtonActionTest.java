@@ -8,6 +8,7 @@
 package com.kooo.evcam.button;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
@@ -41,7 +42,28 @@ public class ButtonActionTest {
             assertSame(floating, action.floating);
             assertEquals(0, action.driveMode);
         }
-        assertEquals(1 + FloatingAction.values().length + 3 + 4 + 42, all.size());
+        assertEquals(1 + FloatingAction.values().length + 3 + 4 + 44, all.size());
+    }
+
+    @Test
+    public void onlyStepwiseActionsRepeatPerNotch() {
+        for (String key : new String[] {"volume_up", "volume_down", "climate_temp_up", "climate_temp_down",
+                "drive_mode_up", "drive_mode_down", "gear_up", "gear_down", "media_previous", "media_next"}) {
+            assertTrue(key, ButtonAction.fromKey(key).stepwise());
+        }
+        for (String key : new String[] {"none", "climate_power", "central_lock", "media_play_pause", "media_mute",
+                "drive_mode_sport", "sport_one_touch", "view_360"}) {
+            assertFalse(key, ButtonAction.fromKey(key).stepwise());
+        }
+        assertFalse(ButtonAction.fromKey(FloatingAction.values()[0].key).stepwise());
+    }
+
+    @Test
+    public void temperatureSitsInTheClimateGroup() {
+        List<ButtonAction> climate = ButtonAction.of(ButtonAction.Group.CLIMATE);
+        assertEquals("climate_power", climate.get(0).key);
+        assertEquals("climate_temp_up", climate.get(1).key);
+        assertEquals("climate_temp_down", climate.get(2).key);
     }
 
     /** 「不使用」不在哪一组；别的都在一组里，按组的先后列出，每一组都有东西。 */
@@ -66,7 +88,7 @@ public class ButtonActionTest {
     /** 车控动作：写车的有要做的事，媒体、语音的有不碰车的那一样；关门六项在「车身」里（2026-11-15）。 */
     @Test
     public void theCarActionsKnowWhatToDo() {
-        String[] car = {"sport_one_touch", "volume_up", "volume_down", "steering_wheel_heat", "seat_vent_driver",
+        String[] car = {"sport_one_touch", "steering_wheel_heat", "seat_vent_driver",
                 "seat_vent_passenger", "seat_heat_driver", "seat_heat_passenger", "seat_heat_rear_left",
                 "seat_heat_rear_right", "seat_heat_rear", "seat_massage_driver", "seat_massage_passenger", "seat_restore",
                 "climate_power", "climate_circulation", "defrost_front", "defrost_rear", "central_lock", "mirror_fold",
@@ -79,6 +101,14 @@ public class ButtonActionTest {
             assertNull(key, action.media);
             assertNull(key, action.floating);
         }
+        String[] stepCar = {"volume_up", "volume_down", "climate_temp_up", "climate_temp_down"};
+        for (String key : stepCar) {
+            ButtonAction action = ButtonAction.fromKey(key);
+            assertNotNull(key, action.stepCar);
+            assertNull(key, action.car);
+            assertNull(key, action.media);
+            assertNull(key, action.floating);
+        }
         String[] media = {"voice_assistant", "media_play_pause", "media_previous", "media_next", "media_mute"};
         for (String key : media) {
             ButtonAction action = ButtonAction.fromKey(key);
@@ -86,7 +116,7 @@ public class ButtonActionTest {
             assertNull(key, action.car);
             assertSame(key, ButtonAction.Group.MEDIA, action.group);
         }
-        assertEquals(41, car.length + media.length);
+        assertEquals(43, car.length + stepCar.length + media.length);
         for (String key : new String[] {"close_all_doors", "close_driver_door", "close_passenger_door",
                 "close_rear_left_door", "close_rear_right_door", "close_tailgate"}) {
             assertSame(key, ButtonAction.Group.BODY, ButtonAction.fromKey(key).group);

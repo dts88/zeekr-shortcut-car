@@ -80,11 +80,13 @@ public final class ButtonAction {
     public final int gearStep;
     /** 写车的（{@link CarMoves}）；别的是 null。 */
     final CarMoves.Job car;
+    final java.util.function.IntFunction<CarMoves.Job> stepCar;
     /** 不碰车的媒体、语音（{@link MediaMove}）；别的是 null。 */
     final MediaMove media;
 
     private ButtonAction(String key, Group group, int labelRes, FloatingAction floating, int driveMode,
-                              int driveModeStep, int gearStep, CarMoves.Job car, MediaMove media) {
+                              int driveModeStep, int gearStep, CarMoves.Job car,
+                              java.util.function.IntFunction<CarMoves.Job> stepCar, MediaMove media) {
         this.key = key;
         this.group = group;
         this.labelRes = labelRes;
@@ -93,37 +95,47 @@ public final class ButtonAction {
         this.driveModeStep = driveModeStep;
         this.gearStep = gearStep;
         this.car = car;
+        this.stepCar = stepCar;
         this.media = media;
     }
 
     private ButtonAction(String key, Group group, int labelRes) {
-        this(key, group, labelRes, null, 0, 0, 0, null, null);
+        this(key, group, labelRes, null, 0, 0, 0, null, null, null);
     }
 
     private static ButtonAction car(String key, Group group, int labelRes, CarMoves.Job job) {
-        return new ButtonAction(key, group, labelRes, null, 0, 0, 0, job, null);
+        return new ButtonAction(key, group, labelRes, null, 0, 0, 0, job, null, null);
+    }
+
+    private static ButtonAction stepCar(String key, Group group, int labelRes,
+                                        java.util.function.IntFunction<CarMoves.Job> job) {
+        return new ButtonAction(key, group, labelRes, null, 0, 0, 0, null, job, null);
     }
 
     private static ButtonAction media(String key, int labelRes, MediaMove move) {
-        return new ButtonAction(key, Group.MEDIA, labelRes, null, 0, 0, 0, null, move);
+        return new ButtonAction(key, Group.MEDIA, labelRes, null, 0, 0, 0, null, null, move);
+    }
+
+    private static ButtonAction drive(String key, int labelRes, int driveMode, int driveModeStep, int gearStep) {
+        return new ButtonAction(key, Group.DRIVE, labelRes, null, driveMode, driveModeStep, gearStep, null, null, null);
     }
 
     private static List<ButtonAction> build() {
         List<ButtonAction> all = new ArrayList<>();
         all.add(NONE);
         for (FloatingAction action : FloatingAction.values()) {
-            all.add(new ButtonAction(action.key, Group.APP, 0, action, 0, 0, 0, null, null));
+            all.add(new ButtonAction(action.key, Group.APP, 0, action, 0, 0, 0, null, null, null));
         }
 
         // 驾驶：驾驶模式三项、手排模式（2026-10-30、31），一键运动（超级省电时不执行）
-        all.add(new ButtonAction("drive_mode_comfort", Group.DRIVE, 0, null, Signal.DRIVE_MODE_COMFORT, 0, 0, null, null));
-        all.add(new ButtonAction("drive_mode_standard", Group.DRIVE, 0, null, Signal.DRIVE_MODE_STANDARD, 0, 0, null, null));
-        all.add(new ButtonAction("drive_mode_sport", Group.DRIVE, 0, null, Signal.DRIVE_MODE_SPORT, 0, 0, null, null));
-        all.add(new ButtonAction("drive_mode_up", Group.DRIVE, R.string.smart_button_action_drive_up, null, 0, 1, 0, null, null));
-        all.add(new ButtonAction("drive_mode_down", Group.DRIVE, R.string.smart_button_action_drive_down, null, 0, -1, 0, null, null));
+        all.add(drive("drive_mode_comfort", 0, Signal.DRIVE_MODE_COMFORT, 0, 0));
+        all.add(drive("drive_mode_standard", 0, Signal.DRIVE_MODE_STANDARD, 0, 0));
+        all.add(drive("drive_mode_sport", 0, Signal.DRIVE_MODE_SPORT, 0, 0));
+        all.add(drive("drive_mode_up", R.string.smart_button_action_drive_up, 0, 1, 0));
+        all.add(drive("drive_mode_down", R.string.smart_button_action_drive_down, 0, -1, 0));
         all.add(car("sport_one_touch", Group.DRIVE, R.string.smart_button_action_sport, CarMoves.saving(CarMoves.sport())));
-        all.add(new ButtonAction("gear_up", Group.DRIVE, R.string.smart_button_action_gear_up, null, 0, 0, 1, null, null));
-        all.add(new ButtonAction("gear_down", Group.DRIVE, R.string.smart_button_action_gear_down, null, 0, 0, -1, null, null));
+        all.add(drive("gear_up", R.string.smart_button_action_gear_up, 0, 0, 1));
+        all.add(drive("gear_down", R.string.smart_button_action_gear_down, 0, 0, -1));
 
         // 语音与媒体（音量在超级省电时不执行）
         all.add(media("voice_assistant", R.string.smart_button_action_voice, MediaMove.VOICE));
@@ -131,8 +143,10 @@ public final class ButtonAction {
         all.add(media("media_previous", R.string.smart_button_action_previous, MediaMove.PREVIOUS));
         all.add(media("media_next", R.string.smart_button_action_next, MediaMove.NEXT));
         all.add(media("media_mute", R.string.smart_button_action_mute, MediaMove.MUTE));
-        all.add(car("volume_up", Group.MEDIA, R.string.smart_button_action_volume_up, CarMoves.saving(CarMoves.volume(1))));
-        all.add(car("volume_down", Group.MEDIA, R.string.smart_button_action_volume_down, CarMoves.saving(CarMoves.volume(-1))));
+        all.add(stepCar("volume_up", Group.MEDIA, R.string.smart_button_action_volume_up,
+                steps -> CarMoves.saving(CarMoves.volume(steps))));
+        all.add(stepCar("volume_down", Group.MEDIA, R.string.smart_button_action_volume_down,
+                steps -> CarMoves.saving(CarMoves.volume(-steps))));
 
         // 座椅与方向盘（超级省电时不执行；座椅恢复还要车停稳）
         all.add(car("steering_wheel_heat", Group.SEATS, R.string.smart_button_action_steering_heat,
@@ -161,6 +175,9 @@ public final class ButtonAction {
         // 空调
         all.add(car("climate_power", Group.CLIMATE, R.string.smart_button_action_ac,
                 CarMoves.toggle("IHvac", "HVAC_FUNC_POWER", CarNames.ROW_1)));
+        all.add(stepCar("climate_temp_up", Group.CLIMATE, R.string.smart_button_action_temp_up, CarMoves::temperature));
+        all.add(stepCar("climate_temp_down", Group.CLIMATE, R.string.smart_button_action_temp_down,
+                steps -> CarMoves.temperature(-steps)));
         all.add(car("climate_circulation", Group.CLIMATE, R.string.smart_button_action_circulation, CarMoves.circulation()));
         all.add(car("defrost_front", Group.CLIMATE, R.string.smart_button_action_defrost_front,
                 CarMoves.toggle("IHvac", "HVAC_FUNC_DEFROST_FRONT_MAX", CarNames.ALL)));
@@ -230,6 +247,11 @@ public final class ButtonAction {
     public static ButtonAction forFloating(String key) {
         ButtonAction action = fromKey(key);
         return action != NONE || NONE.key.equals(key) ? action : fromKey(FloatingAction.OPEN_APP.key);
+    }
+
+    public boolean stepwise() {
+        return driveModeStep != 0 || gearStep != 0 || stepCar != null
+                || media == MediaMove.PREVIOUS || media == MediaMove.NEXT;
     }
 
     /** 存下的 key → 动作；认不出来的是 {@link #NONE}。 */

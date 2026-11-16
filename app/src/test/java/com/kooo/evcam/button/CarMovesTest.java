@@ -52,6 +52,26 @@ public class CarMovesTest {
     private static final int VIEW_360 = 0x9000;
     private static final int MIRROR = 0xA000;
     private static final int SENTRY = 0xB000;
+    private static final int TEMP = 0xC000;
+    private static final int CLIMATE_POWER = 0xC100;
+    private static final int AMBIENT_ON = 0xD000;
+    private static final int AMBIENT_MODE = 0xD300;
+    private static final int AMBIENT_THEME = 0xD400;
+    private static final int ROW_1 = 0x8;
+    private static final int ROW_2 = 0x80;
+    private static final int AUTO = 0xC200;
+    private static final int AC_SWITCH = 0xC300;
+    private static final int FAN_SPEED = 0xC400;
+    private static final int AUTO_FAN = 0xC500;
+    private static final int BLOWING = 0xC600;
+    private static final int SWEEPING = 0xC700;
+    private static final int AIRVENT = 0xC800;
+    private static final int RAPID_COOL = 0xC900;
+    private static final int SUSPENSION = 0xCA00;
+    private static final int REGEN = 0xCC00;
+    private static final int WINDOW_POS = 0xCD00;
+    private static final int AMBIENT_MAIN = 0xD100;
+    private static final int AMBIENT_TOP = 0xD200;
 
     /** 假的车辆接口：值按「号@区域」存；写了照写进去（{@link #applies}），也可以不受理。 */
     private static class FakeCar implements CarAccess {
@@ -71,6 +91,31 @@ public class CarMovesTest {
 
         Integer get(int id, int zone) {
             return values.get(id + "@" + zone);
+        }
+
+        final Map<String, Float> floats = new HashMap<>();
+        final Map<Integer, Integer> configs = new HashMap<>();
+
+        @Override
+        public Integer config(int n) {
+            return configs.get(n);
+        }
+
+        @Override
+        public Float readFloat(int id, int zone) {
+            return floats.get(id + "@" + zone);
+        }
+
+        @Override
+        public boolean writeFloat(int id, int zone, float value) {
+            writes.add(id + "@" + zone + "=" + value);
+            if (!acceptZoned) {
+                return false;
+            }
+            if (applies) {
+                floats.put(id + "@" + zone, value);
+            }
+            return true;
         }
 
         @Override
@@ -139,6 +184,24 @@ public class CarMovesTest {
             functions.put("IPAS.PAS_FUNC_PAC_ACTIVATION", VIEW_360);
             functions.put("IBcm.BCM_FUNC_FOLD_REAR_MIRROR", MIRROR);
             functions.put("IVehicle.SETTING_FUNC_VSTD_MODE_STS", SENTRY);
+            functions.put("IHvac.HVAC_FUNC_TEMP", TEMP);
+            functions.put("IHvac.HVAC_FUNC_POWER", CLIMATE_POWER);
+            functions.put("IAmbienceLight.SETTING_FUNC_AMBIENCE_LIGHT_MAINZONES", AMBIENT_ON);
+            functions.put("IAmbienceLight.SETTING_FUNC_AMBIENCE_LIGHT_MAINCOLOR", AMBIENT_MODE);
+            functions.put("IAmbienceLight.SETTING_FUNC_AMBIENCE_LIGHT_THEME_COLOR", AMBIENT_THEME);
+            functions.put("IHvac.HVAC_FUNC_AUTO", AUTO);
+            functions.put("IHvac.HVAC_FUNC_AC", AC_SWITCH);
+            functions.put("IHvac.HVAC_FUNC_FAN_SPEED", FAN_SPEED);
+            functions.put("IHvac.HVAC_FUNC_AUTO_FAN_SETTING", AUTO_FAN);
+            functions.put("IHvac.HVAC_FUNC_BLOWING_MODE", BLOWING);
+            functions.put("IHvac.HVAC_FUNC_SWEEPING_MODE", SWEEPING);
+            functions.put("IHvac.HVAC_FUNC_SEAT_AIRVENT_SWITCH", AIRVENT);
+            functions.put("IHvac.HVAC_FUNC_RAPID_COOLG_REQ", RAPID_COOL);
+            functions.put("IVehicle.SETTING_FUNC_SUSPENSION_HEIGHT_ADJUST", SUSPENSION);
+            functions.put("IVehicle.SETTING_FUNC_ENERGY_REGENERATION", REGEN);
+            functions.put("IBcm.BCM_FUNC_WINDOW_POS", WINDOW_POS);
+            functions.put("IAmbienceLight.SETTING_FUNC_AMBIENCE_LIGHT_MAINZONES_COLOR_SET", AMBIENT_MAIN);
+            functions.put("IAmbienceLight.SETTING_FUNC_AMBIENCE_LIGHT_TOPZONES_COLOR_SET", AMBIENT_TOP);
         }
 
         @Override
@@ -157,6 +220,10 @@ public class CarMovesTest {
                     return ROW_2_LEFT;
                 case CarNames.ROW_2_RIGHT:
                     return ROW_2_RIGHT;
+                case CarNames.ROW_1:
+                    return ROW_1;
+                case CarNames.ROW_2:
+                    return ROW_2;
                 default:
                     return ALL;
             }
@@ -183,6 +250,252 @@ public class CarMovesTest {
             }
         }, null);
         return job.run(car);
+    }
+
+    private static CarMoves.Car car(FakeCar fake) {
+        return new CarMoves.Car(fake, NAMES, ms -> { }, null, null);
+    }
+
+    @Test
+    public void fanStepsWithinItsTableAndOpensTheClimate() {
+        FakeCar f = new FakeCar();
+        f.set(AUTO, ROW_1, 0);
+        f.set(CLIMATE_POWER, ROW_1, 0);
+        f.set(FAN_SPEED, ROW_1, 0);
+        assertEquals(CarMoves.Result.DONE, KnobTurn.FAN.dial.turn(car(f), 2));
+        assertEquals(Integer.valueOf(FAN_SPEED + 2), f.get(FAN_SPEED, ROW_1));
+        assertEquals(Integer.valueOf(1), f.get(CLIMATE_POWER, ROW_1));
+        assertEquals(CarMoves.Result.DONE, KnobTurn.FAN.dial.turn(car(f), 20));
+        assertEquals(Integer.valueOf(FAN_SPEED + 9), f.get(FAN_SPEED, ROW_1));
+        int writes = f.writes.size();
+        assertEquals(CarMoves.Result.DONE, KnobTurn.FAN.dial.turn(car(f), 1));
+        assertEquals(writes, f.writes.size());
+    }
+
+    @Test
+    public void autoClimateTurnsTheAutoFanTable() {
+        FakeCar f = new FakeCar();
+        f.set(AUTO, ROW_1, 1);
+        f.set(AUTO_FAN, ROW_1, AUTO_FAN + 1);
+        assertEquals(CarMoves.Result.DONE, KnobTurn.FAN.dial.turn(car(f), 1));
+        assertEquals(Integer.valueOf(AUTO_FAN + 2), f.get(AUTO_FAN, ROW_1));
+        f.set(AUTO, ROW_2, 1);
+        f.set(AUTO_FAN, ROW_2, AUTO_FAN + 4);
+        f.set(CLIMATE_POWER, ROW_2, 1);
+        assertEquals(CarMoves.Result.DONE, KnobTurn.REAR_FAN.dial.turn(car(f), -1));
+        assertEquals(Integer.valueOf(0), f.get(AUTO_FAN, ROW_2));
+        assertEquals(Integer.valueOf(0), f.get(CLIMATE_POWER, ROW_2));
+    }
+
+    @Test
+    public void anUnknownValueGoesToTheFirst() {
+        FakeCar f = new FakeCar();
+        f.set(CIRCULATION, ALL, 99);
+        assertEquals(CarMoves.Result.DONE, KnobTurn.CIRCULATION.dial.turn(car(f), 1));
+        assertEquals(Integer.valueOf(CIRCULATION + 3), f.get(CIRCULATION, ALL));
+    }
+
+    @Test
+    public void airDirectionPreparesTheVents() {
+        FakeCar f = new FakeCar();
+        f.set(CLIMATE_POWER, ROW_1, 0);
+        f.set(CLIMATE_POWER, DRIVER, 0);
+        f.set(BLOWING, DRIVER, BLOWING + 2);
+        f.set(SWEEPING, DRIVER, 0);
+        assertEquals(CarMoves.Result.DONE, KnobTurn.DRIVER_SWEEP.dial.turn(car(f), 1));
+        assertEquals(Integer.valueOf(1), f.get(SWEEPING, DRIVER));
+        assertEquals(Integer.valueOf(1), f.get(CLIMATE_POWER, ROW_1));
+        assertEquals(Integer.valueOf(1), f.get(CLIMATE_POWER, DRIVER));
+        assertEquals(Integer.valueOf(BLOWING + 3), f.get(BLOWING, DRIVER));
+        assertEquals(Integer.valueOf(1), f.get(AIRVENT, DRIVER));
+    }
+
+    @Test
+    public void massageUsesItsSwitch() {
+        FakeCar f = new FakeCar();
+        f.set(MASSAGE_SWITCH, DRIVER, 0);
+        f.set(MASSAGE, DRIVER, MASSAGE + 2);
+        assertEquals(CarMoves.Result.DONE, KnobTurn.DRIVER_MASSAGE.dial.turn(car(f), 1));
+        assertEquals(Integer.valueOf(1), f.get(MASSAGE_SWITCH, DRIVER));
+        assertEquals(Integer.valueOf(MASSAGE + 1), f.get(MASSAGE, DRIVER));
+        assertEquals(CarMoves.Result.DONE, KnobTurn.DRIVER_MASSAGE.dial.turn(car(f), -1));
+        assertEquals(Integer.valueOf(0), f.get(MASSAGE_SWITCH, DRIVER));
+        assertEquals(Integer.valueOf(MASSAGE + 1), f.get(MASSAGE, DRIVER));
+    }
+
+    @Test
+    public void suspensionNeedsTheCarToSayActive() {
+        FakeCar f = new FakeCar();
+        f.statuses.put(SUSPENSION + "@" + ALL, "notavailable");
+        f.set(SUSPENSION, ALL, SUSPENSION + 3);
+        assertEquals(CarMoves.Result.UNAVAILABLE, KnobTurn.SUSPENSION.dial.turn(car(f), -1));
+        assertTrue(f.writes.isEmpty());
+        f.statuses.remove(SUSPENSION + "@" + ALL);
+        assertEquals(CarMoves.Result.DONE, KnobTurn.SUSPENSION.dial.turn(car(f), -1));
+        assertEquals(Integer.valueOf(SUSPENSION + 2), f.get(SUSPENSION, ALL));
+        assertEquals(Signal.DRIVE_MODE.id + "=" + (Signal.DRIVE_MODE.id + 0x40), f.writes.get(0));
+    }
+
+    @Test
+    public void energyRecoveryNeedsTheCarToSayActive() {
+        FakeCar f = new FakeCar();
+        f.statuses.put(REGEN + "@" + ALL, "notactive");
+        f.set(REGEN, ALL, 0);
+        assertEquals(CarMoves.Result.UNAVAILABLE, KnobTurn.REGEN.dial.turn(car(f), 1));
+        assertTrue(f.writes.isEmpty());
+    }
+
+    @Test
+    public void driveModesFollowTheCarConfig() {
+        int[] here = KnobDials.driveModeList(n -> n == 605 || n == 607 || n == 608 || n == 610 ? 1 : 0).steps;
+        assertTrue(java.util.Arrays.equals(new int[] {0x03, 0x02, 0x01, 0x09, 0x40}, here));
+        int[] unknown = KnobDials.driveModeList(n -> -1).steps;
+        assertTrue(java.util.Arrays.equals(new int[] {0x03, 0x02, 0x01, 0x47, 0x0D, 0x0A, 0x09, 0x0B, 0x40}, unknown));
+    }
+
+    @Test
+    public void driveModeStepsWithThePlainWrite() {
+        FakeCar f = new FakeCar();
+        int id = Signal.DRIVE_MODE.id;
+        f.values.put(String.valueOf(id), id + 3);
+        assertEquals(CarMoves.Result.DONE, KnobTurn.DRIVE_MODE.dial.turn(car(f), 1));
+        assertEquals(Integer.valueOf(id + 2), f.values.get(String.valueOf(id)));
+        assertEquals(id + "=" + (id + 2), f.writes.get(0));
+    }
+
+    @Test
+    public void windowsSkipTheOnesTheCarCannotMove() {
+        FakeCar f = new FakeCar();
+        f.statuses.put(WINDOW_POS + "@" + 0x100, "notavailable");
+        f.statuses.put(WINDOW_POS + "@" + 0x200, "notavailable");
+        assertEquals(CarMoves.Result.DONE, KnobTurn.WINDOWS_VENT.dial.turn(car(f), 1));
+        assertEquals(Float.valueOf(12f), f.floats.get(WINDOW_POS + "@" + 0x10));
+        assertEquals(Float.valueOf(12f), f.floats.get(WINDOW_POS + "@" + 0x20));
+        assertNull(f.floats.get(WINDOW_POS + "@" + 0x100));
+        f.statuses.put(WINDOW_POS + "@" + 0x10, "notavailable");
+        f.statuses.put(WINDOW_POS + "@" + 0x20, "notavailable");
+        assertEquals(CarMoves.Result.UNAVAILABLE, KnobTurn.WINDOWS.dial.turn(car(f), -1));
+    }
+
+    @Test
+    public void togglesFollowTheDirection() {
+        FakeCar f = new FakeCar();
+        f.set(AC_SWITCH, ALL, 0);
+        assertEquals(CarMoves.Result.DONE, KnobTurn.AC.dial.turn(car(f), 1));
+        assertEquals(Integer.valueOf(1), f.get(AC_SWITCH, ALL));
+        f.set(RAPID_COOL, ALL, 1);
+        assertEquals(CarMoves.Result.DONE, KnobTurn.RAPID_COOL.dial.turn(car(f), 1));
+        assertEquals(Integer.valueOf(0), f.get(RAPID_COOL, ALL));
+    }
+
+    @Test
+    public void oneZoneTemperatureLeavesTheClimateAlone() {
+        FakeCar f = new FakeCar();
+        f.floats.put(TEMP + "@" + DRIVER, 22f);
+        f.set(CLIMATE_POWER, DRIVER, 0);
+        assertEquals(CarMoves.Result.DONE, KnobTurn.DRIVER_TEMP.dial.turn(car(f), 2));
+        assertEquals(Float.valueOf(23f), f.floats.get(TEMP + "@" + DRIVER));
+        assertEquals(Integer.valueOf(0), f.get(CLIMATE_POWER, DRIVER));
+        assertNull(f.floats.get(TEMP + "@" + PASSENGER));
+    }
+
+    @Test
+    public void knobFragranceNeedsAFittedSlot() {
+        assertEquals(CarMoves.Result.NOT_FITTED, KnobTurn.FRAGRANCE.dial.turn(car(new FakeCar()), 1));
+    }
+
+    @Test
+    public void shownValuesWithoutLabels() {
+        FakeCar f = new FakeCar();
+        f.floats.put(TEMP + "@" + DRIVER, 22.5f);
+        assertEquals("22.5\u00b0", KnobTurn.TEMPERATURE.dial.shown(car(f), null, 0));
+        assertEquals("+5", KnobTurn.VOLUME.dial.shown(car(f), null, 8));
+        assertEquals("-2", KnobTurn.VOLUME.dial.shown(car(f), null, -2));
+        assertNull(KnobTurn.VOLUME.dial.shown(car(f), null, 0));
+    }
+
+    private static int glow(FakeCar fake) {
+        return CarMoves.glow(new CarMoves.Car(fake, NAMES, ms -> { }, null, null));
+    }
+
+    @Test
+    public void glowNeedsTheLightOn() {
+        FakeCar car = new FakeCar();
+        car.values.put(String.valueOf(AMBIENT_MAIN), 0xFF00FFCB);
+        assertEquals(-1, glow(car));
+        car.values.put(String.valueOf(AMBIENT_ON), 0);
+        assertEquals(-1, glow(car));
+        car.values.put(String.valueOf(AMBIENT_ON), 1);
+        assertEquals(0x00FFCB, glow(car));
+    }
+
+    @Test
+    public void glowFollowsTheThemeAndKeepsTheColorForMusic() {
+        FakeCar car = new FakeCar();
+        car.values.put(String.valueOf(AMBIENT_ON), 1);
+        car.values.put(String.valueOf(AMBIENT_MAIN), 0xFF00FFCB);
+        car.values.put(String.valueOf(AMBIENT_MODE), AMBIENT_MODE + 3);
+        assertEquals(0x00FFCB, glow(car));
+        car.values.put(String.valueOf(AMBIENT_MODE), AMBIENT_MODE + 1);
+        car.values.put(String.valueOf(AMBIENT_THEME), 3);
+        assertEquals(0x78E8C9, glow(car));
+        car.values.put(String.valueOf(AMBIENT_THEME), 9);
+        assertEquals(0xE9947D, glow(car));
+        car.values.put(String.valueOf(AMBIENT_MODE), AMBIENT_MODE + 4);
+        assertEquals(CarMoves.KEEP_TINT, glow(car));
+        car.values.put(String.valueOf(AMBIENT_ON), 0);
+        assertEquals(-1, glow(car));
+    }
+
+    @Test
+    public void glowFallsBackToTheTop() {
+        FakeCar car = new FakeCar();
+        car.values.put(String.valueOf(AMBIENT_ON), 1);
+        car.values.put(String.valueOf(AMBIENT_TOP), 0xFF123456);
+        assertEquals(0x123456, glow(car));
+        car.values.put(String.valueOf(AMBIENT_MAIN), 255);
+        assertEquals(0x123456, glow(car));
+        car.values.remove(String.valueOf(AMBIENT_TOP));
+        assertEquals(-1, glow(car));
+    }
+
+    @Test
+    public void temperatureStepsHalfADegreeWithinItsRange() {
+        assertEquals(22.5f, CarMoves.nextTemperature(22f, 1), 0.001f);
+        assertEquals(21f, CarMoves.nextTemperature(22f, -2), 0.001f);
+        assertEquals(28.5f, CarMoves.nextTemperature(28f, 5), 0.001f);
+        assertEquals(15.5f, CarMoves.nextTemperature(16f, -3), 0.001f);
+        assertEquals(22.5f, CarMoves.nextTemperature(22.3f, 0), 0.001f);
+    }
+
+    @Test
+    public void temperatureWritesBothFrontZonesAndOpensTheClimateFirst() {
+        FakeCar car = new FakeCar();
+        car.floats.put(TEMP + "@" + DRIVER, 22f);
+        car.set(CLIMATE_POWER, DRIVER, 1);
+        car.set(CLIMATE_POWER, PASSENGER, 0);
+        assertEquals(CarMoves.Result.DONE, run(car, CarMoves.temperature(2)));
+        assertEquals(Float.valueOf(23f), car.floats.get(TEMP + "@" + DRIVER));
+        assertEquals(Float.valueOf(23f), car.floats.get(TEMP + "@" + PASSENGER));
+        assertEquals(Integer.valueOf(1), car.get(CLIMATE_POWER, PASSENGER));
+        assertTrue(car.writes.indexOf(CLIMATE_POWER + "@" + PASSENGER + "=1") < car.writes.indexOf(TEMP + "@" + DRIVER + "=23.0"));
+    }
+
+    @Test
+    public void temperatureLeavesTheCarAloneWhenItCannotOrNeedNot() {
+        FakeCar unread = new FakeCar();
+        assertEquals(CarMoves.Result.UNAVAILABLE, run(unread, CarMoves.temperature(1)));
+        assertTrue(unread.writes.isEmpty());
+
+        FakeCar top = new FakeCar();
+        top.floats.put(TEMP + "@" + DRIVER, 28.5f);
+        assertEquals(CarMoves.Result.DONE, run(top, CarMoves.temperature(1)));
+        assertTrue(top.writes.isEmpty());
+
+        FakeCar stuck = new FakeCar();
+        stuck.applies = false;
+        stuck.floats.put(TEMP + "@" + DRIVER, 22f);
+        assertEquals(CarMoves.Result.NO_CHANGE, run(stuck, CarMoves.temperature(-1)));
     }
 
     // ---- 换法

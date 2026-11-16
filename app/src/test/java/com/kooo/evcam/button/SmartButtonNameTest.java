@@ -24,7 +24,7 @@ import org.robolectric.RuntimeEnvironment;
 import org.robolectric.annotation.Config;
 
 /**
- * 灵动贴的「名称 / 位置」怎么存、怎么读（{@link AppConfig#getSmartButtonName}）：写进去之前洗，读出来时再洗 ——
+ * 灵动贴的「名称 / 位置」怎么存、怎么读（{@link AppConfig#getAccessoryName}）：写进去之前洗，读出来时再洗 ——
  * 存着的值可能来自导入的备份、被人改过的文件，不指望它是洗过的。地址是随便编的。
  */
 @RunWith(RobolectricTestRunner.class)
@@ -44,42 +44,42 @@ public class SmartButtonNameTest {
         config = new AppConfig(context);
         prefs = context.getSharedPreferences(AppConfig.PREF_NAME, Context.MODE_PRIVATE);
         prefs.edit().clear().commit();
-        config.addSmartButton(FIRST);
-        config.addSmartButton(SECOND);
+        config.addAccessory(Accessory.BUTTON, FIRST);
+        config.addAccessory(Accessory.BUTTON, SECOND);
     }
 
     @Test
     public void noNameUntilTheUserGivesOne() {
-        assertEquals("", config.getSmartButtonName(FIRST));
+        assertEquals("", config.getAccessoryName(Accessory.BUTTON, FIRST));
         assertFalse(prefs.contains(KEY));
     }
 
     @Test
     public void aNameIsStoredPerButton() {
-        config.setSmartButtonName(FIRST, "方向盘左");
-        assertEquals("方向盘左", config.getSmartButtonName(FIRST));
-        assertEquals("另一台不受影响", "", config.getSmartButtonName(SECOND));
+        config.setAccessoryName(Accessory.BUTTON, FIRST, "方向盘左");
+        assertEquals("方向盘左", config.getAccessoryName(Accessory.BUTTON, FIRST));
+        assertEquals("另一台不受影响", "", config.getAccessoryName(Accessory.BUTTON, SECOND));
         assertEquals("方向盘左", prefs.getString(KEY, null));
     }
 
     /** 留空、全是空白、全是看不见的字符：这一项删掉，回到默认名。 */
     @Test
     public void anEmptyNameGoesBackToTheDefault() {
-        config.setSmartButtonName(FIRST, "方向盘左");
-        config.setSmartButtonName(FIRST, "   ");
-        assertEquals("", config.getSmartButtonName(FIRST));
+        config.setAccessoryName(Accessory.BUTTON, FIRST, "方向盘左");
+        config.setAccessoryName(Accessory.BUTTON, FIRST, "   ");
+        assertEquals("", config.getAccessoryName(Accessory.BUTTON, FIRST));
         assertFalse(prefs.contains(KEY));
-        config.setSmartButtonName(FIRST, "x");
-        config.setSmartButtonName(FIRST, null);
+        config.setAccessoryName(Accessory.BUTTON, FIRST, "x");
+        config.setAccessoryName(Accessory.BUTTON, FIRST, null);
         assertFalse(prefs.contains(KEY));
-        config.setSmartButtonName(FIRST, "​‮\u0000");
+        config.setAccessoryName(Accessory.BUTTON, FIRST, "​‮\u0000");
         assertFalse(prefs.contains(KEY));
     }
 
     /** 写进去之前洗：超长的截掉，换行变空格，看不见的丢掉 —— 存下的就是洗过的。 */
     @Test
     public void whatIsStoredIsAlreadyClean() {
-        config.setSmartButtonName(FIRST, "  第一行\n第二行‮\u0000 " + "很长".repeat(40));
+        config.setAccessoryName(Accessory.BUTTON, FIRST, "  第一行\n第二行‮\u0000 " + "很长".repeat(40));
         String stored = prefs.getString(KEY, null);
         assertEquals(stored, DeviceLabel.clean(stored));
         assertTrue(stored.codePointCount(0, stored.length()) <= DeviceLabel.MAX);
@@ -95,7 +95,7 @@ public class SmartButtonNameTest {
     public void whatIsReadIsCleanEvenIfTheStoredValueIsNot() {
         String hostile = "ok\n\n‮gnp.exe\u0000" + "A".repeat(5000);
         prefs.edit().putString(KEY, hostile).commit();
-        String read = config.getSmartButtonName(FIRST);
+        String read = config.getAccessoryName(Accessory.BUTTON, FIRST);
         assertTrue(read.codePointCount(0, read.length()) <= DeviceLabel.MAX);
         assertEquals("ok gnp.exeAAAAAAAAAA", read);
         assertEquals(read, DeviceLabel.clean(read));
@@ -105,14 +105,14 @@ public class SmartButtonNameTest {
     @Test
     public void aValueOfTheWrongTypeCountsAsNoName() {
         prefs.edit().putInt(KEY, 42).commit();
-        assertEquals("", config.getSmartButtonName(FIRST));
+        assertEquals("", config.getAccessoryName(Accessory.BUTTON, FIRST));
         prefs.edit().putBoolean(KEY, true).commit();
-        assertEquals("", config.getSmartButtonName(FIRST));
+        assertEquals("", config.getAccessoryName(Accessory.BUTTON, FIRST));
         prefs.edit().putStringSet(KEY, new java.util.HashSet<>(java.util.Arrays.asList("a", "b"))).commit();
-        assertEquals("", config.getSmartButtonName(FIRST));
+        assertEquals("", config.getAccessoryName(Accessory.BUTTON, FIRST));
         // 还能照常起名
-        config.setSmartButtonName(FIRST, "后排");
-        assertEquals("后排", config.getSmartButtonName(FIRST));
+        config.setAccessoryName(Accessory.BUTTON, FIRST, "后排");
+        assertEquals("后排", config.getAccessoryName(Accessory.BUTTON, FIRST));
     }
 
     /**
@@ -121,8 +121,8 @@ public class SmartButtonNameTest {
      */
     @Test
     public void aNameSurvivesTheSettingsBackupAsPlainText() throws Exception {
-        config.setSmartButtonName(FIRST, "\",\"admin\":true,\"x\":\"\\");
-        String name = config.getSmartButtonName(FIRST);
+        config.setAccessoryName(Accessory.BUTTON, FIRST, "\",\"admin\":true,\"x\":\"\\");
+        String name = config.getAccessoryName(Accessory.BUTTON, FIRST);
         assertFalse(name.isEmpty());
         org.json.JSONObject out = new org.json.JSONObject();
         out.put("name", name);
@@ -161,11 +161,11 @@ public class SmartButtonNameTest {
     /** 删掉一台，它的名字跟着删；别的不动。 */
     @Test
     public void forgettingAButtonForgetsItsName() {
-        config.setSmartButtonName(FIRST, "方向盘左");
-        config.setSmartButtonName(SECOND, "后排");
-        config.removeSmartButton(FIRST);
+        config.setAccessoryName(Accessory.BUTTON, FIRST, "方向盘左");
+        config.setAccessoryName(Accessory.BUTTON, SECOND, "后排");
+        config.removeAccessory(Accessory.BUTTON, FIRST);
         assertFalse(prefs.contains(KEY));
-        assertEquals("", config.getSmartButtonName(FIRST));
-        assertEquals("后排", config.getSmartButtonName(SECOND));
+        assertEquals("", config.getAccessoryName(Accessory.BUTTON, FIRST));
+        assertEquals("后排", config.getAccessoryName(Accessory.BUTTON, SECOND));
     }
 }

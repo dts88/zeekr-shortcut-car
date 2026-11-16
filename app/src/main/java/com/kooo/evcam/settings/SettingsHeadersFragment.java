@@ -192,7 +192,10 @@ public class SettingsHeadersFragment extends PreferenceFragmentCompat {
                 return config.isSideViewEnabled()
                         ? SettingsRegistry.SIDE_VIEW_MODE.label(context, config.getSideViewMode()) : getString(R.string.opt_off);
             case "screen_floating": {
-                int on = (config.isRecordingFloatingEnabled() ? 1 : 0) + (config.isSmartButtonsEnabled() ? 1 : 0);
+                int on = (config.isRecordingFloatingEnabled() ? 1 : 0)
+                        + (config.isAccessoryEnabled(com.kooo.evcam.button.Accessory.BUTTON) ? 1 : 0)
+                        + (config.isAccessoryEnabled(com.kooo.evcam.button.Accessory.KNOB)
+                        && !config.getAccessories(com.kooo.evcam.button.Accessory.KNOB).isEmpty() ? 1 : 0);
                 return on == 0 ? getString(R.string.header_none_enabled) : getString(R.string.header_enabled_count, on);
             }
             case "screen_update":
