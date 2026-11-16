@@ -1185,12 +1185,6 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             });
         }
 
-        Preference diagnosticsRow = findPreference("pref_alerts_diagnostics");
-        if (diagnosticsRow != null) {
-            diagnosticsRow.setPersistent(false);
-            onClick("pref_alerts_diagnostics", pref -> startActivity(
-                    new Intent(requireContext(), DiagnosticsActivity.class)));
-        }
 
         Preference probeRow = findPreference("pref_alerts_probe");
         if (probeRow != null) {

@@ -15,7 +15,7 @@
     <string name="set_section_alerts">Makluman</string>
     <string name="set_group_alerts_telegram">Telegram</string>
     <string name="set_alerts_on_title">Maklumkan semasa letak kereta</string>
-    <string name="set_alerts_on_summary">Dengan Mod Sentri hidup, kereta menghantar apa yang dilihatnya ke Telegram apabila berlaku sesuatu. Tutup secara lalai</string>
+    <string name="set_alerts_on_summary">Dengan Mod Sentri hidup, kereta menghantar apa yang dilihat ke tempat yang anda tetapkan. Tutup secara lalai</string>
     <string name="set_alerts_token_title">Token bot</string>
     <string name="set_alerts_token_empty">Belum diisi</string>
     <string name="set_alerts_token_summary">Token daripada @BotFather. Disimpan dalam kereta ini sahaja, tidak masuk eksport tetapan atau log</string>

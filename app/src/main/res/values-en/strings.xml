@@ -15,7 +15,7 @@
     <string name="set_section_alerts">Alerts</string>
     <string name="set_group_alerts_telegram">Telegram</string>
     <string name="set_alerts_on_title">Alert while parked</string>
-    <string name="set_alerts_on_summary">With Sentry Mode on, the car sends what it sees to Telegram when something happens. Off by default</string>
+    <string name="set_alerts_on_summary">With Sentry Mode on, the car sends what it sees to the place you configured. Off by default</string>
     <string name="set_alerts_token_title">Bot token</string>
     <string name="set_alerts_token_empty">Not set</string>
     <string name="set_alerts_token_summary">The token from @BotFather. Kept on this car only, out of the settings export and the log</string>

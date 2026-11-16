@@ -29,7 +29,7 @@
     <string name="set_section_alerts">停车警报</string>
     <string name="set_group_alerts_telegram">Telegram</string>
     <string name="set_alerts_on_title">停车时发警报</string>
-    <string name="set_alerts_on_summary">哨兵模式开着时，车被碰了就把它看到的发到 Telegram。默认关</string>
+    <string name="set_alerts_on_summary">开着哨兵模式时，车上的动静会发到你配好的那个地方。默认关</string>
     <string name="set_alerts_token_title">机器人令牌</string>
     <string name="set_alerts_token_empty">未填写</string>
     <string name="set_alerts_token_summary">从 @BotFather 拿到的令牌。只存在这辆车上，不进设置导出，也不进日志</string>

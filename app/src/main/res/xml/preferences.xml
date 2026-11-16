@@ -286,10 +286,6 @@
                 android:title="@string/set_alerts_probe_title"
                 android:summary="@string/set_alerts_probe_summary" />
 
-            <Preference
-                android:key="pref_alerts_diagnostics"
-                android:title="@string/set_diagnostics_title"
-                android:summary="@string/set_diagnostics_summary" />
 
             <!-- 车能发给机器人的每一条消息：一行一条，点一条发一条真的（车主 2026-11-15）。
                  两条出口都能看，所以它不跟着 Telegram 那一组走。
