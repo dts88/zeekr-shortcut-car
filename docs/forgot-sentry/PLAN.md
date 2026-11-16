@@ -10,8 +10,8 @@ and `docs/ui-spec.md` gain their rows too.
 ## Why the timings are what they are
 
 With Sentry off the head unit powers down 4–6 minutes after the owner leaves, and the process ends
-3–5 s after that (`docs/zeekr-platform-notes.md:415`, `docs/lifecycle-spec.md:945`). That window is
-the whole feature:
+3–5 s after that (`docs/lifecycle-spec.md:945`; the 2026-10-10 times and dates are in
+`docs/sentry-alerts-spec.md` §7). That window is the whole feature:
 
 | Constant | Value | Why |
 |---|---|---|

@@ -409,10 +409,10 @@ things: no token in the export; the token is not in `app_config`.
 
 ## 6.5 车主自己回来不发：解锁会先把「布防」打掉
 
-`Signal.SENTRY_MODE` 是 0 关、1 开、2 布防。平台笔记（`docs/zeekr-platform-notes.md`）记的顺序：
+`Signal.SENTRY_MODE` 是 0 关、1 开、2 布防。车上记下来的顺序（2026-10-03 / 10-12，时刻见 §7「测量出处」）：
 
 - 开哨兵 0 → 1；**锁车**一分半后 1 → 2；
-- **解锁** 2 → 1（比 `0x20240300` 早 10 毫秒）；
+- **解锁** 2 → 1（`0x20240300` 1 → 0 之后 10 毫秒）；
 - 挂 D 1 → 0。
 
 所以判断只认 2（`alarm.SentryFacts#armed`，`SentryFactsTest` 钉住）。车主回来时解锁那一下，
@@ -421,16 +421,16 @@ things: no token in the export; the token is not in `app_config`.
 
 这正是“锁车就是布防”这条事实的用处，而不是我们另加的一个猜测。
 
-**还不采用的**：`0x20240300`（VSTD_ALRM_STS）据称是“锁车后进入防盗”，解锁 1 → 0，但平台笔记里
-只有一次观察、主项目明确没采用。等有交叉验证再拿它当第二重证据。
+**还不采用的**：`0x20240300`（VSTD_ALRM_STS）据称是“锁车后进入防盗”，解锁 1 → 0，但只有一次观察
+（2026-10-03，§7）、主项目明确没采用。等有交叉验证再拿它当第二重证据。
 
 ##### English
 
-`Signal.SENTRY_MODE` is 0 off, 1 on, 2 armed. The order recorded in the platform notes
-(`docs/zeekr-platform-notes.md`):
+`Signal.SENTRY_MODE` is 0 off, 1 on, 2 armed. The order recorded on the car
+(2026-10-03 / 10-12, times in §7, "where the numbers come from"):
 
 - Sentry on 0 → 1; **locked**, a minute and a half later 1 → 2;
-- **Unlock** 2 → 1 (10 ms before `0x20240300`);
+- **Unlock** 2 → 1 (10 ms after `0x20240300`);
 - Shift to D 1 → 0.
 
 So the check accepts only 2 (`alarm.SentryFacts#armed`, pinned by `SentryFactsTest`). At the
@@ -441,7 +441,7 @@ touches the car it is still locked, 2 holds, and the lights / screen / hazards t
 That is the point of the fact "locked means armed", not an extra guess we added.
 
 **Not adopted yet**: `0x20240300` (VSTD_ALRM_STS) is said to be "entered anti-theft after locking",
-1 → 0 on unlock, but the platform notes have only a single observation and the main project
+1 → 0 on unlock, but there is only a single observation (2026-10-03, §7) and the main project
 explicitly did not adopt it. It will become a second line of evidence only after cross-validation.
 
 ## 6.6 反向命令：给机器人发 pic
@@ -517,6 +517,12 @@ not retry all night.
 
 ## 7. 人为的悬崖
 
+- **测量出处**（这些数字原本记在平台笔记里；平台笔记 2026-11-15 起不再放在仓库里，所以数字搬到这里）：
+  哨兵没开、车主离车之后，车机会拿走座舱相机 1，约四分钟后下电 —— 2026-10-10 三次：09:16 → 09:20、
+  14:23 → 14:27、17:07 → 17:11；安卓熄屏广播之后 3.3–4.6 秒进程被信号结束或者冻住（冻住那一次的最后
+  一行在熄屏后 3.4 秒）。2026-10-12 又一次离车，熄屏广播 4–6 分钟才来。哨兵模式的值：0 关、1 开、
+  2 布防 —— 开哨兵 0 → 1，锁车一分半后 1 → 2（2026-10-12 那次是屏幕黑了 99 秒后 1 → 2），解锁 2 → 1，
+  挂 D 1 → 0。本规格里的窗口（5 s、60 s、180 s）都比这段寿命短。
 - 环视那一路的 JPEG 出帧口在会话配置失败时是第一个被让出去的（`camera/ChannelRules.java`
   `onConfigFailed`）。那种状态下拍照会退回预览取帧，需要主界面在前台 —— 长时间熄屏的哨兵录像碰上它，
   照片可能拍不出来。拍不出来就只发文字，不假装发了照片。
@@ -527,6 +533,15 @@ not retry all night.
 
 ##### English
 
+- **Where the numbers come from** (they used to live in the platform notes; those notes left the
+  repository on 2026-11-15, so the numbers moved here): with sentry off the head unit takes the rear
+  cabin camera and powers down about four minutes after the owner leaves — 2026-10-10, three times:
+  09:16 → 09:20, 14:23 → 14:27, 17:07 → 17:11 — and the process is killed or frozen 3.3–4.6 s after
+  the Android screen-off broadcast (the frozen run's last line was 3.4 s after it); on 2026-10-12
+  the broadcast came 4–6 minutes after leaving. Sentry mode values: 0 off, 1 on, 2 armed — sentry on
+  0 → 1, locked and a minute and a half later 1 → 2 (on 2026-10-12 it was 99 s after the screen went
+  dark), unlock 2 → 1, shift to D 1 → 0. Every window in this spec (5 s, 60 s, 180 s) is shorter
+  than that life.
 - The surround channel's JPEG output is the first thing given up when the session configuration
   fails (`camera/ChannelRules.java` `onConfigFailed`). In that state taking a photo falls back to
   preview capture, which needs the main UI in the foreground — sentry recording with the screen off
