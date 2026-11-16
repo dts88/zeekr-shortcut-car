@@ -879,7 +879,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         if (token != null) {
             token.setPersistent(false);
             token.setOnPreferenceClickListener(preference -> {
-                editAlertsToken();
+                chooseAlertsTokenEntry();
                 return true;
             });
         }
@@ -1552,6 +1552,44 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
      */
 
     /** 开关之后的共同收尾：把勾选状态、行尾说明、发送那边一起对齐。 */
+
+    /**
+     * 「机器人令牌」那一行点下去：带路，还是自己填。
+     *
+     * <p>没造过机器人的人不知道令牌是什么，直接丢一个空输入框等于让人去搜教程；
+     * 已经有一个令牌、只想换掉的人也不想再读一遍六条。所以先问一句，两个选择，一个「取消」。</p>
+     *
+     * <p>Tapping the token row: be walked through it, or type it in. Someone who has never made a
+     * bot does not know what a token is, and handing them an empty box just sends them searching
+     * for a guide; someone who already has one does not want six steps again. So one question, two
+     * choices, one Cancel.</p>
+     */
+    private void chooseAlertsTokenEntry() {
+        com.kooo.evcam.ui.CamDialogs.show(new MaterialAlertDialogBuilder(requireContext(),
+                R.style.Theme_Cam_MaterialAlertDialog)
+                .setTitle(R.string.set_alerts_wizard_entry_title)
+                .setItems(new CharSequence[]{
+                        getString(R.string.set_alerts_wizard_entry_guided),
+                        getString(R.string.set_alerts_wizard_entry_manual)}, (dialog, which) -> {
+                    if (which == 0) {
+                        startTelegramWizard();
+                    } else {
+                        editAlertsToken();
+                    }
+                })
+                .setNegativeButton(R.string.action_cancel, null));
+    }
+
+    /** 三步走完（或者中途退出）之后，行尾说明和发送那边都要按新的值重排。 */
+    private void startTelegramWizard() {
+        TelegramSetupDialog.show(this, appConfig, () -> {
+            if (!isAdded()) {
+                return;
+            }
+            com.kooo.evcam.alarm.SentryAlerts.get(requireContext()).refreshConfig();
+            showAlertsRows();
+        });
+    }
 
     private void editAlertsToken() {
         showTextDialog("pref_alerts_token", getString(R.string.set_alerts_token_title),

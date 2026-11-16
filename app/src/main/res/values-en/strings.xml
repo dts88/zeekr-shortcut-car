@@ -1486,4 +1486,60 @@ If I forget: %3$s</string>
     <string name="alert_headline_recorded">One frame from the recording, at the time you asked for</string>
     <string name="alert_clip_available_from">The recordings go back to %1$s</string>
     <string name="alert_headline_recorded_clip">%1$s, cut from the recording at the time you asked for</string>
+    <string name="set_alerts_wizard_entry_title">Bot token</string>
+    <string name="set_alerts_wizard_entry_hint">About two minutes — or paste a token you already have</string>
+    <string name="set_alerts_wizard_entry_guided">Walk me through it (about two minutes)</string>
+    <string name="set_alerts_wizard_entry_manual">I will paste the token myself</string>
+    <string name="set_alerts_wizard_bot_title">Step 1: get a bot from Telegram</string>
+    <string name="set_alerts_wizard_bot_body">You need Telegram on the phone. If it is not there, install it from your app store and sign up first.
+
+1. Open Telegram and type @BotFather in the search box at the top
+2. @BotFather is the official Telegram account that makes bots. Open it
+3. Tap the Open button at the bottom of the chat: the panel it opens has Create a New Bot at the top. On an older Telegram that shows only the chat, send /newbot instead
+4. It shows a form. The first field is the bot\'s name; anything you like, only you see it
+5. The second field is the username. It must end in bot, for example my_zeekr_bot. Only one bot on all of Telegram can hold a name, so when yours is taken it says so — add a few letters or numbers and try again
+6. At the end it gives you a long code. That code is the token: this car signs in as your bot with it, so it works like a password. Long press it and copy</string>
+    <string name="set_alerts_wizard_bot_hint">Paste the code you just copied here</string>
+    <string name="set_alerts_wizard_next">Next</string>
+    <string name="set_alerts_wizard_bot_bad_title">That code does not look right</string>
+    <string name="set_alerts_wizard_bot_bad_body">A token looks like this: some digits, a colon, then a long run of letters and digits, such as 123456789:AAH…
+
+Three usual causes: only half of it was copied; the words /newbot came along with it; it is the token of a different bot.
+
+Go back to @BotFather in Telegram, send /mybots, pick your bot, tap API Token, and copy it again.</string>
+    <string name="set_alerts_wizard_retry">Try again</string>
+    <string name="set_alerts_wizard_chat_title">Step 2: let the car find your chat</string>
+    <string name="set_alerts_wizard_chat_body">1. In Telegram open the bot you just made (@BotFather gives you a link; tapping it opens the bot)
+2. Tap the Start button at the bottom
+3. Send it any message, for example hello
+
+The car has to see one message before it knows where to send alerts.</string>
+    <string name="set_alerts_wizard_chat_find">Find my chat</string>
+    <string name="set_alerts_wizard_chat_looking">Asking Telegram, half a minute at most</string>
+    <string name="set_alerts_wizard_chat_found">Found it</string>
+    <string name="set_alerts_wizard_chat_none_title">The bot has no messages yet</string>
+    <string name="set_alerts_wizard_chat_none_body">Telegram has nothing from you, so there is no chat to find yet.
+
+On the phone, open your bot, send it one message (hello is fine), then tap Try again.</string>
+    <string name="set_alerts_wizard_chat_failed_title">Cannot reach Telegram</string>
+    <string name="set_alerts_wizard_chat_failed_body">That did not work: %1$s
+
+Wait a moment and try again. A weak signal or Telegram rate limiting both look like this.</string>
+    <string name="set_alerts_wizard_chat_pick_title">Found more than one chat, pick one</string>
+    <string name="set_alerts_wizard_test_title">Step 3: send one picture</string>
+    <string name="set_alerts_wizard_test_body">Tap once and the car takes a picture now, makes it smaller, and sends it to that chat. It should arrive on the phone straight away.</string>
+    <string name="set_alerts_wizard_test_send">Send one</string>
+    <string name="set_alerts_wizard_test_sending">Taking it and sending it, one moment</string>
+    <string name="set_alerts_wizard_test_failed_title">The picture did not go out</string>
+    <string name="set_alerts_wizard_test_failed_body">What happened: %1$s
+
+Next: go back to step 2, check that you sent the bot a message and that a chat was found, then try again.</string>
+    <string name="set_alerts_wizard_done_title">Setup is done</string>
+    <string name="set_alerts_wizard_done_body">It works: %1$s
+
+Pictures reach your chat, so they will reach it when something really happens.
+
+One thing left: the switch at the top is off. While it is off the car will not send alerts by itself.</string>
+    <string name="set_alerts_wizard_done_again">Send another</string>
+    <string name="set_alerts_wizard_finish">Done</string>
 </resources>
