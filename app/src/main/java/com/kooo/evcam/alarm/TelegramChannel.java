@@ -7,6 +7,10 @@
 
 package com.kooo.evcam.alarm;
 
+import com.kooo.evcam.alarm.ntfy.NtfyGate;
+import com.kooo.evcam.alarm.telegram.TelegramRequest;
+import com.kooo.evcam.alarm.telegram.TelegramSender;
+
 /**
  * Telegram 这条出口：把 {@link TelegramSender} 包一层，行为一点没变。
  *

@@ -7,6 +7,11 @@
 
 package com.kooo.evcam.alarm;
 
+import com.kooo.evcam.alarm.ntfy.NtfyChannel;
+import com.kooo.evcam.alarm.ntfy.NtfyGate;
+import com.kooo.evcam.alarm.ntfy.NtfyRisk;
+import com.kooo.evcam.alarm.policy.AlertPolicy;
+
 /**
  * 一条警报的出口：一个话题、一个机器人，都长这个样子。
  *

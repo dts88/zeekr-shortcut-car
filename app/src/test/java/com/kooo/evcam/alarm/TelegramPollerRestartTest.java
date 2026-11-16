@@ -13,6 +13,7 @@ import static org.junit.Assert.assertTrue;
 import android.content.Context;
 
 import com.kooo.evcam.AppConfig;
+import com.kooo.evcam.alarm.telegram.TelegramPoller;
 
 import org.junit.After;
 import org.junit.Test;

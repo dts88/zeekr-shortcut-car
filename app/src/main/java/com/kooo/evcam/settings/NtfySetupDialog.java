@@ -22,13 +22,13 @@ import androidx.fragment.app.Fragment;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.R;
-import com.kooo.evcam.alarm.AlertChannel;
-import com.kooo.evcam.alarm.NtfyRequest;
-import com.kooo.evcam.alarm.NtfyRisk;
-import com.kooo.evcam.alarm.NtfySender;
 import com.kooo.evcam.blackbox.BlackBox;
 import com.kooo.evcam.share.QrCode;
 import com.kooo.evcam.ui.CamDialogs;
+import com.kooo.evcam.alarm.AlertChannel;
+import com.kooo.evcam.alarm.ntfy.NtfyRequest;
+import com.kooo.evcam.alarm.ntfy.NtfyRisk;
+import com.kooo.evcam.alarm.ntfy.NtfySender;
 
 import java.security.SecureRandom;
 

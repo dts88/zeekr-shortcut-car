@@ -10,6 +10,7 @@ package com.kooo.evcam.settings;
 import static com.kooo.evcam.settings.SettingSpec.entry;
 
 import com.kooo.evcam.R;
+import com.kooo.evcam.alarm.media.AlertPicture;
 
 import java.util.Arrays;
 import java.util.Collections;

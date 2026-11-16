@@ -13,11 +13,13 @@ package com.kooo.evcam;
 import android.content.Context;
 import android.content.SharedPreferences;
 
+import com.kooo.evcam.alarm.guard.GuardPolicy;
+import com.kooo.evcam.alarm.ntfy.NtfyGate;
 import com.kooo.evcam.camera.CameraNames;
-import com.kooo.evcam.zeekr.FisheyeProjection;
-import com.kooo.evcam.settings.SettingSpec;
 import com.kooo.evcam.settings.LicensePlate;
+import com.kooo.evcam.settings.SettingSpec;
 import com.kooo.evcam.settings.SettingsRegistry;
+import com.kooo.evcam.zeekr.FisheyeProjection;
 
 /**
  * 应用配置管理类
@@ -2072,7 +2074,7 @@ public class AppConfig {
      * 停车警报开着没有。默认关：这是要联网、要填令牌的功能，不该在没答应它的车上跑。
      *
      * <p>开着也未必发得出去 —— 令牌或会话号缺一个就不发，判断在
-     * {@link com.kooo.evcam.alarm.AlertPolicy}，那一条规则有单测。</p>
+     * {@link com.kooo.evcam.alarm.policy.AlertPolicy}，那一条规则有单测。</p>
      */
     public boolean isAlertsEnabled() {
         return prefs.getBoolean(KEY_ALERTS_ENABLED, false);
@@ -2154,12 +2156,12 @@ public class AppConfig {
      * becomes invisible when developer options are reopened.
      */
     public String getAlertsTransportStored() {
-        return com.kooo.evcam.alarm.NtfyGate.stored(
-                prefs.getString(KEY_ALERTS_TRANSPORT, com.kooo.evcam.alarm.NtfyGate.TELEGRAM));
+        return com.kooo.evcam.alarm.ntfy.NtfyGate.stored(
+                prefs.getString(KEY_ALERTS_TRANSPORT, com.kooo.evcam.alarm.ntfy.NtfyGate.TELEGRAM));
     }
 
     /**
-     * 真正在用的那条路。开发者选项关着时一律 telegram（{@link com.kooo.evcam.alarm.NtfyGate#effective}）。
+     * 真正在用的那条路。开发者选项关着时一律 telegram（{@link com.kooo.evcam.alarm.ntfy.NtfyGate#effective}）。
      *
      * <p>发送、界面上的状态行都读这一个值 —— 两处读同一个函数，说法就不会打架。</p>
      *
@@ -2171,7 +2173,7 @@ public class AppConfig {
         // 所以不再跟着开发者选项开关走；存坏的值仍然按 telegram 算（NtfyGate.stored）。
         // 2026-11-15: the choice moved out of Developer options into the alerts section, so it no longer
         // follows that switch; a stored value that makes no sense still reads as telegram.
-        return com.kooo.evcam.alarm.NtfyGate.stored(getAlertsTransportStored());
+        return com.kooo.evcam.alarm.ntfy.NtfyGate.stored(getAlertsTransportStored());
     }
 
     /**
@@ -2180,14 +2182,14 @@ public class AppConfig {
      * Switch routes. Writes this one key and touches nothing on the other side.
      */
     public void setAlertsTransport(String value) {
-        String clean = com.kooo.evcam.alarm.NtfyGate.stored(value);
+        String clean = com.kooo.evcam.alarm.ntfy.NtfyGate.stored(value);
         prefs.edit().putString(KEY_ALERTS_TRANSPORT, clean).apply();
         AppLog.i(TAG, "警报出口设为 " + clean);
     }
 
     /** 现在是不是走 ntfy。Whether the effective route is ntfy. */
     public boolean isAlertsNtfy() {
-        return com.kooo.evcam.alarm.NtfyGate.NTFY.equals(getAlertsTransport());
+        return com.kooo.evcam.alarm.ntfy.NtfyGate.NTFY.equals(getAlertsTransport());
     }
 
     /** ntfy 服务器地址；空表示用默认的 ntfy.sh。The ntfy server; empty means the default. */
@@ -2274,7 +2276,7 @@ public class AppConfig {
         AppLog.i(TAG, "ntfy 令牌" + (clean.isEmpty() ? "已清空" : "已填写"));
     }
 
-    /** 免费话题的风险提示接受记录：{@code 版本|话题末八位}（{@link com.kooo.evcam.alarm.NtfyRisk}）。 */
+    /** 免费话题的风险提示接受记录：{@code 版本|话题末八位}（{@link com.kooo.evcam.alarm.ntfy.NtfyRisk}）。 */
     public String getAlertsNtfyRiskAck() {
         String raw = readString(KEY_ALERTS_NTFY_RISK_ACK, "");
         return raw == null ? "" : raw.trim();
@@ -2288,18 +2290,18 @@ public class AppConfig {
 
     /** ntfy 这条路配好了没有：有没有一个像样的话题名。Whether ntfy has a usable topic yet. */
     public boolean hasAlertsNtfyConfig() {
-        return com.kooo.evcam.alarm.NtfyRequest.looksLikeTopic(getAlertsNtfyTopic());
+        return com.kooo.evcam.alarm.ntfy.NtfyRequest.looksLikeTopic(getAlertsNtfyTopic());
     }
 
-    /** 发一张 2×2，还是勾选的那几路各一张（{@link com.kooo.evcam.alarm.AlertPicture}）。 */
+    /** 发一张 2×2，还是勾选的那几路各一张（{@link com.kooo.evcam.alarm.media.AlertPicture}）。 */
     public String getAlertsLayout() {
-        return prefs.getString(KEY_ALERTS_LAYOUT, com.kooo.evcam.alarm.AlertPicture.layoutValue(
-                com.kooo.evcam.alarm.AlertPicture.Layout.GRID));
+        return prefs.getString(KEY_ALERTS_LAYOUT, com.kooo.evcam.alarm.media.AlertPicture.layoutValue(
+                com.kooo.evcam.alarm.media.AlertPicture.Layout.GRID));
     }
 
     public void setAlertsLayout(String value) {
-        String clean = com.kooo.evcam.alarm.AlertPicture.layoutValue(
-                com.kooo.evcam.alarm.AlertPicture.layout(value));
+        String clean = com.kooo.evcam.alarm.media.AlertPicture.layoutValue(
+                com.kooo.evcam.alarm.media.AlertPicture.layout(value));
         prefs.edit().putString(KEY_ALERTS_LAYOUT, clean).apply();
     }
 
@@ -2310,8 +2312,8 @@ public class AppConfig {
 
     public void setAlertsCameras(String value) {
         prefs.edit().putString(KEY_ALERTS_CAMERAS,
-                com.kooo.evcam.alarm.AlertPicture.lanesValue(
-                        com.kooo.evcam.alarm.AlertPicture.lanes(value))).apply();
+                com.kooo.evcam.alarm.media.AlertPicture.lanesValue(
+                        com.kooo.evcam.alarm.media.AlertPicture.lanes(value))).apply();
     }
 
     /** 发之前把鱼眼掰直（和回看界面同一个校正）。 */
@@ -2378,24 +2380,24 @@ public class AppConfig {
     }
 
     /**
-     * 哪些事情算「有事」（{@link com.kooo.evcam.alarm.TriggerSet}）。
+     * 哪些事情算「有事」（{@link com.kooo.evcam.alarm.policy.TriggerSet}）。
      *
      * <p>存的是一串逗号分开的名字；空串按全开算。每台车上能看到的信号不一样，
      * 能不能看到那一项由车主自己选。</p>
      */
     public String getAlertsTriggers() {
-        return prefs.getString(KEY_ALERTS_TRIGGERS, com.kooo.evcam.alarm.TriggerSet.DEFAULT);
+        return prefs.getString(KEY_ALERTS_TRIGGERS, com.kooo.evcam.alarm.policy.TriggerSet.DEFAULT);
     }
 
     public void setAlertsTriggers(String value) {
-        String clean = com.kooo.evcam.alarm.TriggerSet.value(
-                parseTriggers(com.kooo.evcam.alarm.TriggerSet.parse(value)));
+        String clean = com.kooo.evcam.alarm.policy.TriggerSet.value(
+                parseTriggers(com.kooo.evcam.alarm.policy.TriggerSet.parse(value)));
         prefs.edit().putString(KEY_ALERTS_TRIGGERS, clean).apply();
     }
 
-    private static java.util.Set<String> parseTriggers(com.kooo.evcam.alarm.TriggerSet set) {
+    private static java.util.Set<String> parseTriggers(com.kooo.evcam.alarm.policy.TriggerSet set) {
         java.util.Set<String> names = new java.util.LinkedHashSet<>();
-        for (String name : com.kooo.evcam.alarm.TriggerSet.ALL) {
+        for (String name : com.kooo.evcam.alarm.policy.TriggerSet.ALL) {
             if (set.has(name)) {
                 names.add(name);
             }
@@ -2405,13 +2407,13 @@ public class AppConfig {
 
     /** 画面移动的灵敏度（1–10，默认 5）。 */
     public int getAlertsMotionSensitivity() {
-        return com.kooo.evcam.alarm.MotionSensitivity.clamp(
-                prefs.getInt(KEY_ALERTS_MOTION_SENSITIVITY, com.kooo.evcam.alarm.MotionSensitivity.DEFAULT));
+        return com.kooo.evcam.alarm.media.MotionSensitivity.clamp(
+                prefs.getInt(KEY_ALERTS_MOTION_SENSITIVITY, com.kooo.evcam.alarm.media.MotionSensitivity.DEFAULT));
     }
 
     public void setAlertsMotionSensitivity(int level) {
         prefs.edit().putInt(KEY_ALERTS_MOTION_SENSITIVITY,
-                com.kooo.evcam.alarm.MotionSensitivity.clamp(level)).apply();
+                com.kooo.evcam.alarm.media.MotionSensitivity.clamp(level)).apply();
     }
 
     /** 警报时发一段短视频吗：0 关，5 或 10 秒。 */
@@ -2444,34 +2446,34 @@ public class AppConfig {
     }
 
     public int getAlertsQuietStart() {
-        return com.kooo.evcam.alarm.QuietHours.clampMinute(
-                prefs.getInt(KEY_ALERTS_QUIET_START, com.kooo.evcam.alarm.QuietHours.DEFAULT_START_MIN));
+        return com.kooo.evcam.alarm.policy.QuietHours.clampMinute(
+                prefs.getInt(KEY_ALERTS_QUIET_START, com.kooo.evcam.alarm.policy.QuietHours.DEFAULT_START_MIN));
     }
 
     public void setAlertsQuietStart(int minute) {
         prefs.edit().putInt(KEY_ALERTS_QUIET_START,
-                com.kooo.evcam.alarm.QuietHours.clampMinute(minute)).apply();
+                com.kooo.evcam.alarm.policy.QuietHours.clampMinute(minute)).apply();
     }
 
     public int getAlertsQuietEnd() {
-        return com.kooo.evcam.alarm.QuietHours.clampMinute(
-                prefs.getInt(KEY_ALERTS_QUIET_END, com.kooo.evcam.alarm.QuietHours.DEFAULT_END_MIN));
+        return com.kooo.evcam.alarm.policy.QuietHours.clampMinute(
+                prefs.getInt(KEY_ALERTS_QUIET_END, com.kooo.evcam.alarm.policy.QuietHours.DEFAULT_END_MIN));
     }
 
     public void setAlertsQuietEnd(int minute) {
         prefs.edit().putInt(KEY_ALERTS_QUIET_END,
-                com.kooo.evcam.alarm.QuietHours.clampMinute(minute)).apply();
+                com.kooo.evcam.alarm.policy.QuietHours.clampMinute(minute)).apply();
     }
 
     /** 锁车之后等几分钟才开始发警报（0 / 1 / 3）。 */
     public int getAlertsArmDelayMinutes() {
-        return com.kooo.evcam.alarm.ArmDelay.clamp(
-                prefs.getInt(KEY_ALERTS_ARM_DELAY, com.kooo.evcam.alarm.ArmDelay.DEFAULT_MIN));
+        return com.kooo.evcam.alarm.policy.ArmDelay.clamp(
+                prefs.getInt(KEY_ALERTS_ARM_DELAY, com.kooo.evcam.alarm.policy.ArmDelay.DEFAULT_MIN));
     }
 
     public void setAlertsArmDelayMinutes(int minutes) {
         prefs.edit().putInt(KEY_ALERTS_ARM_DELAY,
-                com.kooo.evcam.alarm.ArmDelay.clamp(minutes)).apply();
+                com.kooo.evcam.alarm.policy.ArmDelay.clamp(minutes)).apply();
     }
 
     /**
@@ -2484,14 +2486,14 @@ public class AppConfig {
      * touches this row behaves exactly as before. Once switched on, "ask then on" is the default:
      * forgetting is the problem being solved, waiting for a tap is not the cure.</p>
      */
-    public com.kooo.evcam.alarm.GuardPolicy.Mode getAlertsGuardMode() {
-        return com.kooo.evcam.alarm.GuardPolicy.Mode.of(prefs.getInt(KEY_ALERTS_GUARD_MODE,
-                com.kooo.evcam.alarm.GuardPolicy.DEFAULT_MODE.stored()));
+    public com.kooo.evcam.alarm.guard.GuardPolicy.Mode getAlertsGuardMode() {
+        return com.kooo.evcam.alarm.guard.GuardPolicy.Mode.of(prefs.getInt(KEY_ALERTS_GUARD_MODE,
+                com.kooo.evcam.alarm.guard.GuardPolicy.DEFAULT_MODE.stored()));
     }
 
-    public void setAlertsGuardMode(com.kooo.evcam.alarm.GuardPolicy.Mode mode) {
-        com.kooo.evcam.alarm.GuardPolicy.Mode value =
-                mode == null ? com.kooo.evcam.alarm.GuardPolicy.DEFAULT_MODE : mode;
+    public void setAlertsGuardMode(com.kooo.evcam.alarm.guard.GuardPolicy.Mode mode) {
+        com.kooo.evcam.alarm.guard.GuardPolicy.Mode value =
+                mode == null ? com.kooo.evcam.alarm.guard.GuardPolicy.DEFAULT_MODE : mode;
         prefs.edit().putInt(KEY_ALERTS_GUARD_MODE, value.stored()).apply();
     }
 
@@ -2510,19 +2512,19 @@ public class AppConfig {
     }
 
     /**
-     * 记下家的位置。认不出来的坐标不收（{@link com.kooo.evcam.alarm.GuardHome#parse} 说了不算）。
+     * 记下家的位置。认不出来的坐标不收（{@link com.kooo.evcam.alarm.guard.GuardHome#parse} 说了不算）。
      *
      * @return 收下了没有
      */
     public boolean setAlertsGuardHome(double latitude, double longitude) {
-        com.kooo.evcam.alarm.GuardHome.Point point =
-                com.kooo.evcam.alarm.GuardHome.parse(
-                        com.kooo.evcam.alarm.GuardHome.format(latitude, longitude));
+        com.kooo.evcam.alarm.guard.GuardHome.Point point =
+                com.kooo.evcam.alarm.guard.GuardHome.parse(
+                        com.kooo.evcam.alarm.guard.GuardHome.format(latitude, longitude));
         if (point == null) {
             return false;
         }
         secrets().edit().putString(KEY_ALERTS_GUARD_HOME,
-                com.kooo.evcam.alarm.GuardHome.format(point.lat, point.lon)).apply();
+                com.kooo.evcam.alarm.guard.GuardHome.format(point.lat, point.lon)).apply();
         return true;
     }
 

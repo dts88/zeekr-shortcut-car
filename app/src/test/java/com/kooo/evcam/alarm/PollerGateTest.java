@@ -12,6 +12,9 @@ import static org.junit.Assert.assertEquals;
 
 import org.junit.Test;
 
+import com.kooo.evcam.alarm.telegram.PollerGate;
+import com.kooo.evcam.alarm.telegram.TelegramCommand;
+
 /**
  * 一条更新该不该执行（{@link PollerGate}）：私聊、是那个人、没过期、是命令，四道都要过。
  *

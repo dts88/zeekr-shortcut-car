@@ -18,6 +18,8 @@ import org.junit.Test;
 
 import java.util.Calendar;
 
+import com.kooo.evcam.alarm.guard.AlertMoment;
+
 /**
  * 警报里那个时刻（{@link AlertMoment}）：写出来长什么样、读回来是不是同一刻。
  *

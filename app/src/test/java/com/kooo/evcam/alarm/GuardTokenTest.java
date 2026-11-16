@@ -15,6 +15,8 @@ import static org.junit.Assert.assertTrue;
 import java.nio.charset.StandardCharsets;
 import org.junit.Test;
 
+import com.kooo.evcam.alarm.guard.GuardToken;
+
 /** 按钮上那一小段号码（{@link GuardToken}）。 */
 public class GuardTokenTest {
 

@@ -12,6 +12,8 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import com.kooo.evcam.R;
+import com.kooo.evcam.alarm.ntfy.NtfyRequest;
+import com.kooo.evcam.alarm.ntfy.NtfyRisk;
 
 import org.junit.Test;
 

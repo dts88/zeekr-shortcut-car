@@ -17,6 +17,9 @@ import com.kooo.evcam.profile.ProfileStore;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
+import com.kooo.evcam.alarm.guard.GuardPolicy;
+import com.kooo.evcam.alarm.policy.TriggerSet;
+import com.kooo.evcam.alarm.SentryAlerts;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -36,8 +39,8 @@ import com.kooo.evcam.MainActivity;
 import com.kooo.evcam.R;
 import com.kooo.evcam.StorageHelper;
 import com.kooo.evcam.WakeUpHelper;
-import com.kooo.evcam.overlay.OverlayCoordinator;
 import com.kooo.evcam.button.ButtonAction;
+import com.kooo.evcam.overlay.OverlayCoordinator;
 import com.kooo.evcam.service.RecordingFloatingService;
 import com.kooo.evcam.zeekr.DiagnosticsActivity;
 import com.kooo.evcam.zeekr.RearViewMirrorService;
@@ -1013,9 +1016,9 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 try {
                     value = Integer.parseInt(String.valueOf(newValue));
                 } catch (NumberFormatException e) {
-                    value = com.kooo.evcam.alarm.GuardPolicy.DEFAULT_MODE.stored();
+                    value = com.kooo.evcam.alarm.guard.GuardPolicy.DEFAULT_MODE.stored();
                 }
-                appConfig.setAlertsGuardMode(com.kooo.evcam.alarm.GuardPolicy.Mode.of(value));
+                appConfig.setAlertsGuardMode(com.kooo.evcam.alarm.guard.GuardPolicy.Mode.of(value));
                 com.kooo.evcam.blackbox.BlackBox.noteImportant(
                         "设置变更: pref_alerts_guard → " + value);
                 return true;
@@ -1057,10 +1060,10 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         // 这一栏的显示规则全写在这里（ui-spec §三：可见性只在一处）。
         // 总开关关着时，下面那些设置没有意义；下层的选项只在它自己的上一层选中时才出现。
         boolean alertsOn = appConfig.isAlertsEnabled();
-        com.kooo.evcam.alarm.TriggerSet shownTriggers =
-                com.kooo.evcam.alarm.TriggerSet.parse(appConfig.getAlertsTriggers());
-        boolean perCamera = com.kooo.evcam.alarm.AlertPicture.layout(appConfig.getAlertsLayout())
-                == com.kooo.evcam.alarm.AlertPicture.Layout.SEPARATE;
+        com.kooo.evcam.alarm.policy.TriggerSet shownTriggers =
+                com.kooo.evcam.alarm.policy.TriggerSet.parse(appConfig.getAlertsTriggers());
+        boolean perCamera = com.kooo.evcam.alarm.media.AlertPicture.layout(appConfig.getAlertsLayout())
+                == com.kooo.evcam.alarm.media.AlertPicture.Layout.SEPARATE;
         boolean clipOn = appConfig.getAlertsClipSeconds() > 0;
         boolean quietOn = appConfig.isAlertsQuietEnabled();
         // 总开关关着时整组收起来：只留总开关和「检查」，
@@ -1072,7 +1075,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             show(key, alertsOn);
         }
         show("pref_alerts_motion_sensitivity", alertsOn && shownTriggers.has(
-                com.kooo.evcam.alarm.TriggerSet.MOTION));
+                com.kooo.evcam.alarm.policy.TriggerSet.MOTION));
         show("pref_alerts_arm_delay", alertsOn);
         // 起止时刻只看「安静时段」那个开关（车主 2026-11-15）：安静时段关着时两行收起来，
         // 打开才出现；行尾的时刻在 showAlertsRows 里写，出现时总是当前值。
@@ -1145,7 +1148,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 try {
                     appConfig.setAlertsArmDelayMinutes(Integer.parseInt(String.valueOf(newValue)));
                 } catch (NumberFormatException e) {
-                    appConfig.setAlertsArmDelayMinutes(com.kooo.evcam.alarm.ArmDelay.DEFAULT_MIN);
+                    appConfig.setAlertsArmDelayMinutes(com.kooo.evcam.alarm.policy.ArmDelay.DEFAULT_MIN);
                 }
                 com.kooo.evcam.blackbox.BlackBox.noteImportant(
                         "设置变更: pref_alerts_arm_delay → " + newValue);
@@ -1173,8 +1176,8 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 findPreference("pref_alerts_motion_sensitivity");
         if (sensitivity != null) {
             sensitivity.setPersistent(false);
-            sensitivity.setMin(com.kooo.evcam.alarm.MotionSensitivity.MIN);
-            sensitivity.setMax(com.kooo.evcam.alarm.MotionSensitivity.MAX);
+            sensitivity.setMin(com.kooo.evcam.alarm.media.MotionSensitivity.MIN);
+            sensitivity.setMax(com.kooo.evcam.alarm.media.MotionSensitivity.MAX);
             sensitivity.setSeekBarIncrement(1);
             sensitivity.setShowSeekBarValue(true);
             sensitivity.setValue(appConfig.getAlertsMotionSensitivity());
@@ -1211,8 +1214,8 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                     getString(R.string.set_alerts_transport_telegram),
                     getString(R.string.set_alerts_transport_ntfy)});
             transport.setEntryValues(new CharSequence[] {
-                    com.kooo.evcam.alarm.NtfyGate.TELEGRAM,
-                    com.kooo.evcam.alarm.NtfyGate.NTFY});
+                    com.kooo.evcam.alarm.ntfy.NtfyGate.TELEGRAM,
+                    com.kooo.evcam.alarm.ntfy.NtfyGate.NTFY});
             transport.setValue(appConfig.getAlertsTransport());
             transport.setOnPreferenceChangeListener((preference, newValue) -> {
                 String chosen = String.valueOf(newValue);
@@ -1278,12 +1281,12 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         show("pref_alerts_quiet_end", quietOn);
         Preference quietStart = findPreference("pref_alerts_quiet_start");
         if (quietStart != null) {
-            quietStart.setSummary(com.kooo.evcam.alarm.QuietHours.format(
+            quietStart.setSummary(com.kooo.evcam.alarm.policy.QuietHours.format(
                     appConfig.getAlertsQuietStart()));
         }
         Preference quietEnd = findPreference("pref_alerts_quiet_end");
         if (quietEnd != null) {
-            quietEnd.setSummary(com.kooo.evcam.alarm.QuietHours.format(
+            quietEnd.setSummary(com.kooo.evcam.alarm.policy.QuietHours.format(
                     appConfig.getAlertsQuietEnd()));
         }
 
@@ -1305,7 +1308,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             String value = appConfig.getAlertsTelegramToken();
             if (value.isEmpty()) {
                 token.setSummary(R.string.set_alerts_token_empty);
-            } else if (!com.kooo.evcam.alarm.TelegramRequest.looksLikeToken(value)) {
+            } else if (!com.kooo.evcam.alarm.telegram.TelegramRequest.looksLikeToken(value)) {
                 token.setSummary(R.string.set_alerts_token_bad);
             } else {
                 // 只写「填了」：令牌的末四位也不必留在常亮的屏幕上
@@ -1320,10 +1323,10 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         }
         Preference triggersRow = findPreference("pref_alerts_triggers");
         if (triggersRow != null) {
-            com.kooo.evcam.alarm.TriggerSet set =
-                    com.kooo.evcam.alarm.TriggerSet.parse(appConfig.getAlertsTriggers());
+            com.kooo.evcam.alarm.policy.TriggerSet set =
+                    com.kooo.evcam.alarm.policy.TriggerSet.parse(appConfig.getAlertsTriggers());
             StringBuilder text = new StringBuilder();
-            for (String name : com.kooo.evcam.alarm.TriggerSet.ALL) {
+            for (String name : com.kooo.evcam.alarm.policy.TriggerSet.ALL) {
                 if (!set.has(name)) {
                     continue;
                 }
@@ -1338,10 +1341,10 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
 
         Preference cameras = findPreference("pref_alerts_cameras");
         if (cameras != null) {
-            com.kooo.evcam.alarm.AlertPicture.Layout layout =
-                    com.kooo.evcam.alarm.AlertPicture.layout(appConfig.getAlertsLayout());
-            cameras.setVisible(layout == com.kooo.evcam.alarm.AlertPicture.Layout.SEPARATE);
-            int[] lanes = com.kooo.evcam.alarm.AlertPicture.lanes(appConfig.getAlertsCameras());
+            com.kooo.evcam.alarm.media.AlertPicture.Layout layout =
+                    com.kooo.evcam.alarm.media.AlertPicture.layout(appConfig.getAlertsLayout());
+            cameras.setVisible(layout == com.kooo.evcam.alarm.media.AlertPicture.Layout.SEPARATE);
+            int[] lanes = com.kooo.evcam.alarm.media.AlertPicture.lanes(appConfig.getAlertsCameras());
             StringBuilder names = new StringBuilder();
             for (int lane : lanes) {
                 if (names.length() > 0) {
@@ -1349,7 +1352,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 }
                 names.append(com.kooo.evcam.camera.CameraNames.ofLane(requireContext(), lane));
             }
-            cameras.setSummary(com.kooo.evcam.alarm.AlertPicture.allLanes(lanes)
+            cameras.setSummary(com.kooo.evcam.alarm.media.AlertPicture.allLanes(lanes)
                     ? getString(R.string.set_alerts_cameras_all) : names.toString());
         }
 
@@ -1365,9 +1368,9 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
 
     /** 哪些事情算「有事」（TriggerSet）。 */
     private void pickAlertsTriggers(Preference row) {
-        com.kooo.evcam.alarm.TriggerSet current =
-                com.kooo.evcam.alarm.TriggerSet.parse(appConfig.getAlertsTriggers());
-        String[] names = com.kooo.evcam.alarm.TriggerSet.ALL;
+        com.kooo.evcam.alarm.policy.TriggerSet current =
+                com.kooo.evcam.alarm.policy.TriggerSet.parse(appConfig.getAlertsTriggers());
+        String[] names = com.kooo.evcam.alarm.policy.TriggerSet.ALL;
         CharSequence[] labels = new CharSequence[names.length];
         boolean[] checked = new boolean[names.length];
         for (int i = 0; i < names.length; i++) {
@@ -1384,7 +1387,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                             picked.add(names[i]);
                         }
                     }
-                    appConfig.setAlertsTriggers(com.kooo.evcam.alarm.TriggerSet.value(picked));
+                    appConfig.setAlertsTriggers(com.kooo.evcam.alarm.policy.TriggerSet.value(picked));
                     com.kooo.evcam.blackbox.BlackBox.noteImportant("设置变更: pref_alerts_triggers → "
                             + (picked.isEmpty() ? "（一项都没选）" : picked));
                     com.kooo.evcam.alarm.SentryAlerts.get(requireContext()).refreshConfig();
@@ -1397,15 +1400,15 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     /** 触发项的名字（存的是英文 key，界面上说人话）。 */
     private CharSequence triggerLabel(String name) {
         switch (name) {
-            case com.kooo.evcam.alarm.TriggerSet.MOTION:
+            case com.kooo.evcam.alarm.policy.TriggerSet.MOTION:
                 return getString(R.string.alert_trigger_motion);
-            case com.kooo.evcam.alarm.TriggerSet.HAZARD:
+            case com.kooo.evcam.alarm.policy.TriggerSet.HAZARD:
                 return getString(R.string.alert_trigger_hazard);
-            case com.kooo.evcam.alarm.TriggerSet.FLASH:
+            case com.kooo.evcam.alarm.policy.TriggerSet.FLASH:
                 return getString(R.string.alert_trigger_flash);
-            case com.kooo.evcam.alarm.TriggerSet.DOORS:
+            case com.kooo.evcam.alarm.policy.TriggerSet.DOORS:
                 return getString(R.string.alert_trigger_doors);
-            case com.kooo.evcam.alarm.TriggerSet.LAMPS:
+            case com.kooo.evcam.alarm.policy.TriggerSet.LAMPS:
                 return getString(R.string.alert_trigger_lamps);
             default:
                 return getString(R.string.alert_trigger_screen);
@@ -1424,8 +1427,8 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             showTextDialog(key, getString(start ? R.string.set_alerts_quiet_start_title
                             : R.string.set_alerts_quiet_end_title),
                     getString(R.string.set_alerts_quiet_hint),
-                    com.kooo.evcam.alarm.QuietHours.format(current), value -> {
-                        int minute = com.kooo.evcam.alarm.QuietHours.parse(value);
+                    com.kooo.evcam.alarm.policy.QuietHours.format(current), value -> {
+                        int minute = com.kooo.evcam.alarm.policy.QuietHours.parse(value);
                         if (minute < 0) {
                             toast(getString(R.string.set_alerts_quiet_bad_time));
                             return;
@@ -1443,8 +1446,8 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
 
     /** 勾要哪几路。四路都勾就等于「全部」。 */
     private void pickAlertsCameras() {
-        int[] selected = com.kooo.evcam.alarm.AlertPicture.lanes(appConfig.getAlertsCameras());
-        CharSequence[] names = new CharSequence[com.kooo.evcam.alarm.AlertPicture.LANES];
+        int[] selected = com.kooo.evcam.alarm.media.AlertPicture.lanes(appConfig.getAlertsCameras());
+        CharSequence[] names = new CharSequence[com.kooo.evcam.alarm.media.AlertPicture.LANES];
         boolean[] checked = new boolean[names.length];
         for (int lane = 0; lane < names.length; lane++) {
             names[lane] = com.kooo.evcam.camera.CameraNames.ofLane(requireContext(), lane);
@@ -1499,7 +1502,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     /**
      * ntfy 那条路存完之后的收尾：让对方重新读设置、重画行。
      *
-     * <p>换出口只写一个键（{@link com.kooo.evcam.alarm.NtfyGate}），这边只负责通知。</p>
+     * <p>换出口只写一个键（{@link com.kooo.evcam.alarm.ntfy.NtfyGate}），这边只负责通知。</p>
      *
      * The tidy-up after ntfy settings change: make the sender re-read its config and repaint the rows.
      * Switching exits writes one key; this only tells the rest.
@@ -1699,7 +1702,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         com.kooo.evcam.alarm.SentryAlerts.get(requireContext()).findChats(
                 new com.kooo.evcam.alarm.SentryAlerts.ChatListCallback() {
                     @Override
-                    public void onChats(java.util.List<com.kooo.evcam.alarm.TelegramSender.Chat> chats) {
+                    public void onChats(java.util.List<com.kooo.evcam.alarm.telegram.TelegramSender.Chat> chats) {
                         if (!isAdded()) {
                             return;
                         }
@@ -1732,7 +1735,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 });
     }
 
-    private void applyAlertsChat(com.kooo.evcam.alarm.TelegramSender.Chat chat) {
+    private void applyAlertsChat(com.kooo.evcam.alarm.telegram.TelegramSender.Chat chat) {
         String chatId = chat.id;
         appConfig.setAlertsTelegramChatId(chatId);
         // 记下发话的那个人：群聊里靠它才分得出是不是车主本人

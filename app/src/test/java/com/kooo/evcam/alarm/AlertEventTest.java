@@ -16,6 +16,8 @@ import java.util.HashSet;
 import java.util.Set;
 import org.junit.Test;
 
+import com.kooo.evcam.alarm.policy.TriggerSet;
+
 /** 车能发给机器人的每一条消息（{@link AlertEvent}）。 */
 public class AlertEventTest {
 

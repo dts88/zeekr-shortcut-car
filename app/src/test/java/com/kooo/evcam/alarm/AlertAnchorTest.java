@@ -15,6 +15,8 @@ import static org.junit.Assert.assertSame;
 
 import org.junit.Test;
 
+import com.kooo.evcam.alarm.guard.AlertAnchor;
+
 /**
  * 最近几条警报的时刻（{@link AlertAnchor}）：留几条、丢哪条、按时间怎么找回来。
  *

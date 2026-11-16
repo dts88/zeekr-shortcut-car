@@ -7,6 +7,9 @@
 
 package com.kooo.evcam.alarm;
 
+import com.kooo.evcam.alarm.guard.GuardToken;
+import com.kooo.evcam.alarm.telegram.TelegramCommand;
+
 /**
  * 警报那张照片下面那排按钮（纯字符串，{@code AlertButtonTest}）。
  *

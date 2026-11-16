@@ -15,6 +15,8 @@ import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
+import com.kooo.evcam.alarm.policy.SentryFacts;
+
 /**
  * 停车警报怎么读车辆信号（{@link SentryFacts}）：只有「锁着、布防」（哨兵 2）才算数，
  * 所以车主解锁回来那一下之后的亮屏、亮灯都不会发出去。

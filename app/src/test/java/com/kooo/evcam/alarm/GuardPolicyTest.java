@@ -13,6 +13,9 @@ import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
+import com.kooo.evcam.alarm.guard.GuardHome;
+import com.kooo.evcam.alarm.guard.GuardPolicy;
+
 /**
  * 「忘了开哨兵」的判断，一条规则一句话（{@link GuardPolicy}）。
  *

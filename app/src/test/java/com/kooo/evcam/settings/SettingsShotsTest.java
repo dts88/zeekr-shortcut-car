@@ -248,7 +248,7 @@ public class SettingsShotsTest {
      */
     @Test
     public void forgotSentryRowsSitUnderWhenItFires() {
-        SettingsPreferenceFragment on = alertsPage(true, com.kooo.evcam.alarm.NtfyGate.TELEGRAM);
+        SettingsPreferenceFragment on = alertsPage(true, com.kooo.evcam.alarm.ntfy.NtfyGate.TELEGRAM);
         androidx.preference.PreferenceGroup when = (androidx.preference.PreferenceGroup)
                 on.findPreference("cat_alerts_when");
         assertNotNull("少了「什么时候发」那一组", when);
@@ -266,14 +266,14 @@ public class SettingsShotsTest {
 
         // 换成 ntfy：两条出口的组互相换位置，但那三行不动 —— 它们说的和发到哪儿无关。
         // Switch to ntfy: the two transport blocks swap, the three rows stay — they are not exit-specific.
-        SettingsPreferenceFragment ntfy = alertsPage(true, com.kooo.evcam.alarm.NtfyGate.NTFY);
+        SettingsPreferenceFragment ntfy = alertsPage(true, com.kooo.evcam.alarm.ntfy.NtfyGate.NTFY);
         assertTrue("ntfy 时「哪一组出现」照旧", ntfy.findPreference("cat_alerts_ntfy").isVisible());
         for (String key : GUARD_ROWS) {
             assertTrue("ntfy 时 " + key + " 还在", ntfy.findPreference(key).isVisible());
         }
 
         // 总开关关着：三行一起收起来。Master off: all three go with it.
-        SettingsPreferenceFragment off = alertsPage(false, com.kooo.evcam.alarm.NtfyGate.TELEGRAM);
+        SettingsPreferenceFragment off = alertsPage(false, com.kooo.evcam.alarm.ntfy.NtfyGate.TELEGRAM);
         for (String key : GUARD_ROWS) {
             assertFalse("总开关关着时 " + key + " 该收起来", off.findPreference(key).isVisible());
         }

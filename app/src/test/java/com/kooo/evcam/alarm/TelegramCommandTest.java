@@ -14,6 +14,8 @@ import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
+import com.kooo.evcam.alarm.telegram.TelegramCommand;
+
 /**
  * 车主发来的一句话怎么读（{@link TelegramCommand}）：只认配好的那个会话，只认命令、四个方向和
  * {@code guard} 那一族。

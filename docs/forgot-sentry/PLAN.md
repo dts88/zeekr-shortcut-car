@@ -37,9 +37,9 @@ With Sentry off the head unit powers down 4–6 minutes after the owner leaves, 
 
 | Slice | Files | Owner |
 |---|---|---|
-| Core rules | `alarm/GuardPolicy.java`, `alarm/GuardHome.java`, `alarm/GuardToken.java` (all new) + their tests | main |
+| Core rules | `alarm/guard/GuardPolicy.java`, `alarm/guard/GuardHome.java`, `alarm/guard/GuardToken.java` (all new) + their tests | main |
 | State + wiring | `alarm/SentryAlerts.java`, `AppConfig.java`, `button/SentryRemote.java` (new) | main |
-| Telegram transport | `alarm/TelegramSender.java`, `alarm/TelegramPoller.java`, `alarm/PollerGate.java`, `alarm/TelegramCommand.java` + tests | worker A |
+| Telegram transport | `alarm/telegram/TelegramSender.java`, `alarm/telegram/TelegramPoller.java`, `alarm/telegram/PollerGate.java`, `alarm/telegram/TelegramCommand.java` + tests | worker A |
 | Screen and copy | `res/xml/preferences.xml`, `settings/SettingsPreferenceFragment.java`, `res/values*/strings.xml`, `README.md`, `docs/sentry-alerts-spec.md`, `docs/ui-spec.md` | worker B |
 
 Two rules that keep the tree mergeable: nobody touches another slice's files, and every shared-file
@@ -47,7 +47,7 @@ edit is appended at a named anchor rather than scattered.
 
 ## Tickets
 
-### T1 `alarm/GuardPolicy.java` (new, pure)
+### T1 `alarm/guard/GuardPolicy.java` (new, pure)
 
 The decision, and nothing else:
 
@@ -64,12 +64,12 @@ static boolean autoOnDue(long leftAtMs, long nowMs)
 park (that is what separates "parked after a drive" from "parked since Tuesday"); home; a reminder
 already sent for this park. Tests state each rule as a sentence.
 
-### T2 `alarm/GuardHome.java` (new, pure)
+### T2 `alarm/guard/GuardHome.java` (new, pure)
 
 `parse("lat,lon")`, haversine `distanceM`, and `classify(home, lat, lon, fixAgeMs)` →
 `HOME / AWAY / UNKNOWN`. Unknown covers: no home set, no fix, stale fix, nonsense coordinates.
 
-### T3 `alarm/GuardToken.java` (new, pure)
+### T3 `alarm/guard/GuardToken.java` (new, pure)
 
 Mints the callback nonce and parses button data. `data` layout `g:<action>:<token>`, ≤64 bytes;
 actions `on`, `no`, `off`, `st`. A press whose token is not the current one is not ours and returns

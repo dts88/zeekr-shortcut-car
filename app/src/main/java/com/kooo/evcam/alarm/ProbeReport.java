@@ -8,6 +8,8 @@
 package com.kooo.evcam.alarm;
 
 import com.kooo.evcam.R;
+import com.kooo.evcam.alarm.ntfy.NtfyRequest;
+import com.kooo.evcam.alarm.ntfy.NtfyRisk;
 
 import java.util.ArrayList;
 import java.util.List;

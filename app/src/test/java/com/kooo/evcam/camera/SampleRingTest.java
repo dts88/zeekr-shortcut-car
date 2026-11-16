@@ -20,6 +20,8 @@ import org.junit.Test;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.kooo.evcam.alarm.guard.AlertMoment;
+
 /**
  * {@link SampleRing} 的单元测试。
  *

@@ -13,6 +13,9 @@ import static org.junit.Assert.assertTrue;
 import java.nio.charset.StandardCharsets;
 import org.junit.Test;
 
+import com.kooo.evcam.alarm.guard.GuardToken;
+import com.kooo.evcam.alarm.telegram.TelegramRequest;
+
 /**
  * 一排能回话的按钮：字节要能进 Telegram，按钮上的字不能把 JSON 拆了（{@link TelegramRequest#inlineKeyboard}）。
  *

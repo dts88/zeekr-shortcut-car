@@ -12,6 +12,8 @@ import org.robolectric.annotation.Implementation;
 import org.robolectric.annotation.Implements;
 
 import com.kooo.evcam.R;
+import com.kooo.evcam.alarm.media.PictureBudget;
+import com.kooo.evcam.alarm.telegram.TelegramSender;
 
 import java.util.ArrayList;
 import java.util.List;

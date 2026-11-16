@@ -18,6 +18,8 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
+import com.kooo.evcam.alarm.telegram.TelegramRequest;
+
 /**
  * 拼往 Telegram 的那一次请求（{@link TelegramRequest}）：地址怎么拼、令牌怎么擦、表单怎么写、令牌和会话号的形状。
  *

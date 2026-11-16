@@ -15,6 +15,8 @@ import java.util.concurrent.TimeUnit;
 
 import org.junit.Test;
 
+import com.kooo.evcam.alarm.policy.AlertPolicy;
+
 /**
  * 两条线程同时占位（{@link AlertPolicy#reserve}）：只许一条拿到 ALLOW（D-03、F-00.04）。
  *

@@ -13,6 +13,9 @@ import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
+import com.kooo.evcam.alarm.guard.GuardToken;
+import com.kooo.evcam.alarm.telegram.TelegramCommand;
+
 /** 警报照片下面那排按钮（{@link AlertButton}）。 */
 public class AlertButtonTest {
 

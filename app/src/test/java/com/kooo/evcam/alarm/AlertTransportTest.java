@@ -15,6 +15,8 @@ import static org.junit.Assert.assertTrue;
 import android.content.Context;
 
 import com.kooo.evcam.AppConfig;
+import com.kooo.evcam.alarm.ntfy.NtfyGate;
+import com.kooo.evcam.alarm.ntfy.NtfyRisk;
 import com.kooo.evcam.settings.DeveloperMode;
 
 import org.json.JSONObject;

@@ -16,6 +16,8 @@ import org.junit.Test;
 
 import java.util.LinkedHashSet;
 
+import com.kooo.evcam.alarm.policy.TriggerSet;
+
 /**
  * 车主选了哪几项算「有事」（{@link TriggerSet}）：存的是名字，读错、写坏都不能变成「一项都没有」。
  *

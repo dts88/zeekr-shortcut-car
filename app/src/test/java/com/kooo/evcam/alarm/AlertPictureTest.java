@@ -15,6 +15,8 @@ import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
+import com.kooo.evcam.alarm.media.AlertPicture;
+
 /**
  * 警报发几张、发哪几路（{@link AlertPicture}）：排版和勾选的存法。
  *

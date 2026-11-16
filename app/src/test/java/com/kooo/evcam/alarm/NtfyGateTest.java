@@ -13,6 +13,10 @@ import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
+import com.kooo.evcam.alarm.ntfy.NtfyChannel;
+import com.kooo.evcam.alarm.ntfy.NtfyGate;
+import com.kooo.evcam.alarm.ntfy.NtfyRisk;
+
 /**
  * ntfy 这道门、这张风险单：两个纯函数类，不碰 Android、不碰网络。
  *

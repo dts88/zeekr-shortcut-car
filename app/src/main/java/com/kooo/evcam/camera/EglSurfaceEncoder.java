@@ -27,7 +27,7 @@ import android.opengl.Matrix;
 import android.view.Surface;
 
 import com.kooo.evcam.AppLog;
-import com.kooo.evcam.alarm.MotionTap;
+import com.kooo.evcam.alarm.media.MotionTap;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;

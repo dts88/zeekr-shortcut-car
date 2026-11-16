@@ -14,6 +14,8 @@ import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
+import com.kooo.evcam.alarm.policy.ArmDelay;
+
 /**
  * 锁车之后等多久才发（{@link ArmDelay}）：等的那一分钟是自己走开的时间，不是把真事吞掉的时间。
  *

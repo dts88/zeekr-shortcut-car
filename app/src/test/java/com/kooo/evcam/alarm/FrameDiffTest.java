@@ -14,6 +14,8 @@ import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
+import com.kooo.evcam.alarm.media.FrameDiff;
+
 /**
  * 画面里有没有东西在动（{@link FrameDiff}）：三道过滤 —— 曝光跳变、平均差、显著变化占比。
  *

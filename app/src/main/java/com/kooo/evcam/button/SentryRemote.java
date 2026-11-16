@@ -10,6 +10,7 @@ package com.kooo.evcam.button;
 import android.content.Context;
 
 import com.kooo.evcam.R;
+import com.kooo.evcam.alarm.guard.GuardPolicy;
 
 /**
  * 从「停车警报」那一侧开 / 关哨兵模式的那道门。

@@ -18,11 +18,11 @@ import androidx.fragment.app.Fragment;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.R;
-import com.kooo.evcam.alarm.SentryAlerts;
-import com.kooo.evcam.alarm.TelegramRequest;
-import com.kooo.evcam.alarm.TelegramSender;
 import com.kooo.evcam.blackbox.BlackBox;
 import com.kooo.evcam.ui.CamDialogs;
+import com.kooo.evcam.alarm.SentryAlerts;
+import com.kooo.evcam.alarm.telegram.TelegramRequest;
+import com.kooo.evcam.alarm.telegram.TelegramSender;
 
 import java.util.List;
 

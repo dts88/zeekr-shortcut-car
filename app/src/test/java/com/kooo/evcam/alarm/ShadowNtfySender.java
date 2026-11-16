@@ -10,6 +10,8 @@ package com.kooo.evcam.alarm;
 import org.robolectric.annotation.Implementation;
 import org.robolectric.annotation.Implements;
 
+import com.kooo.evcam.alarm.ntfy.NtfySender;
+
 /**
  * 截图测试里的 ntfy 服务器：收到了（`NtfySetupDialog` 那一步只负责把那条带四位数的通知发出去，
  * 手机上收没收到由车主填回来说）。不发的话测试会去连真的 ntfy.sh，慢，而且不该连。

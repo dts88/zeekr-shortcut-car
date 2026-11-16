@@ -14,6 +14,8 @@ import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
+import com.kooo.evcam.alarm.guard.GuardHome;
+
 /** 家的那一个点、那一段距离、那个保守的结论（{@link GuardHome}）。 */
 public class GuardHomeTest {
 

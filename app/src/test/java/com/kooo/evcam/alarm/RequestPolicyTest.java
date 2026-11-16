@@ -14,6 +14,8 @@ import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
+import com.kooo.evcam.alarm.policy.RequestPolicy;
+
 /**
  * 人从 Telegram 要照片的频率上限（{@link RequestPolicy}）：30 秒一张，一小时 6 张。
  *

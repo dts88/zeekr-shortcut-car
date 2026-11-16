@@ -12,6 +12,8 @@ import static org.junit.Assert.assertEquals;
 
 import org.junit.Test;
 
+import com.kooo.evcam.alarm.policy.AlertPolicy;
+
 /**
  * 停车警报什么时候发（{@link AlertPolicy}）：只要停着、哨兵开着，还要等冷却、守每小时的上限。
  *
