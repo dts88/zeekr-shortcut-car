@@ -211,6 +211,9 @@ public final class CameraAvailabilityWatch {
      *
      * <p>黑匣子那一行的格式不变（「相机服务: N 空闲 / 被占用」加括号），括号按新的分类写：我们开着它时报的「空闲」
      * 是相机服务乱报、算别人引起的变化；丢了之后那一次关的途中报的「被占用」是新的主人，算在途。</p>
+     *
+     * <p>不是我们的「被占用」当场查一下相机列表（{@link #listed}，项目所有者 2026-11-16）：列表里没有它就写「从相机列表消失」，
+     * 不写成别的程序拿了。只改黑匣子的说法，记录（{@link Ledger}）和调度照旧。</p>
      */
     private static void heard(String cameraId, boolean available, boolean replay) {
         long now = SystemClock.elapsedRealtime();
@@ -218,7 +221,8 @@ public final class CameraAvailabilityWatch {
         boolean holdsOrOpen = weHoldOrOpen(cameraId);
         boolean holdsDevice = weHoldDevice(cameraId);
         Cause cause = LEDGER.heard(cameraId, available, replay, ourStepInFlight(cameraId), holdsOrOpen, now);
-        changed(cameraId, available);
+        boolean vanished = !available && !replay && !holdsOrOpen && !listed(cameraId);
+        changed(cameraId, available, vanished);
         if (cause == Cause.SAME) {
             return;
         }
@@ -235,7 +239,9 @@ public final class CameraAvailabilityWatch {
                     : cameBack ? "（回来了：之前相机服务的缓存里没有它）" : ""));
         } else {
             BlackBox.noteImportant("相机服务: " + cameraId + " 被占用"
-                    + (holdsOrOpen ? "（我们开着）" : "（不是我们：别的程序，或相机服务里没清掉的占用）")
+                    + (holdsOrOpen ? "（我们开着）"
+                    : vanished ? "（不是我们：它从相机列表消失了）"
+                    : "（不是我们：别的程序，或相机服务里没清掉的占用）")
                     + (cause == Cause.INITIAL ? "（初始状态）"
                     : cause == Cause.OURS && !holdsOrOpen ? "（我们这边正在关它：算在途）"
                     : cause == Cause.OTHERS && holdsOrOpen ? "（相机服务改口，算别人引起的变化）"
@@ -247,8 +253,10 @@ public final class CameraAvailabilityWatch {
     /**
      * 诊断报告的旧表（{@link #snapshot}）和争用日志（{@link CameraContention}）。黑匣子那一行在 {@link #heard}。
      * 2.11 阶段 3 起不再调 CameraTaken：它那几个事件入口会叫看门狗去重开，动相机的只剩通道调度一处。
+     *
+     * @param vanished 「被占用」的那一刻它已经不在相机列表里（{@link #listed}）：争用日志写「从相机列表消失」
      */
-    private static void changed(String cameraId, boolean available) {
+    private static void changed(String cameraId, boolean available, boolean vanished) {
         Boolean before = AVAILABLE.put(cameraId, available);
         if (before != null && before == available) {
             return;
@@ -266,7 +274,7 @@ public final class CameraAvailabilityWatch {
                 CameraContention.othersReleased(cameraId);
             }
         } else if (!ours) {
-            CameraContention.othersTook(cameraId, before == null);
+            CameraContention.othersTook(cameraId, before == null, vanished);
         }
     }
 
@@ -284,6 +292,34 @@ public final class CameraAvailabilityWatch {
     private static boolean weHoldDevice(String cameraId) {
         CameraRound live = CameraRounds.process().live(cameraId);
         return live != null && live.holdsDevice();
+    }
+
+    /**
+     * 这一路此刻在不在相机列表里（{@code CameraManager.getCameraIdList}）：读的是进程里的缓存，不开相机，和 {@link #ask} 一样只问。
+     *
+     * <p>相机服务对「被别的程序打开」和「从相机服务里没了」（NOT_PRESENT：断电、被系统收走）发的是同一声
+     * {@code onCameraUnavailable}。没了的那一路先从缓存里拿掉、再发这一声（AOSP 12 {@code CameraManagerGlobal.onStatusChangedLocked}），
+     * 所以收到时查一下就分得开：列表里没有它 = 从相机列表消失了。离车后约 98 秒后座舱用不了就是这种（Lab 10-30：那一刻它从列表里消失，
+     * 新起的进程也看不到），黑匣子以前一律写成「别的程序拿了」（项目所有者 2026-11-16：多半是断电或被系统锁住，以后当场查、分开写）。</p>
+     *
+     * <p>还没开始听（{@link #start} 没做成）或者查不成的，当它在：照旧的说法。</p>
+     */
+    static boolean listed(String cameraId) {
+        CameraManager cm = cameraManager;
+        if (cm == null || cameraId == null) {
+            return true;
+        }
+        try {
+            for (String id : cm.getCameraIdList()) {
+                if (cameraId.equals(id)) {
+                    return true;
+                }
+            }
+            return false;
+        } catch (Exception e) {
+            AppLog.w(TAG, "getCameraIdList failed: " + e);
+            return true;
+        }
     }
 
     /** 有没有收到过回调。没有的话，多半是容器没把这条接口转过来。 */
