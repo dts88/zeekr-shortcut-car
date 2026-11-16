@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [4.9.0-alpha] - 2026-11-17
+
+- X knob (experimental) in Settings → Buttons.
+- Smart buttons and the floating button: new actions Temperature up and Temperature down.
+- Volume up / down: adjust through the suggested stream.
+
 ## [4.8.0-alpha] - 2026-11-16
 
 - Super mirror and side view: the camera keeper hands their pictures to every camera pipeline as soon as it is built; their own retries and 2-second watchdogs are gone.
