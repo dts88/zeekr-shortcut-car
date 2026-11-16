@@ -30,6 +30,7 @@ public class ValueActionPreference extends Preference implements PreferenceRows.
     private CharSequence value;
     private CharSequence actionLabel;
     private Runnable action;
+    private Boolean expanded;
 
     public ValueActionPreference(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -40,6 +41,13 @@ public class ValueActionPreference extends Preference implements PreferenceRows.
     public void setValue(CharSequence value) {
         if (!TextUtils.equals(this.value, value)) {
             this.value = value;
+            notifyChanged();
+        }
+    }
+
+    void setExpanded(Boolean expanded) {
+        if (!java.util.Objects.equals(this.expanded, expanded)) {
+            this.expanded = expanded;
             notifyChanged();
         }
     }
@@ -59,6 +67,12 @@ public class ValueActionPreference extends Preference implements PreferenceRows.
             valueView.setText(value);
             valueView.setVisibility(TextUtils.isEmpty(value) ? View.GONE : View.VISIBLE);
         }
+        View chevron = holder.findViewById(R.id.pref_chevron);
+        if (chevron != null) {
+            chevron.setRotation(expanded == null ? 0f : expanded ? -90f : 90f);
+        }
+        CardItemPreference.shape(holder.itemView, Boolean.TRUE.equals(expanded) ? CardItemPreference.TOP
+                : CardItemPreference.ALONE, true);
         TextView button = (TextView) holder.findViewById(R.id.pref_action);
         if (button != null) {
             boolean shown = action != null && !TextUtils.isEmpty(actionLabel);

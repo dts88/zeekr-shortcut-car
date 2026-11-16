@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="8dp"
+    android:background="@drawable/bg_pref_row"
+    android:baselineAligned="false"
+    android:gravity="center_vertical"
+    android:minHeight="64dp"
+    android:orientation="horizontal"
+    android:paddingStart="@dimen/pref_row_padding_start"
+    android:paddingEnd="14dp">
+
+    <LinearLayout
+        android:id="@android:id/widget_frame"
+        android:layout_width="@dimen/pref_switch_width"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="@dimen/pref_switch_gap"
+        android:gravity="center"
+        android:orientation="vertical" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:paddingTop="12dp"
+        android:paddingBottom="12dp">
+
+        <TextView
+            android:id="@android:id/title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="2"
+            android:textColor="@color/pref_title"
+            android:textAppearance="@style/TextAppearance.Cam.Body" />
+
+        <TextView
+            android:id="@android:id/summary"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:maxLines="4"
+            android:textColor="@color/pref_summary"
+            android:textAppearance="@style/TextAppearance.Cam.Micro" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/pref_value"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:ellipsize="end"
+        android:gravity="end"
+        android:maxWidth="420dp"
+        android:maxLines="2"
+        android:textColor="@color/pref_summary"
+        android:textAppearance="@style/TextAppearance.Cam.Caption"
+        android:visibility="gone" />
+
+    <ImageView
+        android:id="@+id/pref_chevron"
+        android:layout_width="26dp"
+        android:layout_height="26dp"
+        android:layout_marginStart="8dp"
+        android:importantForAccessibility="no"
+        android:src="@drawable/ic_chevron_right"
+        android:tint="@color/text_tertiary" />
+</LinearLayout>

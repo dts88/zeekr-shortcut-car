@@ -10,6 +10,8 @@ package com.kooo.evcam.settings;
 import android.content.Context;
 import android.text.InputFilter;
 import android.text.InputType;
+import android.text.TextUtils;
+import android.text.format.DateFormat;
 import android.view.inputmethod.EditorInfo;
 import android.widget.EditText;
 import android.widget.LinearLayout;
@@ -33,7 +35,12 @@ import com.kooo.evcam.button.SmartButtons;
 import com.kooo.evcam.ui.CamDialogs;
 
 import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 final class AccessoryRows {
 
@@ -41,9 +48,21 @@ final class AccessoryRows {
     private final SettingsPreferenceFragment fragment;
     private final PreferenceCategory category;
     private final ActivityResultLauncher<String[]> permissions;
-    private final Runnable onChanged = this::rebuildRows;
+    private final Runnable onChanged = this::refreshAll;
+    private final Map<String, Device> devices = new LinkedHashMap<>();
+    private final Set<String> expanded = new HashSet<>();
     private AlertDialog bindDialog;
     private boolean bindAfterPermission;
+
+    private static final class Device {
+        ValueActionPreference row;
+        CardItemPreference status;
+        CardItemPreference name;
+        CardItemPreference exclusive;
+        final Map<Integer, CardItemPreference> presses = new LinkedHashMap<>();
+        CardItemPreference turn;
+        CardItemPreference home;
+    }
 
     AccessoryRows(Accessory kind, SettingsPreferenceFragment fragment, PreferenceCategory category,
                   ActivityResultLauncher<String[]> permissions) {
@@ -121,7 +140,6 @@ final class AccessoryRows {
         }
     }
 
-
     private void startBinding() {
         SmartButtons buttons = SmartButtons.get();
         Context context = fragment.getContext();
@@ -182,7 +200,7 @@ final class AccessoryRows {
                     dialog.dismiss();
                 }
                 showResult(result, address);
-                rebuildRows();
+                refreshAll();
             }
         };
         bindDialog = CamDialogs.show(new MaterialAlertDialogBuilder(context, R.style.Theme_Cam_MaterialAlertDialog)
@@ -227,7 +245,6 @@ final class AccessoryRows {
         }
     }
 
-
     private void rebuildRows() {
         Context context = fragment.getContext();
         if (context == null) {
@@ -243,31 +260,170 @@ final class AccessoryRows {
         for (Preference p : old) {
             category.removePreference(p);
         }
-        SmartButtons buttons = SmartButtons.get();
+        devices.clear();
         AppConfig config = new AppConfig(context);
+        List<String> addresses = config.getAccessories(kind);
+        expanded.retainAll(addresses);
         int order = 2;
-        for (String address : config.getAccessories(kind)) {
-            ValueActionPreference row = new ValueActionPreference(context, null);
-            row.setKey(rowPrefix() + address);
-            row.setPersistent(false);
-            row.setIconSpaceReserved(false);
-            row.setOrder(order++);
-            String named = config.getAccessoryName(kind, address);
-            row.setTitle(displayName(context, config, address));
-            String actions = summary(context, config, address);
-            String info = info(context, named.isEmpty() ? null : defaultName(context, address),
-                    buttons == null ? null : buttons.version(address), buttons == null ? null : buttons.serial(address));
-            row.setSummary(info.isEmpty() ? actions : actions + "\n" + info);
-            int battery = buttons == null ? -1 : buttons.battery(address);
-            row.setValue(battery < 0 ? null : context.getString(R.string.smart_button_battery, battery));
-            row.setAction(context.getString(R.string.action_delete), () -> confirmDelete(address));
-            row.setOnPreferenceClickListener(p -> {
-                editActions(address);
+        for (String address : addresses) {
+            Device d = new Device();
+            d.row = new ValueActionPreference(context, null);
+            d.row.setKey(rowPrefix() + address);
+            d.row.setPersistent(false);
+            d.row.setIconSpaceReserved(false);
+            d.row.setOrder(order++);
+            d.row.setAction(context.getString(R.string.action_delete), () -> confirmDelete(address));
+            d.row.setOnPreferenceClickListener(p -> {
+                toggle(address);
                 return true;
             });
-            category.addPreference(row);
-            row.setDependency(switchKey(kind));
+            category.addPreference(d.row);
+            d.row.setDependency(switchKey(kind));
+            String base = rowPrefix() + address + "/";
+            d.status = item(context, base + "status", order++, 0);
+            d.status.setSelectable(false);
+            d.name = item(context, base + "name", order++, R.string.set_smart_button_label);
+            d.name.setOnPreferenceClickListener(p -> {
+                editName(address);
+                return true;
+            });
+            if (kind == Accessory.KNOB) {
+                d.exclusive = item(context, base + "exclusive", order++, R.string.set_x_knob_exclusive);
+                d.exclusive.setSwitch(on -> setExclusive(address, on));
+            }
+            CardItemPreference lastPress = null;
+            for (int gesture : kind.actionGestures()) {
+                if (Accessory.isTurn(gesture)) {
+                    continue;
+                }
+                CardItemPreference press = item(context, base + gesture, order++, gestureLabel(gesture));
+                press.setOnPreferenceClickListener(p -> {
+                    pickAction(address, gesture);
+                    return true;
+                });
+                d.presses.put(gesture, press);
+                lastPress = press;
+            }
+            if (kind == Accessory.KNOB) {
+                d.turn = item(context, base + "turn", order++, R.string.set_x_knob_turn);
+                d.turn.setOnPreferenceClickListener(p -> {
+                    pickTurn(address);
+                    return true;
+                });
+                d.turn.setLast(true);
+                d.home = item(context, base + "home", order++, R.string.set_x_knob_home);
+                d.home.setOnPreferenceClickListener(p -> {
+                    pickHome(address);
+                    return true;
+                });
+                d.home.setLast(true);
+            } else if (lastPress != null) {
+                lastPress.setLast(true);
+            }
+            devices.put(address, d);
+            fill(context, config, address, d);
         }
+    }
+
+    private CardItemPreference item(Context context, String key, int order, int title) {
+        CardItemPreference p = new CardItemPreference(context);
+        p.setKey(key);
+        p.setOrder(order);
+        if (title != 0) {
+            p.setTitle(title);
+        }
+        category.addPreference(p);
+        return p;
+    }
+
+    private void refreshAll() {
+        Context context = fragment.getContext();
+        if (context == null) {
+            return;
+        }
+        AppConfig config = new AppConfig(context);
+        if (!config.getAccessories(kind).equals(new ArrayList<>(devices.keySet()))) {
+            rebuildRows();
+            return;
+        }
+        for (Map.Entry<String, Device> entry : devices.entrySet()) {
+            fill(context, config, entry.getKey(), entry.getValue());
+        }
+    }
+
+    private void fill(Context context, AppConfig config, String address, Device d) {
+        SmartButtons buttons = SmartButtons.get();
+        String named = config.getAccessoryName(kind, address);
+        d.row.setTitle(displayName(context, config, address));
+        String actions = summary(context, config, address);
+        d.row.setSummary(named.isEmpty() ? actions : actions + "\n" + defaultName(context, address));
+        int battery = buttons == null ? -1 : buttons.battery(address);
+        d.row.setValue(battery < 0 ? null : context.getString(R.string.smart_button_battery, battery));
+        d.status.setSummary(status(context, config, buttons, address));
+        d.name.setValue(displayName(context, config, address));
+        if (d.exclusive != null) {
+            d.exclusive.setChecked(config.isKnobExclusive(address));
+        }
+        for (Map.Entry<Integer, CardItemPreference> press : d.presses.entrySet()) {
+            press.getValue().setValue(actionLabel(context, config, address, press.getKey()));
+        }
+        if (d.turn != null) {
+            d.turn.setValue(config.getKnobTurn(address).label(context));
+        }
+        if (d.home != null) {
+            d.home.setValue(context.getString(R.string.x_knob_home_count, config.getKnobHome(address).size()));
+        }
+        show(config, address, d);
+    }
+
+    private void show(AppConfig config, String address, Device d) {
+        boolean on = config.isAccessoryEnabled(kind);
+        boolean open = expanded.contains(address);
+        boolean exclusive = d.exclusive != null && config.isKnobExclusive(address);
+        d.row.setExpanded(open);
+        want(d.status, on, open && !TextUtils.isEmpty(d.status.getSummary()));
+        want(d.name, on, open);
+        if (d.exclusive != null) {
+            want(d.exclusive, on, open);
+        }
+        for (CardItemPreference press : d.presses.values()) {
+            want(press, on, open && !exclusive);
+        }
+        if (d.turn != null) {
+            want(d.turn, on, open && !exclusive);
+        }
+        if (d.home != null) {
+            want(d.home, on, open && exclusive);
+        }
+    }
+
+    private static void want(CardItemPreference row, boolean on, boolean wanted) {
+        row.setWanted(wanted);
+        if (row.isVisible() != (on && wanted)) {
+            row.setVisible(on && wanted);
+        }
+    }
+
+    private void toggle(String address) {
+        Context context = fragment.getContext();
+        Device d = devices.get(address);
+        if (context == null || d == null) {
+            return;
+        }
+        if (!expanded.remove(address)) {
+            expanded.add(address);
+        }
+        show(new AppConfig(context), address, d);
+    }
+
+    private void refresh(String address) {
+        Context context = fragment.getContext();
+        Device d = devices.get(address);
+        if (context == null || d == null) {
+            refreshAll();
+            return;
+        }
+        fill(context, new AppConfig(context), address, d);
     }
 
     private String summary(Context context, AppConfig config, String address) {
@@ -285,6 +441,37 @@ final class AccessoryRows {
                 actionLabel(context, config, address, SmartButtonAd.DOUBLE));
     }
 
+    private String status(Context context, AppConfig config, SmartButtons buttons, String address) {
+        List<String> facts = new ArrayList<>();
+        int battery = buttons == null ? -1 : buttons.battery(address);
+        if (battery >= 0) {
+            facts.add(context.getString(R.string.smart_button_battery, battery));
+        }
+        String version = buttons == null ? null : buttons.version(address);
+        if (version != null) {
+            facts.add(context.getString(R.string.smart_button_version, version));
+        }
+        String serial = buttons == null ? null : buttons.serial(address);
+        if (serial != null) {
+            facts.add(context.getString(R.string.smart_button_serial, serial));
+        }
+        String first = String.join(" · ", facts);
+        if (kind != Accessory.KNOB) {
+            return first;
+        }
+        KnobTurn current = buttons == null ? config.getKnobHome(address).get(0) : buttons.knobCurrent(address);
+        String mode = config.isKnobExclusive(address)
+                ? context.getString(R.string.x_knob_mode_exclusive, current.label(context))
+                : context.getString(R.string.x_knob_mode_normal);
+        long until = buttons == null ? 0L : buttons.boostEndsAt(address);
+        String light = until > 0
+                ? context.getString(R.string.x_knob_light_boost, DateFormat.getTimeFormat(context).format(new Date(until)))
+                : context.getString(R.string.quick_off);
+        String second = context.getString(R.string.x_knob_status_mode, mode) + " · "
+                + context.getString(R.string.x_knob_status_light, light);
+        return first.isEmpty() ? second : first + "\n" + second;
+    }
+
     private String defaultName(Context context, String address) {
         return context.getString(res(R.string.smart_button_name, R.string.x_knob_name), SmartButtonAd.shortId(address));
     }
@@ -292,20 +479,6 @@ final class AccessoryRows {
     private String displayName(Context context, AppConfig config, String address) {
         String named = config.getAccessoryName(kind, address);
         return named.isEmpty() ? defaultName(context, address) : named;
-    }
-
-    private static String info(Context context, String defaultName, String version, String serial) {
-        List<String> parts = new ArrayList<>();
-        if (defaultName != null) {
-            parts.add(defaultName);
-        }
-        if (version != null) {
-            parts.add(context.getString(R.string.smart_button_version, version));
-        }
-        if (serial != null) {
-            parts.add(context.getString(R.string.smart_button_serial, serial));
-        }
-        return String.join(" · ", parts);
     }
 
     private String actionLabel(Context context, AppConfig config, String address, int gesture) {
@@ -322,68 +495,15 @@ final class AccessoryRows {
         }
     }
 
-    private void editActions(String address) {
+    private void setExclusive(String address, boolean on) {
         Context context = fragment.getContext();
         if (context == null) {
             return;
         }
-        AppConfig config = new AppConfig(context);
-        String name = displayName(context, config, address);
-        boolean knob = kind == Accessory.KNOB;
-        boolean exclusive = knob && config.isKnobExclusive(address);
-        List<String> items = new ArrayList<>();
-        List<Runnable> picks = new ArrayList<>();
-        items.add(context.getString(R.string.set_smart_button_label) + " · " + name);
-        picks.add(() -> editName(address));
-        if (knob) {
-            items.add(context.getString(R.string.set_x_knob_exclusive) + " · "
-                    + context.getString(exclusive ? R.string.quick_on : R.string.quick_off));
-            picks.add(() -> pickExclusive(address));
-        }
-        if (exclusive) {
-            items.add(context.getString(R.string.set_x_knob_home) + " · "
-                    + context.getString(R.string.x_knob_home_count, config.getKnobHome(address).size()));
-            picks.add(() -> pickHome(address));
-        } else {
-            for (int gesture : kind.actionGestures()) {
-                if (!Accessory.isTurn(gesture)) {
-                    items.add(context.getString(gestureLabel(gesture)) + " · "
-                            + actionLabel(context, config, address, gesture));
-                    picks.add(() -> pickAction(address, gesture));
-                }
-            }
-            if (knob) {
-                items.add(context.getString(R.string.set_x_knob_turn) + " · " + config.getKnobTurn(address).label(context));
-                picks.add(() -> pickTurn(address));
-            }
-        }
-        CamDialogs.show(new MaterialAlertDialogBuilder(context, R.style.Theme_Cam_MaterialAlertDialog)
-                .setTitle(name)
-                .setItems(items.toArray(new String[0]), (d, which) -> picks.get(which).run())
-                .setNegativeButton(R.string.action_cancel, null));
-    }
-
-    private void pickExclusive(String address) {
-        Context context = fragment.getContext();
-        if (context == null) {
-            return;
-        }
-        boolean on = new AppConfig(context).isKnobExclusive(address);
-        String[] choices = {context.getString(R.string.quick_on), context.getString(R.string.quick_off)};
-        CamDialogs.show(new MaterialAlertDialogBuilder(context, R.style.Theme_Cam_MaterialAlertDialog)
-                .setTitle(R.string.set_x_knob_exclusive)
-                .setSingleChoiceItems(choices, on ? 0 : 1, (d, which) -> {
-                    d.dismiss();
-                    boolean picked = which == 0;
-                    if (picked == on) {
-                        return;
-                    }
-                    new AppConfig(context).setKnobExclusive(address, picked);
-                    com.kooo.evcam.blackbox.BlackBox.noteImportant("开关变更: X旋钮 " + SmartButtonAd.shortId(address)
-                            + " 专属模式 → " + (picked ? "开" : "关"));
-                    rebuildRows();
-                })
-                .setNegativeButton(R.string.action_cancel, null));
+        new AppConfig(context).setKnobExclusive(address, on);
+        com.kooo.evcam.blackbox.BlackBox.noteImportant("开关变更: X旋钮 " + SmartButtonAd.shortId(address)
+                + " 专属模式 → " + (on ? "开" : "关"));
+        refresh(address);
     }
 
     private void pickHome(String address) {
@@ -421,7 +541,7 @@ final class AccessoryRows {
                     new AppConfig(context).setKnobHome(address, picked);
                     com.kooo.evcam.blackbox.BlackBox.noteImportant("开关变更: X旋钮 " + SmartButtonAd.shortId(address)
                             + " 按下时显示 " + picked.size() + " 项");
-                    rebuildRows();
+                    refresh(address);
                 })
                 .setNegativeButton(R.string.action_cancel, null));
     }
@@ -486,7 +606,7 @@ final class AccessoryRows {
         config.setKnobTurn(address, picked);
         com.kooo.evcam.blackbox.BlackBox.noteImportant("开关变更: X旋钮 " + SmartButtonAd.shortId(address)
                 + " 转动 → " + picked.key);
-        rebuildRows();
+        refresh(address);
     }
 
     private void editName(String address) {
@@ -506,7 +626,7 @@ final class AccessoryRows {
                 .setView(box)
                 .setPositiveButton(R.string.action_save, (d, w) -> {
                     new AppConfig(context).setAccessoryName(kind, address, input.getText().toString());
-                    rebuildRows();
+                    refresh(address);
                 })
                 .setNegativeButton(R.string.action_cancel, null));
     }
@@ -543,7 +663,7 @@ final class AccessoryRows {
         com.kooo.evcam.blackbox.BlackBox.noteImportant("开关变更: " + (kind == Accessory.KNOB ? "X旋钮 " : "灵动贴 ")
                 + SmartButtonAd.shortId(address) + " " + (gesture == SmartButtonAd.DOUBLE ? "双击" : "单击")
                 + " → " + picked.key);
-        rebuildRows();
+        refresh(address);
     }
 
     private void confirmDelete(String address) {
@@ -561,7 +681,7 @@ final class AccessoryRows {
                     } else {
                         new AppConfig(context).removeAccessory(kind, address);
                     }
-                    rebuildRows();
+                    refreshAll();
                 })
                 .setNegativeButton(R.string.action_cancel, null));
     }

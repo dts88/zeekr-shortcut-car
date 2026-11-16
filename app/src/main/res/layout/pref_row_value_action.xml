@@ -58,6 +58,7 @@
         android:visibility="gone" />
 
     <ImageView
+        android:id="@+id/pref_chevron"
         android:layout_width="26dp"
         android:layout_height="26dp"
         android:layout_marginStart="8dp"

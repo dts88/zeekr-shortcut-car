@@ -133,36 +133,64 @@ public class SettingsShotsTest {
         section.scrollToPreference("x_knob." + knob);
         File file = Shots.save(activity, "settings-floating-day-knob" + suffix);
         assertTrue(file.length() > 10_000);
+        Preference status = section.findPreference("x_knob." + knob + "/status");
+        assertNotNull(status);
+        assertFalse(status.isVisible());
+
+        Preference buttonRow = section.findPreference("smart_button." + button);
+        buttonRow.getOnPreferenceClickListener().onPreferenceClick(buttonRow);
+        Shots.settle();
+        assertFalse(section.findPreference("smart_button." + button + "/status").isVisible());
+        assertTrue(section.findPreference("smart_button." + button + "/name").isVisible());
+        assertTrue(section.findPreference("smart_button." + button + "/2").isVisible());
+        section.scrollToPreference("smart_button." + button + "/2");
+        Shots.settle();
+        File buttonOpen = Shots.save(activity, "settings-floating-day-button-open" + suffix);
+        assertTrue(buttonOpen.length() > 10_000);
+        buttonRow.getOnPreferenceClickListener().onPreferenceClick(buttonRow);
+        Shots.settle();
+        assertFalse(section.findPreference("smart_button." + button + "/name").isVisible());
 
         row.getOnPreferenceClickListener().onPreferenceClick(row);
         Shots.settle();
-        android.app.Dialog menu = org.robolectric.shadows.ShadowDialog.getLatestDialog();
-        assertNotNull(menu);
-        File menuFile = Shots.save(menu, "settings-floating-day-knob-menu" + suffix);
-        assertTrue(menuFile.length() > 10_000);
-        android.widget.ListView items = ((androidx.appcompat.app.AlertDialog) menu).getListView();
-        items.performItemClick(items.getAdapter().getView(4, null, items), 4, items.getItemIdAtPosition(4));
+        assertTrue(status.isVisible());
+        assertTrue(String.valueOf(status.getSummary()).contains(activity.getString(R.string.x_knob_mode_normal)));
+        Preference turnRow = section.findPreference("x_knob." + knob + "/turn");
+        Preference homeRow = section.findPreference("x_knob." + knob + "/home");
+        assertTrue(turnRow.isVisible());
+        assertFalse(homeRow.isVisible());
+        section.scrollToPreference("x_knob." + knob + "/turn");
+        Shots.settle();
+        File open = Shots.save(activity, "settings-floating-day-knob-open" + suffix);
+        assertTrue(open.length() > 10_000);
+
+        turnRow.getOnPreferenceClickListener().onPreferenceClick(turnRow);
         Shots.settle();
         android.app.Dialog turn = org.robolectric.shadows.ShadowDialog.getLatestDialog();
-        org.junit.Assert.assertNotSame(menu, turn);
+        assertNotNull(turn);
         assertEquals(1 + com.kooo.evcam.button.KnobTurn.groups().indexOf(com.kooo.evcam.button.ButtonAction.Group.MEDIA),
                 ((androidx.appcompat.app.AlertDialog) turn).getListView().getCheckedItemPosition());
         File turnFile = Shots.save(turn, "settings-floating-day-knob-turn" + suffix);
         turn.dismiss();
         assertTrue(turnFile.length() > 10_000);
 
-        config.setKnobExclusive(knob, true);
-        row.getOnPreferenceClickListener().onPreferenceClick(row);
+        CardItemPreference exclusive = section.findPreference("x_knob." + knob + "/exclusive");
+        assertNotNull(exclusive);
+        assertFalse(exclusive.isChecked());
+        exclusive.onClick();
         Shots.settle();
-        android.app.Dialog exclusive = org.robolectric.shadows.ShadowDialog.getLatestDialog();
-        org.junit.Assert.assertNotSame(turn, exclusive);
-        File exclusiveFile = Shots.save(exclusive, "settings-floating-day-knob-menu-exclusive" + suffix);
-        assertTrue(exclusiveFile.length() > 10_000);
-        android.widget.ListView rows = ((androidx.appcompat.app.AlertDialog) exclusive).getListView();
-        rows.performItemClick(rows.getAdapter().getView(2, null, rows), 2, rows.getItemIdAtPosition(2));
+        assertTrue(config.isKnobExclusive(knob));
+        assertFalse(turnRow.isVisible());
+        assertTrue(homeRow.isVisible());
+        section.scrollToPreference("x_knob." + knob + "/home");
+        Shots.settle();
+        File openExclusive = Shots.save(activity, "settings-floating-day-knob-open-exclusive" + suffix);
+        assertTrue(openExclusive.length() > 10_000);
+
+        homeRow.getOnPreferenceClickListener().onPreferenceClick(homeRow);
         Shots.settle();
         android.app.Dialog home = org.robolectric.shadows.ShadowDialog.getLatestDialog();
-        org.junit.Assert.assertNotSame(exclusive, home);
+        org.junit.Assert.assertNotSame(turn, home);
         File homeFile = Shots.save(home, "settings-floating-day-knob-home" + suffix);
         android.util.SparseBooleanArray picks = ((androidx.appcompat.app.AlertDialog) home).getListView()
                 .getCheckedItemPositions();
@@ -175,6 +203,11 @@ public class SettingsShotsTest {
         }
         home.dismiss();
         assertTrue(homeFile.length() > 10_000);
+
+        row.getOnPreferenceClickListener().onPreferenceClick(row);
+        Shots.settle();
+        assertFalse(status.isVisible());
+        assertFalse(homeRow.isVisible());
         config.setKnobExclusive(knob, false);
     }
 

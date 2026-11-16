@@ -233,6 +233,11 @@
     <string name="x_knob_home_count">%1$d 项</string>
     <string name="x_knob_summary_exclusive">专属模式：按下时显示 %1$d 项</string>
     <string name="msg_x_knob_home_empty">至少勾选一项</string>
+    <string name="x_knob_status_mode">模式：%1$s</string>
+    <string name="x_knob_mode_normal">普通</string>
+    <string name="x_knob_mode_exclusive">专属模式（现在：%1$s）</string>
+    <string name="x_knob_status_light">背光：%1$s</string>
+    <string name="x_knob_light_boost">常亮，超频中，%1$s 结束</string>
     <string name="knob_fn_volume">音量</string>
     <string name="knob_fn_call_volume">通话音量</string>
     <string name="knob_fn_track">曲目</string>

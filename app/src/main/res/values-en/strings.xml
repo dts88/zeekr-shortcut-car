@@ -211,6 +211,11 @@
     <string name="x_knob_home_count">%1$d items</string>
     <string name="x_knob_summary_exclusive">Exclusive mode: %1$d items shown on press</string>
     <string name="msg_x_knob_home_empty">Select at least one</string>
+    <string name="x_knob_status_mode">Mode: %1$s</string>
+    <string name="x_knob_mode_normal">Normal</string>
+    <string name="x_knob_mode_exclusive">Exclusive mode (now: %1$s)</string>
+    <string name="x_knob_status_light">Backlight: %1$s</string>
+    <string name="x_knob_light_boost">On, boost mode until %1$s</string>
     <string name="knob_fn_volume">Volume</string>
     <string name="knob_fn_call_volume">Call volume</string>
     <string name="knob_fn_track">Track</string>
