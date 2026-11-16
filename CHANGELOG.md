@@ -11,6 +11,10 @@ commit message, not here.
 
 Nothing yet.
 
+## [4.7.1-alpha] - 2026-11-16
+
+- Diagnostics: when a camera becomes unavailable, the black box notes whether it left the camera list, instead of always saying another app took it.
+
 ## [4.7.0-alpha] - 2026-11-16
 
 - Smart buttons: the Bluetooth scan restarts every 25 minutes, so presses are no longer missed after a long drive.
