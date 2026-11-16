@@ -71,6 +71,37 @@ public final class GuardPolicy {
         ACT
     }
 
+    /**
+     * 为什么不动 —— {@link Verdict#IGNORE} 的那一条理由，写进黑匣子用。
+     *
+     * <p>「什么都没发生」也得能看出是哪一条挡住了：分不清「车主没走」和「停在自家车库」的那种日志等于没写。</p>
+     *
+     * Which rule said no, so the black box can say why. "Nothing happened" must be readable as to which
+     * check blocked it.
+     */
+    public enum Block {
+        /** 这一项被关掉了。The reminder is off. */
+        MODE_OFF,
+        /** 哨兵读数读不到：猜一个值去写是最坏的错。The sentry reading is unavailable. */
+        SENTRY_UNREADABLE,
+        /** 哨兵已经开着或者已布防：不用管。Sentry is already on or armed. */
+        SENTRY_ON,
+        /** 车在走。The car is moving. */
+        NOT_PARKED,
+        /** 从上次停车起没动过车。No real drive since the last park. */
+        NO_DRIVE,
+        /** 在家（没选「在哪都开」）。At home, without "everywhere". */
+        HOME,
+        /** 不知道离开的时刻。The leaving moment is unknown. */
+        NO_LEAVING_TIME,
+        /** 这一趟停车已经问过了。Already asked this park. */
+        ALREADY_ASKED,
+        /** 离开太久了，按钮按了也来不及。Too late for the button to be honoured. */
+        TOO_LATE,
+        /** 没挡住。None of them blocked it. */
+        NONE
+    }
+
     /** 离开之后多久发提醒：让关门那一下过去，不要拍在车主脸上。 */
     public static final long ASK_AT_MS = 5_000L;
 
@@ -102,37 +133,57 @@ public final class GuardPolicy {
     public static Verdict decide(Mode mode, Integer sentry, boolean parked, boolean afterDrive,
                                  GuardHome.Where where, boolean anywhere,
                                  long leftAtMs, long askedAtMs, long nowMs) {
-        if (mode == null || mode == Mode.OFF) {
+        if (block(mode, sentry, parked, afterDrive, where, anywhere, leftAtMs, askedAtMs, nowMs)
+                != Block.NONE) {
             return Verdict.IGNORE;
+        }
+        return mode == Mode.ON ? Verdict.ACT : Verdict.ASK;
+    }
+
+    /**
+     * 哪一条挡住了；{@link Block#NONE} 表示一条都没挡，那时 {@link #decide} 按档位给
+     * {@link Verdict#ASK} 或者 {@link Verdict#ACT}。参数和 {@link #decide} 一样。
+     *
+     * Which rule says no; {@link Block#NONE} means none did, and {@link #decide} then answers
+     * {@link Verdict#ASK} or {@link Verdict#ACT} from the mode. Same parameters as {@link #decide}.
+     */
+    public static Block block(Mode mode, Integer sentry, boolean parked, boolean afterDrive,
+                              GuardHome.Where where, boolean anywhere,
+                              long leftAtMs, long askedAtMs, long nowMs) {
+        if (mode == null || mode == Mode.OFF) {
+            return Block.MODE_OFF;
         }
         // 读不到哨兵就不动手：这一项是「替车主打开它」，猜一个值去写是最坏的错
         if (sentry == null) {
-            return Verdict.IGNORE;
+            return Block.SENTRY_UNREADABLE;
         }
         // 只补「关着」这一种：1 = 开着还没布防，2 = 已布防，两种都在守；别的值（255 之类）不认识，不碰
         if (sentry != 0) {
-            return Verdict.IGNORE;
+            return Block.SENTRY_ON;
         }
-        if (!parked || !afterDrive) {
-            return Verdict.IGNORE;
+        if (!parked) {
+            return Block.NOT_PARKED;
+        }
+        if (!afterDrive) {
+            return Block.NO_DRIVE;
         }
         // 在家不开：车库里天天提醒一次，这一项活不过一周 —— 除非车主自己选了「在哪都开」
         // Home is left alone: a reminder every evening in the driveway would not survive a week —
         // unless the owner asked for "everywhere" themselves.
         if (where == GuardHome.Where.HOME && !anywhere) {
-            return Verdict.IGNORE;
+            return Block.HOME;
         }
         if (leftAtMs <= 0) {
-            return Verdict.IGNORE;
+            return Block.NO_LEAVING_TIME;
         }
         // 这一趟已经问过：问一次就够，按钮和超时都挂在同一个问题上
         if (askedAtMs > 0 && askedAtMs >= leftAtMs) {
-            return Verdict.IGNORE;
+            return Block.ALREADY_ASKED;
         }
         if (!stillActionable(leftAtMs, nowMs)) {
-            return Verdict.IGNORE;
+            return Block.TOO_LATE;
         }
-        return mode == Mode.ON ? Verdict.ACT : Verdict.ASK;
+        return Block.NONE;
     }
 
     /** 现在按按钮还来不来得及（按离开的时刻算）。Whether a button pressed now can still be honoured. */

@@ -127,9 +127,11 @@ line in the black box (`alerts: armed N s ago, waiting for M min`).
 ## 1.8 忘了开哨兵
 
 下车那一刻哨兵模式还关着、车又不在家 —— 车在会话里问一句，没人反对就自己打开。
-触发点是「车主走了」这一刻：屏幕熄灭（`SCREEN_POWER_EVENT 0 → 1`，这台车上和点火 ON → ACC 同一毫秒，
-`Signal.java:143`）或者主驾座椅从有人变成没人，**两者都要在停着车的时候**，而且这一趟真的开过车 ——
-从上次停车起没动过的车不提醒，那是「停了一星期」，不是「刚下车」。
+触发点是「车主走了」这一刻（`alarm.GuardEdge`）：主驾座椅从有人变成没人算离开；屏幕熄灭
+（`SCREEN_POWER_EVENT 0 → 1`，这台车上和点火 ON → ACC 同一毫秒，`Signal.java:143`）只在主驾座椅**已经空着**的时候才算。
+**车里还坐着人时一律不算** —— 在车里按锁车，屏幕一样会黑，那不是下车。屏幕黑了而座椅读数读不到，也不动。
+两者都要在停着车的时候，而且这一趟真的开过车 —— 从上次停车起没动过的车不提醒，那是「停了一星期」，不是「刚下车」。
+哪一条挡住了、哪一档，都会往黑匣子记一行（`alarm.GuardPolicy.Block`），不做事也要能看出为什么。
 
 设置里四档（`alarm.GuardPolicy.Mode`，存 0..3，默认 0 关）：
 
@@ -172,11 +174,15 @@ line in the black box (`alerts: armed N s ago, waiting for M min`).
 ##### English
 
 The owner walks away with Sentry Mode still off and the car not at home — the car asks in the chat and
-switches it on by itself unless the owner objects. The trigger is the moment the owner leaves: the
-screen going black (`SCREEN_POWER_EVENT 0 → 1`, the same millisecond as ignition ON → ACC on this car,
-`Signal.java:143`) or the driver seat going from occupied to empty, **both while parked**, and only
-after a real drive — a car that has not moved since the last park is "parked since Tuesday", not
-"just left".
+switches it on by itself unless the owner objects. The trigger is the moment the owner leaves
+(`alarm.GuardEdge`): the driver seat going from occupied to empty is a departure; the screen going black
+(`SCREEN_POWER_EVENT 0 → 1`, the same millisecond as ignition ON → ACC on this car, `Signal.java:143`)
+counts only when the driver seat is **already empty**, and **nothing counts while someone is still sitting
+in the driver seat** — locking from inside blacks the screen too, and that is not leaving. A black screen
+with an unreadable seat decides nothing either. Both edges have to happen while parked, and only after a
+real drive — a car that has not moved since the last park is "parked since Tuesday", not "just left".
+Every blocked departure writes one black-box line naming the rule and the mode
+(`alarm.GuardPolicy.Block`), so doing nothing is still readable.
 
 Four modes in the settings (`alarm.GuardPolicy.Mode`, stored 0..3, default 0 = off):
 

@@ -64,18 +64,6 @@ public final class SentryFacts {
      */
     public static final int SENTRY_ARMED = 2;
 
-    /** 屏幕电源事件：0 是亮着。
-     *
-     * Screen power event: 0 means lit.
-     */
-    public static final int SCREEN_LIT = 0;
-
-    /** 屏幕电源事件：1 是黑着。
-     *
-     * Screen power event: 1 means dark.
-     */
-    public static final int SCREEN_DARK = 1;
-
     private SentryFacts() {
     }
 
@@ -98,23 +86,29 @@ public final class SentryFacts {
     /**
      * 中控屏亮着没有。
      *
-     * @param screenPowerEvent {@link Signal#SCREEN_POWER_EVENT} 的读数：0 亮着、1 黑、255 读不到
+     * <p>看的是 {@link com.kooo.evcam.telemetry.Readings#bool}，<b>不是</b> {@code code()}：这个信号在快照里存的是归一后的布尔
+     * （0 亮 / 1 黑 / 255 读不到 → {@code FALSE / TRUE / null}），整数一份根本没有。曾经在这里用 {@code code()}，
+     * 读回来永远是 null，“亮 → 黑”那一条边就从来没有发生过 —— 忘了开哨兵在任何一档下都不响。</p>
+     *
+     * @param readings 车辆信号那一份快照
      * @return 读不到（255 / null）为 {@code null}，不当成任何一个状态
      *
      * Is the center screen lit?
      *
-     * @param screenPowerEvent reading of {@link Signal#SCREEN_POWER_EVENT}: 0 lit, 1 dark, 255
-     *        unavailable
+     * <p>Reads {@link com.kooo.evcam.telemetry.Readings#bool}, <b>not</b> {@code code()}: in the snapshot
+     * this signal is the normalised Boolean (0 lit / 1 dark / 255 unavailable → {@code FALSE / TRUE /
+     * null}) and there is no integer copy. It used to read {@code code()} here, which is always null, so
+     * the lit → black edge never happened and the Forgot Sentry reminder never fired in any mode.</p>
+     *
+     * @param readings the vehicle-signal snapshot
      * @return {@code null} when unavailable (255 / null); never treated as either state
      */
-    public static Boolean screenLit(Integer screenPowerEvent) {
-        if (screenPowerEvent == null) {
+    public static Boolean screenLit(com.kooo.evcam.telemetry.Readings readings) {
+        Boolean dark = readings.bool(Signal.SCREEN_POWER_EVENT);
+        if (dark == null) {
             return null;
         }
-        if (screenPowerEvent == SCREEN_LIT) {
-            return Boolean.TRUE;
-        }
-        return screenPowerEvent == SCREEN_DARK ? Boolean.FALSE : null;
+        return dark ? Boolean.FALSE : Boolean.TRUE;
     }
 
     /**

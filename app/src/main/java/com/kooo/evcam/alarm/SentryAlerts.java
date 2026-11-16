@@ -24,6 +24,7 @@ import com.kooo.evcam.MainActivity;
 import com.kooo.evcam.R;
 import com.kooo.evcam.alarm.guard.AlertAnchor;
 import com.kooo.evcam.alarm.guard.AlertMoment;
+import com.kooo.evcam.alarm.guard.GuardEdge;
 import com.kooo.evcam.alarm.guard.GuardHome;
 import com.kooo.evcam.alarm.guard.GuardPolicy;
 import com.kooo.evcam.alarm.guard.GuardToken;
@@ -885,7 +886,7 @@ public final class SentryAlerts implements Telemetry.Listener {
             carJson.put("parked", parkedNow(state));
             carJson.put("hazard", String.valueOf(hazardOn(now)));
             carJson.put("lamps", String.valueOf(lampsOn(now)));
-            carJson.put("screenLit", String.valueOf(screenLit(now.code(Signal.SCREEN_POWER_EVENT))));
+            carJson.put("screenLit", String.valueOf(screenLit(now)));
             carJson.put("carLink", Telemetry.get().carLinkConnected());
             root.put("car", carJson);
         } catch (org.json.JSONException e) {
@@ -947,7 +948,7 @@ public final class SentryAlerts implements Telemetry.Listener {
         out.append(app.getString(R.string.set_alerts_probe_signals,
                 hazardOn(now) == null ? "?" : (hazardOn(now) ? "\u53cc\u95ea" : "-"),
                 lampsOn(now) == null ? "?" : (lampsOn(now) ? "\u4eae" : "\u706d"),
-                screenLit(now.code(Signal.SCREEN_POWER_EVENT)) == null ? "?" : (screenLit(now.code(Signal.SCREEN_POWER_EVENT)) ? "\u4eae" : "\u9ed1"))).append('\n');
+                screenLit(now) == null ? "?" : (screenLit(now) ? "\u4eae" : "\u9ed1"))).append('\n');
         int samples = motion.samples();
         out.append(app.getString(R.string.set_alerts_probe_motion,
                 (sampling ? "on" : "off"), String.valueOf(samples),
@@ -1203,7 +1204,7 @@ public final class SentryAlerts implements Telemetry.Listener {
         boolean doorOpening = doorOpened(readings);
         Boolean lamps = lampsOn(readings);
         boolean lampsRising = SentryFacts.rising(lamps, lastLamps);
-        Boolean screenOn = screenLit(readings.code(Signal.SCREEN_POWER_EVENT));
+        Boolean screenOn = screenLit(readings);
         boolean screenRising = SentryFacts.rising(screenOn, lastScreenOn);
 
         heartbeatIfDue();
@@ -1435,8 +1436,8 @@ public final class SentryAlerts implements Telemetry.Listener {
      *
      * Whether the center screen is lit ({@link SentryFacts#screenLit}).
      */
-    private static Boolean screenLit(Integer screenPowerEvent) {
-        return SentryFacts.screenLit(screenPowerEvent);
+    private static Boolean screenLit(Readings readings) {
+        return SentryFacts.screenLit(readings);
     }
 
     /**
@@ -1475,7 +1476,8 @@ public final class SentryAlerts implements Telemetry.Listener {
         lastHazard = hazardOn(readings);
         lastFlash = readings.bool(Signal.HIGH_BEAM_FLASH);
         lastLamps = lampsOn(readings);
-        lastScreenOn = screenLit(readings.code(Signal.SCREEN_POWER_EVENT));
+        lastScreenOn = screenLit(readings);
+        lastScreenLit = screenLit(readings);
         rememberDoors(readings);
     }
 
@@ -2325,7 +2327,8 @@ public final class SentryAlerts implements Telemetry.Listener {
      * <h3>为什么挂在「离开的那一条边」</h3>
      *
      * <p>哨兵没开时车机在车主离车四到六分钟后下电，进程再活三到五秒。晚一点发出去的消息，
-     * 车主按得再快也来不及 —— 所以判断就在屏幕灭、或者主驾空出来那一下。</p>
+     * 车主按得再快也来不及 —— 所以判断就在离开那一下：主驾空出来，或者屏幕黑掉而主驾已经空着
+     * （{@link GuardEdge}）。车里还坐着人时屏幕也会黑，那不是离开。</p>
      *
      * <h3>这一路不是警报</h3>
      *
@@ -2335,12 +2338,13 @@ public final class SentryAlerts implements Telemetry.Listener {
      * <h3>The leaving edge, not a timer</h3>
      *
      * <p>The head unit is gone four to six minutes after the owner walks away, so the decision is taken
-     * on the screen-off edge (or the driver seat emptying), while the car can still be written to. It is
-     * not an alert: no armed gate, no cooldown, and quiet hours do not apply, because a car left
-     * unguarded at night is exactly when the question matters.</p>
+     * on the leaving moment (the driver seat emptying, or the screen going black with the seat already
+     * empty; see {@link GuardEdge}) while the car can still be written to, and never while someone is
+     * still sitting in the driver seat. It is not an alert: no armed gate, no cooldown, and quiet hours
+     * do not apply, because a car left unguarded at night is exactly when the question matters.</p>
      */
 
-    /** 屏幕亮 → 灭，或者主驾有人 → 没人：车主走了。 */
+    /** 屏幕亮 → 灭，或者主驾有人 → 没人：车主走了；车里还坐着人就不算（{@link GuardEdge}）。 */
     private void watchForForgottenSentry(Readings readings, VehicleState state, Integer sentry,
                                          boolean parked, Boolean screenOn) {
         // 按钮是 Telegram 的回程，别的出口没有：这一项在 ntfy 下整段不做（DECISIONS.md D8）。
@@ -2354,13 +2358,25 @@ public final class SentryAlerts implements Telemetry.Listener {
             guardDroveSincePark = true;
         }
         Boolean seatOccupied = readings.bool(Signal.SEAT_DRIVER);
-        boolean screenWentBlack = Boolean.TRUE.equals(lastScreenLit) && Boolean.FALSE.equals(screenOn);
-        boolean seatEmptied = Boolean.TRUE.equals(lastSeatOccupied)
-                && Boolean.FALSE.equals(seatOccupied);
+        GuardEdge.Leaving leaving = GuardEdge.leaving(parked, lastSeatOccupied, seatOccupied,
+                lastScreenLit, screenOn);
         lastScreenLit = screenOn;
         lastSeatOccupied = seatOccupied;
         guardRememberFix(state);
-        if (!parked || (!screenWentBlack && !seatEmptied)) {
+        if (leaving == GuardEdge.Leaving.STILL_SEATED) {
+            // 在车里按了锁车（屏幕同样会黑）：主驾还坐着人，这不是离开，也不能问。
+            // Locked from inside (the screen blacks all the same): someone is still in the driver seat, so
+            // this is not a departure and must not be asked about.
+            BlackBox.note("alerts: forgot sentry, screen went black but the driver seat is occupied");
+            return;
+        }
+        if (leaving == GuardEdge.Leaving.SEAT_UNKNOWN) {
+            // 有边，座椅却读不到：分不出车里有没有人，就不动（GuardEdge 说了为什么）。
+            // An edge, but the driver seat is unreadable: cannot tell, so decide nothing.
+            BlackBox.note("alerts: forgot sentry, leaving edge but the driver seat is unreadable");
+            return;
+        }
+        if (leaving != GuardEdge.Leaving.DEPARTURE) {
             return;
         }
         long now = SystemClock.elapsedRealtime();
@@ -2374,11 +2390,19 @@ public final class SentryAlerts implements Telemetry.Listener {
         guardToken = "";
         cancelGuardPending();
         GuardPolicy.Mode mode = config.getAlertsGuardMode();
-        GuardPolicy.Verdict verdict = GuardPolicy.decide(mode, sentry, parked, afterDrive,
-                guardWhere(), config.isAlertsGuardEverywhere(), now, 0L, now);
-        if (verdict == GuardPolicy.Verdict.IGNORE) {
+        GuardHome.Where where = guardWhere();
+        boolean anywhere = config.isAlertsGuardEverywhere();
+        GuardPolicy.Block block = GuardPolicy.block(mode, sentry, parked, afterDrive,
+                where, anywhere, now, 0L, now);
+        if (block != GuardPolicy.Block.NONE) {
+            // 「什么都没发生」也得能看出是哪一条挡住了，不然下一次车上只能再猜一遍。
+            // "Nothing happened" must be readable as to which check blocked it.
+            BlackBox.note("alerts: forgot sentry, nothing sent (" + block + ", " + mode + ", "
+                    + where + ")");
             return;
         }
+        GuardPolicy.Verdict verdict = GuardPolicy.decide(mode, sentry, parked, afterDrive,
+                where, anywhere, now, 0L, now);
         if (verdict == GuardPolicy.Verdict.ACT) {
             BlackBox.note("alerts: forgot sentry, switching it on (" + mode + ")");
             switchSentryOnByGuard("leaving");
