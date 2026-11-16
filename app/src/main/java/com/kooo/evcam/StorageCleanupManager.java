@@ -41,6 +41,8 @@ public class StorageCleanupManager {
     // 定时任务延迟
     private static final long INITIAL_DELAY_MS = 30 * 1000;  // 冷启动后30秒
     private static final long PERIODIC_INTERVAL_MS = 60 * 60 * 1000;  // 每1小时
+    /** 屏幕黑着时到点不跑；亮屏后过这么久补一次（项目所有者 2026-11-16）。 */
+    private static final long CATCH_UP_AFTER_LIT_MS = 10 * 60 * 1000;
 
     // 照片超了上限时删到上限的八成，免得刚删完又超
     private static final double EXTRA_DELETE_RATIO = 0.20;
@@ -53,6 +55,25 @@ public class StorageCleanupManager {
     private ScheduledExecutorService scheduler;
     private Handler mainHandler;
     private boolean isRunning = false;
+    /** 屏幕黑着时到过点、没跑：亮屏后补一次（{@link #screen}）。执行线程写、主线程读。 */
+    private volatile boolean skippedInDark;
+    /** 亮屏时看要不要补跑（主线程上叫）。 */
+    private final com.kooo.evcam.screen.ScreenState.Listener screen = new com.kooo.evcam.screen.ScreenState.Listener() {
+        @Override
+        public void onScreenOff() {
+        }
+
+        @Override
+        public void onScreenOn() {
+            ScheduledExecutorService s = scheduler;
+            if (!skippedInDark || s == null || s.isShutdown()) {
+                return;
+            }
+            skippedInDark = false;
+            s.schedule(StorageCleanupManager.this::performCleanup, CATCH_UP_AFTER_LIT_MS, TimeUnit.MILLISECONDS);
+            AppLog.i(TAG, "亮屏：黑着时跳过的存储清理 " + (CATCH_UP_AFTER_LIT_MS / 60_000) + " 分钟后补一次");
+        }
+    };
     
     public StorageCleanupManager(Context context) {
         this.context = context.getApplicationContext();
@@ -85,7 +106,8 @@ public class StorageCleanupManager {
             TimeUnit.MILLISECONDS
         );
         
-        AppLog.d(TAG, "存储清理任务已启动：30秒后首次检测，之后每1小时检测一次");
+        com.kooo.evcam.screen.ScreenState.addListener(screen);
+        AppLog.d(TAG, "存储清理任务已启动：30秒后首次检测，之后每1小时检测一次（屏幕黑着时到点不跑，亮屏 10 分钟后补）");
         AppLog.d(TAG, "视频限制: " + appConfig.getVideoStorageLimitGb() + " GB, 图片限制: " + appConfig.getPhotoStorageLimitGb() + " GB");
     }
     
@@ -93,6 +115,7 @@ public class StorageCleanupManager {
      * 停止存储清理任务
      */
     public void stop() {
+        com.kooo.evcam.screen.ScreenState.removeListener(screen);
         if (scheduler != null && !scheduler.isShutdown()) {
             scheduler.shutdown();
             scheduler = null;
@@ -105,6 +128,14 @@ public class StorageCleanupManager {
      * 执行清理任务
      */
     private void performCleanup() {
+        if (com.kooo.evcam.screen.ScreenState.dark()) {
+            // 屏幕黑着（停车离开、车机快要睡）：不碰 U 盘，亮屏 10 分钟后补一次（项目所有者 2026-11-16）
+            if (!skippedInDark) {
+                skippedInDark = true;
+                com.kooo.evcam.blackbox.BlackBox.note("存储清理：屏幕黑着，到点不跑，亮屏 10 分钟后补一次");
+            }
+            return;
+        }
         AppLog.d(TAG, "开始执行存储清理检测...");
         
         int videoLimitGb = appConfig.getVideoStorageLimitGb();
