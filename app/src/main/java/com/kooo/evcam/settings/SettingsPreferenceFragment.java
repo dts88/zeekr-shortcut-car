@@ -1478,20 +1478,18 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
      */
     private void bindAccessories() {
         detachAccessories();
-        for (com.kooo.evcam.button.Accessory kind : com.kooo.evcam.button.Accessory.values()) {
-            bindSwitch(AccessoryRows.switchKey(kind), appConfig.isAccessoryEnabled(kind), on -> {
-                appConfig.setAccessoryEnabled(kind, on);
-                com.kooo.evcam.button.SmartButtons buttons = com.kooo.evcam.button.SmartButtons.get();
-                if (buttons != null) {
-                    buttons.setEnabled(kind, on);
-                }
-            });
-            androidx.preference.PreferenceCategory category = findPreference(AccessoryRows.categoryKey(kind));
-            if (category != null) {
-                AccessoryRows rows = new AccessoryRows(kind, this, category, bluetoothPermissions);
-                accessoryRows.add(rows);
-                rows.bind();
+        bindSwitch(AccessoryRows.SWITCH_KEY, appConfig.isAccessoriesEnabled(), on -> {
+            appConfig.setAccessoriesEnabled(on);
+            com.kooo.evcam.button.SmartButtons buttons = com.kooo.evcam.button.SmartButtons.get();
+            if (buttons != null) {
+                buttons.setEnabled(on);
             }
+        });
+        androidx.preference.PreferenceCategory category = findPreference(AccessoryRows.CATEGORY_KEY);
+        if (category != null) {
+            AccessoryRows rows = new AccessoryRows(this, category, bluetoothPermissions);
+            accessoryRows.add(rows);
+            rows.bind();
         }
     }
 
@@ -2225,16 +2223,13 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         show("pref_floating_appearance", floating);
 
         // 总开关下面的都跟着它（绑定的每一台是代码里加的行，AccessoryRows）
-        for (com.kooo.evcam.button.Accessory kind : com.kooo.evcam.button.Accessory.values()) {
-            androidx.preference.PreferenceCategory group = findPreference(AccessoryRows.categoryKey(kind));
-            if (group == null) {
-                continue;
-            }
-            boolean on = appConfig.isAccessoryEnabled(kind);
-            for (int i = 0; i < group.getPreferenceCount(); i++) {
-                Preference row = group.getPreference(i);
+        androidx.preference.PreferenceCategory accessories = findPreference(AccessoryRows.CATEGORY_KEY);
+        if (accessories != null) {
+            boolean on = appConfig.isAccessoriesEnabled();
+            for (int i = 0; i < accessories.getPreferenceCount(); i++) {
+                Preference row = accessories.getPreference(i);
                 boolean visible = on && (!(row instanceof CardItemPreference) || ((CardItemPreference) row).isWanted());
-                if (!AccessoryRows.switchKey(kind).equals(row.getKey()) && row.isVisible() != visible) {
+                if (!AccessoryRows.SWITCH_KEY.equals(row.getKey()) && row.isVisible() != visible) {
                     row.setVisible(visible);
                 }
             }
@@ -2291,7 +2286,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
 
     /** 试验性的功能：名称旁一个小标签（ui-spec §三「试验性标签」），名称后面不再写「（试验性）」。 */
     private void tagExperimental() {
-        for (String key : new String[] {"pref_info_bar", "cat_smart_buttons", "cat_x_knobs", "cat_drive_sound",
+        for (String key : new String[] {"pref_info_bar", "cat_smart_buttons", "cat_drive_sound",
                 "pref_vehicle_status"}) {
             Preference pref = findPreference(key);
             if (pref != null && getContext() != null) {

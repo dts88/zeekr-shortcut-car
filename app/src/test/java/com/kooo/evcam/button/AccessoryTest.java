@@ -46,17 +46,18 @@ public class AccessoryTest {
     }
 
     @Test
-    public void scanNamesFollowWhatIsOnBoundOrBeingBound() {
+    public void scanNamesFollowWhatIsBoundOrBeingBound() {
         List<Accessory> buttonOnly = Collections.singletonList(Accessory.BUTTON);
         assertEquals(new TreeSet<>(Collections.singletonList("ZEEKR_button")),
-                SmartButtons.namesTS(buttonOnly, true, true, null));
-        assertTrue(SmartButtons.namesTS(buttonOnly, false, true, null).isEmpty());
+                SmartButtons.namesTS(buttonOnly, true, false));
+        assertTrue(SmartButtons.namesTS(buttonOnly, false, false).isEmpty());
+        assertTrue(SmartButtons.namesTS(buttonOnly, false, true).isEmpty());
         assertEquals(new TreeSet<>(Arrays.asList("ZEEKR_button", "ZEEKR_knob")),
-                SmartButtons.namesTS(buttonOnly, true, true, Accessory.KNOB));
-        assertEquals(new TreeSet<>(Collections.singletonList("ZEEKR_button")),
-                SmartButtons.namesTS(buttonOnly, true, false, Accessory.KNOB));
+                SmartButtons.namesTS(buttonOnly, true, true));
+        assertEquals(new TreeSet<>(Arrays.asList("ZEEKR_button", "ZEEKR_knob")),
+                SmartButtons.namesTS(Collections.emptyList(), true, true));
         assertEquals(new TreeSet<>(Collections.singletonList("ZEEKR_knob")),
-                SmartButtons.namesTS(Arrays.asList(Accessory.KNOB, Accessory.KNOB), true, true, null));
-        assertTrue(SmartButtons.namesTS(Collections.emptyList(), true, true, null).isEmpty());
+                SmartButtons.namesTS(Arrays.asList(Accessory.KNOB, Accessory.KNOB), true, false));
+        assertTrue(SmartButtons.namesTS(Collections.emptyList(), true, false).isEmpty());
     }
 }

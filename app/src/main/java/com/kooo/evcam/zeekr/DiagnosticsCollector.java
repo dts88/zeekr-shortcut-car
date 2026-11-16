@@ -1292,8 +1292,7 @@ public final class DiagnosticsCollector {
             return;
         }
         String detail = buttons.listenDetail();
-        sb.append("  灵动贴开关=").append(config.isAccessoryEnabled(com.kooo.evcam.button.Accessory.BUTTON) ? "开" : "关")
-                .append("  X旋钮开关=").append(config.isAccessoryEnabled(com.kooo.evcam.button.Accessory.KNOB) ? "开" : "关")
+        sb.append("  开关=").append(config.isAccessoriesEnabled() ? "开" : "关")
                 .append("  听=").append(listenName(buttons.listen())).append(detail.isEmpty() ? "" : "（" + detail + "）")
                 .append("  在绑定=").append(buttons.binding() ? "是" : "否")
                 .append("  连着=").append(buttons.connecting() == null ? "没有" : buttons.connecting()).append('\n');

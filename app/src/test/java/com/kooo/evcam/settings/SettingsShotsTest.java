@@ -119,9 +119,11 @@ public class SettingsShotsTest {
                 shell.getChildFragmentManager().findFragmentById(R.id.settings_detail);
         assertNotNull(section);
 
-        assertNotNull(section.findPreference("cat_x_knobs"));
-        assertNotNull(section.findPreference("pref_x_knobs"));
-        assertNotNull(section.findPreference("pref_x_knob_bind"));
+        assertNotNull(section.findPreference("cat_smart_buttons"));
+        assertNotNull(section.findPreference("pref_smart_buttons"));
+        assertNotNull(section.findPreference("pref_smart_button_bind"));
+        org.junit.Assert.assertNull(section.findPreference("cat_x_knobs"));
+        org.junit.Assert.assertNull(section.findPreference("pref_x_knobs"));
         Preference row = section.findPreference("x_knob." + knob);
         assertNotNull(row);
         assertEquals(activity.getString(R.string.x_knob_name, com.kooo.evcam.button.SmartButtonAd.shortId(knob)),
