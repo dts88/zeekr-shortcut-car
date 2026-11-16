@@ -1484,7 +1484,7 @@
     <string name="set_alerts_wizard_entry_manual">我自己粘贴令牌</string>
     <string name="set_alerts_wizard_bot_title">第 1 步：让 Telegram 给你造一个机器人</string>
     <string name="set_alerts_wizard_bot_body">手机要先有 Telegram。没有就先去应用商店装一个，注册好账号。\n\n1. 打开 Telegram，在最上面的搜索框里输入 @BotFather\n\n2. @BotFather 是 Telegram 官方的账号，专门用来造机器人。点开它\n\n3. 点聊天底部那个「打开」按钮，弹出的面板最上面就是「新建机器人」（英文界面叫 Create a New Bot）。只看到聊天的旧版 Telegram，就改成发送 /newbot\n\n4. 它给一张表：第一格填机器人的名字，随便起一个，是给你自己看的\n\n5. 第二格填用户名，必须以 bot 结尾，比如 my_zeekr_bot。这个名字全 Telegram 只能用一次 —— 被别人占了它就说已占用，加几个字母或数字再试\n\n6. 最后它给一长串码。那串码就是令牌 —— 这辆车用它当你的机器人，所以它等于密码。长按它、复制</string>
-    <string name="set_alerts_wizard_bot_hint">把刚复制的那串码粘在这里</string>
+    <string name="set_alerts_wizard_bot_hint">在这里输入这串码</string>
     <string name="set_alerts_wizard_next">下一步</string>
     <string name="set_alerts_wizard_bot_bad_title">这串码不对</string>
     <string name="set_alerts_wizard_bot_bad_body">令牌长这样：几位数字，一个冒号，然后一长串字母和数字，比如 123456789:AAH…\n\n常见的三种错：只复制了一半；把 /newbot 这几个字也复制进来了；复制成了别的机器人的令牌。\n\n回 Telegram 找 @BotFather，发送 /mybots，选中你的机器人，点 API Token，再复制一次。</string>
