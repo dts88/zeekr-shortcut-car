@@ -233,6 +233,10 @@ public class RearViewMirrorService extends Service {
                 @Override
                 public void onScreenOn() {
                     com.kooo.evcam.blackbox.BlackBox.noteImportant("亮屏：后视镜重新接相机");
+                    if (mirrorView != null) {
+                        // 屏幕黑着、画面盖上以后窗口停了每秒检查（RearViewMirrorView.idleTick）：接着看
+                        mirrorView.screenLit();
+                    }
                     rebindNow();
                 }
             };

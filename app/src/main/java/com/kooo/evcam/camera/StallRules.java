@@ -39,6 +39,12 @@ public final class StallRules {
     /** 刚开始盯时给第一帧留的时间：相机刚接上、会话还在建的时候没有帧是正常的。 */
     public static final long ARM_GRACE_MS = 4000L;
 
+    /**
+     * 屏幕黑了多久以后监测可以停下：和相机黑满多久放开同一个数（{@link ChannelRules#HOLD_MS}，项目所有者 2026-10-13「黑满 30 秒再放」）——
+     * 黑着的头 30 秒照旧看，熄屏关相机正是「卡住的是主线程还是相机线程」最要紧的时候。
+     */
+    public static final long REST_AFTER_DARK_MS = ChannelRules.HOLD_MS;
+
     /** 一小时最多留几份完整报告。反复卡的时候头几份就够看了，不能把存储写满。 */
     public static final int MAX_REPORTS_PER_HOUR = 6;
 
@@ -85,6 +91,17 @@ public final class StallRules {
             return Transition.RECOVERED;
         }
         return Transition.NONE;
+    }
+
+    /**
+     * 监测此刻停不停（项目所有者 2026-11-16「黑满 30 秒、相机都关完后停，亮屏再开」）：屏幕黑满 {@link #REST_AFTER_DARK_MS}
+     * （黑着、不知道什么时候黑的也算满了），而且手上什么都没有（{@code busy}：还有一路相机没关完、在盯着超级镜子或录制、
+     * 除主线程外还有线程要探）。停了以后亮屏、又有要盯的时接着看（{@code StallWatch.wake}）。
+     *
+     * @param darkForMs 屏幕黑了多久；不知道什么时候黑的是 -1（{@code ScreenState.darkForMs}）
+     */
+    public static boolean rests(boolean dark, long darkForMs, boolean busy) {
+        return dark && !busy && (darkForMs < 0 || darkForMs >= REST_AFTER_DARK_MS);
     }
 
     /** 报告限额：任意一小时之内最多 {@link #MAX_REPORTS_PER_HOUR} 份。只在监测线程上用。 */

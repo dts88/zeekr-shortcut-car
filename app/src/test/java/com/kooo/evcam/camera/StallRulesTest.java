@@ -32,6 +32,18 @@ public class StallRulesTest {
         assertFalse(state.isStalled());
     }
 
+    /** 黑满 30 秒、手上什么都没有才停；黑着不知道什么时候黑的也算满了；亮着、还在忙都不停（项目所有者 2026-11-16）。 */
+    @Test
+    public void restsOnlyWhenDarkLongEnoughAndIdle() {
+        long full = StallRules.REST_AFTER_DARK_MS;
+        assertEquals(30_000L, full);
+        assertFalse(StallRules.rests(false, -1L, false));
+        assertFalse(StallRules.rests(true, full - 1, false));
+        assertTrue(StallRules.rests(true, full, false));
+        assertTrue(StallRules.rests(true, -1L, false));
+        assertFalse(StallRules.rests(true, full * 10, true));
+    }
+
     /** 一直卡着只报一次，好了报一次 —— 否则卡住期间每半秒写一份报告。 */
     @Test
     public void reportsOnceThenRecoversOnce() {

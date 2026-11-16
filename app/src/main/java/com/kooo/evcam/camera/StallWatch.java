@@ -44,6 +44,7 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 
@@ -83,6 +84,12 @@ import java.util.function.Supplier;
  * <p><b>只记录，不修复。</b>自动恢复会把证据抹掉；而且动相机的只有通道调度一个地方（{@link ChannelScheduler}：
  * 救援按出帧判、重建会话或重开相机；2.10.10 起 SingleCamera 自己不再重连），这里再动手只会和它打架
  * （项目所有者 2026-10-14 R1 审查：这里一个相机动作都没有，只读、只写报告和黑匣子）。</p>
+ *
+ * <h3>黑着时停下</h3>
+ *
+ * <p>屏幕黑满 30 秒（和相机黑满多久放开同一个数）、相机都关完、没有在盯的（超级镜子、录制、相机线程）就停下，一下都不跑；
+ * 亮屏、或者又有要盯的（开相机、录制、超级镜子接上）时接着看（项目所有者 2026-11-16，{@link StallRules#rests}）。
+ * 黑着的头 30 秒照旧看：熄屏关相机正是「卡住的是主线程还是相机线程」最要紧的时候。</p>
  *
  * <p>报告写在应用私有目录的 {@code stall/} 下，重启后还在。「保存日志」和诊断报告都会带上。
  * 报告是写给维护者看的，不做翻译。</p>
@@ -144,6 +151,8 @@ public final class StallWatch {
     private static volatile Handler watchHandler;
     private static volatile Handler mainHandler;
     private static volatile boolean foreground;
+    /** 停着（{@link #tick} 照 {@link StallRules#rests} 判的）：不再排下一次，{@link #wake} 接着看。 */
+    private static final AtomicBoolean RESTING = new AtomicBoolean();
 
     private StallWatch() {
     }
@@ -167,6 +176,17 @@ public final class StallWatch {
         thread.start();
         watchHandler = new Handler(thread.getLooper());
         watchHandler.postDelayed(TICK, TICK_IDLE_MS);
+        // 亮屏接着看（黑满 30 秒、相机都关完、没有要盯的时停着，见 tick）。熄屏不用管：停不停由 tick 自己判
+        com.kooo.evcam.screen.ScreenState.addListener(new com.kooo.evcam.screen.ScreenState.Listener() {
+            @Override
+            public void onScreenOff() {
+            }
+
+            @Override
+            public void onScreenOn() {
+                wake(null);
+            }
+        });
     }
 
     public static Heartbeat capture(String cameraId) {
@@ -182,6 +202,7 @@ public final class StallWatch {
     public static void watchEncoder(String cameraId, Heartbeat beat) {
         if (beat != null) {
             ENCODER.put(String.valueOf(cameraId), beat);
+            wake("recorder " + cameraId);
         }
     }
 
@@ -199,6 +220,7 @@ public final class StallWatch {
     public static void watchWriter(String cameraId, Heartbeat beat) {
         if (beat != null) {
             WRITER.put(String.valueOf(cameraId), beat);
+            wake("writer " + cameraId);
         }
     }
 
@@ -224,6 +246,7 @@ public final class StallWatch {
     public static void armMirror(boolean on) {
         if (on) {
             MIRROR.arm(now(), StallRules.ARM_GRACE_MS);
+            wake("mirror");
         } else {
             MIRROR.disarm();
         }
@@ -278,6 +301,7 @@ public final class StallWatch {
     public static void watchLooper(String name, Handler handler) {
         if (name != null && handler != null) {
             LOOPERS.put(name, new LooperProbe(name, handler));
+            wake(name);
         }
     }
 
@@ -376,9 +400,57 @@ public final class StallWatch {
         }
         refreshImportance(now());
         Handler handler = watchHandler;
-        if (handler != null) {
-            handler.postDelayed(TICK, isActive() ? TICK_ACTIVE_MS : TICK_IDLE_MS);
+        if (handler == null) {
+            return;
         }
+        if (restsNow()) {
+            RESTING.set(true);
+            // 判完到置位之间来的 wake 看到的还是「没停」、什么都没做：置位以后再判一次
+            if (restsNow()) {
+                com.kooo.evcam.blackbox.BlackBox.note("卡顿监测：屏幕黑满 30 秒、相机都关了、没有要盯的，停下，"
+                        + "亮屏或再有要盯的时接着看");
+                return;
+            }
+            if (!RESTING.compareAndSet(true, false)) {
+                return;   // 那一下 wake 已经把它翻回去、排了下一次
+            }
+        }
+        handler.postDelayed(TICK, isActive() ? TICK_ACTIVE_MS : TICK_IDLE_MS);
+    }
+
+    /**
+     * 此刻停不停（{@link StallRules#rests}）：还有一路相机没关完（账本上还有一轮）、在盯着超级镜子或录制、除主线程外还有线程要探
+     * （相机线程、录像的编码 / 写入线程、读相机尺寸的线程），都不停。
+     */
+    private static boolean restsNow() {
+        boolean busy = isActive() || !CameraRounds.process().liveIds().isEmpty() || watchesThreadsBesidesMain();
+        return StallRules.rests(com.kooo.evcam.screen.ScreenState.dark(),
+                com.kooo.evcam.screen.ScreenState.darkForMs(), busy);
+    }
+
+    private static boolean watchesThreadsBesidesMain() {
+        for (String name : LOOPERS.keySet()) {
+            if (!"main".equals(name)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 停着时（{@link #tick}）亮屏了（{@code what} 为 null）、或者有了要盯的（开相机、录像、超级镜子接上）：接着看，当场先看一次。
+     * 哪个线程都能调；没停着什么都不做。
+     */
+    private static void wake(String what) {
+        if (!RESTING.compareAndSet(true, false)) {
+            return;
+        }
+        Handler handler = watchHandler;
+        if (handler != null) {
+            handler.post(TICK);
+        }
+        com.kooo.evcam.blackbox.BlackBox.note("卡顿监测：" + (what == null ? "亮屏" : "要盯 " + what)
+                + "，接着看");
     }
 
     private static boolean isActive() {

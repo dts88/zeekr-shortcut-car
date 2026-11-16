@@ -153,6 +153,11 @@ public class RearViewMirrorView extends ViewGroup {
     private static final float TAP_FLASH_ALPHA = 0.5f;
 
     private final Handler idleHandler = new Handler(Looper.getMainLooper());
+    /**
+     * 每秒检查停着（{@link #idleTick}）：屏幕黑着、画面已经盖上「点击恢复」（或者贴边不画）—— 黑着没人看，盖上了也就没什么要看的了
+     * （项目所有者 2026-11-16）。新的一帧来了（{@link #noteFrame}）、亮屏（{@link #screenLit}）时接着看。
+     */
+    private boolean idlePaused;
     private final Paint scrimPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint labelPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     /** 最后一帧新画面的时刻，单调时钟。 */
@@ -298,6 +303,10 @@ public class RearViewMirrorView extends ViewGroup {
         if (frozen && cabin == isShowingCabin()) {
             frozen = false;
             invalidate();
+        }
+        if (idlePaused) {
+            // 黑着停下以后又来了画面（黑着时相机又开了）：接着看，画面再停时照样盖上
+            resumeIdleTick();
         }
     }
 
@@ -530,9 +539,31 @@ public class RearViewMirrorView extends ViewGroup {
                 invalidate();
             }
             syncDockState();
+            if (com.kooo.evcam.screen.ScreenState.dark() && (frozen || docked)) {
+                // 屏幕黑着、画面已经盖上（或者贴边不画）：停下。画面还在走时照旧每秒看 —— 不先盖上就停的话，
+                // 亮屏时那张黑之前的画面会露出来，直到这里再看一次
+                idlePaused = true;
+                return;
+            }
             idleHandler.postDelayed(this, IDLE_TICK_MS);
         }
     };
+
+    /**
+     * 亮屏了（服务的屏幕监听叫）：每秒检查停着的话接着看，当场先看一次（{@link #idleTick}）。黑着时画面停了已经盖上「点击恢复」，
+     * 新的一帧来了照旧揭掉（{@link #noteFrame}）。
+     */
+    public void screenLit() {
+        resumeIdleTick();
+    }
+
+    private void resumeIdleTick() {
+        if (!attached || !idlePaused) {
+            return;
+        }
+        idlePaused = false;
+        idleHandler.post(idleTick);
+    }
 
     /**
      * 贴边状态变了就改一次画布的可见、通知一次服务。
