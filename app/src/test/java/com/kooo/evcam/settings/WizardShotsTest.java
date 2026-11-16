@@ -28,6 +28,7 @@ import androidx.fragment.app.Fragment;
 import com.google.android.material.button.MaterialButton;
 import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.R;
+import com.kooo.evcam.alarm.PictureBudget;
 import com.kooo.evcam.alarm.ShadowNtfySender;
 import com.kooo.evcam.alarm.ShadowSentryAlerts;
 import com.kooo.evcam.screens.ShotActivity;
@@ -217,11 +218,48 @@ public class WizardShotsTest {
         Dialog done = latest();
         assertEquals("通了", text(R.string.set_alerts_wizard_finish),
                 button(done, DialogInterface.BUTTON_POSITIVE));
+        // 开关开着就要照实说：说开、并且说哨兵模式那一条。
+        // With the switch on, say so — and say the one thing that makes it true.
+        String sent = text(R.string.set_alerts_test_size, PictureBudget.size(96_000));
+        assertTrue("开关开着时说开着：" + words(done),
+                words(done).contains(text(R.string.set_alerts_wizard_done_body_on, sent,
+                        text(R.string.vi_sentry_mode))));
         shot("wizard-telegram-4-done-" + lang);
         assertEquals("走到最后就存下了会话号", "123456789", config.getAlertsTelegramChatId());
         // 「完成」：框关掉，向导结束。Finish: the dialog closes and the wizard ends.
         click(done, DialogInterface.BUTTON_POSITIVE);
         assertTrue("「完成」之后框关掉", !done.isShowing());
+    }
+
+    /**
+     * 总开关关着走完：那一屏不能说「警报是开的」，要写「开关还是关的」。
+     *
+     * <p>两种状态各走一遍，因为这个框只有读了 {@code AppConfig.isAlertsEnabled()} 才写得对；
+     * 一句写死的「开关是关的」在开关开着时就是假话。</p>
+     *
+     * Walking the wizard with the master switch off: the finish screen must not claim alerts are on.
+     * Both states are asserted because the text is only true if it reads the stored state.
+     */
+    @Test
+    public void telegramDoneWithTheSwitchOff() {
+        Fragment host = openSettings(EN);
+        config.setAlertsEnabled(false);
+        TelegramSetupDialog.show(host, config, () -> { });
+        Shots.settle();
+
+        Dialog token = latest();
+        find(token.getWindow().getDecorView(), EditText.class).setText(TOKEN);
+        click(token, DialogInterface.BUTTON_POSITIVE);
+        ShadowSentryAlerts.addChat("Xiao Ming's car", "123456789", "123456789");
+        click(latest(), DialogInterface.BUTTON_POSITIVE);
+        click(latest(), DialogInterface.BUTTON_POSITIVE);
+
+        Dialog done = latest();
+        String sent = text(R.string.set_alerts_test_size, PictureBudget.size(96_000));
+        assertTrue("开关关着时说关着：" + words(done), words(done).contains(
+                text(R.string.set_alerts_wizard_done_body_off, sent)));
+        shot("wizard-telegram-4-done-switch-off-en");
+        click(done, DialogInterface.BUTTON_POSITIVE);
     }
 
     /** 令牌不对：说清楚该长什么样，人还在第一步。Telegram rejects the token: say what it looks like. */
@@ -425,6 +463,18 @@ public class WizardShotsTest {
         return out;
     }
 
+    /** 框里所有文字接起来：正文是几段还是半段，看这里。All the dialog's words in one string. */
+    private static String words(Dialog dialog) {
+        StringBuilder all = new StringBuilder();
+        for (TextView view : texts(dialog)) {
+            if (all.length() > 0) {
+                all.append(' ');
+            }
+            all.append(view.getText());
+        }
+        return all.toString();
+    }
+
     /** 框里有没有一句话写着这个（标题、说明都是 TextView）。 */
     private static boolean hasText(Dialog dialog, String expected) {
         for (TextView view : texts(dialog)) {
@@ -497,6 +547,11 @@ public class WizardShotsTest {
 
     private String text(int id) {
         return activity.getString(id);
+    }
+
+    /** 带参数的字符串，和界面里那句一模一样。A resource string with its arguments, exactly as the screen has it. */
+    private String text(int id, Object... args) {
+        return activity.getString(id, args);
     }
 
     /** 在框里找第一个某种控件（输入框）。Find the first view of a kind inside the dialog. */

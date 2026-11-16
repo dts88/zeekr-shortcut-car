@@ -1083,12 +1083,11 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         show("pref_alerts_cameras", alertsOn && perCamera);
         show("pref_alerts_clip_audio", alertsOn && clipOn);
         show("pref_alerts_clip_data", alertsOn && clipOn);
-        // 忘了开哨兵那两行跟着 telegram 那一组：警报总开关关着时一起收起来。
-        // 另一条出口没有回程（按钮是 callback_query），所以真正走 ntfy 时这两行也不出现。
-        // The two Forgot Sentry rows follow the Telegram group: hidden with the master switch. The other
-        // exit has no return path (the buttons are callback_query), so they also go away when ntfy is
-        // the effective transport.
-        boolean guardRows = alertsOn && !appConfig.isAlertsNtfy();
+        // 忘了开哨兵那三行只看警报总开关：它们是「什么时候问一句」，跟发到哪儿无关，
+        // 所以 ntfy / Telegram 那两组怎么收起来都不带它们。
+        // The three Forgot Sentry rows follow the master switch only: they are about when the car asks,
+        // not where alerts go, so the transport blocks hiding does not touch them.
+        boolean guardRows = alertsOn;
         show("pref_alerts_guard", guardRows);
         show("pref_alerts_guard_home", guardRows);
         show("pref_alerts_guard_everywhere", guardRows);

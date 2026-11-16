@@ -1467,55 +1467,31 @@ Kalau lupa: %3$s</string>
     <string name="set_alerts_wizard_entry_guided">Bimbing saya langkah demi langkah (kira-kira dua minit)</string>
     <string name="set_alerts_wizard_entry_manual">Saya akan tampal token sendiri</string>
     <string name="set_alerts_wizard_bot_title">Langkah 1: minta Telegram buatkan bot</string>
-    <string name="set_alerts_wizard_bot_body">Telefon perlu ada Telegram. Kalau belum ada, pasang dari gedung app dahulu dan daftar akaun.
-
-1. Buka Telegram dan taip @BotFather di kotak carian di atas
-2. @BotFather ialah akaun rasmi Telegram yang membuat bot. Buka ia
-3. Tekan butang Open di bawah chat: panel yang terbuka ada Create a New Bot di atasnya. Pada Telegram lama yang hanya tunjuk chat, hantar /newbot
-4. Ia tunjuk satu borang. Ruang pertama ialah nama bot; apa-apa pun boleh, hanya anda yang nampak
-5. Ruang kedua ialah nama pengguna. Ia mesti berakhir dengan bot, contohnya my_zeekr_bot. Hanya satu bot di seluruh Telegram boleh pakai satu nama, jadi kalau nama itu sudah diambil ia akan beritahu — tambah beberapa huruf atau nombor dan cuba lagi
-6. Akhirnya ia beri satu kod panjang. Kod itu ialah token: kereta ini masuk sebagai bot anda dengannya, jadi ia berfungsi seperti kata laluan. Tekan lama dan salin</string>
+    <string name="set_alerts_wizard_bot_body">Telefon perlu ada Telegram. Kalau belum ada, pasang dari gedung app dahulu dan daftar akaun.\n\n1. Buka Telegram dan taip @BotFather di kotak carian di atas\n\n2. @BotFather ialah akaun rasmi Telegram yang membuat bot. Buka ia\n\n3. Tekan butang Open di bawah chat: panel yang terbuka ada Create a New Bot di atasnya. Pada Telegram lama yang hanya tunjuk chat, hantar /newbot\n\n4. Ia tunjuk satu borang. Ruang pertama ialah nama bot; apa-apa pun boleh, hanya anda yang nampak\n\n5. Ruang kedua ialah nama pengguna. Ia mesti berakhir dengan bot, contohnya my_zeekr_bot. Hanya satu bot di seluruh Telegram boleh pakai satu nama, jadi kalau nama itu sudah diambil ia akan beritahu — tambah beberapa huruf atau nombor dan cuba lagi\n\n6. Akhirnya ia beri satu kod panjang. Kod itu ialah token: kereta ini masuk sebagai bot anda dengannya, jadi ia berfungsi seperti kata laluan. Tekan lama dan salin</string>
     <string name="set_alerts_wizard_bot_hint">Tampal kod yang baru anda salin di sini</string>
     <string name="set_alerts_wizard_next">Seterusnya</string>
     <string name="set_alerts_wizard_bot_bad_title">Kod itu nampak tidak betul</string>
-    <string name="set_alerts_wizard_bot_bad_body">Token nampak begini: beberapa digit, satu titik bertindih, kemudian rentetan huruf dan digit yang panjang, contohnya 123456789:AAH…
-
-Tiga sebab biasa: hanya separuh disalin; perkataan /newbot ikut sekali; ia token bot lain.
-
-Balik ke @BotFather dalam Telegram, hantar /mybots, pilih bot anda, tekan API Token, dan salin sekali lagi.</string>
+    <string name="set_alerts_wizard_bot_bad_body">Token nampak begini: beberapa digit, satu titik bertindih, kemudian rentetan huruf dan digit yang panjang, contohnya 123456789:AAH…\n\nTiga sebab biasa: hanya separuh disalin; perkataan /newbot ikut sekali; ia token bot lain.\n\nBalik ke @BotFather dalam Telegram, hantar /mybots, pilih bot anda, tekan API Token, dan salin sekali lagi.</string>
     <string name="set_alerts_wizard_retry">Cuba lagi</string>
     <string name="set_alerts_wizard_chat_title">Langkah 2: biar kereta cari sembang anda</string>
-    <string name="set_alerts_wizard_chat_body">1. Dalam Telegram buka bot yang baru dibuat (@BotFather beri satu pautan; tekan ia untuk masuk)
-2. Tekan butang Mula di bawah
-3. Hantar apa-apa mesej kepadanya, contohnya hello
-
-Kereta perlu nampak satu mesej dahulu sebelum ia tahu ke mana amaran perlu dihantar.</string>
+    <string name="set_alerts_wizard_chat_body">1. Dalam Telegram buka bot yang baru dibuat (@BotFather beri satu pautan; tekan ia untuk masuk)\n\n2. Tekan butang Mula di bawah\n\n3. Hantar apa-apa mesej kepadanya, contohnya hello\n\nKereta perlu nampak satu mesej dahulu sebelum ia tahu ke mana amaran perlu dihantar.</string>
     <string name="set_alerts_wizard_chat_find">Cari sembang saya</string>
     <string name="set_alerts_wizard_chat_looking">Sedang bertanya Telegram, paling lama setengah minit</string>
     <string name="set_alerts_wizard_chat_found">Sudah jumpa</string>
     <string name="set_alerts_wizard_chat_none_title">Bot belum terima sebarang mesej</string>
-    <string name="set_alerts_wizard_chat_none_body">Telegram tiada apa-apa daripada anda, jadi belum ada sembang untuk dicari.
-
-Di telefon, buka bot anda, hantar satu mesej (hello pun cukup), kemudian tekan Cuba lagi.</string>
+    <string name="set_alerts_wizard_chat_none_body">Telegram tiada apa-apa daripada anda, jadi belum ada sembang untuk dicari.\n\nDi telefon, buka bot anda, hantar satu mesej (hello pun cukup), kemudian tekan Cuba lagi.</string>
     <string name="set_alerts_wizard_chat_failed_title">Tidak dapat hubungi Telegram</string>
-    <string name="set_alerts_wizard_chat_failed_body">Tidak berjaya: %1$s
-
-Tunggu sebentar dan cuba lagi. Isyarat lemah atau had kadar Telegram kedua-duanya nampak begini.</string>
+    <string name="set_alerts_wizard_chat_failed_body">Tidak berjaya: %1$s\n\nTunggu sebentar dan cuba lagi. Isyarat lemah atau had kadar Telegram kedua-duanya nampak begini.</string>
     <string name="set_alerts_wizard_chat_pick_title">Jumpa lebih daripada satu sembang, pilih satu</string>
     <string name="set_alerts_wizard_test_title">Langkah 3: hantar satu gambar</string>
     <string name="set_alerts_wizard_test_body">Tekan sekali dan kereta ambil gambar sekarang, kecilkan sedikit, dan hantar ke sembang itu. Ia patut sampai di telefon serta-merta.</string>
     <string name="set_alerts_wizard_test_send">Hantar satu</string>
     <string name="set_alerts_wizard_test_sending">Sedang ambil dan hantar, sekejap</string>
     <string name="set_alerts_wizard_test_failed_title">Gambar tidak keluar</string>
-    <string name="set_alerts_wizard_test_failed_body">Punca: %1$s
-
-Seterusnya: balik ke langkah 2, pastikan anda sudah hantar mesej kepada bot dan sembang dijumpai, kemudian cuba lagi.</string>
+    <string name="set_alerts_wizard_test_failed_body">Punca: %1$s\n\nSeterusnya: balik ke langkah 2, pastikan anda sudah hantar mesej kepada bot dan sembang dijumpai, kemudian cuba lagi.</string>
     <string name="set_alerts_wizard_done_title">Persediaan selesai</string>
-    <string name="set_alerts_wizard_done_body">Berjaya: %1$s
-
-Gambar sampai ke sembang anda, jadi ia akan sampai juga bila sesuatu benar-benar berlaku.
-
-Satu lagi: suis di atas masih tertutup. Selagi tertutup, kereta tidak akan hantar amaran sendiri.</string>
+    <string name="set_alerts_wizard_done_body_off">Berjaya: %1$s\n\nGambar sampai ke sembang anda, jadi ia akan sampai juga bila sesuatu benar-benar berlaku.\n\nSatu lagi: suis di atas masih tertutup. Selagi tertutup, kereta tidak akan hantar amaran sendiri.</string>
+    <string name="set_alerts_wizard_done_body_on">Berjaya: %1$s\n\nGambar sampai ke sembang anda, jadi ia akan sampai juga bila sesuatu benar-benar berlaku.\n\nAmaran sudah hidup.\n\n%2$s juga mesti hidup: amaran hanya keluar semasa ia berjaga, dan ia yang menahan kereta daripada tidur.</string>
     <string name="set_alerts_wizard_done_again">Hantar satu lagi</string>
     <string name="set_alerts_wizard_finish">Selesai</string>
 </resources>

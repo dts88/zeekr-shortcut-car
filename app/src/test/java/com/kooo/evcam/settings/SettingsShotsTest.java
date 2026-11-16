@@ -214,6 +214,87 @@ public class SettingsShotsTest {
                 new AppConfig(RuntimeEnvironment.getApplication()).isPlaybackReadDurations());
     }
 
+    /**
+     * 「忘了开哨兵」那三行在「什么时候发」那一组里，排在安静时段之后；只跟着警报总开关走，
+     * 换到 ntfy 也还在（它们不是 Telegram 独有的）。滚到它们另出一张图。
+     *
+     * <p>三种状态各开一屏新的设置页来验：总开关开着（在、位置对）、换成 ntfy（还在）、
+     * 总开关关着（三行一起收起来）。</p>
+     *
+     * The three Forgot Sentry rows sit in the "When it fires" group after quiet hours, follow the master
+     * switch only, and stay when the transport is ntfy. Each state is checked on a freshly opened page.
+     */
+    @Test
+    public void forgotSentryRowsSitUnderWhenItFires() {
+        SettingsPreferenceFragment on = alertsPage(true, com.kooo.evcam.alarm.NtfyGate.TELEGRAM);
+        androidx.preference.PreferenceGroup when = (androidx.preference.PreferenceGroup)
+                on.findPreference("cat_alerts_when");
+        assertNotNull("少了「什么时候发」那一组", when);
+        for (String key : GUARD_ROWS) {
+            Preference row = on.findPreference(key);
+            assertNotNull("少了 " + key, row);
+            assertTrue(key + " 该在「什么时候发」那一组里", row.getParent() == when);
+            assertTrue(key + " 该看得见", row.isVisible());
+            assertTrue(key + " 该排在安静时段之后",
+                    indexIn(when, key) > indexIn(when, "pref_alerts_quiet_end"));
+        }
+        on.scrollToPreference("pref_alerts_guard_everywhere");
+        File file = Shots.save(shotActivity, "settings-alerts-day-guard");
+        assertTrue(file + " 是空的", file.length() > 10_000);
+
+        // 换成 ntfy：两条出口的组互相换位置，但那三行不动 —— 它们说的和发到哪儿无关。
+        // Switch to ntfy: the two transport blocks swap, the three rows stay — they are not exit-specific.
+        SettingsPreferenceFragment ntfy = alertsPage(true, com.kooo.evcam.alarm.NtfyGate.NTFY);
+        assertTrue("ntfy 时「哪一组出现」照旧", ntfy.findPreference("cat_alerts_ntfy").isVisible());
+        for (String key : GUARD_ROWS) {
+            assertTrue("ntfy 时 " + key + " 还在", ntfy.findPreference(key).isVisible());
+        }
+
+        // 总开关关着：三行一起收起来。Master off: all three go with it.
+        SettingsPreferenceFragment off = alertsPage(false, com.kooo.evcam.alarm.NtfyGate.TELEGRAM);
+        for (String key : GUARD_ROWS) {
+            assertFalse("总开关关着时 " + key + " 该收起来", off.findPreference(key).isVisible());
+        }
+    }
+
+    private static final String[] GUARD_ROWS =
+            {"pref_alerts_guard", "pref_alerts_guard_home", "pref_alerts_guard_everywhere"};
+
+    private ShotActivity shotActivity;
+
+    /** 照着存好的状态开一屏新的「停车警报」。一条按存的这个状态绑出来的设置页。 */
+    private SettingsPreferenceFragment alertsPage(boolean alertsOn, String transport) {
+        AppConfig config = new AppConfig(RuntimeEnvironment.getApplication());
+        config.setAlertsEnabled(alertsOn);
+        config.setAlertsTransport(transport);
+        config.setAlertsTelegramToken("123456789:AAHexampleTOKENvalue0123456789");
+        config.setAlertsTelegramChatId("123456789");
+        config.setAlertsQuietEnabled(true);
+        RuntimeEnvironment.setQualifiers(Shots.DAY_EN);
+        shotActivity = Robolectric.buildActivity(ShotActivity.class).setup().get();
+        Shots.stillFrames(shotActivity);
+        SettingsShellFragment shell = new SettingsShellFragment();
+        shotActivity.getSupportFragmentManager().beginTransaction()
+                .replace(shotActivity.container, shell).commitNow();
+        Shots.settle();
+        shell.showSection("screen_alerts");
+        Shots.settle();
+        SettingsPreferenceFragment section = (SettingsPreferenceFragment) shell.getChildFragmentManager()
+                .findFragmentById(R.id.settings_detail);
+        assertNotNull("「停车警报」那一屏", section);
+        return section;
+    }
+
+    /** 这一行在组里的第几行。Where a row sits inside its group. */
+    private static int indexIn(androidx.preference.PreferenceGroup group, String key) {
+        for (int i = 0; i < group.getPreferenceCount(); i++) {
+            if (key.equals(group.getPreference(i).getKey())) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
     private static boolean shown(SettingsPreferenceFragment section, String key) {
         Preference row = section.findPreference(key);
         assertNotNull("少了 " + key, row);

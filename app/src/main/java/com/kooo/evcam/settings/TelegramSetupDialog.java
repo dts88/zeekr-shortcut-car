@@ -321,10 +321,22 @@ public final class TelegramSetupDialog {
         });
     }
 
-    /** 通了。顺手把「开关还关着」说清楚，免得以为配好就会自己发警报。 */
+    /**
+     * 通了。顺手把「现在到底是什么状态」说清楚 —— 总开关是开是关，这里读一次再写，不猜。
+     *
+     * <p>开关开着也只说一半：警报只在哨兵模式守着的时候发。所以两种状态各有一句话，第二种多一行
+     * 讲哨兵模式 —— 那一行不是补充说明，是「为什么我开了却没收到警报」的答案。</p>
+     *
+     * <p>Done. Say what the state really is, read once, never assumed: with alerts off, say the switch
+     * is still off; with alerts on, say so and add the one line that makes it true — alerts only fire
+     * while Sentry Mode is armed, and that is what keeps the head unit awake.</p>
+     */
     private void showDone(String message) {
-        CamDialogs.show(dialog(R.string.set_alerts_wizard_done_title,
-                fragment.getString(R.string.set_alerts_wizard_done_body, message))
+        String body = config.isAlertsEnabled()
+                ? fragment.getString(R.string.set_alerts_wizard_done_body_on, message,
+                        fragment.getString(R.string.vi_sentry_mode))
+                : fragment.getString(R.string.set_alerts_wizard_done_body_off, message);
+        CamDialogs.show(dialog(R.string.set_alerts_wizard_done_title, body)
                 .setPositiveButton(R.string.set_alerts_wizard_finish, (dialog, which) -> finish())
                 .setNegativeButton(R.string.set_alerts_wizard_done_again,
                         (dialog, which) -> askForTest())

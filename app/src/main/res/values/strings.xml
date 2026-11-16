@@ -1483,55 +1483,31 @@
     <string name="set_alerts_wizard_entry_guided">一步一步来（约两分钟）</string>
     <string name="set_alerts_wizard_entry_manual">我自己粘贴令牌</string>
     <string name="set_alerts_wizard_bot_title">第 1 步：让 Telegram 给你造一个机器人</string>
-    <string name="set_alerts_wizard_bot_body">手机要先有 Telegram。没有就先去应用商店装一个，注册好账号。
-
-1. 打开 Telegram，在最上面的搜索框里输入 @BotFather
-2. @BotFather 是 Telegram 官方的账号，专门用来造机器人。点开它
-3. 点聊天底部那个「打开」按钮，弹出的面板最上面就是「新建机器人」（英文界面叫 Create a New Bot）。只看到聊天的旧版 Telegram，就改成发送 /newbot
-4. 它给一张表：第一格填机器人的名字，随便起一个，是给你自己看的
-5. 第二格填用户名，必须以 bot 结尾，比如 my_zeekr_bot。这个名字全 Telegram 只能用一次 —— 被别人占了它就说已占用，加几个字母或数字再试
-6. 最后它给一长串码。那串码就是令牌 —— 这辆车用它当你的机器人，所以它等于密码。长按它、复制</string>
+    <string name="set_alerts_wizard_bot_body">手机要先有 Telegram。没有就先去应用商店装一个，注册好账号。\n\n1. 打开 Telegram，在最上面的搜索框里输入 @BotFather\n\n2. @BotFather 是 Telegram 官方的账号，专门用来造机器人。点开它\n\n3. 点聊天底部那个「打开」按钮，弹出的面板最上面就是「新建机器人」（英文界面叫 Create a New Bot）。只看到聊天的旧版 Telegram，就改成发送 /newbot\n\n4. 它给一张表：第一格填机器人的名字，随便起一个，是给你自己看的\n\n5. 第二格填用户名，必须以 bot 结尾，比如 my_zeekr_bot。这个名字全 Telegram 只能用一次 —— 被别人占了它就说已占用，加几个字母或数字再试\n\n6. 最后它给一长串码。那串码就是令牌 —— 这辆车用它当你的机器人，所以它等于密码。长按它、复制</string>
     <string name="set_alerts_wizard_bot_hint">把刚复制的那串码粘在这里</string>
     <string name="set_alerts_wizard_next">下一步</string>
     <string name="set_alerts_wizard_bot_bad_title">这串码不对</string>
-    <string name="set_alerts_wizard_bot_bad_body">令牌长这样：几位数字，一个冒号，然后一长串字母和数字，比如 123456789:AAH…
-
-常见的三种错：只复制了一半；把 /newbot 这几个字也复制进来了；复制成了别的机器人的令牌。
-
-回 Telegram 找 @BotFather，发送 /mybots，选中你的机器人，点 API Token，再复制一次。</string>
+    <string name="set_alerts_wizard_bot_bad_body">令牌长这样：几位数字，一个冒号，然后一长串字母和数字，比如 123456789:AAH…\n\n常见的三种错：只复制了一半；把 /newbot 这几个字也复制进来了；复制成了别的机器人的令牌。\n\n回 Telegram 找 @BotFather，发送 /mybots，选中你的机器人，点 API Token，再复制一次。</string>
     <string name="set_alerts_wizard_retry">再试一次</string>
     <string name="set_alerts_wizard_chat_title">第 2 步：让车找到你的聊天</string>
-    <string name="set_alerts_wizard_chat_body">1. 在 Telegram 里打开刚造好的那个机器人（@BotFather 会给一个链接，点它就进去了）
-2. 点屏幕下面的「开始」或「Start」
-3. 随便发一句话给它，比如 hello
-
-车要看到这句话，才知道以后该往哪儿发警报。</string>
+    <string name="set_alerts_wizard_chat_body">1. 在 Telegram 里打开刚造好的那个机器人（@BotFather 会给一个链接，点它就进去了）\n\n2. 点屏幕下面的「开始」或「Start」\n\n3. 随便发一句话给它，比如 hello\n\n车要看到这句话，才知道以后该往哪儿发警报。</string>
     <string name="set_alerts_wizard_chat_find">找到我的聊天</string>
     <string name="set_alerts_wizard_chat_looking">在问 Telegram，最多等半分钟</string>
     <string name="set_alerts_wizard_chat_found">找到了</string>
     <string name="set_alerts_wizard_chat_none_title">机器人还没收到话</string>
-    <string name="set_alerts_wizard_chat_none_body">Telegram 那边没有你的任何消息，所以还找不到你的聊天。
-
-回手机，打开你的机器人，先发一句话（比如 hello），再点「再试一次」。</string>
+    <string name="set_alerts_wizard_chat_none_body">Telegram 那边没有你的任何消息，所以还找不到你的聊天。\n\n回手机，打开你的机器人，先发一句话（比如 hello），再点「再试一次」。</string>
     <string name="set_alerts_wizard_chat_failed_title">连不上 Telegram</string>
-    <string name="set_alerts_wizard_chat_failed_body">没问成：%1$s
-
-等一下再试。网络不好、或者 Telegram 那边在限流，都会这样。</string>
+    <string name="set_alerts_wizard_chat_failed_body">没问成：%1$s\n\n等一下再试。网络不好、或者 Telegram 那边在限流，都会这样。</string>
     <string name="set_alerts_wizard_chat_pick_title">找到好几个聊天，选一个</string>
     <string name="set_alerts_wizard_test_title">第 3 步：试一张</string>
     <string name="set_alerts_wizard_test_body">按一下，车会现在拍一张照片、压小一点，发到刚才那个聊天。手机上应该马上收到。</string>
     <string name="set_alerts_wizard_test_send">发一张试试</string>
     <string name="set_alerts_wizard_test_sending">在拍、在发，稍等</string>
     <string name="set_alerts_wizard_test_failed_title">照片没发出去</string>
-    <string name="set_alerts_wizard_test_failed_body">原因：%1$s
-
-下一步：回第 2 步，确认你给机器人发过话、也找到了聊天，然后再试一次。</string>
+    <string name="set_alerts_wizard_test_failed_body">原因：%1$s\n\n下一步：回第 2 步，确认你给机器人发过话、也找到了聊天，然后再试一次。</string>
     <string name="set_alerts_wizard_done_title">设置完成</string>
-    <string name="set_alerts_wizard_done_body">通了：%1$s
-
-照片能送到你的聊天，真出事的时候也能。
-
-还剩一件：最上面那个开关现在是关的。不开它，车不会自己发警报。</string>
+    <string name="set_alerts_wizard_done_body_off">通了：%1$s\n\n照片能送到你的聊天，真出事的时候也能。\n\n还剩一件：最上面那个开关现在是关的。不开它，车不会自己发警报。</string>
+    <string name="set_alerts_wizard_done_body_on">通了：%1$s\n\n照片能送到你的聊天，真出事的时候也能。\n\n警报开关是开着的。\n\n%2$s也得开着：警报只在哨兵模式守着的时候发，车机也是靠它才不睡。</string>
     <string name="set_alerts_wizard_done_again">再发一张</string>
     <string name="set_alerts_wizard_finish">完成</string>
 </resources>

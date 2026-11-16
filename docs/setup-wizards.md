@@ -170,21 +170,27 @@ phone proves the whole path.
 3. If the chat was found but sending fails, the chat itself probably changed (left the group, account
    deleted) — go back to step 2 and find it again.
 
-### 第 4 步：完成，但开关还关着 · Step 4: done, and the switch is still off
+### 第 4 步：完成，而且说的是真的状态 · Step 4: done, and it says what is actually true
 
 ![Setup finished](screenshots/telegram-wizard-4-done.png)
 
+开关关着走完那一屏 · the same screen with the switch still off:
+
+![Setup finished with the switch off](screenshots/telegram-wizard-4-done-switch-off.png)
+
 **中文**
 
-1. 框里写着「通了：已发出，96 kB」—— 大小是真的量出来的，100 kB 是预算，不是承诺。
-2. 还剩一件：最上面那个「停车时发警报」的开关现在是关的。不开它，车不会自己发警报。
+1. 框里写着「通了：已发出，94 kB」—— 大小是真的量出来的，100 kB 是预算，不是承诺。
+2. 下面那几句是读着开关此刻的位置写的，不是写死的：开关关着就说「最上面那个开关现在是关的。不开它，车不会自己发警报」；开着就说「警报开关是开着的」，再补一句哨兵模式也得开着 —— 警报只在哨兵模式守着的时候发，车机也是靠它才不睡（`AppConfig.isAlertsEnabled()`）。
 3. 「再发一张」重发一张；「完成」关掉向导，那一行显示已配好。
 
 **English**
 
-1. It says "It works: sent, 96 kB" — the size is measured, 100 kB is a budget and not a promise.
-2. One thing is left: the **Alerts while parked** switch at the top is still off. Without it the car sends
-   nothing on its own.
+1. It says "It works: Sent, 94 kB" — the size is measured, 100 kB is a budget and not a promise.
+2. The lines under it are written from where the switch actually is, not from fixed text: with it off the
+   dialog says the **Alerts while parked** switch at the top is still off and that the car sends nothing on
+   its own; with it on it says alerts are on, and adds the one line that alerts only fire while
+   **Sentry Mode** is armed — and that is what keeps the head unit awake (`AppConfig.isAlertsEnabled()`).
 3. **Send another** sends one more picture; **Finish** closes the wizard and the settings row shows it is
    configured.
 
