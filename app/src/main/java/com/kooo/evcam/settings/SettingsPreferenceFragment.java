@@ -14,6 +14,8 @@ import android.os.Bundle;
 import android.text.InputType;
 import com.kooo.evcam.profile.ProfileMigration;
 import com.kooo.evcam.profile.ProfileStore;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import java.util.ArrayList;
@@ -25,6 +27,7 @@ import androidx.preference.PreferenceFragmentCompat;
 import androidx.preference.SeekBarPreference;
 import androidx.preference.SwitchPreferenceCompat;
 import androidx.appcompat.app.AlertDialog;
+import com.google.android.material.button.MaterialButton;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import com.kooo.evcam.AppConfig;
@@ -1563,21 +1566,88 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
      * bot does not know what a token is, and handing them an empty box just sends them searching
      * for a guide; someone who already has one does not want six steps again. So one question, two
      * choices, one Cancel.</p>
+     *
+     * <h3>两个选择做成按钮</h3>
+     *
+     * <p>之前是一行行的文字（{@code setItems}）：和下面的说明分不开，看着像句子，不像能点的东西。
+     * 现在用对话框按钮那一种块：52dp 高、整行宽、上下叠着，推荐的那个实心在上。颜色、字号、圆角
+     * 都走 {@code CamDialogs.paintButton}，所以和「取消 / 保存」按钮是一个长相，不是又一套。</p>
+     *
+     * <p>The two choices are real buttons now: the same block the dialog actions use, 52dp high,
+     * full width, stacked, the recommended one solid and first. Style comes from
+     * {@code CamDialogs.paintButton} rather than a second set of colours.</p>
      */
     private void chooseAlertsTokenEntry() {
-        com.kooo.evcam.ui.CamDialogs.show(new MaterialAlertDialogBuilder(requireContext(),
+        Context context = requireContext();
+        float density = getResources().getDisplayMetrics().density;
+        int pad = Math.round(20 * density);
+        int gap = Math.round(8 * density);
+
+        LinearLayout column = new LinearLayout(context);
+        column.setOrientation(LinearLayout.VERTICAL);
+        column.setPadding(pad, Math.round(4 * density), pad, 0);
+        column.addView(com.kooo.evcam.ui.CamDialogs.note(context,
+                getString(R.string.set_alerts_wizard_entry_hint)));
+
+        // 按钮的点击要先把框关掉，而框要等下面 builder 建完才存在：留一个位置给它。
+        // The buttons need the dialog to close themselves, and the dialog only exists once the
+        // builder below runs: keep one slot for it.
+        final AlertDialog[] holder = new AlertDialog[1];
+
+        MaterialButton guided = tokenEntryButton(context,
+                R.string.set_alerts_wizard_entry_guided, true, gap);
+        guided.setOnClickListener(v -> {
+            if (holder[0] != null) {
+                holder[0].dismiss();
+            }
+            startTelegramWizard();
+        });
+        column.addView(guided);
+
+        MaterialButton manual = tokenEntryButton(context,
+                R.string.set_alerts_wizard_entry_manual, false, gap);
+        manual.setOnClickListener(v -> {
+            if (holder[0] != null) {
+                holder[0].dismiss();
+            }
+            editAlertsToken();
+        });
+        column.addView(manual);
+
+        holder[0] = com.kooo.evcam.ui.CamDialogs.show(new MaterialAlertDialogBuilder(context,
                 R.style.Theme_Cam_MaterialAlertDialog)
                 .setTitle(R.string.set_alerts_wizard_entry_title)
-                .setItems(new CharSequence[]{
-                        getString(R.string.set_alerts_wizard_entry_guided),
-                        getString(R.string.set_alerts_wizard_entry_manual)}, (dialog, which) -> {
-                    if (which == 0) {
-                        startTelegramWizard();
-                    } else {
-                        editAlertsToken();
-                    }
-                })
+                .setView(column)
                 .setNegativeButton(R.string.action_cancel, null));
+    }
+
+    /**
+     * 第一个画面上的一个选择：整行宽的按钮，长相跟对话框按钮一样。
+     *
+     * <p>要先放进父布局再画 —— {@code paintButton} 改的是它自己的边距。画完再换一份没有
+     * 左边距的布局参数：那个 12dp 的左边距是给横向一排按钮留的，<b>整行宽</b>的块带上它就不居中了。</p>
+     *
+     * One choice on the first screen: a full-width button in the dialog-action style. It is painted
+     * after being added, then given fresh layout params without the 12dp start margin that the
+     * horizontal button bar needs and a full-width block does not.
+     */
+    private MaterialButton tokenEntryButton(Context context, int text, boolean primary, int gap) {
+        MaterialButton button = new MaterialButton(context);
+        button.setText(text);
+        button.setAllCaps(false);
+        button.setLayoutParams(buttonParams(gap));
+        com.kooo.evcam.ui.CamDialogs.paintButton(button, primary);
+        // 新的一份，不是刚刚那一份：paintButton 就地改了它加上的边距。
+        // A fresh object, not the one above: paintButton mutated the margins in place.
+        button.setLayoutParams(buttonParams(gap));
+        return button;
+    }
+
+    private LinearLayout.LayoutParams buttonParams(int gap) {
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        params.topMargin = gap;
+        return params;
     }
 
     /** 三步走完（或者中途退出）之后，行尾说明和发送那边都要按新的值重排。 */
