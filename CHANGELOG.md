@@ -11,6 +11,14 @@ commit message, not here.
 
 Nothing yet.
 
+## [4.8.0-alpha] - 2026-11-16
+
+- Super mirror and side view: the camera keeper hands their pictures to every camera pipeline as soon as it is built; their own retries and 2-second watchdogs are gone.
+- Super mirror: while the screen is dark, the window stops checking its picture every second once the picture is covered, and checks again when the screen comes on or a new frame arrives.
+- Smart buttons: while the screen is dark and Bluetooth is off, the app no longer checks Bluetooth every 5 seconds; it checks again when the screen comes on or the head unit wakes.
+- Storage cleanup: does not run while the screen is dark; a skipped run happens 10 minutes after the screen comes on.
+- Diagnostics: the stall monitor stops once the screen has been dark for 30 seconds and every camera is closed, and resumes when the screen comes on or something needs watching.
+
 ## [4.7.1-alpha] - 2026-11-16
 
 - Diagnostics: when a camera becomes unavailable, the black box notes whether it left the camera list, instead of always saying another app took it.
