@@ -44,7 +44,7 @@ import com.kooo.evcam.R;
  *
  * <h3>为什么用重画而不是 GL</h3>
  *
- * <p>这台车机上有一条硬性平台事实（见 {@code docs/zeekr-platform-notes.md} 2.1）：
+ * <p>这台车机上有一条硬性平台事实（见 {@code docs/local/zeekr-platform-notes.md} 2.1）：
  * 用 GL 自建 SurfaceTexture 顶替相机的生产者会崩，而「一个普通 TextureView + 父容器
  * 用矩阵把它重画一遍」是验证可行的结构 —— 四宫格预览就是这么做的。</p>
  *
@@ -1262,7 +1262,7 @@ public class RearViewMirrorView extends ViewGroup {
      * 格子够密，拼起来看不出接缝。</p>
      *
      * <p>关键在于这样做<b>不需要 OpenGL</b>：画的还是原来那个 TextureView，
-     * 相机的消费者始终只有它一个（为什么不上 GL，见 docs/zeekr-platform-notes.md §2.1）。</p>
+     * 相机的消费者始终只有它一个（为什么不上 GL，见 docs/local/zeekr-platform-notes.md §2.1）。</p>
      *
      * <p>代价是每帧 {@code N²} 次绘制。后视镜是一块小窗口，固定每边
      * {@link FisheyeProjection#MESH_DIVISIONS} 格；投影固定是直线投影，只有视野可调。</p>

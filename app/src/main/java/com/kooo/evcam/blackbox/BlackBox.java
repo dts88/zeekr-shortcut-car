@@ -19,6 +19,7 @@ import android.os.Process;
 import android.os.SystemClock;
 
 import com.kooo.evcam.AppLog;
+import com.kooo.evcam.StorageHelper;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -73,6 +74,10 @@ import java.util.concurrent.TimeUnit;
  * 之后只累加，每隔一段时间汇总一行。</p>
  *
  * <p>文件在应用私有目录的 {@code blackbox/} 下，重启还在，诊断报告会带上。</p>
+ *
+ * <p>U 盘上另存一份（{@link #USB_FILE}，和导出的诊断报告同一个文件夹，{@link StorageHelper#usbLogDir}；项目所有者 2026-11-15）：
+ * App Lab 丢了、应用重装以后，私有目录那一份没了，U 盘上的还在；诊断报告里比私有目录那一份更早的时间线从它取（{@link #exportUsbBefore}）。
+ * 写 U 盘在自己的线程上，盘慢、盘不在都不耽误私有目录那一份。</p>
  */
 public final class BlackBox {
 
@@ -80,6 +85,11 @@ public final class BlackBox {
     private static final String DIR = "blackbox";
     private static final String FILE = "events.log";
     private static final String OLD_FILE = "events.1.log";
+    /** U 盘上那一份（{@link StorageHelper#usbLogDir}）。 */
+    static final String USB_FILE = "blackbox.log";
+    private static final String USB_OLD_FILE = "blackbox.1.log";
+    /** U 盘上那一份超过这么大就轮换，只留上一份。 */
+    private static final long USB_FILE_LIMIT_BYTES = 2L * 1024L * 1024L;
 
     /** 超过这么大就轮换，只留上一份。 */
     private static final long FILE_LIMIT_BYTES = 512L * 1024L;
@@ -94,11 +104,21 @@ public final class BlackBox {
     /** 写盘只在这条线程上：别的线程记一行只是入队（以前每条要紧事件都在调用线程上 fsync）。 */
     private static final HandlerThread THREAD = new HandlerThread("blackbox");
     private static final Handler BOX;
+    /** 写 U 盘那一份只在这条线程上：U 盘写得慢、掉了，都不耽误私有目录那一份。 */
+    private static final HandlerThread USB_THREAD = new HandlerThread("blackbox-usb");
+    private static final Handler USB;
 
     static {
         THREAD.start();
         BOX = new Handler(THREAD.getLooper());
+        USB_THREAD.start();
+        USB = new Handler(USB_THREAD.getLooper());
     }
+
+    /** U 盘不在、写不进时少写了几行（只在 U 盘线程上动）：接上时先记一句。 */
+    private static int usbMissed;
+    /** 写 U 盘正在出错（只在 U 盘线程上动）：一阵只往日志里报一次。 */
+    private static boolean usbFailing;
     private static final List<String> PENDING = new ArrayList<>();
     private static final Map<String, int[]> COUNTS = new LinkedHashMap<>();
 
@@ -306,16 +326,28 @@ public final class BlackBox {
     /**
      * 等黑匣子线程把已经排队的都写完，最多等 {@code timeoutMs}。
      *
-     * <p>只给退出（紧接着 {@code System.exit}）、崩溃处理器和导出报告用；别处不该等。</p>
+     * <p>只给退出（紧接着 {@code System.exit}）、崩溃处理器和导出报告用；别处不该等。U 盘那一份接着等，两份合起来不超过 {@code timeoutMs}。</p>
      */
     public static void flush(long timeoutMs) {
-        if (Looper.myLooper() == THREAD.getLooper()) {
+        Looper here = Looper.myLooper();
+        if (here == THREAD.getLooper() || here == USB_THREAD.getLooper()) {
+            return;
+        }
+        long deadline = SystemClock.uptimeMillis() + timeoutMs;
+        drain(BOX, deadline);
+        drain(USB, deadline);
+    }
+
+    /** 等这条线程把已经排队的做完，最晚到 {@code deadline}（uptime）。 */
+    private static void drain(Handler handler, long deadline) {
+        long left = deadline - SystemClock.uptimeMillis();
+        if (left <= 0) {
             return;
         }
         CountDownLatch done = new CountDownLatch(1);
-        BOX.post(done::countDown);
+        handler.post(done::countDown);
         try {
-            done.await(timeoutMs, TimeUnit.MILLISECONDS);
+            done.await(left, TimeUnit.MILLISECONDS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
@@ -340,7 +372,7 @@ public final class BlackBox {
         }
         try {
             File file = fileIn(context);
-            rotateIfBig(file);
+            rotateIfBig(file, OLD_FILE, FILE_LIMIT_BYTES);
             synchronized (LOCK) {
                 try (FileOutputStream out = new FileOutputStream(file, true);
                      Writer writer = new OutputStreamWriter(out, StandardCharsets.UTF_8)) {
@@ -361,6 +393,49 @@ public final class BlackBox {
         } catch (Throwable t) {
             AppLog.w(TAG, "写黑匣子失败: " + t);
         }
+        List<String> lines = batch != null ? batch : new ArrayList<>(1);
+        lines.add(line);
+        USB.post(() -> writeUsb(lines, sync));
+    }
+
+    /**
+     * 写 U 盘上那一份（U 盘线程）：存储位置是 U 盘、盘此刻在才写。不在、写不进就记着少了几行，接上时先说一句。
+     * 要紧的那几行照样 fsync —— 车机下电时 U 盘一起没电。
+     */
+    private static void writeUsb(List<String> lines, boolean sync) {
+        Context context = appContext;
+        File dir = context == null ? null : StorageHelper.usbLogDir(context);
+        if (dir == null) {
+            usbMissed += lines.size();
+            return;
+        }
+        try {
+            File file = new File(dir, USB_FILE);
+            rotateIfBig(file, USB_OLD_FILE, USB_FILE_LIMIT_BYTES);
+            try (FileOutputStream out = new FileOutputStream(file, true);
+                 Writer writer = new OutputStreamWriter(out, StandardCharsets.UTF_8)) {
+                if (usbMissed > 0) {
+                    writer.write(stamp() + "  （U 盘这一份从这里接上：之前 U 盘不在或写不进，少了 " + usbMissed
+                            + " 行，应用里的黑匣子有）\n");
+                }
+                for (String each : lines) {
+                    writer.write(each);
+                    writer.write('\n');
+                }
+                writer.flush();
+                if (sync) {
+                    out.getFD().sync();
+                }
+            }
+            usbMissed = 0;
+            usbFailing = false;
+        } catch (Throwable t) {
+            usbMissed += lines.size();
+            if (!usbFailing) {
+                usbFailing = true;
+                AppLog.w(TAG, "写 U 盘上的黑匣子失败，接上时补一句少了几行: " + t);
+            }
+        }
     }
 
     private static File fileIn(Context context) {
@@ -371,12 +446,12 @@ public final class BlackBox {
         return new File(dir, FILE);
     }
 
-    private static void rotateIfBig(File file) {
+    private static void rotateIfBig(File file, String oldName, long limitBytes) {
         try {
-            if (file.length() < FILE_LIMIT_BYTES) {
+            if (file.length() < limitBytes) {
                 return;
             }
-            File old = new File(file.getParentFile(), OLD_FILE);
+            File old = new File(file.getParentFile(), oldName);
             if (old.exists() && !old.delete()) {
                 return;
             }
@@ -652,6 +727,61 @@ public final class BlackBox {
             sb.append("!! 读取失败: ").append(e).append('\n');
         }
         return sb.toString();
+    }
+
+    /**
+     * U 盘那一份里，比 {@code shown}（报告里刚列出的私有目录那一份）更早的部分，只取末尾 {@code maxChars}。
+     *
+     * <p>App Lab 丢了、应用重装过以后，私有目录那一份从重装那一刻才开始，之前的时间线只在 U 盘上（项目所有者 2026-11-15）；
+     * 平时这一段就是更早的几天。</p>
+     */
+    public static String exportUsbBefore(Context context, String shown, int maxChars) {
+        File dir = context == null ? null : StorageHelper.usbLogDir(context);
+        if (dir == null) {
+            return "（没有：存储位置不是 U 盘，或者 U 盘此刻不在）\n";
+        }
+        try {
+            String usb = joined(readIfThere(new File(dir, USB_OLD_FILE)), readIfThere(new File(dir, USB_FILE)));
+            if (usb.isEmpty()) {
+                return "（U 盘上还没有）\n";
+            }
+            String older = olderPart(usb, shown);
+            if (older == null) {
+                return "（和上面接不上：上面第一条不在 U 盘那一份里。下面是 U 盘那一份的末尾）\n" + tail(usb, maxChars);
+            }
+            if (older.isEmpty()) {
+                return "（U 盘那一份没有比上面更早的）\n";
+            }
+            return tail(older, maxChars);
+        } catch (IOException e) {
+            return "!! 读取失败: " + e + "\n";
+        }
+    }
+
+    /** {@code usb} 里排在 {@code shown} 第一条记录之前的那些行；第一条不在 {@code usb} 里（对不上）时是 null。只认整行。 */
+    static String olderPart(String usb, String shown) {
+        String first = firstRecord(shown);
+        if (first == null || usb == null) {
+            return null;
+        }
+        if (usb.startsWith(first + "\n")) {
+            return "";
+        }
+        int at = usb.indexOf("\n" + first + "\n");
+        return at < 0 ? null : usb.substring(0, at + 1);
+    }
+
+    /** 第一条记录：跳过 {@link #tail} 加的「…」那句；一条都没有是 null。 */
+    static String firstRecord(String shown) {
+        if (shown == null) {
+            return null;
+        }
+        for (String line : shown.split("\n")) {
+            if (!line.isEmpty() && !line.startsWith("…")) {
+                return line;
+            }
+        }
+        return null;
     }
 
     private static String readIfThere(File file) throws IOException {

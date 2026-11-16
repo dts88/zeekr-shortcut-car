@@ -8,7 +8,8 @@
 package com.kooo.evcam.overlay;
 
 /**
- * 悬浮按钮上单击和长按各自做什么。
+ * 应用功能那几样（{@code button.ButtonAction} 的「应用功能」一组）：原来只有悬浮按钮能选，2026-11-15 起悬浮按钮、灵动贴
+ * 从同一份动作列表里选（项目所有者），这几样照旧在这里，怎么做在 {@link QuickActions}。
  *
  * <h3>为什么默认两个都是「打开主界面」</h3>
  *
@@ -27,6 +28,8 @@ public enum FloatingAction {
     TOGGLE_RECORDING("toggle_recording"),
     /** 拍一张。 */
     TAKE_PHOTO("take_photo"),
+    /** 截下整个中控屏的画面（{@code capture.ScreenCapture}，项目所有者 2026-11-15）。 */
+    TAKE_SCREENSHOT("take_screenshot"),
     /** 开 / 关超级镜子。 */
     TOGGLE_MIRROR("toggle_mirror"),
     /** 锁定此刻前后 10 秒所在的录像：和闪远光自动锁定同一套（{@code AutoLock#lockNow}）。 */
@@ -53,6 +56,8 @@ public enum FloatingAction {
                 return com.kooo.evcam.R.string.floating_action_toggle_recording;
             case TAKE_PHOTO:
                 return com.kooo.evcam.R.string.floating_action_take_photo;
+            case TAKE_SCREENSHOT:
+                return com.kooo.evcam.R.string.floating_action_take_screenshot;
             case TOGGLE_MIRROR:
                 return com.kooo.evcam.R.string.floating_action_toggle_mirror;
             case LOCK_FOOTAGE:

@@ -153,6 +153,8 @@ final class EcarxSource {
     /** 写只走 {@link #access}：灵动贴的动作。 */
     private Method setFunctionValue;
     private Method setFunctionValueZoned;
+    /** 车机说某个号某个区域现在能不能用：关门前问（{@link CarAccess#status}）。 */
+    private Method isFunctionSupportedZoned;
     /** 连着时给灵动贴读写用的那一份（{@link #access}）；没连上、断了、停了是 null。 */
     private volatile CarAccess access;
     private Method getSensorEvent;
@@ -475,6 +477,7 @@ final class EcarxSource {
                 getFunctionValueZoned = findMethod(function, "getFunctionValue", int.class, int.class);
                 setFunctionValue = findMethod(function, "setFunctionValue", int.class, int.class);
                 setFunctionValueZoned = findMethod(function, "setFunctionValue", int.class, int.class, int.class);
+                isFunctionSupportedZoned = findMethod(function, "isFunctionSupported", int.class, int.class);
             }
             if (sensor != null) {
                 getSensorEvent = findMethod(sensor, "getSensorEvent", int.class);
@@ -506,7 +509,7 @@ final class EcarxSource {
             }
             sleptAtLastPass = sleptMs();
             access = new Access(function, getFunctionValue, getFunctionValueZoned, setFunctionValue, setFunctionValueZoned,
-                    sensor, getSensorLatestValue);
+                    isFunctionSupportedZoned, sensor, getSensorLatestValue);
             status = String.format(Locale.US,
                     "connected in %d ms; function=%s zoned=%s sensorEvent=%s sensorValue=%s; driver %s; %s",
                     SystemClock.elapsedRealtime() - start, getFunctionValue != null, getFunctionValueZoned != null,
@@ -1440,15 +1443,18 @@ final class EcarxSource {
         private final Method getZoned;
         private final Method set;
         private final Method setZoned;
+        private final Method supportedZoned;
         private final Object sensor;
         private final Method sensorValue;
 
-        Access(Object function, Method get, Method getZoned, Method set, Method setZoned, Object sensor, Method sensorValue) {
+        Access(Object function, Method get, Method getZoned, Method set, Method setZoned, Method supportedZoned,
+               Object sensor, Method sensorValue) {
             this.function = function;
             this.get = get;
             this.getZoned = getZoned;
             this.set = set;
             this.setZoned = setZoned;
+            this.supportedZoned = supportedZoned;
             this.sensor = sensor;
             this.sensorValue = sensorValue;
         }
@@ -1471,6 +1477,20 @@ final class EcarxSource {
         @Override
         public boolean write(int id, int zone, int value) {
             return accepted(setZoned, id, zone, value);
+        }
+
+        /** 回的是 ECARX 的 {@code FunctionStatus}，写成它自己的名字（同 {@link DarkScreenProbes#status}）。 */
+        @Override
+        public String status(int id, int zone) {
+            if (supportedZoned == null || function == null) {
+                return null;
+            }
+            try {
+                Object v = supportedZoned.invoke(function, id, zone);
+                return v == null ? null : String.valueOf(v);
+            } catch (Throwable t) {
+                return null;
+            }
         }
 
         @Override

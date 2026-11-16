@@ -665,6 +665,20 @@
   its length before grouping, which is slower. Turn on if the grouping is wrong. / Setiap klip dibuka untuk membaca
   tempohnya sebelum dikumpulkan, lebih lambat. Hidupkan jika pengumpulan salah.
   「分组」是项目所有者说这件事时的原话，只在这一句里当动词用；界面上一次从开始到停止的录制仍叫「录像」。
+- 2026-11-15 批准（按键动作「车身」一组加关门六项；项目所有者要了这六项，看过预览图后说「继续」）：
+  smart_button_action_close_all_doors「关闭所有车门」/ Close all doors / Tutup semua pintu；
+  smart_button_action_close_driver_door「关闭主驾门」/ Close driver door / Tutup pintu pemandu；
+  smart_button_action_close_passenger_door「关闭副驾门」/ Close passenger door / Tutup pintu penumpang；
+  smart_button_action_close_rear_left_door「关闭左后门」/ Close rear left door / Tutup pintu belakang kiri；
+  smart_button_action_close_rear_right_door「关闭右后门」/ Close rear right door / Tutup pintu belakang kanan；
+  smart_button_action_close_tailgate「关闭后备箱」/ Close tailgate / Tutup but belakang。
+  门的叫法同「车辆信号」页（vi_door_*）；没做成时的提示用已有的 msg_car_action_*。
+- 2026-11-15 批准（悬浮按钮、灵动贴的动作「截屏」；项目所有者：「用“截屏”，同意」，草稿是「截取屏幕」）：
+  floating_action_take_screenshot「截屏」/ Take a screenshot / Ambil tangkapan skrin；
+  msg_screenshot_saved「截图已保存」/ Screenshot saved / Tangkapan skrin disimpan；
+  msg_screenshot_no_drive「截图失败：未检测到 U 盘」/ No screenshot: no USB drive found /
+  Tiada tangkapan skrin: tiada pemacu USB ditemui（照 msg_photo_no_drive 的写法）。截不到用已有的
+  msg_car_action_unavailable「无法执行「截屏」」；通知标题就是动作名。
 - vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
 - 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
 

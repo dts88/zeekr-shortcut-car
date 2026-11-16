@@ -40,6 +40,28 @@ commit message, not here.
   flash, or a door opens. The bot token is typed on the car screen and can be found together with the
   chat id under Alerts; it stays on the car and out of the settings export.
 
+## [4.7.0-alpha] - 2026-11-16
+
+- Smart buttons: the Bluetooth scan restarts every 25 minutes, so presses are no longer missed after a long drive.
+- Diagnostics: the black box timeline is also kept on the USB drive (Download/EVCam_Log/blackbox.log), so it survives an App Lab reinstall. Exported reports include its older part.
+
+## [4.6.0-alpha] - 2026-11-15
+
+- Floating button: tap and long press can use every smart-button action (driving, media, seats, climate, body, lights, scenes), chosen the same way as for smart buttons.
+- Floating button and smart buttons: new Take a screenshot action. It saves the whole screen as a PNG in the raw folder under photos on the USB drive. The first press asks for the system's screen recording permission, which lasts until the screen turns off or the app exits.
+
+## [4.5.0-alpha] - 2026-11-15
+
+- Smart buttons: new Body actions to close all doors, the driver door, the passenger door, the rear left door, the rear right door or the tailgate. They only work on power-operated doors and need the car to be stationary.
+- About: lists the open-source components the app uses and their licenses; lelelolo added to the contributors.
+- About: the Diagnostics path now reads Settings → General → Diagnostics.
+
+## [4.4.2-beta] - 2026-11-14
+
+Apart from X knob support, everything is essentially ready. This is a milestone release, and the last beta before X knob support.
+
+Support for the facelift 7X will be attempted later, if time allows. Support for the EVA robot will not be released publicly for now.
+
 ## [4.4.1-alpha] - 2026-11-14
 
 - Video playback: clips are grouped into recordings by file name and file time instead of opening each one, so the list appears much sooner. Opening each clip to read its length remains as a developer option.

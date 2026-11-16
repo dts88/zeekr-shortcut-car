@@ -8,6 +8,7 @@
 package com.kooo.evcam.screens;
 
 import android.app.Activity;
+import android.app.Dialog;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.os.Looper;
@@ -38,8 +39,8 @@ public final class Shots {
     public static final String DAY = "zh-rCN-w1600dp-h848dp-land-notnight-xhdpi";
     /** 车机应用区域，中文，夜间。 */
     public static final String NIGHT = "zh-rCN-w1600dp-h848dp-land-night-xhdpi";
-    /** 同一尺寸、白天，英文：给上游的 PR 和不读中文的人看。 */
-    public static final String DAY_EN = "en-rUS-w1600dp-h848dp-land-notnight-xhdpi";
+    /** 车机应用区域，英文，白天（wiki 的英文页配图用，文件名后面加 -en）；上游的 PR 讨论也用这一套。 */
+    public static final String DAY_EN = "en-w1600dp-h848dp-land-notnight-xhdpi";
 
     private static final File FOLDER = new File("build/outputs/screenshots");
 
@@ -69,6 +70,33 @@ public final class Shots {
         settle();
         Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
         root.draw(new Canvas(bitmap));
+        try {
+            return save(bitmap, name);
+        } finally {
+            bitmap.recycle();
+        }
+    }
+
+    /** 弹着的对话框存成 {@code name.png}：只画对话框窗口那一块（照它自己排出来的大小），不带后面的界面。 */
+    public static File save(Dialog dialog, String name) {
+        settle();
+        View root = dialog.getWindow().getDecorView();
+        int width = root.getWidth();
+        int height = root.getHeight();
+        if (width <= 0 || height <= 0) {
+            throw new IllegalStateException("对话框还没排好：" + width + " × " + height);
+        }
+        Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+        root.draw(new Canvas(bitmap));
+        try {
+            return save(bitmap, name);
+        } finally {
+            bitmap.recycle();
+        }
+    }
+
+    /** 已经画好的一张图（信息条这种不在界面上的）存成 {@code name.png}；图归叫的人管。 */
+    public static File save(Bitmap bitmap, String name) {
         File out = new File(FOLDER, name + ".png");
         //noinspection ResultOfMethodCallIgnored
         FOLDER.mkdirs();
@@ -76,8 +104,6 @@ public final class Shots {
             bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream);
         } catch (IOException e) {
             throw new IllegalStateException("无法写入截图 " + out, e);
-        } finally {
-            bitmap.recycle();
         }
         return out;
     }

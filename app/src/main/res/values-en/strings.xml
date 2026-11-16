@@ -313,6 +313,7 @@ If I forget: %3$s</string>
     <string name="floating_action_open_app">Open the app</string>
     <string name="floating_action_toggle_recording">Start / stop recording</string>
     <string name="floating_action_take_photo">Take a photo</string>
+    <string name="floating_action_take_screenshot">Take a screenshot</string>
     <string name="floating_action_toggle_mirror">Super mirror on / off</string>
     <string name="floating_action_lock_footage">Lock the current recording</string>
     <string name="floating_action_toggle_drive_sound">Simulated drive sound on / off</string>
@@ -371,6 +372,12 @@ If I forget: %3$s</string>
     <string name="smart_button_action_defrost_front">Front defrost</string>
     <string name="smart_button_action_defrost_rear">Rear defrost</string>
     <string name="smart_button_action_central_lock">Central locking</string>
+    <string name="smart_button_action_close_all_doors">Close all doors</string>
+    <string name="smart_button_action_close_driver_door">Close driver door</string>
+    <string name="smart_button_action_close_passenger_door">Close passenger door</string>
+    <string name="smart_button_action_close_rear_left_door">Close rear left door</string>
+    <string name="smart_button_action_close_rear_right_door">Close rear right door</string>
+    <string name="smart_button_action_close_tailgate">Close tailgate</string>
     <string name="smart_button_action_mirrors">Fold / unfold side mirrors</string>
     <string name="smart_button_action_charging_cap">Charging port cover</string>
     <string name="smart_button_action_view_360">Factory 360 view</string>
@@ -740,6 +747,8 @@ If I forget: %3$s</string>
     <string name="msg_photo_not_saved">No photo: couldn\'t save it</string>
     <string name="msg_photo_no_picture">No photo: no image from the cameras</string>
     <string name="msg_photo_no_drive">No photo: no USB drive found</string>
+    <string name="msg_screenshot_no_drive">No screenshot: no USB drive found</string>
+    <string name="msg_screenshot_saved">Screenshot saved</string>
     <string name="msg_recording_stopped">Recording stopped</string>
     <string name="msg_recording_started_all">Recording started (all cameras)</string>
     <string name="msg_recording_started_n">Recording started (cameras: %1$d)</string>

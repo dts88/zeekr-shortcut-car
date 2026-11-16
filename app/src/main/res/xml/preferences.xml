@@ -439,11 +439,11 @@
                 android:title="@string/set_section_floating"
                 android:summary="@string/set_recording_floating_summary" />
 
-            <ListPreference
+            <Preference
                 android:key="pref_floating_tap"
                 android:title="@string/set_floating_tap_title" />
 
-            <ListPreference
+            <Preference
                 android:key="pref_floating_long_press"
                 android:title="@string/set_floating_long_press_title" />
 

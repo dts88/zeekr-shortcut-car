@@ -9,6 +9,7 @@
 package com.kooo.evcam.button;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
@@ -61,6 +62,8 @@ public class CarMovesTest {
         /** 受理了也不变（这台车没有这个功能）。 */
         boolean applies = true;
         Float speed;
+        /** 车机说「号@区域」能不能用；没放的是 active，放 null 是问不了。 */
+        final Map<String, String> statuses = new HashMap<>();
 
         void set(int id, int zone, int value) {
             values.put(id + "@" + zone, value);
@@ -102,6 +105,12 @@ public class CarMovesTest {
                 values.put(id + "@" + zone, value);
             }
             return true;
+        }
+
+        @Override
+        public String status(int id, int zone) {
+            String key = id + "@" + zone;
+            return statuses.containsKey(key) ? statuses.get(key) : "active";
         }
 
         @Override
@@ -157,7 +166,11 @@ public class CarMovesTest {
     private final Map<String, Integer> memory = new HashMap<>();
 
     private CarMoves.Result run(FakeCar fake, CarMoves.Job job) {
-        CarMoves.Car car = new CarMoves.Car(fake, NAMES, ms -> { }, new CarMoves.Memory() {
+        return run(fake, job, ms -> { });
+    }
+
+    private CarMoves.Result run(FakeCar fake, CarMoves.Job job, CarMoves.Sleeper sleeper) {
+        CarMoves.Car car = new CarMoves.Car(fake, NAMES, sleeper, new CarMoves.Memory() {
             @Override
             public int get(String key, int fallback) {
                 Integer v = memory.get(key);
@@ -478,6 +491,164 @@ public class CarMovesTest {
         FakeCar car = new FakeCar();
         car.applies = false;                                      // 写了也不变，读到的一直是 null
         assertEquals(CarMoves.Result.NO_CHANGE, run(car, CarMoves.rearFogFlash()));
+    }
+
+    // ---- 关门（项目所有者 2026-11-15）
+
+    private static final int DOOR = Signal.DOOR_DRIVER.id;
+
+    private static CarMoves.Job allDoors() {
+        return CarMoves.closeDoors(Signal.DOOR_DRIVER, Signal.DOOR_PASSENGER, Signal.DOOR_REAR_LEFT, Signal.DOOR_REAR_RIGHT);
+    }
+
+    /** 开着的、停在半路的写 0，本来关着的不写；读回都关好了算成了。 */
+    @Test
+    public void closeDoorsClosesOnlyTheOpenOnes() {
+        FakeCar car = new FakeCar();
+        car.set(DOOR, Signal.DOOR_DRIVER.zone, 1);
+        car.set(DOOR, Signal.DOOR_PASSENGER.zone, 0);
+        car.set(DOOR, Signal.DOOR_REAR_LEFT.zone, DOOR + 1);
+        car.set(DOOR, Signal.DOOR_REAR_RIGHT.zone, 0);
+        assertEquals(CarMoves.Result.DONE, run(car, allDoors()));
+        assertEquals(2, car.writes.size());
+        assertEquals(DOOR + "@" + Signal.DOOR_DRIVER.zone + "=0", car.writes.get(0));
+        assertEquals(DOOR + "@" + Signal.DOOR_REAR_LEFT.zone + "=0", car.writes.get(1));
+    }
+
+    /** 几扇一起关：一扇一扇写，两扇之间隔 200 ms（车自己的设置页逐扇关就是这样）。 */
+    @Test
+    public void doorsAreWrittenOneAtATime() {
+        FakeCar car = new FakeCar();
+        car.set(DOOR, Signal.DOOR_DRIVER.zone, 1);
+        car.set(DOOR, Signal.DOOR_PASSENGER.zone, 0);
+        car.set(DOOR, Signal.DOOR_REAR_LEFT.zone, 1);
+        car.set(DOOR, Signal.DOOR_REAR_RIGHT.zone, 1);
+        assertEquals(CarMoves.Result.DONE, run(car, allDoors(), ms -> car.writes.add("sleep " + ms)));
+        assertEquals(DOOR + "@" + Signal.DOOR_DRIVER.zone + "=0", car.writes.get(0));
+        assertEquals("sleep " + CarMoves.DOOR_GAP_MS, car.writes.get(1));
+        assertEquals(DOOR + "@" + Signal.DOOR_REAR_LEFT.zone + "=0", car.writes.get(2));
+        assertEquals("sleep " + CarMoves.DOOR_GAP_MS, car.writes.get(3));
+        assertEquals(DOOR + "@" + Signal.DOOR_REAR_RIGHT.zone + "=0", car.writes.get(4));
+    }
+
+    /** 都关着：一个都不写，算做成（按了没事可做）。 */
+    @Test
+    public void closedDoorsNeedNothing() {
+        FakeCar car = new FakeCar();
+        car.set(DOOR, Signal.DOOR_TRUNK.zone, 0);
+        assertEquals(CarMoves.Result.DONE, run(car, CarMoves.closeDoors(Signal.DOOR_TRUNK)));
+        assertTrue(car.writes.isEmpty());
+    }
+
+    /** 车机说这一扇不是 active（没有电动门）、问不了：不写；开着的一扇都写不了是做不了。 */
+    @Test
+    public void doorsTheCarCannotMoveAreLeftAlone() {
+        FakeCar car = new FakeCar();
+        String passenger = DOOR + "@" + Signal.DOOR_PASSENGER.zone;
+        car.set(DOOR, Signal.DOOR_PASSENGER.zone, 1);
+        for (String status : new String[] {"notavailable", "notactive", "error", null}) {
+            car.statuses.put(passenger, status);
+            assertEquals(String.valueOf(status), CarMoves.Result.UNAVAILABLE,
+                    run(car, CarMoves.closeDoors(Signal.DOOR_PASSENGER)));
+            assertTrue(car.writes.isEmpty());
+        }
+    }
+
+    /** 四扇一起：写不了的那扇跳过，别的照关；写了的关好了算做成。 */
+    @Test
+    public void allDoorsClosesWhatItCan() {
+        FakeCar car = new FakeCar();
+        car.set(DOOR, Signal.DOOR_DRIVER.zone, 1);
+        car.set(DOOR, Signal.DOOR_PASSENGER.zone, 1);
+        car.statuses.put(DOOR + "@" + Signal.DOOR_PASSENGER.zone, "notavailable");
+        assertEquals(CarMoves.Result.DONE, run(car, allDoors()));
+        assertEquals(1, car.writes.size());
+        assertEquals(DOOR + "@" + Signal.DOOR_DRIVER.zone + "=0", car.writes.get(0));
+        assertEquals(Integer.valueOf(1), car.get(DOOR, Signal.DOOR_PASSENGER.zone));
+    }
+
+    /** 读不到、读到不认识的值：那一扇不写；一扇都读不到是做不了。 */
+    @Test
+    public void unreadableDoorsAreSkipped() {
+        FakeCar car = new FakeCar();
+        assertEquals(CarMoves.Result.UNAVAILABLE, run(car, allDoors()));
+        car.set(DOOR, Signal.DOOR_REAR_RIGHT.zone, 255);
+        assertEquals(CarMoves.Result.UNAVAILABLE, run(car, CarMoves.closeDoors(Signal.DOOR_REAR_RIGHT)));
+        car.set(DOOR, Signal.DOOR_DRIVER.zone, 0);
+        assertEquals("读得到的都关着", CarMoves.Result.DONE, run(car, allDoors()));
+        assertTrue(car.writes.isEmpty());
+    }
+
+    /** 关门要几秒：读回等得比 1 秒久，读到关好就停；车机受理了、门一直没关上是没生效。 */
+    @Test
+    public void closingWaitsForTheDoorToGetThere() {
+        int[] reads = {0};
+        FakeCar slow = new FakeCar() {
+            @Override
+            public boolean write(int id, int zone, int value) {
+                writes.add(id + "@" + zone + "=" + value);
+                return true;
+            }
+
+            @Override
+            public Integer read(int id, int zone) {
+                // 写了以后读到第 20 下（约 4 秒）才关好
+                if (!writes.isEmpty() && ++reads[0] >= 20) {
+                    set(id, zone, 0);
+                }
+                return super.read(id, zone);
+            }
+        };
+        slow.set(DOOR, Signal.DOOR_TRUNK.zone, 1);
+        assertEquals(CarMoves.Result.DONE, run(slow, CarMoves.closeDoors(Signal.DOOR_TRUNK)));
+        assertTrue(20L * CarMoves.DOOR_STEP_MS > CarMoves.BACK_MS);
+
+        FakeCar stuck = new FakeCar();
+        stuck.applies = false;
+        stuck.set(DOOR, Signal.DOOR_TRUNK.zone, 1);
+        assertEquals(CarMoves.Result.NO_CHANGE, run(stuck, CarMoves.closeDoors(Signal.DOOR_TRUNK)));
+        assertEquals(1, stuck.writes.size());
+    }
+
+    /** 关到一半受阻、停在半路（读到号加 1）：到时是做不了，不说「此车可能没有该功能」。 */
+    @Test
+    public void aDoorThatStopsHalfwayIsUnavailable() {
+        FakeCar car = new FakeCar() {
+            @Override
+            public boolean write(int id, int zone, int value) {
+                writes.add(id + "@" + zone + "=" + value);
+                set(id, zone, id + 1);
+                return true;
+            }
+        };
+        car.set(DOOR, Signal.DOOR_TRUNK.zone, 1);
+        assertEquals(CarMoves.Result.UNAVAILABLE, run(car, CarMoves.closeDoors(Signal.DOOR_TRUNK)));
+        assertEquals(1, car.writes.size());
+        car.writes.clear();
+        assertEquals("停在半路的再按一下再写一次关", CarMoves.Result.UNAVAILABLE,
+                run(car, CarMoves.closeDoors(Signal.DOOR_TRUNK)));
+        assertEquals(DOOR + "@" + Signal.DOOR_TRUNK.zone + "=0", car.writes.get(0));
+    }
+
+    /** 车机不受理写：做不了。 */
+    @Test
+    public void aRefusedCloseIsUnavailable() {
+        FakeCar car = new FakeCar();
+        car.acceptZoned = false;
+        car.set(DOOR, Signal.DOOR_DRIVER.zone, 1);
+        assertEquals(CarMoves.Result.UNAVAILABLE, run(car, CarMoves.closeDoors(Signal.DOOR_DRIVER)));
+    }
+
+    /** 车机回的可用状态：只有 active 算能用（枚举名带类名的也认）。 */
+    @Test
+    public void onlyActiveCounts() {
+        assertTrue(CarMoves.active("active"));
+        assertTrue(CarMoves.active("FunctionStatus.active"));
+        assertFalse(CarMoves.active("notactive"));
+        assertFalse(CarMoves.active("FunctionStatus.notactive"));
+        assertFalse(CarMoves.active("notavailable"));
+        assertFalse(CarMoves.active("error"));
+        assertFalse(CarMoves.active(null));
     }
 
     // ---- 执行前的检查

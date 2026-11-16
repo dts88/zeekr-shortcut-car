@@ -313,6 +313,7 @@ Kalau lupa: %3$s</string>
     <string name="floating_action_open_app">Buka apl</string>
     <string name="floating_action_toggle_recording">Mula / henti rakaman</string>
     <string name="floating_action_take_photo">Ambil foto</string>
+    <string name="floating_action_take_screenshot">Ambil tangkapan skrin</string>
     <string name="floating_action_toggle_mirror">Hidupkan / matikan Cermin super</string>
     <string name="floating_action_lock_footage">Kunci rakaman semasa</string>
     <string name="floating_action_toggle_drive_sound">Hidupkan / matikan bunyi pemanduan simulasi</string>
@@ -371,6 +372,12 @@ Kalau lupa: %3$s</string>
     <string name="smart_button_action_defrost_front">Penyahbeku depan</string>
     <string name="smart_button_action_defrost_rear">Penyahbeku belakang</string>
     <string name="smart_button_action_central_lock">Kunci berpusat</string>
+    <string name="smart_button_action_close_all_doors">Tutup semua pintu</string>
+    <string name="smart_button_action_close_driver_door">Tutup pintu pemandu</string>
+    <string name="smart_button_action_close_passenger_door">Tutup pintu penumpang</string>
+    <string name="smart_button_action_close_rear_left_door">Tutup pintu belakang kiri</string>
+    <string name="smart_button_action_close_rear_right_door">Tutup pintu belakang kanan</string>
+    <string name="smart_button_action_close_tailgate">Tutup but belakang</string>
     <string name="smart_button_action_mirrors">Lipat / buka cermin sisi</string>
     <string name="smart_button_action_charging_cap">Penutup port pengecasan</string>
     <string name="smart_button_action_view_360">Paparan 360 kilang</string>
@@ -735,6 +742,8 @@ Kalau lupa: %3$s</string>
     <string name="msg_photo_not_saved">Tiada foto: foto tidak dapat disimpan</string>
     <string name="msg_photo_no_picture">Tiada foto: tiada imej daripada kamera</string>
     <string name="msg_photo_no_drive">Tiada foto: tiada pemacu USB ditemui</string>
+    <string name="msg_screenshot_no_drive">Tiada tangkapan skrin: tiada pemacu USB ditemui</string>
+    <string name="msg_screenshot_saved">Tangkapan skrin disimpan</string>
     <string name="msg_recording_stopped">Rakaman dihentikan</string>
     <string name="msg_recording_started_all">Rakaman bermula (semua kamera)</string>
     <string name="msg_recording_started_n">Rakaman bermula (%1$d kamera)</string>

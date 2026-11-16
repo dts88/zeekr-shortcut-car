@@ -46,6 +46,11 @@ public class MainScreenShotsTest {
     }
 
     @Test
+    public void mainScreenByDayInEnglish() {
+        shoot(Shots.DAY_EN, "day-en", false);
+    }
+
+    @Test
     public void mainScreenByNight() {
         shoot(Shots.NIGHT, "night", false);
     }
@@ -53,12 +58,22 @@ public class MainScreenShotsTest {
     /** 开关都开着、正在录：四块都亮，录制键里有熄屏提示那一行。 */
     @Test
     public void mainScreenRecordingWithEverythingOn() {
+        everythingOn();
+        shoot(Shots.DAY, "day-on", true);
+    }
+
+    @Test
+    public void mainScreenRecordingWithEverythingOnInEnglish() {
+        everythingOn();
+        shoot(Shots.DAY_EN, "day-on-en", true);
+    }
+
+    private static void everythingOn() {
         AppConfig config = new AppConfig(RuntimeEnvironment.getApplication());
         config.setRearViewEnabled(true);
         config.setSideViewEnabled(true);
         config.setDriveSoundEnabled(true);
         config.setFisheyeCorrection(true);
-        shoot(Shots.DAY, "day-on", true);
     }
 
     /**

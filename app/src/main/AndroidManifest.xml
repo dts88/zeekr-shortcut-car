@@ -32,6 +32,9 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <!-- 录制声音开着时，前台服务试着带上麦克风类型（安卓 11 起后台用麦克风要它；带不上照旧） -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <!-- 截屏（悬浮按钮、灵动贴的动作，capture.ScreenCapture）：拿屏幕录制授权要一个「屏幕录制」类型的前台服务，
+         安卓 14 起还要这个权限 -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
     <!-- CPU唤醒锁（保持CPU运行，不亮屏，用于息屏状态下拍照/录制） -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- 悬浮窗权限（绕过后台启动Activity限制，需要用户手动授权） -->
@@ -185,6 +188,19 @@
             android:name=".zeekr.AboutActivity"
             android:label="@string/about_title"
             android:theme="@style/Theme.Cam"
+            android:exported="false" />
+
+        <!-- 截屏：拿着屏幕录制授权的前台服务；弹系统同意框的透明界面（单独一个任务：弹框时主界面不跟着出来） -->
+        <service
+            android:name=".capture.ScreenCaptureService"
+            android:foregroundServiceType="mediaProjection"
+            android:exported="false" />
+
+        <activity
+            android:name=".capture.ScreenCaptureConsentActivity"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:taskAffinity=""
+            android:excludeFromRecents="true"
             android:exported="false" />
 
         <!-- 无障碍服务：保活手段之一。系统肯不肯让它跑还没在车上试过，它自己会把结果记进黑匣子 -->

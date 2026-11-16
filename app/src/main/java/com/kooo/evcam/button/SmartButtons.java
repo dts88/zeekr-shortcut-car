@@ -27,21 +27,15 @@ import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
 import android.os.SystemClock;
-import android.widget.Toast;
 
 import androidx.core.content.ContextCompat;
 
 import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.AppLog;
-import com.kooo.evcam.R;
 import com.kooo.evcam.UserExit;
 import com.kooo.evcam.blackbox.BlackBox;
 import com.kooo.evcam.camera.CameraKeeper;
-import com.kooo.evcam.overlay.QuickActions;
 import com.kooo.evcam.screen.ScreenState;
-import com.kooo.evcam.sound.DriveSound;
-import com.kooo.evcam.telemetry.Signal;
-import com.kooo.evcam.telemetry.Telemetry;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -65,11 +59,17 @@ import java.util.TreeSet;
  * <ul>
  *   <li>扫描按名字过滤（{@link SmartButtonAd#NAME}），结果用 PendingIntent 由系统交给 {@link ScanReceiver}：应用在后台、被系统收掉了也送得到。
  *       低延迟、积极匹配、每包都报、只收传统广播。</li>
- *   <li>按名字过滤以后只有按下时才有广播，平时没有是正常的；带过滤的扫描安卓也不会因为扫得久就降级。所以扫描开着就不动（车主 2026-11-01：
- *       不反复强行启动），只在这些时候停、开：灵动贴的开关、绑定（一台都没绑时）、蓝牙开关、车机睡醒、扫描起不来、退出、连接重试（见下），
- *       还有车机的蓝牙搜索停了以后（{@link #DISCOVERY_SETTLE_MS} 后重开一次，见下一条）。</li>
+ *   <li>按名字过滤以后只有按下时才有广播，平时没有是正常的。扫描开着就不动（车主 2026-11-01：不反复强行启动），只在这些时候停、开：
+ *       灵动贴的开关、绑定（一台都没绑时）、蓝牙开关、车机睡醒、扫描起不来、退出、连接重试（见下），
+ *       车机的蓝牙搜索停了以后（{@link #DISCOVERY_SETTLE_MS} 后重开一次，见下一条），还有开满 {@link #RENEW_MS}。</li>
+ *   <li>开满 {@link #RENEW_MS} 重开一次：安卓 12 一次扫描开满 30 分钟，过滤条件没交给蓝牙芯片去筛的，就降成「顺带」——
+ *       只有别的程序也在扫时才收得到。按名字过滤也逃不掉（2026-11-15 车主的报告：最后一次开扫描之后一路开车、31 分钟后按键没反应，
+ *       关开一次就好）。3.4.0 以为带过滤就不降级，把 2.93.4 的 25 分钟重开去掉了，这里补回来；车机醒来开始听那一行记着芯片能不能接手过滤
+ *       （{@link ScanProbe#scanFacts}）。</li>
  *   <li>车机的蓝牙搜索（经典蓝牙的搜索设备）停了（搜完了、或者被取消），已经开着的扫描在这台车上就收不到东西了（登记还在），
  *       重新登记才好（车主 2026-11-08：车机「搜索蓝牙」页在搜时灵动贴有效，停了就失效，再搜又好）。取消时没在搜，也会走一遍「搜索结束」（安卓的做法）。
+ *       这多半就是上一条的「顺带」：降了的扫描只在别人扫（搜索设备也扫）时收得到；重开一次也把 30 分钟清零。车上确认 25 分钟重开管用以后，
+ *       这一条留不留再定。
  *       搜索停了从三处看：系统的通知（{@link #adapterState}；App Lab 里蓝牙的通知没收到过，收到也算）；每 {@link #WATCH_MS} 看一眼在不在搜，
  *       在搜变成不搜；手机跟车机的蓝牙连上了（{@link PhoneLink#joined}）：连之前要先取消搜索（CarPlay 每次用蓝牙连 iPhone 之前都取消一次），
  *       当时没在搜的话，App Lab 里只有这一处看得出来。</li>
@@ -86,9 +86,8 @@ import java.util.TreeSet;
  * <h3>按法</h3>
  * <ul>
  *   <li>广播里的计数变了就是按了一下（{@link SmartButtonAd}）。计数存着，进程重启后照样接得上。</li>
- *   <li>单击、双击查这一台选的动作（{@link SmartButtonAction}），在主线程上做：悬浮按钮那几项走 {@link QuickActions}（同一份），
- *       写车的（驾驶模式和其他车控动作）交给 {@link CarMoves}，媒体、语音走 {@link MediaMove}，升挡、降挡交给模拟声浪
- *       （{@link DriveSound#shift}）。写车的没做成提示一句（{@link #carResult}）。没开启灵动贴、用户退出以后什么都不做。</li>
+ *   <li>单击、双击查这一台选的动作（{@link ButtonAction}），在主线程上交给 {@link ButtonActions}（悬浮按钮走同一份）。
+ *       没开启灵动贴、用户退出以后什么都不做。</li>
  *   <li>长按（约 3 秒、背光闪）只用来连接，不绑动作（车主 2026-11-04）。</li>
  *   <li>同一下从广播、通知各来一遍只算一次（{@link SmartButtonAd#samePress}）。</li>
  *   <li>正在绑定时绑过的按了不做；拿绑过的来长按，告诉一声，这次绑定结束。</li>
@@ -123,6 +122,8 @@ public final class SmartButtons {
     static final long WATCH_MS = 2_000L;
     /** 车机的蓝牙搜索停了以后隔这么久重开一次扫描（{@link #discoveryStopped}）。 */
     static final long DISCOVERY_SETTLE_MS = 200L;
+    /** 扫描开满这么久重开一次（{@link #renew}）：赶在安卓 12 把开满 30 分钟的扫描降成「顺带」之前。 */
+    static final long RENEW_MS = 25 * 60_000L;
     /** {@code BluetoothProfile.HEADSET_CLIENT}、{@code A2DP_SINK}（系统 API，公开 SDK 里没有）：车机这一端的蓝牙电话、音乐。 */
     private static final int PROFILE_HEADSET_CLIENT = 16;
     private static final int PROFILE_A2DP_SINK = 11;
@@ -134,8 +135,6 @@ public final class SmartButtons {
     /** 开扫描的次数按这么长一阵算，一阵里最多开 {@link #MAX_STARTS} 次（安卓 12 按 uid 算 5 次，容器里别的应用也算，Lab 3.5.4）。 */
     static final long STARTS_WINDOW_MS = 30_000L;
     static final int MAX_STARTS = 3;
-    /** 连按驾驶模式向上、向下时，这么久（毫秒）之内接着上一次的目标算。 */
-    static final long DRIVE_TARGET_MS = 2000L;
     /** 绑定等多久（长按要 3 秒，再给连接留点，Lab）。 */
     static final long BIND_WINDOW_MS = 30_000L;
     /** 绑定的时间到了还在连：隔这么久再看（连接自己的超时管着它）。 */
@@ -323,9 +322,6 @@ public final class SmartButtons {
     private final Map<String, Pressed> pressed = new HashMap<>();
 
     // ---- 只在主线程上碰
-    /** 刚要切到的驾驶模式、什么时候要的（{@link #stepDriveMode}）；0 = 没有。 */
-    private int driveTarget;
-    private long driveTargetAt;
     private BindListener bindListener;
     private final List<Runnable> changeListeners = new ArrayList<>();
 
@@ -894,6 +890,7 @@ public final class SmartButtons {
             BlackBox.note("灵动贴：开始听；phone " + phoneSeen.words());
         }
         bt.postDelayed(watch, WATCH_MS);
+        bt.postDelayed(renew, RENEW_MS);
     }
 
     private void stopScan() {
@@ -902,6 +899,7 @@ public final class SmartButtons {
         bt.removeCallbacks(retry);
         bt.removeCallbacks(watch);
         bt.removeCallbacks(relisten);
+        bt.removeCallbacks(renew);
         if (maybeScanning) {
             stopIntentScan();
             maybeScanning = false;
@@ -991,6 +989,15 @@ public final class SmartButtons {
     /** 搜索停了以后重开一次扫描（{@link #discoveryStopped}）：这时还在扫才重开。 */
     private final Runnable relisten = () -> {
         if (scanning) {
+            stopScan();
+            ensureScan();
+        }
+    };
+
+    /** 这一轮扫描开满 {@link #RENEW_MS}（{@link #startNow} 排上，{@link #stopScan} 撤掉）：照搜索停了那样重开一次。 */
+    private final Runnable renew = () -> {
+        if (scanning) {
+            BlackBox.note("灵动贴：扫描开满 " + RENEW_MS / 60_000L + " 分钟，重开一次（安卓开满 30 分钟会降级）");
             stopScan();
             ensureScan();
         }
@@ -1259,62 +1266,9 @@ public final class SmartButtons {
         if (!config.getSmartButtons().contains(address)) {
             return;
         }
-        SmartButtonAction action = SmartButtonAction.fromKey(config.getSmartButtonAction(address, clicks));
+        ButtonAction action = ButtonAction.fromKey(config.getSmartButtonAction(address, clicks));
         BlackBox.noteImportant("灵动贴 " + SmartButtonAd.shortId(address) + "：" + (clicks == SmartButtonAd.DOUBLE ? "双击" : "单击") + " → " + action.key);
-        if (action.floating != null) {
-            try {
-                QuickActions.perform(app, action.floating, CameraKeeper.Why.BUTTON);
-            } catch (RuntimeException e) {
-                // 应用在后台、又没有前台服务撑着时，安卓不让起服务（超级镜子、录制）：这一下不做，进程不能因为它崩
-                AppLog.w(TAG, "action " + action.key + " failed: " + e);
-            }
-        } else if (action.driveMode != 0) {
-            writeDriveMode(action.driveMode);
-        } else if (action.driveModeStep != 0) {
-            stepDriveMode(action.driveModeStep);
-        } else if (action.gearStep != 0) {
-            DriveSound.shift(action.gearStep);
-        } else if (action.car != null) {
-            String label = action.label(app);
-            CarMoves.run(app, action.key, action.car, result -> carResult(label, result));
-        } else if (action.media != null && !action.media.perform(app)) {
-            Toast.makeText(app, app.getString(R.string.msg_car_action_unavailable, action.label(app)), Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    /** 写车的没做成（主线程）：提示一句为什么。做成了不提示：车上看得到。 */
-    private void carResult(String label, CarMoves.Result result) {
-        String text = CarMoves.failureText(app, label, result);
-        if (text != null) {
-            Toast.makeText(app, text, Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    /**
-     * 驾驶模式走一级（{@link SmartButtonAction#nextDriveMode}）：到头不动、不提示；此刻不在舒适、标准、运动里（雪地、读不到）不切换。
-     * 连按时接着上一次的目标算，车机回报晚了也不会少走一级（{@link #DRIVE_TARGET_MS}）。
-     */
-    private void stepDriveMode(int step) {
-        boolean recent = driveTarget != 0 && SystemClock.elapsedRealtime() - driveTargetAt < DRIVE_TARGET_MS;
-        Integer from = recent ? Integer.valueOf(driveTarget) : Telemetry.get().readings().code(Signal.DRIVE_MODE);
-        int to = SmartButtonAction.nextDriveMode(from, step);
-        if (to == 0) {
-            Toast.makeText(app, R.string.msg_drive_mode_failed, Toast.LENGTH_SHORT).show();
-        } else if (to != from) {
-            writeDriveMode(to);
-        }
-    }
-
-    /** 切驾驶模式（{@link CarMoves#driveMode}）：没切成提示「驾驶模式没有切换」，连按的目标作废。 */
-    private void writeDriveMode(int mode) {
-        driveTarget = mode;
-        driveTargetAt = SystemClock.elapsedRealtime();
-        CarMoves.run(app, "drive_mode", CarMoves.driveMode(mode), result -> {
-            if (result != CarMoves.Result.DONE) {
-                driveTarget = 0;
-                Toast.makeText(app, R.string.msg_drive_mode_failed, Toast.LENGTH_SHORT).show();
-            }
-        });
+        ButtonActions.perform(app, action, CameraKeeper.Why.BUTTON);
     }
 
     // ================================================================= 连接（bt 线程）

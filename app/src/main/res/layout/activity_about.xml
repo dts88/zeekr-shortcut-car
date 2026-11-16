@@ -151,6 +151,16 @@
                 android:textColor="@color/text_secondary"
                 android:textAppearance="@style/TextAppearance.Cam.Body" />
 
+            <!-- 第三方开源组件和许可证（随 APK 分发的那些，同 NOTICE.md §3） -->
+            <TextView
+                android:id="@+id/about_credits_libraries"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="@string/about_credits_libraries"
+                android:textColor="@color/text_secondary"
+                android:textAppearance="@style/TextAppearance.Cam.Body" />
+
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"

@@ -2899,7 +2899,7 @@ public class AppConfig {
     }
 
     /**
-     * 单击做什么。默认「打开主界面」—— 手指擦到按钮就停了录像，
+     * 单击做什么（{@code button.ButtonAction} 的 key，和灵动贴同一份列表）。默认「打开主界面」—— 手指擦到按钮就停了录像，
      * 是行车记录仪最不该发生的事。
      */
     public String getFloatingTapAction() {
@@ -2937,7 +2937,7 @@ public class AppConfig {
     private static final String KEY_SMART_BUTTONS = "smart_buttons";
     /** 灵动贴开着没有（2026-11-04 车主：没开启时不扫描蓝牙，Lab 同时开着时好用蓝牙做测试）。 */
     private static final String KEY_SMART_BUTTONS_ENABLED = "smart_buttons_enabled";
-    /** 每一台单击 / 双击做什么：{@code smart_button_action.<地址>.<1 或 2>}，值是 {@code button.SmartButtonAction} 的 key。 */
+    /** 每一台单击 / 双击做什么：{@code smart_button_action.<地址>.<1 或 2>}，值是 {@code button.ButtonAction} 的 key。 */
     private static final String KEY_SMART_BUTTON_ACTION_PREFIX = "smart_button_action.";
     /**
      * 每一台的「名称 / 位置」（项目所有者 2026-11-14）：{@code smart_button_name.<地址>}，用户自己打的字；没起名就没有这一项。
@@ -3013,7 +3013,7 @@ public class AppConfig {
     /** 这一台这种按法（1 单击、2 双击）做什么；没选过是「不使用」。 */
     public String getSmartButtonAction(String address, int clicks) {
         return prefs.getString(smartButtonActionKey(address, clicks),
-                com.kooo.evcam.button.SmartButtonAction.NONE.key);
+                com.kooo.evcam.button.ButtonAction.NONE.key);
     }
 
     public void setSmartButtonAction(String address, int clicks, String key) {

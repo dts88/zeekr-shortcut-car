@@ -17,11 +17,14 @@ import android.os.Looper;
 import android.os.SystemClock;
 
 import com.kooo.evcam.blackbox.BlackBox;
+import com.kooo.evcam.camera.CameraKeeper;
 import com.kooo.evcam.telemetry.CarAccess;
 import com.kooo.evcam.telemetry.CarNames;
 import com.kooo.evcam.telemetry.Signal;
 import com.kooo.evcam.telemetry.Telemetry;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.function.Consumer;
 
@@ -31,12 +34,13 @@ import java.util.function.Consumer;
  * 代码在这里按本项目重写；功能号、区域按系统里的常量名取（{@link CarNames}），这台车机上没有的就是做不了。
  *
  * <ul>
- *   <li>按了先读现在的值，照规则写下一个；写完每 {@link #BACK_STEP_MS} 读回一次，{@link #BACK_MS} 内变成写的值才算成了（{@link Result#DONE}）。
+ *   <li>按了先读现在的值，照规则写下一个；写完每 {@link #BACK_STEP_MS} 读回一次，{@link #BACK_MS} 内变成写的值才算成了（{@link Result#DONE}；
+ *       关门等得久一些，{@link #DOOR_BACK_MS}）。
  *       车机受理了、车没变是 {@link Result#NO_CHANGE}：这台车多半没有这个功能（比如这台车的座椅加热，Lab 3.5.3 车上），选项照留，
  *       给别的地区的车用（项目所有者 2026-11-04）。</li>
- *   <li>执行前看：超级省电时座椅、方向盘、音量、一键运动不执行（{@link #saving}）。座椅恢复会动座椅，后视镜、充电口盖
- *       会动车身，要车停稳才执行：车速读得到、不超过 {@link #STANDSTILL_KMH}（{@link #standstill}；座椅恢复的是 Lab 加的，后视镜、
- *       充电口盖的是我们加的）。不看挡位，按了就写、不恢复（项目所有者 2026-10-27、11-04）。</li>
+ *   <li>执行前看：超级省电时座椅、方向盘、音量、一键运动不执行（{@link #saving}）。座椅恢复会动座椅，后视镜、充电口盖、关门
+ *       会动车身，要车停稳才执行：车速读得到、不超过 {@link #STANDSTILL_KMH}（{@link #standstill}；座椅恢复的是 Lab 加的，关车门的
+ *       照 Lab 车上用的做法，后视镜、充电口盖、关后备箱的是我们加的）。不看挡位，按了就写、不恢复（项目所有者 2026-10-27、11-04）。</li>
  *   <li>全车的读写先带「全车」区域，车机不认（读不到、写不进）再不带区域（Lab：驾驶模式以前就是不带区域写通的）。
  *       驾驶模式、一键运动照本项目车上验证过的不带区域读写（{@link Car#setPlain}）。</li>
  *   <li>一件一件做，在自己的线程上（{@code SmartButtonCar}）：读回要等，不占主线程，也不占车辆信号的线程（{@link CarAccess}）。
@@ -54,6 +58,15 @@ final class CarMoves {
     static final double STANDSTILL_KMH = 1.0;
     /** 香氛刚打开时隔这么久再看一眼开关，没开上再写一次。 */
     static final long FRAGRANCE_RECHECK_MS = 400;
+    /**
+     * 关门读回最多等多久：门、后备箱从开到关要几秒，1 秒肯定不够。电动门、电动尾门关上要多久车上还没量过
+     * （Lab 2026-11-15：等后备箱的实测再改），先放宽到 15 秒，读到关好就停。
+     */
+    static final long DOOR_BACK_MS = 15_000;
+    /** 关门读回多久看一次。 */
+    static final long DOOR_STEP_MS = 200;
+    /** 几扇一起关时，两扇之间隔多久写：车自己的设置页逐扇关就是隔 200 ms（Lab findings §2.139）。 */
+    static final long DOOR_GAP_MS = 200;
     /** 一键运动记下的原来的驾驶模式（运行状态，在 {@code smart_button_state} 里）。 */
     static final String SPORT_SAVED = "sport_saved_mode";
 
@@ -70,7 +83,7 @@ final class CarMoves {
         DONE,
         /** 车机受理了，车上没变。 */
         NO_CHANGE,
-        /** 做不了：车辆接口没连上、这台车机没有这个功能号、读到的值不认识、车机不受理。 */
+        /** 做不了：车辆接口没连上、这台车机没有这个功能号、读到的值不认识、车机不受理；关门时门停在半路（受阻）。 */
         UNAVAILABLE,
         /** 超级省电模式下不执行。 */
         POWER_SAVING,
@@ -135,8 +148,16 @@ final class CarMoves {
         return handler;
     }
 
-    /** 排一件（主线程上叫）：在写车的线程上做，结果在主线程上交给 {@code done}。{@code key} 是动作的名字，黑匣子用。 */
+    /** 排一件（主线程上叫），黑匣子记成灵动贴按的（主界面的哨兵键也走这里）。 */
     static void run(Context app, String key, Job job, Consumer<Result> done) {
+        run(app, CameraKeeper.Why.BUTTON, key, job, done);
+    }
+
+    /**
+     * 排一件（主线程上叫）：在写车的线程上做，结果在主线程上交给 {@code done}。{@code key} 是动作的名字，黑匣子用；
+     * {@code why} 是谁按的：悬浮按钮按的记「悬浮按钮动作」，别的照旧记「灵动贴动作」。
+     */
+    static void run(Context app, CameraKeeper.Why why, String key, Job job, Consumer<Result> done) {
         Handler h = handler();
         Handler back = main;
         h.post(() -> {
@@ -156,7 +177,7 @@ final class CarMoves {
                 }
                 detail = car.detail();
             }
-            BlackBox.note("灵动贴动作 " + key + "：" + result + "（" + detail + "）");
+            BlackBox.note((why == CameraKeeper.Why.FLOATING ? "悬浮按钮动作 " : "灵动贴动作 ") + key + "：" + result + "（" + detail + "）");
             Result r = result;
             back.post(() -> done.accept(r));
         });
@@ -296,6 +317,39 @@ final class CarMoves {
             return Result.NO_CHANGE;
         }
 
+        /**
+         * 写了关的那几扇：{@link #DOOR_BACK_MS} 内都读到 0（关好了）算成了。到时有一扇读到号加 1（受阻、停在半路，
+         * Lab findings §2.139）是做不了；还开着是没生效。关门途中一直读 1，不提前停。
+         */
+        Result closed(List<Signal> doors) {
+            for (long waited = DOOR_STEP_MS; waited <= DOOR_BACK_MS; waited += DOOR_STEP_MS) {
+                sleeper.sleep(DOOR_STEP_MS);
+                if (allClosed(doors)) {
+                    note("closed after " + waited + " ms");
+                    return Result.DONE;
+                }
+            }
+            StringBuilder still = new StringBuilder();
+            boolean stopped = false;
+            for (Signal door : doors) {
+                Integer v = read(door.id, door.zone);
+                stopped |= v != null && v == door.id + 1;
+                still.append(' ').append(hex(door.zone)).append('=').append(hex(v));
+            }
+            note((stopped ? "stopped halfway" : "not closed") + " after " + DOOR_BACK_MS + " ms:" + still);
+            return stopped ? Result.UNAVAILABLE : Result.NO_CHANGE;
+        }
+
+        private boolean allClosed(List<Signal> doors) {
+            for (Signal door : doors) {
+                Integer v = read(door.id, door.zone);
+                if (v == null || v != 0) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
         /** 超级省电开着（读不到当没开：这台车机没有这个号，就没有这件事）。 */
         boolean powerSaving() {
             Integer id = names.function("IVehicle", "SETTING_FUNC_POWER_SAVING_MODE");
@@ -321,7 +375,7 @@ final class CarMoves {
         return c -> c.powerSaving() ? Result.POWER_SAVING : job.run(c);
     }
 
-    /** 车没停稳不执行（座椅恢复、后视镜、充电口盖）。 */
+    /** 车没停稳不执行（座椅恢复、后视镜、充电口盖、关门）。 */
     static Job standstill(Job job) {
         return c -> c.standingStill() ? job.run(c) : Result.MOVING;
     }
@@ -439,6 +493,60 @@ final class CarMoves {
                 return Result.UNAVAILABLE;
             }
             return c.changed(() -> c.read(id, zone), cur);
+        };
+    }
+
+    /**
+     * 关门（项目所有者 2026-11-15）：只关不开，一扇或几扇（「关闭所有车门」是四扇侧门，后备箱单独一项）。
+     * 号、区域用车辆信号表里车上对过的那几项（{@link Signal#DOOR_DRIVER} 这些，信息条读的也是它们）。
+     * 照 Lab findings §2.93、§2.139：读到 0 是关着、1 是开着（关门途中也是 1）、号加 1 是受阻或停在半路；开着、停在半路的写 0；
+     * 车机说这一扇不是 active（没有电动门的车、没有电动门的那一扇）就不写。
+     * 项目所有者的车侧门用不了（副驾那扇是 notavailable），选项照留，给有电动门的车用（项目所有者 2026-11-15）。
+     *
+     * <p>几扇一起关时一扇一扇写，两扇之间隔 {@link #DOOR_GAP_MS}（同车自己的设置页）。
+     * 读不到、读到别的值的那一扇跳过（几扇一起关时不影响别的）；一扇都读不到是做不了。都关着算做成；
+     * 有开着的、一扇都写不了是做不了；写了的 {@link #DOOR_BACK_MS} 内都读到关好算做成，到时停在半路是做不了，还开着是没生效。</p>
+     */
+    static Job closeDoors(Signal... doors) {
+        return c -> {
+            List<Signal> closing = new ArrayList<>();
+            int known = 0;
+            int open = 0;
+            for (Signal door : doors) {
+                String which = "door " + hex(door.zone);
+                Integer cur = c.read(door.id, door.zone);
+                if (cur == null || (cur != 0 && cur != 1 && cur != door.id + 1)) {
+                    c.note(which + " read " + hex(cur));
+                    continue;
+                }
+                known++;
+                if (cur == 0) {
+                    c.note(which + " closed");
+                    continue;
+                }
+                open++;
+                String status = c.access.status(door.id, door.zone);
+                if (!active(status)) {
+                    c.note(which + " " + (status == null ? "status ?" : status));
+                    continue;
+                }
+                if (!closing.isEmpty()) {
+                    c.sleeper.sleep(DOOR_GAP_MS);
+                }
+                if (c.write(door.id, door.zone, 0)) {
+                    closing.add(door);
+                }
+            }
+            if (known == 0) {
+                return Result.UNAVAILABLE;
+            }
+            if (open == 0) {
+                return Result.DONE;
+            }
+            if (closing.isEmpty()) {
+                return Result.UNAVAILABLE;
+            }
+            return c.closed(closing);
         };
     }
 
@@ -659,6 +767,15 @@ final class CarMoves {
     }
 
     // ================================================================= 纯函数
+
+    /** 车机说能用：{@code active}（枚举的名字；带着类名的也认）。别的（notactive、notavailable、error、问不了）都不算。 */
+    static boolean active(String status) {
+        if (status == null) {
+            return false;
+        }
+        String s = status.trim().toLowerCase(Locale.US);
+        return s.equals("active") || s.endsWith(".active");
+    }
 
     /** 0 → 1、1 → 0；别的是 null（不认识，不写）。 */
     static Integer flipped(Integer cur) {

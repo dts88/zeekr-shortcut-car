@@ -8,6 +8,7 @@
 package com.kooo.evcam.blackbox;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
@@ -34,6 +35,17 @@ public class BlackBoxTest {
                 "a\nb\n", BlackBox.joined("a", "b\n"));
         assertEquals("b\n", BlackBox.joined("", "b\n"));
         assertEquals("a\n", BlackBox.joined("a\n", ""));
+    }
+
+    /** U 盘那一份里比报告上那段更早的部分：按报告的第一条记录对齐（跳过「…」那句），只认整行。 */
+    @Test
+    public void usbCopyGivesWhatCameBefore() {
+        String usb = "a\nb\nc\nd\n";
+        assertEquals("a\nb\n", BlackBox.olderPart(usb, "…（更早的在文件里）\nc\nd\n"));
+        assertEquals("第一条就是 U 盘的第一行：没有更早的", "", BlackBox.olderPart(usb, "a\nb\n"));
+        assertNull("报告第一条不在 U 盘那一份里：对不上", BlackBox.olderPart(usb, "x\ny\n"));
+        assertNull("半行不算对上", BlackBox.olderPart("xa\nb\n", "a\n"));
+        assertNull("报告里一条都没有", BlackBox.olderPart(usb, "…（更早的在文件里）\n"));
     }
 
     @Test
