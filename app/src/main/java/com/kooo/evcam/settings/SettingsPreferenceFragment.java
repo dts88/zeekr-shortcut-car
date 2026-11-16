@@ -2233,8 +2233,9 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             boolean on = appConfig.isAccessoryEnabled(kind);
             for (int i = 0; i < group.getPreferenceCount(); i++) {
                 Preference row = group.getPreference(i);
-                if (!AccessoryRows.switchKey(kind).equals(row.getKey()) && row.isVisible() != on) {
-                    row.setVisible(on);
+                boolean visible = on && (!(row instanceof CardItemPreference) || ((CardItemPreference) row).isWanted());
+                if (!AccessoryRows.switchKey(kind).equals(row.getKey()) && row.isVisible() != visible) {
+                    row.setVisible(visible);
                 }
             }
         }

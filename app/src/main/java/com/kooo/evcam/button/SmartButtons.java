@@ -300,7 +300,7 @@ public final class SmartButtons {
     private int bindFailures;
     private final Map<String, Last> lastPress = new HashMap<>();
     private final Map<String, BatteryWindow> batteryWindows = new HashMap<>();
-    private final Map<String, Long> boostUntil = new HashMap<>();
+    private final Map<String, Long> boostUntil = new java.util.concurrent.ConcurrentHashMap<>();
     /** 认不出广播的那几台：每台这次进程只记一次。 */
     private final Set<String> unreadable = new HashSet<>();
     /** 这一阵最后一次记下的 GATT 服务情况，一样的不再记。 */
@@ -1414,6 +1414,7 @@ public final class SmartButtons {
     private void boost(String address) {
         boostUntil.put(address, SystemClock.elapsedRealtime() + BOOST_MS);
         scheduleBoostEnd();
+        publishChange();
         BlackBox.note("X旋钮 " + SmartButtonAd.shortId(address) + "：长按，" + BOOST_MS / 60_000 + " 分钟");
         ButtonLink l = link;
         if (l != null && l.address.equals(address) && l.isReady()) {
@@ -1465,8 +1466,19 @@ public final class SmartButtons {
                 l.boost(false, -1);
             }
             BlackBox.note("X旋钮 " + SmartButtonAd.shortId(entry.getKey()) + "：" + BOOST_MS / 60_000 + " 分钟到了");
+            publishChange();
         }
         scheduleBoostEnd();
+    }
+
+    public long boostEndsAt(String address) {
+        Long until = boostUntil.get(address);
+        long now = SystemClock.elapsedRealtime();
+        return until == null || until <= now ? 0L : System.currentTimeMillis() + (until - now);
+    }
+
+    public KnobTurn knobCurrent(String address) {
+        return KnobMode.current(state, address, new AppConfig(app).getKnobHome(address));
     }
 
     private void dropBoosts() {
