@@ -20,10 +20,12 @@ import android.util.DisplayMetrics;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.TextView;
 import android.widget.EditText;
 
 import androidx.fragment.app.Fragment;
 
+import com.google.android.material.button.MaterialButton;
 import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.R;
 import com.kooo.evcam.alarm.ShadowNtfySender;
@@ -86,6 +88,7 @@ public class WizardShotsTest {
 
     private ShotActivity activity;
     private AppConfig config;
+    private SettingsShellFragment shell;
 
     @Before
     public void setUp() {
@@ -103,7 +106,7 @@ public class WizardShotsTest {
         config.setAlertsTelegramToken("");
         config.setAlertsTelegramChatId("");
         config.setAlertsNtfyTopic("");
-        SettingsShellFragment shell = new SettingsShellFragment();
+        shell = new SettingsShellFragment();
         activity.getSupportFragmentManager().beginTransaction()
                 .replace(activity.container, shell).commitNow();
         Shots.settle();
@@ -115,6 +118,56 @@ public class WizardShotsTest {
     }
 
     // ------------------------------------------------------------------ Telegram
+
+    /** 入口那一屏：先问「带着走一遍，还是自己粘令牌」。第一张图就是它。 */
+    @Test
+    public void telegramTokenEntryEnglish() {
+        tokenEntry(EN, "en");
+    }
+
+    /** 同一屏，中文。The same screen, Chinese. */
+    @Test
+    public void telegramTokenEntryChinese() {
+        tokenEntry(ZH, "zh");
+    }
+
+    private void tokenEntry(String qualifiers, String lang) {
+        Fragment host = openSettings(qualifiers);
+        // 点真的那一行：向导就是从「机器人令牌」这一行进去的。
+        // Tap the real row: the wizard is entered from the "Bot token" row.
+        SettingsPreferenceFragment section = (SettingsPreferenceFragment)
+                shell.getChildFragmentManager().findFragmentById(R.id.settings_detail);
+        assertNotNull("「停车警报」那一屏", section);
+        androidx.preference.Preference row = section.findPreference("pref_alerts_token");
+        assertNotNull("少了「机器人令牌」那一行", row);
+        row.performClick();
+        Shots.settle();
+
+        Dialog entry = latest();
+        // 两个整行宽的按钮，推荐的那个实心在上；说明写在上面。
+        // Two full-width buttons, the recommended one solid and first; the caption sits above them.
+        MaterialButton[] buttons = buttons(entry);
+        // 两个选择，加对话框自己那个「取消」：没设的按钮位是空字，不算。
+        // Two choices plus the dialog's own Cancel; unset button slots are empty and do not count.
+        assertEquals("两个选择 + 取消", 3, buttons.length);
+        assertEquals("带着走一遍在上面", text(R.string.set_alerts_wizard_entry_guided),
+                String.valueOf(buttons[0].getText()));
+        assertEquals("自己粘令牌在下面", text(R.string.set_alerts_wizard_entry_manual),
+                String.valueOf(buttons[1].getText()));
+        assertEquals("取消", text(R.string.action_cancel), String.valueOf(buttons[2].getText()));
+        assertTrue("上面那句说明：" + text(R.string.set_alerts_wizard_entry_hint),
+                hasText(entry, text(R.string.set_alerts_wizard_entry_hint)));
+        shot("wizard-telegram-0-entry-" + lang);
+
+        // 「一步一步来」：这个框关掉，第 1 步接着开。Walk through it: this closes, step 1 opens.
+        buttons[0].performClick();
+        Shots.settle();
+        Dialog step1 = latest();
+        assertNotSame("按了就进第 1 步", entry, step1);
+        assertEquals("第 1 步", text(R.string.set_alerts_wizard_next),
+                button(step1, DialogInterface.BUTTON_POSITIVE));
+        click(step1, DialogInterface.BUTTON_NEGATIVE);
+    }
 
     /** 顺利走完三步，英文：文档里用的那一套。The happy path, English: the set the docs use. */
     @Test
@@ -370,6 +423,56 @@ public class WizardShotsTest {
         }
         assertTrue(out + " 是空的", out.length() > 10_000);
         return out;
+    }
+
+    /** 框里有没有一句话写着这个（标题、说明都是 TextView）。 */
+    private static boolean hasText(Dialog dialog, String expected) {
+        for (TextView view : texts(dialog)) {
+            if (expected.contentEquals(view.getText())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static java.util.List<TextView> texts(Dialog dialog) {
+        java.util.List<TextView> found = new java.util.ArrayList<>();
+        collectTexts(dialog.getWindow().getDecorView(), found);
+        return found;
+    }
+
+    private static void collectTexts(View root, java.util.List<TextView> found) {
+        if (root instanceof TextView) {
+            found.add((TextView) root);
+        }
+        if (root instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) root;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                collectTexts(group.getChildAt(i), found);
+            }
+        }
+    }
+
+    /** 框里写得有字的那些 MaterialButton，按摆放顺序（先整行宽的选择，后按钮栏）。 */
+    private static MaterialButton[] buttons(Dialog dialog) {
+        java.util.List<MaterialButton> found = new java.util.ArrayList<>();
+        collect(dialog.getWindow().getDecorView(), found);
+        return found.toArray(new MaterialButton[0]);
+    }
+
+    private static void collect(View root, java.util.List<MaterialButton> found) {
+        if (root instanceof MaterialButton) {
+            MaterialButton button = (MaterialButton) root;
+            if (button.getVisibility() == View.VISIBLE && button.getText().length() > 0) {
+                found.add(button);
+            }
+        }
+        if (root instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) root;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                collect(group.getChildAt(i), found);
+            }
+        }
     }
 
     private static Dialog latest() {

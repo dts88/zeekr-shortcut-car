@@ -35,6 +35,23 @@ steps has a reason: nothing works without a token; a bot only writes to people w
 the owner sends one message; and the first two steps only look right — only a picture arriving on the
 phone proves the whole path.
 
+### 开始之前：带着走一遍，还是自己粘令牌 · Before step 1: walk through it, or paste the token
+
+![Bot token: walk me through it, or paste the token myself](screenshots/telegram-wizard-0-entry.png)
+
+**中文**
+
+1. 点「机器人令牌」这一行先出来的就是这一屏：两个整行宽的按钮，推荐的那个实心在上。
+2. 「一步一步来」进下面的第 1 步，六条编号的短句带着造机器人。
+3. 「我自己粘贴令牌」跳过向导，只开一个输入框 —— 已经有令牌的人不用再看一遍造机器人的说明。
+
+**English**
+
+1. Tapping the **Bot token** row opens this first: two full-width buttons, the recommended one solid and on top.
+2. **Walk me through it** opens step 1 below, six numbered lines that walk you through making the bot.
+3. **I will paste the token myself** skips the walkthrough and opens one field — someone who already has a token
+   does not have to read how to make one.
+
 ### 第 1 步：让 Telegram 给你造一个机器人 · Step 1: get a bot
 
 ![Step 1: get a bot from Telegram](screenshots/telegram-wizard-1-botfather.png)
