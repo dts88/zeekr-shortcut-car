@@ -50,7 +50,8 @@ import java.util.List;
  *       车通电了（点火 ON、DRIVING）才是亮屏；车没通电时屏幕亮了（远程开空调、远程看车）照熄屏算、不是边，黑匣子里记起止各一行。</li>
  * </ul>
  *
- * <p>安卓熄屏、又亮了（车机要睡、醒了），不管是哪条边，还告诉灵动贴放开、再要蓝牙（{@code SmartButtons}）。</p>
+ * <p>安卓熄屏、又亮了（车机要睡、醒了），不管是哪条边，还告诉灵动贴放开、再要蓝牙（{@code SmartButtons}）。亮屏（E3）时也告诉它
+ * 再看一次蓝牙：屏幕黑着、蓝牙关了时它停着，不每 5 秒看（项目所有者 2026-11-16）。</p>
  *
  * <p>顺序固定：熄屏录制的唤醒锁（{@link ScreenOffRecording}）→ 相机管家（{@link com.kooo.evcam.camera.CameraKeeper}）→ 相机（谁要用就登记，
  * 调度照登记表和「熄屏放开座舱」开关，{@code ChannelRules.releasedByDark}）→ 界面（因熄屏退下去的主界面亮屏接回来，
@@ -634,6 +635,9 @@ public final class ScreenState {
             } else {
                 buttons.headUnitWoke();
             }
+        }
+        if (buttons != null && edge == ScreenTransitions.Edge.LIT) {
+            buttons.screenLit();
         }
         noteUnpoweredLit(before, after, now);
     }

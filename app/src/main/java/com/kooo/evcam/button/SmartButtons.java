@@ -116,6 +116,8 @@ public final class SmartButtons {
 
     /** 没听上（蓝牙关着、没权限、扫描起不来、拿不到扫描器）多久再试。 */
     static final long RETRY_MS = 5_000L;
+    /** 停在「蓝牙关着」时的说明：屏幕黑着，不再隔 {@link #RETRY_MS} 看一次，等亮屏或醒来（诊断报告里看得到）。 */
+    private static final String DARK = "screen dark: waiting for screen on or wake";
     /** 车机醒了等这么久，再向系统要蓝牙服务、开始扫描（车主 2026-11-01）。 */
     static final long SETTLE_MS = 10_000L;
     /** 在扫的时候多久看一眼蓝牙开着没有。 */
@@ -584,6 +586,15 @@ public final class SmartButtons {
         });
     }
 
+    /**
+     * 亮屏（{@link ScreenState}，车通电了，主线程）：屏幕黑着、蓝牙关了时这里停着（不每 5 秒看蓝牙），亮屏再看一次 ——
+     * 开着就照常开始听；还没开（点火 ON 后要一阵才开，2026-11-15 是 24 秒）就照旧每 {@link #RETRY_MS} 看一次，开了就听。
+     * 没停着的照常，什么都不变。
+     */
+    public void screenLit() {
+        bt.post(this::ensureScan);
+    }
+
     /** 车机醒了（{@link ScreenState}，安卓亮了，主线程）：等 {@link #SETTLE_MS}，向系统重新要蓝牙服务，再开始扫描。 */
     public void headUnitWoke() {
         bt.post(() -> {
@@ -801,6 +812,17 @@ public final class SmartButtons {
         }
         if (!bluetoothOn()) {
             bluetoothRestarted();
+            if (ScreenState.dark()) {
+                // 屏幕黑着、蓝牙关了（离车时车机自己关的，2026-11-15 是黑后约 3 秒）：停着，不再每 5 秒看一次蓝牙；
+                // 亮屏（screenLit）、车机醒来（headUnitWoke）时再看（项目所有者 2026-11-16）
+                if (listen != Listen.BLUETOOTH_OFF || !DARK.equals(listenDetail)) {
+                    if (!bound.isEmpty()) {
+                        BlackBox.note("灵动贴：屏幕黑着、蓝牙关了，停下，亮屏或车机醒来再看");
+                    }
+                }
+                note(Listen.BLUETOOTH_OFF, DARK);
+                return;
+            }
             note(Listen.BLUETOOTH_OFF, "");
             bt.postDelayed(retry, RETRY_MS);
             return;
