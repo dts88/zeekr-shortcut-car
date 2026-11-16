@@ -34,9 +34,7 @@ import com.kooo.evcam.alarm.media.PictureBudget;
 import com.kooo.evcam.alarm.media.RecordedClip;
 import com.kooo.evcam.alarm.media.RecordedFrame;
 import com.kooo.evcam.alarm.media.SnapshotTaker;
-import com.kooo.evcam.alarm.ntfy.NtfyChannel;
 import com.kooo.evcam.alarm.ntfy.NtfyCommandPoller;
-import com.kooo.evcam.alarm.ntfy.NtfyGate;
 import com.kooo.evcam.alarm.ntfy.NtfyRisk;
 import com.kooo.evcam.alarm.ntfy.NtfySender;
 import com.kooo.evcam.alarm.policy.AlertPolicy;
@@ -1521,22 +1519,14 @@ public final class SentryAlerts implements Telemetry.Listener {
     }
 
     /**
-     * 现在该走哪条出口。
+     * 现在该走哪条出口。判断本身在 {@link AlertChannels}：那是全应用唯一认得出具体出口的名字的地方，
+     * 也是 {@code ProviderWiringTest} 钉住的那一处。
      *
-     * <p>两条规矩都在这里，且只在这里：开发者选项关着就是 Telegram，存着 ntfy 也一样
-     * （{@link NtfyGate}）—— 藏起来的功能不能变成「悄悄不发了」；ntfy 免费话题的风险提示没被接受，
-     * 就返回一个永远发不出去的出口（{@link NtfyRisk}），由 {@link #blockedChannel} 说清楚。</p>
-     *
-     * Which exit to use now. Both rules live here and only here: developer options closed means
-     * Telegram even when ntfy is stored (a hidden feature must not turn into silence), and an
-     * unaccepted free-topic warning yields an exit that never sends, explained by
-     * {@link #blockedChannel}.
+     * Which exit to use now. The decision itself is {@link AlertChannels}, the one place in the app that
+     * knows concrete exit names and the one {@code ProviderWiringTest} pins.
      */
     private AlertChannel channel() {
-        if (config.isAlertsNtfy()) {
-            return NtfyChannel.of(config);
-        }
-        return new TelegramChannel(config.getAlertsTelegramToken(), config.getAlertsTelegramChatId());
+        return AlertChannels.of(config);
     }
 
     /**

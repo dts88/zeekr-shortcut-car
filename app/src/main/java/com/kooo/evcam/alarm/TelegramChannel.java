@@ -43,7 +43,13 @@ public final class TelegramChannel implements AlertChannel {
 
     @Override
     public Kind blockedReason() {
-        return Kind.NOT_CONFIGURED;
+        // 配好了就是 OK：这个方法回答的是「差哪一步」，不是「永远是哪一步」。
+        // 原来无条件返回 NOT_CONFIGURED —— 所有调用处都先用 ready() 挡了一道，所以没出过事；
+        // 但第三条出口要是照抄这一份，就会抄到一个会说谎的方法。
+        // Ready means OK. This method answers "which step is missing", not "always the same step".
+        // It used to return NOT_CONFIGURED unconditionally — every caller guards with ready() first,
+        // so nothing ever broke; but a third exit copying this file would copy a method that lies.
+        return ready() ? Kind.OK : Kind.NOT_CONFIGURED;
     }
 
     @Override
