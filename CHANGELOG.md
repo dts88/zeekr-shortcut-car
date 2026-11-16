@@ -11,6 +11,10 @@ commit message, not here.
 
 Nothing yet.
 
+## [4.9.1-alpha] - 2026-11-17
+
+- Settings → Buttons: tap a bound smart button or X knob to expand its settings inline.
+
 ## [4.9.0-alpha] - 2026-11-17
 
 - X knob (experimental) in Settings → Buttons.
