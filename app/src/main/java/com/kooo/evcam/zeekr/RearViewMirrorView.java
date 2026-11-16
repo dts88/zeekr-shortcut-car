@@ -32,6 +32,7 @@ import android.view.animation.AccelerateInterpolator;
 import android.view.animation.DecelerateInterpolator;
 import android.view.ViewConfiguration;
 import android.view.ViewGroup;
+import android.view.ViewTreeObserver;
 import android.view.WindowManager;
 
 import com.kooo.evcam.AppConfig;
@@ -300,17 +301,46 @@ public class RearViewMirrorView extends ViewGroup {
         }
     }
 
-    /** 窗口问服务的两件事（RearViewMirrorService 实现）。 */
+    /** 窗口问服务的三件事（RearViewMirrorService 实现）。 */
     public interface CanvasHost {
         /** 这一块画布此刻在出画面：它那一路在出画面，会话里带着这块画布。 */
         boolean streaming(boolean cabin);
 
         /** 这一块画布刚设成可见、或者窗口重新可见：图层可能是新建的，缓冲区尺寸要拨回会话配置时那个。 */
         void shown(boolean cabin);
+
+        /**
+         * 要画了：看得见的这一块画面尺寸还没交过来、相机已经知道了的，现在交过来（{@link #setSourceSize}、{@link #setCabinSource}），
+         * 这一帧就照它画。
+         */
+        void beforeDraw(boolean cabin);
     }
 
     public void setCanvasHost(CanvasHost host) {
         this.canvasHost = host;
+    }
+
+    /**
+     * 每次画之前问一次服务（{@link CanvasHost#beforeDraw}）：环视的取景（{@link #plan}）是这个窗口自己画的，画面尺寸要在第一帧画之前到 ——
+     * 第一帧来时才补的话（那一下已经在画的途中），那一帧照「还不知道几何」原样画了整幅合成流。贴边时不画画面，不问。
+     */
+    private final ViewTreeObserver.OnPreDrawListener askBeforeDraw = () -> {
+        if (canvasHost != null && !docked) {
+            canvasHost.beforeDraw(isShowingCabin());
+        }
+        return true;
+    };
+
+    @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        getViewTreeObserver().addOnPreDrawListener(askBeforeDraw);
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        getViewTreeObserver().removeOnPreDrawListener(askBeforeDraw);
+        super.onDetachedFromWindow();
     }
 
     /**

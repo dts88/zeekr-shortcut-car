@@ -35,7 +35,10 @@ public final class CanvasSlot {
 
     /** 交的结果（{@link #offer}）。 */
     public enum Offer {
-        /** 这一路此刻没有相机（管线还没建好、这一份里没有这一路）：没声明，交上来的记着；那一方照旧过一会儿再交。 */
+        /**
+         * 这一路此刻没有相机（管线还没建好、这一份里没有这一路）：没声明，交上来的记着 —— 管线建好时管家照它声明、再叫那一方
+         * （{@link Listener#onRebuilt}），那一方不用自己隔一会儿再交。
+         */
         NO_CAMERA,
         /** 这一回不带它（{@link #refused}）：没声明，等再试。 */
         REFUSED,
@@ -45,7 +48,7 @@ public final class CanvasSlot {
         UNCHANGED
     }
 
-    /** 那一方要知道的两件事（主线程上叫）。 */
+    /** 那一方要知道的三件事（主线程上叫）。 */
     public interface Listener {
         /** 声明到了这一路相机上（第一次、换了一块画布、管线换了）：照它摆画面（拨回缓冲区尺寸、画面尺寸）。 */
         void onBound(SingleCamera camera);
@@ -54,7 +57,8 @@ public final class CanvasSlot {
         void onRefused();
 
         /**
-         * 管线换了一份、建好了，交着的画布已经声明上去（{@link CameraKeeper} 看着）：照这一方的规矩再对一次 —— 看得见、亮着屏就再交、
+         * 建了一份管线、建好了（冷启动的第一份、换的每一份），交着的画布已经声明上去（{@link CameraKeeper} 看着）：照这一方的规矩再对一次 ——
+         * 看得见、亮着屏就再交、
          * 再登记（交的时候这一路还没有相机，那时没登记上）。和声明在同一下（主线程），新的一份第一轮就带着它。
          */
         void onRebuilt();
@@ -66,7 +70,7 @@ public final class CanvasSlot {
     private final Listener listener;
     /**
      * 那一方交上来的画布（和预览那一格的视图）：撤回、交给管线留着时清。声明不上（这一路没有相机、这一回不带它）时也记着 ——
-     * 管线换了，管家照它重新交（{@link #onNewPipeline}）。
+     * 管线建好了（冷启动的第一份、换的每一份），管家照它重新交（{@link #onNewPipeline}）。
      */
     private SurfaceTexture offered;
     private TextureView offeredView;
@@ -231,7 +235,7 @@ public final class CanvasSlot {
         }
     }
 
-    /** 管线换好了、各块画布都声明过了（{@link #onNewPipeline}）：告诉那一方（{@link Listener#onRebuilt}）。关掉了的不叫。 */
+    /** 管线建好了、各块画布都声明过了（{@link #onNewPipeline}）：告诉那一方（{@link Listener#onRebuilt}）。关掉了的不叫。 */
     void rebuilt() {
         if (!closed) {
             listener.onRebuilt();

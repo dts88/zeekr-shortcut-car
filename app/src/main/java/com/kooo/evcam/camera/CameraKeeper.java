@@ -697,7 +697,8 @@ public final class CameraKeeper {
     // ================================================================= 事实
 
     /**
-     * 建了一份新的相机管线（CameraManagerHolder 建的那一刻）：交给这里接上录像的回调。录着的时候换了一份（配置变了、旧的那份被释放重建）：
+     * 建了一份新的相机管线（CameraManagerHolder 开始建的那一刻，还没建好）：交给这里接上录像的回调，等它建好把交着的画布声明上去
+     * （{@link #offerCanvasesWhenBuilt}）。录着的时候换了一份（配置变了、旧的那份被释放重建）：
      * 旧的那份上的录像到头了，按「录制器自己停了」走停录那条路，收拾完、查过盘在新的这一份上自动接回。
      */
     public void pipelineCreated(MultiCameraManager manager) {

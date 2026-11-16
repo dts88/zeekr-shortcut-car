@@ -300,7 +300,10 @@ public class RearViewMirrorService extends Service {
         ensureStillBound();
     }
 
-    /** 窗口问的两件事：画布在不在出画面（换到另一台摄像头时）、画布刚可见（缓冲区尺寸要拨回去）。 */
+    /**
+     * 窗口问的三件事：画布在不在出画面（换到另一台摄像头时）、画布刚可见（缓冲区尺寸要拨回去）、要画了（画面尺寸还没交给窗口的，
+     * 相机已经知道了就现在交）。
+     */
     private final RearViewMirrorView.CanvasHost canvasHost = new RearViewMirrorView.CanvasHost() {
         @Override
         public boolean streaming(boolean onCabin) {
@@ -310,6 +313,14 @@ public class RearViewMirrorService extends Service {
         @Override
         public void shown(boolean onCabin) {
             (onCabin ? cabin : surround).restoreOnFrame = true;
+        }
+
+        @Override
+        public void beforeDraw(boolean onCabin) {
+            MirrorCanvas canvas = onCabin ? cabin : surround;
+            if (canvas.source == null) {
+                canvas.syncSource(canvas.slot.camera());
+            }
         }
     };
 
@@ -617,7 +628,7 @@ public class RearViewMirrorService extends Service {
          */
         CanvasSlot slot;
         /**
-         * 已经交给窗口的画面尺寸。声明、出帧时都会再对，尺寸没变就不再交 —— 交一次窗口就重算一次取景、写一行日志、
+         * 已经交给窗口的画面尺寸。声明时、窗口每次画之前（还没交过时）都会再对，尺寸没变就不再交 —— 交一次窗口就重算一次取景、写一行日志、
          * 重画一次。换了窗口（{@link #attach}）、撤回输出时清掉。
          */
         Size source;
@@ -662,7 +673,7 @@ public class RearViewMirrorService extends Service {
         }
 
         /**
-         * 管线换了一份、建好了（相机管家已经把交着的画布声明上去）：环视那块照旧再对一次
+         * 建了一份管线、建好了（冷启动的第一份、换的每一份；相机管家已经把交着的画布声明上去）：环视那块照旧再对一次
          * （{@link RearViewMirrorService#ensureStillBound}：看得见、没贴边、亮着屏才交、才登记 MIRROR，后座舱跟着对）。
          * 后座舱那块跟着环视走，这里不动。
          */
@@ -712,11 +723,6 @@ public class RearViewMirrorService extends Service {
                 if (restoreOnFrame) {
                     restoreOnFrame = false;
                     restoreBufferSize(st);
-                }
-                if (source == null) {
-                    // 画面尺寸还没交给窗口（声明时这一路不在相机列表里，算不出来）：帧来了说明相机开着，这时补上（同盲区画面）。
-                    // 以前靠看门狗每 2 秒补
-                    syncSource(slot.camera());
                 }
                 // 每显示一帧新画面响一次（看不见的那块不响）。卡顿监测靠它判断后视镜是不是卡住了，
                 // 窗口自己靠它判断要不要把那张过时的画面盖起来
@@ -777,7 +783,7 @@ public class RearViewMirrorService extends Service {
             return result;
         }
 
-        /** 画面尺寸变了就交给窗口：声明、出帧时都走到这里，尺寸没变不再交。 */
+        /** 画面尺寸变了就交给窗口：声明时、窗口画之前（{@link RearViewMirrorView.CanvasHost#beforeDraw}）都走到这里，尺寸没变不再交。 */
         void syncSource(SingleCamera to) {
             Size preview = to != null ? to.getPreviewSize() : null;
             RearViewMirrorView window = mirrorView;
@@ -787,7 +793,8 @@ public class RearViewMirrorService extends Service {
                     window.setCabinSource(preview.getWidth(), preview.getHeight(), to.laneRotation(),
                             to.isSourceMirrored());
                 } else {
-                    // 几何按合成流的真实尺寸算，不是按缓冲区尺寸。这一路不在相机列表里时尺寸要等它回来才算得出，出帧时补上
+                    // 几何按合成流的真实尺寸算，不是按缓冲区尺寸。声明时还算不出来的（管线刚建好、这一路不在相机列表里），
+                    // 窗口画第一帧之前补上
                     window.setSourceSize(preview);
                 }
                 source = preview;
@@ -899,7 +906,7 @@ public class RearViewMirrorService extends Service {
          * （{@link #takeBack}）。</p>
          *
          * <p>服务退出时 {@link #onDestroy} 已经放开登记、撤回过了（窗口随后当场移走）；服务还在而窗口被拆的，这里先撤回 ——
-         * 环视那块还放开登记、取消重试（整个窗口要走了；排着的那一次拿的是这块画布）。
+         * 环视那块还放开登记（整个窗口要走了）。
          * 退出、换车型时管线已经放了、它的调度还在按次序关：会话里还带着这块画布的，照样交给那一份的调度，随那一路关了再放
          * （2.11.4 R1：会话里的画布只由通道调度放，{@link MultiCameraManager#ownerOf}）。哪一份都不带着它、也没有这一路时
          * 照旧让 TextureView 放，叫醒调度 —— 这个回调返回之后 TextureView 才放，post 出去的那一轮看到的就是此刻的样子。</p>

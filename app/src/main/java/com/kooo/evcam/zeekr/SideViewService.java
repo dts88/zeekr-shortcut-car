@@ -215,19 +215,6 @@ public class SideViewService extends Service {
         ScreenState.addListener(screenListener);
     }
 
-    /**
-     * 窗口挂着、亮着屏、画布在：几个出口各自再声明一次。管线建好、换了一份时，相机管家把交着的画布声明到它上面，
-     * 再叫各出口自己对一次（{@link Output#onRebuilt}）。以前的看门狗（每 2 秒）和重试删了（项目所有者 2026-11-16：
-     * 相机相关的管理、动作都归相机管家）。
-     */
-    private void rebindIfAttached() {
-        if (!destroyed) {
-            center.rebindIfAttached();
-            centerSecond.rebindIfAttached();
-            hud.rebindIfAttached();
-        }
-    }
-
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (com.kooo.evcam.UserExit.blocks(this, "SideViewService")) {
@@ -1001,8 +988,9 @@ public class SideViewService extends Service {
         }
 
         /**
-         * 管线换了一份、建好了（相机管家已经把交着的画布声明上去）：窗口挂着、亮着屏就再对一次、登记 SIDE_VIEW
-         * （{@link #rebindIfAttached}；画布交的时候这一路还没有相机，那时没登记上）。这一段不带它的照旧不交。
+         * 建了一份管线、建好了（冷启动的第一份、换的每一份；相机管家已经把交着的画布声明上去）：窗口挂着、亮着屏就再对一次、
+         * 登记 SIDE_VIEW（{@link #rebindIfAttached}；画布交的时候这一路还没有相机，那时没登记上）。这一段不带它的照旧不交。
+         * 以前的看门狗（每 2 秒）和重试删了（项目所有者 2026-11-16：相机相关的管理、动作都归相机管家）。
          */
         @Override
         public void onRebuilt() {
