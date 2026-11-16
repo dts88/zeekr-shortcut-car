@@ -42,6 +42,15 @@
     <string name="set_alerts_probe_last_error">Kegagalan terakhir: %1$s</string>
     <string name="set_alerts_probe_reach_ok">Telegram boleh dicapai sekarang: %1$s ms @%2$s</string>
     <string name="set_alerts_probe_reach_fail">Telegram tidak dapat dicapai sekarang: %1$s</string>
+    <string name="set_alerts_probe_ntfy_target">Makluman pergi ke %1$s, topik berakhir dengan %2$s</string>
+    <string name="set_alerts_probe_ntfy_no_topic">Topik tidak boleh digunakan: belum ditetapkan, atau terlalu pendek</string>
+    <string name="set_alerts_probe_ntfy_risk_ok">Peringatan pelan percuma: telah diterima</string>
+    <string name="set_alerts_probe_ntfy_risk_missing">Peringatan pelan percuma: belum diterima, jadi tiada apa dihantar</string>
+    <string name="set_alerts_probe_ntfy_token_set">Token berbayar: telah ditetapkan</string>
+    <string name="set_alerts_probe_ntfy_token_none">Token berbayar: belum ditetapkan (dikira pelan percuma)</string>
+    <string name="set_alerts_probe_ntfy_reach_ok">Pelayan %1$s menjawab dalam %2$s ms</string>
+    <string name="set_alerts_probe_ntfy_reach_reply">Pelayan %1$s menjawab, tetapi soalan ini tidak berjaya: %2$s</string>
+    <string name="set_alerts_probe_ntfy_reach_fail">Tidak dapat menghubungi pelayan %1$s: %2$s</string>
     <string name="set_alerts_clip_data_note">Data setiap makluman: gambar bawah 1 MB, 5 saat kira-kira 2–4 MB, 10 saat kira-kira 5–8 MB. Semua melalui 4G kereta</string>
     <string name="set_alerts_clip_title">Video</string>
     <string name="set_alerts_clip_summary">Selepas gambar, beberapa saat terakhir rakaman</string>

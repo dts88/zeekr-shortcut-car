@@ -891,9 +891,17 @@ public final class SentryAlerts implements Telemetry.Listener {
      *
      * <p>只读状态，不发消息。回答在主线程，一行一项，不含令牌。</p>
      *
+     * <p>只查<b>真正在用的那条出口</b>：出口是 ntfy 的时候不去问 Telegram，反过来也一样。
+     * 两条出口共用一份回答约定（先给整块状态，再单独给一行「现在能不能连上」），所以设置里
+     * 那一行和它的字没有变形。</p>
+     *
      * Report the current state of this whole chain; the settings line uses it.
      *
      * <p>Read-only, sends no message. Answer on the main thread, one item per line, no token.</p>
+     *
+     * <p>It walks <b>the transport actually in use</b> and nothing else: with ntfy as the exit it never
+     * asks Telegram, and the other way round. Both exits share one answer contract — the block first,
+     * then a single "can it connect now" line — so the settings row and its words keep their shape.</p>
      */
     public void probe(Callback callback) {
         StringBuilder out = new StringBuilder();
@@ -925,26 +933,78 @@ public final class SentryAlerts implements Telemetry.Listener {
         if (!lastError.isEmpty()) {
             out.append('\n').append(app.getString(R.string.set_alerts_probe_last_error, lastError));
         }
+
+        // ntfy 那三条不用发请求：发给哪、提醒接受没接受、令牌有没有。和上面那一块一起交出去，
+        // 所以设置里那一行看到的还是「整块状态 + 一行活探」。
+        // The three ntfy facts need no request: where it goes, warning accepted, token set. They go out
+        // with the block above, so the settings row still sees "a block, then one live line".
+        boolean ntfyNow = config.isAlertsNtfy();
+        if (ntfyNow) {
+            for (ProbeReport.Line line : ProbeReport.ntfyFacts(config.getAlertsNtfyServer(),
+                    config.getAlertsNtfyTopic(), config.getAlertsNtfyRiskAck(),
+                    config.getAlertsNtfyToken())) {
+                out.append('\n').append(render(line));
+            }
+        }
         callback.onResult(watchingNow, out.toString());
 
-        // 顺手再问一次“现在能不能连上”：远处不回应、回家就好的问题，差别就在这一条
-        // Also ask "can it connect now": for the "no response away, fine at home" problem, the difference is this one check
+        // 顺手再问一次“现在能不能连上”：远处不回应、回家就好的问题，差别就在这一条。
+        // 问的是在用的那条出口，另一条一概不碰。
+        // Also ask "can it connect now": for the "no response away, fine at home" problem, the
+        // difference is this one check. It asks the transport in use and leaves the other alone.
+        if (ntfyNow) {
+            probeNtfyReach(callback, watchingNow);
+            return;
+        }
         if (TelegramRequest.looksLikeToken(config.getAlertsTelegramToken())) {
             sender.execute(() -> {
                 long started = System.currentTimeMillis();
-                String verdict;
+                boolean reached = true;
+                String name = "";
+                String error = "";
                 try {
-                    String name = TelegramSender.botName(config.getAlertsTelegramToken());
-                    verdict = app.getString(R.string.set_alerts_probe_reach_ok,
-                            String.valueOf(System.currentTimeMillis() - started), name);
+                    name = TelegramSender.botName(config.getAlertsTelegramToken());
                 } catch (TelegramSender.ChatListException e) {
-                    verdict = app.getString(R.string.set_alerts_probe_reach_fail,
-                            e.getMessage() == null ? "" : e.getMessage());
+                    reached = false;
+                    error = e.getMessage() == null ? "" : e.getMessage();
                 }
-                final String line = verdict;
+                final String line = render(ProbeReport.telegramReach(reached, name,
+                        System.currentTimeMillis() - started, error));
                 app.getMainExecutor().execute(() -> callback.onResult(watchingNow, line));
             });
         }
+    }
+
+    /**
+     * ntfy 那一次活探：问一句账号，服务器答不答就是这一条。
+     *
+     * <p>为什么是这一问：{@link NtfySender#account} 是现成调用里最便宜的一条 —— 一个 GET，
+     * 只读，不往话题里写任何东西（警报行上写着「不发消息」，那就真不发）。量过：不带令牌问
+     * {@code /v1/account} 回 200，令牌写错回 401，两种情况都算服务器答了话，分得开。</p>
+     *
+     * The one live ntfy attempt: ask for the account, and whether the server answers is the line.
+     *
+     * <p>Why this one: {@link NtfySender#account} is the cheapest call that already exists — one GET,
+     * read-only, writing nothing to the topic (the row promises "no message sent", so none is sent).
+     * Measured: {@code /v1/account} without a token answers 200, a wrong token answers 401, and both
+     * count as the server answering, which the two sentences keep apart.</p>
+     */
+    private void probeNtfyReach(Callback callback, boolean watchingNow) {
+        final String server = config.getAlertsNtfyServer();
+        final String token = config.getAlertsNtfyToken();
+        sender.execute(() -> {
+            long started = SystemClock.elapsedRealtime();
+            NtfySender.Account account = NtfySender.account(server, token);
+            long ms = SystemClock.elapsedRealtime() - started;
+            AlertChannel.Kind kind = account.ok ? AlertChannel.Kind.OK : account.kind;
+            final String line = render(ProbeReport.ntfyReach(server, token, kind, ms, account.detail));
+            app.getMainExecutor().execute(() -> callback.onResult(watchingNow, line));
+        });
+    }
+
+    /** 一行报告翻成人话。One report line, rendered. */
+    private String render(ProbeReport.Line line) {
+        return app.getString(line.resId, line.args);
     }
 
     /**

@@ -56,6 +56,15 @@
     <string name="set_alerts_probe_last_error">上次失败：%1$s</string>
     <string name="set_alerts_probe_reach_ok">现在能连上 Telegram：%1$s 毫秒 @%2$s</string>
     <string name="set_alerts_probe_reach_fail">现在连不上 Telegram：%1$s</string>
+    <string name="set_alerts_probe_ntfy_target">警报发到 %1$s，话题末四位 %2$s</string>
+    <string name="set_alerts_probe_ntfy_no_topic">话题不能用：还没设置，或者太短</string>
+    <string name="set_alerts_probe_ntfy_risk_ok">免费方案提醒：已接受</string>
+    <string name="set_alerts_probe_ntfy_risk_missing">免费方案提醒：还没接受，现在一条都不发</string>
+    <string name="set_alerts_probe_ntfy_token_set">付费令牌：已设置</string>
+    <string name="set_alerts_probe_ntfy_token_none">付费令牌：没设置（按免费方案算）</string>
+    <string name="set_alerts_probe_ntfy_reach_ok">服务器 %1$s 有回应：%2$s 毫秒</string>
+    <string name="set_alerts_probe_ntfy_reach_reply">服务器 %1$s 有回应，但这一问不成：%2$s</string>
+    <string name="set_alerts_probe_ntfy_reach_fail">连不上服务器 %1$s：%2$s</string>
     <string name="set_alerts_clip_data_note">每条警报的数据：照片不到 1 MB，5 秒约 2–4 MB，10 秒约 5–8 MB。都走车的 4G</string>
     <string name="set_alerts_clip_title">另外发一段短视频</string>
     <string name="set_alerts_clip_summary">照片发出去之后，再发最后几秒的录像</string>

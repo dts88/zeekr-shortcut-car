@@ -42,6 +42,15 @@
     <string name="set_alerts_probe_last_error">Last failure: %1$s</string>
     <string name="set_alerts_probe_reach_ok">Telegram reachable now: %1$s ms @%2$s</string>
     <string name="set_alerts_probe_reach_fail">Telegram unreachable now: %1$s</string>
+    <string name="set_alerts_probe_ntfy_target">Alert goes to %1$s, topic ends in %2$s</string>
+    <string name="set_alerts_probe_ntfy_no_topic">Topic unusable: not set, or too short</string>
+    <string name="set_alerts_probe_ntfy_risk_ok">Free-plan warning: accepted</string>
+    <string name="set_alerts_probe_ntfy_risk_missing">Free-plan warning: not accepted yet, so nothing is sent</string>
+    <string name="set_alerts_probe_ntfy_token_set">Paid token: set</string>
+    <string name="set_alerts_probe_ntfy_token_none">Paid token: not set (treated as the free plan)</string>
+    <string name="set_alerts_probe_ntfy_reach_ok">Server %1$s answered in %2$s ms</string>
+    <string name="set_alerts_probe_ntfy_reach_reply">Server %1$s answered, but this question failed: %2$s</string>
+    <string name="set_alerts_probe_ntfy_reach_fail">Cannot reach server %1$s: %2$s</string>
     <string name="set_alerts_clip_data_note">Data per alert: picture under 1 MB, 5 s about 2–4 MB, 10 s about 5–8 MB. All of it over the car’s 4G</string>
     <string name="set_alerts_clip_title">Video</string>
     <string name="set_alerts_clip_summary">After the picture, the last few seconds of the recording</string>
