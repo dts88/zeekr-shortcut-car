@@ -81,6 +81,9 @@ EngineV1 only supplied facts (see [NOTICE.md](NOTICE.md)).
   settings.
 - **[lelelolo](https://github.com/lelelolo)** — two Blind spot view improvements: no black window while the car is
   using the camera, and an edge in the mirror light's colour while that light is on. Many thanks.
+- **[Fabbbrrr](https://github.com/Fabbbrrr)** — the innovative idea of decentralised ntfy and Telegram alerts that go
+  straight to the owner's phone and never through a developer's server, and the design and logic of the ntfy alerts
+  ([#211](https://github.com/dts88/zeekr-shortcut-car/pull/211)). Many thanks.
 - **SW** — active testing and feedback. Many thanks.
 
 Origins, third-party licences and boundaries: [NOTICE.md](NOTICE.md).
