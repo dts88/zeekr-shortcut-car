@@ -1485,6 +1485,8 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                 buttons.setEnabled(on);
             }
         });
+        bindSegmented(AccessoryRows.PANEL_KEY, SettingsRegistry.KNOB_PANEL, appConfig.getKnobPanel(),
+                appConfig::setKnobPanel);
         androidx.preference.PreferenceCategory category = findPreference(AccessoryRows.CATEGORY_KEY);
         if (category != null) {
             AccessoryRows rows = new AccessoryRows(this, category, bluetoothPermissions);
@@ -2228,7 +2230,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             boolean on = appConfig.isAccessoriesEnabled();
             for (int i = 0; i < accessories.getPreferenceCount(); i++) {
                 Preference row = accessories.getPreference(i);
-                boolean visible = on && (!(row instanceof CardItemPreference) || ((CardItemPreference) row).isWanted());
+                boolean visible = on && AccessoryRows.wanted(row, appConfig);
                 if (!AccessoryRows.SWITCH_KEY.equals(row.getKey()) && row.isVisible() != visible) {
                     row.setVisible(visible);
                 }

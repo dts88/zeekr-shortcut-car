@@ -31,6 +31,7 @@ public class ValueActionPreference extends Preference implements PreferenceRows.
     private CharSequence actionLabel;
     private Runnable action;
     private Boolean expanded;
+    private int lead;
 
     public ValueActionPreference(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -52,6 +53,13 @@ public class ValueActionPreference extends Preference implements PreferenceRows.
         }
     }
 
+    void setLead(int drawable) {
+        if (lead != drawable) {
+            lead = drawable;
+            notifyChanged();
+        }
+    }
+
     /** 行尾的按钮：字和点了做什么。 */
     public void setAction(CharSequence label, Runnable action) {
         this.actionLabel = label;
@@ -62,6 +70,19 @@ public class ValueActionPreference extends Preference implements PreferenceRows.
     @Override
     public void onBindViewHolder(PreferenceViewHolder holder) {
         super.onBindViewHolder(holder);
+        View frame = holder.findViewById(android.R.id.widget_frame);
+        if (frame != null) {
+            frame.setVisibility(View.VISIBLE);
+        }
+        android.widget.ImageView leadView = (android.widget.ImageView) holder.findViewById(R.id.pref_lead);
+        if (leadView != null) {
+            if (lead != 0) {
+                leadView.setImageResource(lead);
+            } else {
+                leadView.setImageDrawable(null);
+            }
+            leadView.setVisibility(lead != 0 ? View.VISIBLE : View.INVISIBLE);
+        }
         TextView valueView = (TextView) holder.findViewById(R.id.pref_value);
         if (valueView != null) {
             valueView.setText(value);

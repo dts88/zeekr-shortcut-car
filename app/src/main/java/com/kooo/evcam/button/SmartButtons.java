@@ -299,6 +299,7 @@ public final class SmartButtons {
     /** 这次绑定里没连上的次数。 */
     private int bindFailures;
     private final Map<String, Last> lastPress = new HashMap<>();
+    private final KnobFeel feel = new KnobFeel();
     private final Map<String, BatteryWindow> batteryWindows = new HashMap<>();
     private final Map<String, Long> boostUntil = new java.util.concurrent.ConcurrentHashMap<>();
     /** 认不出广播的那几台：每台这次进程只记一次。 */
@@ -1288,7 +1289,9 @@ public final class SmartButtons {
         if (waking) {
             BlackBox.note("X旋钮 " + SmartButtonAd.shortId(address) + "：先连上，这一下不做");
         } else {
-            press(address, kind, ad.gesture, ad.steps, false);
+            ButtonLink l = link;
+            boolean linked = l != null && l.address.equals(address) && l.isReady();
+            press(address, kind, ad.gesture, ad.steps, linked ? 0 : KnobFeel.missed(ad.counter, last), false);
         }
         if (waking || ad.gesture == kind.connectGesture) {
             connect(address, kind);
@@ -1326,7 +1329,7 @@ public final class SmartButtons {
     }
 
     /** 一下（bt 线程）：另一路又来的同一下不算；单击、双击做选的动作，长按、长按松开不做事。 */
-    private void press(String address, Accessory kind, int gesture, int steps, boolean viaNotification) {
+    private void press(String address, Accessory kind, int gesture, int steps, int missed, boolean viaNotification) {
         long now = SystemClock.elapsedRealtime();
         Last prev = lastPress.get(address);
         if (prev != null && SmartButtonAd.samePress(prev.gesture, prev.viaNotification, prev.at, gesture, viaNotification, now)) {
@@ -1343,15 +1346,22 @@ public final class SmartButtons {
         if (kind == Accessory.KNOB && gesture == SmartButtonAd.RELEASE) {
             boost(address);
         }
+        int felt = steps;
+        if (kind == Accessory.KNOB && Accessory.isTurn(gesture)) {
+            felt = Math.abs(feel.feelTS(address, gesture == SmartButtonAd.CLOCKWISE ? 1 : -1, steps, missed, now));
+        } else if (kind == Accessory.KNOB) {
+            feel.forget(address);
+        }
         if (kind.hasAction(gesture)) {
-            main.post(() -> act(address, kind, gesture, steps));
+            int turned = felt;
+            main.post(() -> act(address, kind, gesture, steps, turned));
         } else if (gesture == 0) {
             BlackBox.note((kind == Accessory.KNOB ? "X旋钮 " : "灵动贴 ") + SmartButtonAd.shortId(address) + "：按了，按法认不出" + (viaNotification ? "（通知）" : ""));
         }
     }
 
     /** 主线程：这一台这种按法选了什么就做什么。 */
-    private void act(String address, Accessory kind, int gesture, int steps) {
+    private void act(String address, Accessory kind, int gesture, int received, int steps) {
         if (!enabled || UserExit.isExited(app)) {
             return;
         }
@@ -1366,7 +1376,8 @@ public final class SmartButtons {
         BlackBox.noteImportant((kind == Accessory.KNOB ? "X旋钮 " : "灵动贴 ") + SmartButtonAd.shortId(address) + "："
                 + (gesture == SmartButtonAd.DOUBLE ? "双击" : gesture == SmartButtonAd.CLOCKWISE ? "正转"
                 : gesture == SmartButtonAd.ANTICLOCKWISE ? "反转" : "单击")
-                + (Accessory.isTurn(gesture) ? " " + steps + " 格" : "") + " → " + target);
+                + (Accessory.isTurn(gesture) ? " " + steps + " 格" + (steps != received ? "（收到 " + received + " 格）" : "") : "")
+                + " → " + target);
         if (exclusive) {
             KnobMode.press(app, address, gesture, steps);
         } else if (turn != null) {
@@ -1550,7 +1561,7 @@ public final class SmartButtons {
             } else if (binding) {
                 BlackBox.note((kind == Accessory.KNOB ? "X旋钮 " : "灵动贴 ") + id + "：正在绑定，绑过的按了不做");
             } else {
-                press(l.address, kind, r.gesture, r.steps, true);
+                press(l.address, kind, r.gesture, r.steps, 0, true);
             }
         }
 

@@ -206,7 +206,12 @@
     <string name="msg_accessory_no_permission">Without the Nearby devices permission, smart buttons and X knobs can\'t be paired</string>
     <string name="set_x_knob_exclusive">Single-knob mode</string>
     <string name="set_x_knob_home">Shown on press</string>
-    <string name="x_knob_home_count">%1$d items</string>
+    <string name="set_x_knob_panel">X knob display</string>
+    <string name="set_x_knob_panel_summary">Shown in single-knob mode when you press or turn; Driver side follows “Action button side”</string>
+    <string name="opt_knob_panel_top">Top</string>
+    <string name="opt_knob_panel_side">Driver side</string>
+    <string name="x_knob_home_more">%1$s, etc. (%2$d)</string>
+    <string name="x_knob_home_joiner">", "</string>
     <string name="x_knob_summary_exclusive">Single-knob mode: %1$d items shown on press</string>
     <string name="msg_x_knob_home_empty">Select at least one</string>
     <string name="x_knob_status_mode">Mode: %1$s</string>

@@ -93,6 +93,11 @@ public final class SettingsRegistry {
             entry("right", "右侧", R.string.opt_rail_right),
             entry("left", "左侧", R.string.opt_rail_left));
 
+    public static final SettingSpec KNOB_PANEL = SettingSpec.of(
+            "x_knob_panel", "X旋钮浮窗", "top",
+            entry("top", "顶部", R.string.opt_knob_panel_top),
+            entry("side", "主驾侧", R.string.opt_knob_panel_side));
+
     /** 超级镜子的切换范围（{@link com.kooo.evcam.zeekr.MirrorViews}）：分段按钮，三档（项目所有者 2026-10-19）。 */
     public static final SettingSpec REARVIEW_VIEWS = SettingSpec.of(
             "rearview_views", "切换范围", "four",
@@ -235,6 +240,7 @@ public final class SettingsRegistry {
             LANGUAGE,
             FISHEYE_PROJECTION,
             ACTION_RAIL_SIDE,
+            KNOB_PANEL,
             REARVIEW_VIEWS,
             SIDE_VIEW_TARGET,
             SIDE_VIEW_MODE,

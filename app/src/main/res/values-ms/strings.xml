@@ -206,7 +206,12 @@
     <string name="msg_accessory_no_permission">Tanpa kebenaran Peranti berdekatan, butang pintar dan tombol X tidak dapat dipasangkan</string>
     <string name="set_x_knob_exclusive">Mod satu tombol</string>
     <string name="set_x_knob_home">Dipaparkan apabila ditekan</string>
-    <string name="x_knob_home_count">%1$d item</string>
+    <string name="set_x_knob_panel">Paparan tombol X</string>
+    <string name="set_x_knob_panel_summary">Dipaparkan dalam mod satu tombol apabila ditekan atau dipusing; Sisi pemandu mengikut “Sebelah butang tindakan”</string>
+    <string name="opt_knob_panel_top">Atas</string>
+    <string name="opt_knob_panel_side">Sisi pemandu</string>
+    <string name="x_knob_home_more">%1$s, dll. (%2$d)</string>
+    <string name="x_knob_home_joiner">", "</string>
     <string name="x_knob_summary_exclusive">Mod satu tombol: %1$d item dipaparkan apabila ditekan</string>
     <string name="msg_x_knob_home_empty">Pilih sekurang-kurangnya satu</string>
     <string name="x_knob_status_mode">Mod: %1$s</string>

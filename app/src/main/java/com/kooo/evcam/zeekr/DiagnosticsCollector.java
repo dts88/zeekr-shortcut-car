@@ -1345,7 +1345,8 @@ public final class DiagnosticsCollector {
                     for (com.kooo.evcam.button.KnobTurn turn : config.getKnobHome(address)) {
                         keys.add(turn.key);
                     }
-                    sb.append("  单旋钮模式=开（").append(String.join(",", keys)).append("）");
+                    sb.append("  单旋钮模式=开（").append(String.join(",", keys)).append("）浮窗=")
+                            .append(config.getKnobPanel());
                 } else {
                     sb.append("  单旋钮模式=关");
                 }

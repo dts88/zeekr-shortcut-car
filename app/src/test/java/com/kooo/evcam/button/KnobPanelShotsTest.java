@@ -14,6 +14,7 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.view.View;
 
+import com.kooo.evcam.R;
 import com.kooo.evcam.screens.Shots;
 
 import org.junit.Test;
@@ -49,28 +50,48 @@ public class KnobPanelShotsTest {
         for (KnobTurn turn : KnobTurn.home()) {
             names.add(turn.label(app));
         }
-        KnobPanel.Holder choose = KnobPanel.build(app);
-        choose.choose(names, 0);
-        save(choose, "knob-panel-choose" + suffix);
-        KnobPanel.Holder show = KnobPanel.build(app);
-        show.show(KnobTurn.TEMPERATURE.label(app), "22.5\u00b0");
-        save(show, "knob-panel-show" + suffix);
-        KnobPanel.Holder level = KnobPanel.build(app);
-        level.show(KnobTurn.DRIVER_SEAT_HEAT.label(app), app.getString(com.kooo.evcam.R.string.knob_v_level, 2));
-        save(level, "knob-panel-level" + suffix);
+        String[] heat = {app.getString(R.string.quick_off), app.getString(R.string.knob_v_level, 1),
+                app.getString(R.string.knob_v_level, 2), app.getString(R.string.knob_v_level, 3)};
+        for (int style : new int[] {KnobDialView.ARC, KnobDialView.DRUM}) {
+            String prefix = "knob-panel-" + (style == KnobDialView.ARC ? "arc" : "drum");
+            KnobDialView choose = view(app, style);
+            choose.choose(names.toArray(new String[0]), 3, 0, true);
+            save(choose, prefix + "-choose" + suffix);
+            KnobDialView temperature = view(app, style);
+            temperature.start(KnobTurn.TEMPERATURE.label(app));
+            KnobDials.Positions t = KnobDials.temperatures(22.5f);
+            temperature.values(t.labels, t.index);
+            save(temperature, prefix + "-value" + suffix);
+            KnobDialView level = view(app, style);
+            level.start(KnobTurn.DRIVER_SEAT_HEAT.label(app));
+            level.values(heat, 2);
+            save(level, prefix + "-level" + suffix);
+            KnobDialView volume = view(app, style);
+            volume.start(KnobTurn.VOLUME.label(app));
+            volume.free();
+            volume.text("+3");
+            save(volume, prefix + "-free" + suffix);
+        }
     }
 
-    private static void save(KnobPanel.Holder holder, String name) {
-        View root = holder.root;
-        int spec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED);
-        root.measure(spec, spec);
-        root.layout(0, 0, root.getMeasuredWidth(), root.getMeasuredHeight());
-        Bitmap bitmap = Bitmap.createBitmap(root.getMeasuredWidth() + 96, root.getMeasuredHeight() + 96,
-                Bitmap.Config.ARGB_8888);
+    private static KnobDialView view(Context app, int style) {
+        KnobDialView view = new KnobDialView(app, style, true);
+        view.moving = false;
+        return view;
+    }
+
+    private static void save(KnobDialView view, String name) {
+        int w = view.widthPx();
+        int h = view.heightPx();
+        view.measure(View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(h, View.MeasureSpec.EXACTLY));
+        view.layout(0, 0, w, h);
+        view.settle();
+        Bitmap bitmap = Bitmap.createBitmap(w + 96, h + 96, Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(bitmap);
         canvas.drawColor(0xFFB8BCC2);
         canvas.translate(48, 48);
-        root.draw(canvas);
+        view.draw(canvas);
         File file = Shots.save(bitmap, name);
         assertTrue(file.length() > 1_000);
     }
