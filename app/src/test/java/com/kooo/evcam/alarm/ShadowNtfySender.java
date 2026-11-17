@@ -27,8 +27,38 @@ public class ShadowNtfySender {
     /** 服务器收不收。Whether the server is said to accept it. */
     public static boolean accepted = true;
 
+    /** 文字发了几次、图发了几次 —— 「只发文字」那条设置就靠这两个数证明。 */
+    /** Text sends and picture sends, counted; "text only" is proven with these two numbers. */
+    public static volatile int texts;
+    public static volatile int photos;
+
+    /** 有一次发送落地就放开：发送在别的线程上，测试要看的是「最终发了什么」。 */
+    /** Opened by the first send that lands: sending happens on another thread. */
+    public static volatile java.util.concurrent.CountDownLatch latch =
+            new java.util.concurrent.CountDownLatch(1);
+
     public static void reset() {
         accepted = true;
+        texts = 0;
+        photos = 0;
+        latch = new java.util.concurrent.CountDownLatch(1);
+    }
+
+    @Implementation
+    public static AlertChannel.Result sendText(String server, String topic, String token,
+                                              String text, String title) {
+        texts++;
+        latch.countDown();
+        return AlertChannel.Result.ok();
+    }
+
+    @Implementation
+    public static AlertChannel.Result sendPhoto(String server, String topic, String token,
+                                                byte[] jpeg, String caption, String title,
+                                                boolean paid) {
+        photos++;
+        latch.countDown();
+        return AlertChannel.Result.ok();
     }
 
     @Implementation

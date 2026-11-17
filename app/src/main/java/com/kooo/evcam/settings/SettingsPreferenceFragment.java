@@ -908,6 +908,15 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             });
         }
 
+        // 每条警报附不附一张图（车主 2026-11-17，上游维护者提的那一条）。默认附。
+        // Whether each alert carries a picture (2026-11-17, the maintainer's point). On by default.
+        bindSwitch("pref_alerts_send_picture", appConfig.isAlertsPictureEnabled(), value -> {
+            appConfig.setAlertsPictureEnabled(value);
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("开关变更: pref_alerts_send_picture → "
+                    + (value ? "开" : "关（只发文字）"));
+            showAlertsRows();
+        });
+
         // 发几张：一张四宫格，还是每一路各一张。合法取值在 SettingsRegistry.ALERTS_LAYOUT 一处
         bindEnum("pref_alerts_picture", SettingsRegistry.ALERTS_LAYOUT, appConfig.getAlertsLayout(),
                 value -> appConfig.setAlertsLayout(value));
@@ -1097,8 +1106,6 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         boolean alertsOn = appConfig.isAlertsEnabled();
         com.kooo.evcam.alarm.policy.TriggerSet shownTriggers =
                 com.kooo.evcam.alarm.policy.TriggerSet.parse(appConfig.getAlertsTriggers());
-        boolean perCamera = com.kooo.evcam.alarm.media.AlertPicture.layout(appConfig.getAlertsLayout())
-                == com.kooo.evcam.alarm.media.AlertPicture.Layout.SEPARATE;
         boolean clipOn = appConfig.getAlertsClipSeconds() > 0;
         boolean quietOn = appConfig.isAlertsQuietEnabled();
         // 总开关关着时整组收起来：只留总开关和「检查」，
@@ -1118,7 +1125,14 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         // summaries are written in showAlertsRows so they are current whenever they appear.
         show("pref_alerts_quiet_start", alertsOn && quietOn);
         show("pref_alerts_quiet_end", alertsOn && quietOn);
-        show("pref_alerts_cameras", alertsOn && perCamera);
+        // 不拍照时，排版、那几路、掰直三行都没有意义，一起收起来；片段是聊天里点出来的，留着。
+        // With pictures off the layout, the lanes and straightening mean nothing, so they collapse
+        // together. Clips are asked for from the chat, so they stay.
+        boolean picturesOn = appConfig.isAlertsPictureEnabled();
+        show("pref_alerts_picture", alertsOn && picturesOn);
+        show("pref_alerts_straighten", alertsOn && picturesOn);
+        // 「那几路」的可见性只写在下面那一处（它还要写行尾的名单），这里不要重复判一次。
+        // The lanes row is decided in one place below, which also writes its summary; do not judge it twice.
         show("pref_alerts_clip_audio", alertsOn && clipOn);
         show("pref_alerts_clip_data", alertsOn && clipOn);
         // 忘了开哨兵那三行只看警报总开关：它们是「什么时候问一句」，跟发到哪儿无关，
@@ -1390,7 +1404,10 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         if (cameras != null) {
             com.kooo.evcam.alarm.media.AlertPicture.Layout layout =
                     com.kooo.evcam.alarm.media.AlertPicture.layout(appConfig.getAlertsLayout());
-            cameras.setVisible(layout == com.kooo.evcam.alarm.media.AlertPicture.Layout.SEPARATE);
+            // 不拍照时这一行没有意义：它选的是「分开发的时候要哪几路」。
+            // With pictures off this row means nothing: it picks lanes for a mode that never runs.
+            cameras.setVisible(appConfig.isAlertsPictureEnabled()
+                    && layout == com.kooo.evcam.alarm.media.AlertPicture.Layout.SEPARATE);
             int[] lanes = com.kooo.evcam.alarm.media.AlertPicture.lanes(appConfig.getAlertsCameras());
             StringBuilder names = new StringBuilder();
             for (int lane : lanes) {

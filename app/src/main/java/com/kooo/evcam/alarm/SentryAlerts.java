@@ -1496,6 +1496,14 @@ public final class SentryAlerts implements Telemetry.Listener {
         }
         String caption = TelegramRequest.caption(headline, sentryLine(sentryValue()),
                 time());
+        if (!config.isAlertsPictureEnabled()) {
+            // 只发文字：连相机都不去碰（不拍、不拼、不压），车主自己设的这一档。
+            // Text only: the camera is never touched — no capture, no stitch, no squeeze. That is the
+            // setting the owner chose.
+            BlackBox.note("alerts: text only, pictures off in settings");
+            deliverText(channel, caption, onSendFailure);
+            return;
+        }
         SnapshotTaker.take(app, new SnapshotTaker.Callback() {
             @Override
             public void onPicture(Bitmap grid) {
@@ -1999,6 +2007,15 @@ public final class SentryAlerts implements Telemetry.Listener {
             return;
         }
         String caption = TelegramRequest.caption(headline, sentryLine(sentryValue()), time());
+        if (!config.isAlertsPictureEnabled()) {
+            // 试发也要照实情：真警报只发文字时，这一屏点出来就该只有文字，否则车主以为整条路都在。
+            // The sample must match reality: when a real alert is text only, this screen must show text
+            // only, or the owner would think the whole path keeps the picture.
+            BlackBox.note("alerts: sample text only (pictures off)");
+            deliverText(channel, caption);
+            reportQueued(callback);
+            return;
+        }
         SnapshotTaker.take(app, new SnapshotTaker.Callback() {
             @Override
             public void onPicture(Bitmap grid) {

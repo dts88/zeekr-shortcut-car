@@ -149,6 +149,7 @@ public class AppConfig {
     private static final String KEY_ALERTS_LAYOUT = "alerts_layout";       // 一张四宫格 / 每路一张
     private static final String KEY_ALERTS_CAMERAS = "alerts_cameras";     // 分开发时要哪几路（"0,1,2,3"）
     private static final String KEY_ALERTS_STRAIGHTEN = "alerts_straighten";  // 发之前掰直
+    private static final String KEY_ALERTS_SEND_PICTURE = "alerts_send_picture";  // 发警报时附一张压缩图
     private static final String KEY_ALERTS_COMMANDS = "alerts_commands";   // 回应 Telegram 里的命令
     // 忘了开哨兵：提醒哪一档（存 0..3，见 alarm.GuardPolicy）
     private static final String KEY_ALERTS_GUARD_MODE = "alerts_guard_mode";
@@ -2432,6 +2433,30 @@ public class AppConfig {
 
     public void setAlertsStraighten(boolean enabled) {
         prefs.edit().putBoolean(KEY_ALERTS_STRAIGHTEN, enabled).apply();
+    }
+
+    /**
+     * 每条警报要不要附一张压缩过的照片。默认<b>要</b>：一张 100 kB 的图比一句话有用得多，而这是这个功能当初的样子。
+     *
+     * <p>关掉之后警报只发一句文字，车<b>根本不去拍</b> —— 不是拍完再丢掉。差别是实的：拍一张要走四路相机、
+     * 拼一张 2×2、压到 100 kB 以下，在车机上是几百毫秒和一块内存；有人只想要一句「双闪亮了」，那就一步都不做。</p>
+     *
+     * <p>关掉不影响<b>要</b>图：聊天里的 {@code pic}、HD、片段仍然照旧，那是车主自己开口要的。
+     * 也不影响测试那一屏里叫「一张测试照片」的那一行 —— 它本来就写着「一张照片」。</p>
+     *
+     * Whether each alert carries one compressed picture. On by default. With it off the car does not
+     * take the picture at all — it does not take one and throw it away. That matters on a head unit:
+     * four lanes, a 2×2 stitch and a squeeze under 100 kB cost a few hundred milliseconds and a bitmap.
+     * Asking for a picture still works: {@code pic} in the chat, HD and clips are the owner asking, and
+     * the row named "a test picture" still sends one.
+     */
+    public boolean isAlertsPictureEnabled() {
+        return prefs.getBoolean(KEY_ALERTS_SEND_PICTURE, true);
+    }
+
+    public void setAlertsPictureEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_ALERTS_SEND_PICTURE, enabled).apply();
+        AppLog.i(TAG, "警报附图设为 " + (enabled ? "开" : "关（只发文字）"));
     }
 
     /**

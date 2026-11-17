@@ -96,6 +96,8 @@
     <string name="alerts_debug_row_title">Nyahpepijat makluman (JSON + log)</string>
     <string name="alerts_debug_row_summary">Satu skrin: suis, pemantauan, pengundi, persampelan, keadaan kereta dan baris log terakhir. Tangkap skrin, salin, atau simpan ke pemacu USB</string>
     <string name="set_alerts_test_title">Hantar gambar ujian</string>
+    <string name="set_alerts_send_picture_title">Hantar gambar dengan setiap amaran</string>
+    <string name="set_alerts_send_picture_summary">Jika dimatikan, hanya satu baris dihantar dan kereta tidak mengambil gambar; meminta gambar dalam sembang masih berfungsi</string>
     <string name="set_alerts_picture_title">Gambar</string>
     <string name="set_alerts_picture_summary">Satu 2×2 semua empat kamera, atau satu gambar setiap kamera</string>
     <string name="opt_alerts_picture_grid">Satu gambar 2×2</string>
@@ -160,7 +162,7 @@ Kalau lupa: %3$s</string>
     <string name="alerts_events_summary">Setiap mesej yang bot boleh terima, satu baris satu, ketik untuk hantar yang itu</string>
     <string name="alert_event_sending">Menghantar: %1$s</string>
     <string name="alert_event_sent">Sudah dihantar</string>
-    <string name="alert_event_hazard">Betul dihantar bila: berhenti dan berjaga, lampu hazard menyala. Di sini hanya pencetus disimulasikan</string>
+    <string name="alert_event_hazard">Betul dihantar bila: kereta diletak dan bersenjata, lampu hazard menyala. Hanya pencetus disimulasikan; kapsyen dan butang adalah sebenar, dan gambar mengikut tetapan "hantar gambar dengan setiap amaran" anda</string>
     <string name="alert_event_flash">Betul dihantar bila: berhenti, lampu jauh berkelip sekali</string>
     <string name="alert_event_doors">Betul dihantar bila: berhenti, pintu / frunk / trunk dibuka</string>
     <string name="alert_event_lamps">Betul dihantar bila: berhenti, lampu kereta menyala sendiri</string>

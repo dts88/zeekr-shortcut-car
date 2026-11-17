@@ -96,6 +96,8 @@
     <string name="alerts_debug_row_title">Alerts debug (JSON + log)</string>
     <string name="alerts_debug_row_summary">One screen: switches, watching, poller, sampling, car state and the last log lines. Screenshot it, copy it, or save it to the USB drive</string>
     <string name="set_alerts_test_title">Send a test picture</string>
+    <string name="set_alerts_send_picture_title">Send a picture with each alert</string>
+    <string name="set_alerts_send_picture_summary">Off sends one line and the car never takes the picture; asking for one in the chat still works</string>
     <string name="set_alerts_picture_title">Pictures</string>
     <string name="set_alerts_picture_summary">One 2×2 of all four cameras, or one picture per camera</string>
     <string name="opt_alerts_picture_grid">One 2×2 picture</string>
@@ -160,7 +162,7 @@ If I forget: %3$s</string>
     <string name="alerts_events_summary">Every message the bot can receive, one per row, and a tap sends that exact one</string>
     <string name="alert_event_sending">Sending: %1$s</string>
     <string name="alert_event_sent">Sent</string>
-    <string name="alert_event_hazard">Really goes out when: parked and armed, hazards come on. Here only the trigger is simulated; picture, buttons and caption are real</string>
+    <string name="alert_event_hazard">Really goes out when: parked and armed, hazards come on. Only the trigger is simulated; the caption and buttons are real, and the picture follows your "send a picture with each alert" setting</string>
     <string name="alert_event_flash">Really goes out when: parked, high beams flash once</string>
     <string name="alert_event_doors">Really goes out when: parked, a door / frunk / trunk opens</string>
     <string name="alert_event_lamps">Really goes out when: parked, the car lights come on by themselves</string>

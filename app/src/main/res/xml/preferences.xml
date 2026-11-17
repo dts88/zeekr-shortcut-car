@@ -175,6 +175,14 @@
             android:key="cat_alerts_picture"
             android:title="@string/set_group_alerts_picture">
 
+            <!-- 每条警报附不附一张图（车主 2026-11-17）。关掉之后下面三行收起来：不拍照，
+                 排版、那几路、掰直都没有意义。The picture switch; with it off the three rows below hide. -->
+            <SwitchPreferenceCompat
+                android:key="pref_alerts_send_picture"
+                android:title="@string/set_alerts_send_picture_title"
+                android:summary="@string/set_alerts_send_picture_summary"
+                android:defaultValue="true" />
+
             <ListPreference
                 android:key="pref_alerts_picture"
                 android:title="@string/set_alerts_picture_title"

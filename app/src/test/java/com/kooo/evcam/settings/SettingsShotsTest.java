@@ -283,6 +283,57 @@ public class SettingsShotsTest {
             {"pref_alerts_guard", "pref_alerts_guard_home", "pref_alerts_guard_everywhere"};
 
     /**
+     * 「警报附一张照片」关掉之后，下面三行跟着收起来。
+     *
+     * <p>排版（一张四宫格 / 每路一张）、那几路、掰直 —— 不拍照的时候三行都没有意义，留着只会让人以为
+     * 自己在设置里能改到已经不發生的事。片段那两行不动：它是聊天里点出来的，跟这条警报带不带图无关。</p>
+     *
+     * <p>开关本身还在，而且跟着存着的值：关掉之后重新进来，它就该是关的。</p>
+     *
+     * With "send a picture with each alert" off, the three rows below it collapse: layout, which lanes,
+     * and straightening all mean nothing when no picture is taken. The clip rows stay — those are asked
+     * for from the chat. The switch itself stays and shows the stored value.
+     */
+    @Test
+    public void thePictureSwitchCollapsesTheRowsBelowIt() {
+        RuntimeEnvironment.setQualifiers(Shots.DAY_EN);
+        SettingsPreferenceFragment on = alertsPage(true,
+                com.kooo.evcam.alarm.ntfy.NtfyGate.TELEGRAM, config -> {
+                    config.setAlertsPictureEnabled(true);
+                    config.setAlertsLayout(com.kooo.evcam.alarm.media.AlertPicture.layoutValue(
+                            com.kooo.evcam.alarm.media.AlertPicture.Layout.SEPARATE));
+                    config.setAlertsClipSeconds(5);
+                });
+        assertTrue("开着时该看得见", shown(on, "pref_alerts_send_picture"));
+        assertTrue("排版该在", shown(on, "pref_alerts_picture"));
+        assertTrue("每路一张时那几路该在", shown(on, "pref_alerts_cameras"));
+        assertTrue("掰直该在", shown(on, "pref_alerts_straighten"));
+
+        SettingsPreferenceFragment off = alertsPage(true,
+                com.kooo.evcam.alarm.ntfy.NtfyGate.TELEGRAM, config -> {
+                    config.setAlertsPictureEnabled(false);
+                    config.setAlertsClipSeconds(5);
+                });
+        androidx.preference.Preference switchRow = off.findPreference("pref_alerts_send_picture");
+        assertNotNull("少了附图那一行", switchRow);
+        assertTrue("开关本身要留着", switchRow.isVisible());
+        assertFalse("存着关，开关就该是关的",
+                ((androidx.preference.SwitchPreferenceCompat) switchRow).isChecked());
+        assertFalse("不拍照就不该有排版", shown(off, "pref_alerts_picture"));
+        assertFalse("不拍照就不该有那几路", shown(off, "pref_alerts_cameras"));
+        assertFalse("不拍照就不该有掰直", shown(off, "pref_alerts_straighten"));
+        assertTrue("片段是聊天里点的，跟这条不图无关", shown(off, "pref_alerts_clip"));
+
+        // 收尾：这几项是存在同一份设置里的，别把后面的测试带跑。
+        // Clean up: these live in the shared settings file.
+        AppConfig config = new AppConfig(RuntimeEnvironment.getApplication());
+        config.setAlertsPictureEnabled(true);
+        config.setAlertsClipSeconds(0);
+        config.setAlertsLayout(com.kooo.evcam.alarm.media.AlertPicture.layoutValue(
+                com.kooo.evcam.alarm.media.AlertPicture.Layout.GRID));
+    }
+
+    /**
      * ntfy 的两行：换话题谁都看得见，命令那一行要看三道门。
      *
      * <p>纯函数（{@code NtfyCommandsTest}）只说「该不该开」；这一条钉的是设置页有没有照着它

@@ -333,8 +333,12 @@ surround view (the file name carries a timestamp, suffix
 written 1280 px wide, JPEG 80, then sent; over 9 MB is not sent (Telegram `sendPhoto` limit is
 10 MB).
 
-## 3.5 发几张、哪几路、掰不掰直
+## 3.5 附不附图、发几张、哪几路、掰不掰直
 
+- **附一张照片**（默认开，`pref_alerts_send_picture`，车主 2026-11-17）：关掉之后每条警报只发那句话，
+  车<b>根本不去拍</b> —— 不走四路相机、不拼 2×2、不压到 100 kB。理由是实的：一次几百毫秒和一块位图，
+  一晚上十几次；有人只想知道「双闪亮了」。关掉不影响<b>要</b>图：聊天里的 `pic`、HD、片段照旧，那是车主
+  自己开口要的；「一张测试照片」那一行也照旧，它本来就写着是一张照片。下面三行跟着这个开关收起来。
 - **一张 2×2**（默认）：四个画面在一起，一眼看全。
 - **每一路各一张**：从四宫格裁出来单发，手机上每张占满屏；设置里勾哪几路就发哪几路，一路都不勾按四路算。
 - **掰直**：和回看界面同一个鱼眼校正（`FisheyeCorrector.correctGrid`，视野和投影跟着「超级镜子」那一项），
@@ -344,6 +348,12 @@ written 1280 px wide, JPEG 80, then sent; over 9 MB is not sent (Telegram `sendP
 
 ##### English
 
+- **Attach a picture** (on by default, `pref_alerts_send_picture`, owner 2026-11-17): with it off each
+  alert sends the line alone and the car **never takes the picture** — no four lanes, no 2×2 stitch, no
+  squeeze under 100 kB. The reason is concrete: a few hundred milliseconds and a bitmap, a dozen times a
+  night, for somebody who only wants to know the hazards came on. Asking still works: `pic` in the chat,
+  HD and clips are the owner asking, and the row named "a test picture" still sends one. The three rows
+  below this switch collapse with it.
 - **One 2×2** (default): all four views together, the whole picture at a glance.
 - **One per channel**: cropped out of the 2×2 and sent separately, each fills the phone screen; the
   channels checked in settings are sent, and with none checked all four are sent.

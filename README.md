@@ -76,6 +76,8 @@ is in **[docs/setup-wizards.md](docs/setup-wizards.md)**. The list below is the 
 
 Optional, in the same section:
 
+- **A picture, or just the line**: on by default. Turn it off and each alert sends the sentence alone and
+  the car never takes the picture — asking for one in the chat still works.
 - **Pictures**: one 2×2 of all four cameras, or one picture per camera so each fills the phone screen.
 - **Straighten**: the same fisheye correction playback uses.
 - **The first picture is small.** Every alert opens with one picture compressed on the car to under
