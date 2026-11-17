@@ -123,11 +123,20 @@
     <string name="alert_headline_motion">Something moved in view while parked</string>
     <string name="alert_headline_test">Test</string>
     <string name="alert_headline_request">Picture taken on request</string>
+    <string name="alert_cmd_alerts_on">Alerts are back on: the car is watching again and will send when something happens</string>
+    <string name="alert_cmd_alerts_off">Alerts are paused: the car is not watching and will send nothing. Send alerts on to resume</string>
+    <string name="alert_cmd_alerts_off_ntfy">Once this command window closes, resume on the head unit</string>
+    <string name="alert_cmd_alerts_running">Alerts are running. Send alerts off to pause them</string>
+    <string name="alert_cmd_alerts_paused">Alerts are paused (the master switch is still on; the car is not watching). Send alerts on to resume</string>
+    <string name="alert_status_paused">Alerts: paused (paused from the chat; the car is not watching)</string>
+    <string name="alert_status_sensitivity">Sensitivity: %1$d/%2$d</string>
+    <string name="set_alerts_paused_title">Paused from the chat</string>
+    <string name="set_alerts_paused_summary">Not watching, not sending. Tap to resume</string>
     <string name="alert_cmd_sensitivity_now">Motion sensitivity is %1$d/%2$d. 1 = only big movement fires, %2$d = rain and leaves count too</string>
     <string name="alert_cmd_sensitivity_changed">Motion sensitivity is now %1$d/%3$d (was %2$d)</string>
     <string name="alert_cmd_sensitivity_edge_up">Motion sensitivity is already %1$d/%2$d, the most sensitive step</string>
     <string name="alert_cmd_sensitivity_edge_down">Motion sensitivity is already %1$d/%2$d, the least sensitive step</string>
-    <string name="alert_cmd_help">Send pic for a picture (add front / rear / left / right), pic 18:22 for one frame from the recording at that moment, or status for one line. sens reports motion sensitivity, sens up / sens down moves a step, sens 7 sets the level</string>
+    <string name="alert_cmd_help">Send pic for a picture (add front / rear / left / right), pic 18:22 for one frame from the recording at that moment, or status for one line. sens reports motion sensitivity, sens up / sens down moves a step, sens 7 sets the level; alerts off pauses alerts, alerts on resumes them</string>
     <string name="alert_cmd_no_sentry">Sentry Mode is off, so the head unit is going to sleep and nothing can be taken</string>
     <string name="alert_cmd_not_parked">The car is not parked, so nothing was taken</string>
     <string name="alert_cmd_too_soon">Wait %1$d s before asking again</string>

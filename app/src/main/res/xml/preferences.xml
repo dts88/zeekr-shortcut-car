@@ -103,6 +103,13 @@
             android:title="@string/set_alerts_on_title"
             android:summary="@string/set_alerts_on_summary" />
 
+        <!-- 聊天里 alerts off 之后那一行：总开关还开着，但车没在看。点一下恢复。
+             一个看不见的静音是最糟的状态，所以它必须写在屏上（见 AppConfig.isAlertsPaused）。 -->
+        <Preference
+            android:key="pref_alerts_paused"
+            android:title="@string/set_alerts_paused_title"
+            android:summary="@string/set_alerts_paused_summary" />
+
         <!--
           警报发到哪儿（车主 2026-11-15 从开发者选项搬到这里）：这一栏最上面的一行，先选路，
           下面各组按选中的那条路出现。

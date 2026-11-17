@@ -135,6 +135,7 @@ public class AppConfig {
     private static final String KEY_LICENSE_PLATE_ENABLED = "license_plate_enabled";
     // 停车警报（Telegram）：开关、机器人令牌、会话号
     private static final String KEY_ALERTS_ENABLED = "alerts_enabled";
+    private static final String KEY_ALERTS_PAUSED = "alerts_paused";  // 聊天里临时关掉，总开关不动
     private static final String KEY_ALERTS_TRIGGERS = "alerts_triggers";
     private static final String KEY_ALERTS_MOTION_SENSITIVITY = "alerts_motion_sensitivity";
     private static final String KEY_ALERTS_CLIP_SECONDS = "alerts_clip_seconds";  // 0 关 / 5 / 10
@@ -2088,6 +2089,48 @@ public class AppConfig {
      * <p>开着也未必发得出去 —— 令牌或会话号缺一个就不发，判断在
      * {@link com.kooo.evcam.alarm.policy.AlertPolicy}，那一条规则有单测。</p>
      */
+    /**
+     * 聊天里临时关掉的警报（{@code alerts off}），和总开关分开存。
+     *
+     * <h3>为什么必须是另一个键</h3>
+     *
+     * <p>命令是从聊天里来的，而收命令那条线程又要「警报开着」。把总开关关掉就是把自己的回程路
+     * 一起关掉 —— 车主再也 {@code alerts on} 不回来，只能上车去点。所以这里是一个暂停标记：
+     * 停发、停看，但命令那条路留着。</p>
+     *
+     * <p>它也<b>不动</b>总开关：车主的设置还是「开」，只是暂时不发。设置页会单独一行写出来，
+     * 点一下就恢复，所以这个状态不会变成一个看不见的静音。</p>
+     *
+     * <h3>Why a separate key</h3>
+     *
+     * <p>Commands arrive through the channel, and the thread that reads them needs "alerts on".
+     * Flipping the master switch would close the way back: {@code alerts on} could never arrive again
+     * and the owner would have to get in the car. So this is a pause: stop sending and stop watching,
+     * keep the command channel. It leaves the master switch alone — the owner's setting still reads
+     * "on", it is just not sending right now — and the settings screen shows a row for it, tappable to
+     * resume, so the state never becomes an invisible mute.
+     */
+    public boolean isAlertsPaused() {
+        return prefs.getBoolean(KEY_ALERTS_PAUSED, false);
+    }
+
+    public void setAlertsPaused(boolean paused) {
+        prefs.edit().putBoolean(KEY_ALERTS_PAUSED, paused).apply();
+        AppLog.i(TAG, "警报" + (paused ? "已暂停（聊天里关的，命令仍然收）" : "已恢复"));
+    }
+
+    /**
+     * 警报现在真的在跑吗：总开关开着、而且没被暂停。
+     *
+     * <p>「发不发」「看不看信号」都读这一个值，{@link #isAlertsEnabled()} 留给「命令那条路要不要留」。</p>
+     *
+     * Whether alerts are actually running: master switch on and not paused. Sending and watching read
+     * this; the master switch alone decides whether the command channel stays.
+     */
+    public boolean isAlertsActive() {
+        return isAlertsEnabled() && !isAlertsPaused();
+    }
+
     public boolean isAlertsEnabled() {
         return prefs.getBoolean(KEY_ALERTS_ENABLED, false);
     }

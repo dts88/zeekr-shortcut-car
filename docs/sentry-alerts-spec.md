@@ -472,6 +472,11 @@ explicitly did not adopt it. It will become a second line of evidence only after
 - `sens`：报一句画面移动的灵敏度（1–10，1 = 只有大动静，10 = 雨和树叶也算）。`sens up` / `sens down`
   各挪一档，到 1 或 10 就停住并如实说「到头了」；`sens 7` 直接要那一档。改完存进设置并当场生效，
   不需重启，也不碰照片那条路 —— 一条调灵敏度的命令不该顺手拍一张。
+- `alerts`：报一句现在是开是停。`alerts off` 暂停（停发、停看信号、忘了开哨兵也不问），
+  `alerts on` 恢复。**暂停不动总开关**，这是刻意的：命令是从聊天里来的，把总开关关掉等于把回程路
+  一起关掉，车主再也发不进 {@code alerts on}。设置页因此多一行「聊天里暂停了警报」，点一下恢复。
+  ntfy 那边有个限制：命令窗口只在发过警报之后开五分钟，暂停之后不会再发警报，所以窗口关上以后
+  只能在车上恢复 —— 回话里明说这一点。
 - **只在哨兵模式开着时回应**：哨兵模式是车机保持醒着的唯一原因（平台笔记 §3.6）。哨兵关掉之后
   车机会下电、进程结束，那时既问不到也没法拍 —— 所以哨兵一关，这条轮询当场停掉，不留一条
   必然要死的线程。
@@ -499,6 +504,13 @@ that request.
   count). `sens up` / `sens down` move one step and stop at 1 or 10, saying so rather than pretending;
   `sens 7` asks for that level. The new level is stored and applies at once — no restart — and the
   picture path is untouched: a command that turns sensitivity down has no business taking a photo.
+- `alerts`: reply with whether alerts are running. `alerts off` pauses them (no sending, no watching the
+  signals, no forgot-sentry question), `alerts on` resumes. **A pause never touches the master switch**,
+  and that is deliberate: commands arrive through the chat, so turning the master switch off would close
+  the way back and `alerts on` could never arrive. The settings screen therefore grows a row, "paused
+  from the chat", that resumes on a tap. One limit on ntfy: the command window only opens for five
+  minutes after an alert, and a paused car sends no alerts, so after that window the way back is the head
+  unit — the reply says so.
 - **Replies only while sentry mode is on**: sentry mode is the only reason the head unit stays
   awake (platform notes §3.6). Once sentry is off the head unit powers down and the process ends,
   so it can neither be asked nor take a photo then — so the polling stops on the spot when sentry

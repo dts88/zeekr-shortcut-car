@@ -88,8 +88,9 @@ Optional, in the same section:
   clip's size follows the frame rate the car records sentry video at.
 - **Answer commands**: send the bot `pic` for a fresh picture, `pic front|rear|left|right` for one
   camera, `status` for one line, `sens` to read the motion sensitivity and `sens up` / `sens down` /
-  `sens 7` to change it from the phone. Only the chat you configured is answered, and only while Sentry
-  Mode is on — that is what keeps the head unit awake.
+  `sens 7` to change it from the phone, `alerts off` / `alerts on` to pause and resume without touching
+  the master switch (the settings screen shows the pause and resumes on a tap). Only the chat you
+  configured is answered, and only while Sentry Mode is on — that is what keeps the head unit awake.
 - **Start after locking**: right away, 1 minute or 3 minutes after the car locks, so walking away
   does not send you a picture of yourself.
 - **Forgot Sentry**: park away from home with Sentry Mode off and the car asks in the chat, then

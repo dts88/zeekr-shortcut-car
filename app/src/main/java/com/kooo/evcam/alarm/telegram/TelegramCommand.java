@@ -22,6 +22,8 @@ import com.kooo.evcam.alarm.media.MotionSensitivity;
  *   <li>{@code status} / {@code state}：只回一句话，不拍；</li>
  *   <li>{@code sens} / {@code sensitivity}，可空，或跟 {@code up} / {@code down} / 一个 1–10 的数字：
  *       画面移动的灵敏度，见 {@link SensitivityAction}；</li>
+ *   <li>{@code alerts} / {@code alarm}，可空，或跟 {@code on} / {@code off}（{@code resume} /
+ *       {@code pause} 也算）：暂停警报、恢复警报，见 {@link AlertsState}；</li>
  *   <li>{@code guard} 及后面一个词（{@code on} / {@code off} / {@code home} / {@code home clear} /
  *       {@code auto off|ask|then|on} / {@code then}）：忘了开哨兵那一块的事，见 {@link GuardAction}。</li>
  * </ul>
@@ -44,6 +46,8 @@ import com.kooo.evcam.alarm.media.MotionSensitivity;
  *   <li>{@code status} / {@code state}: reply with one line, no picture;</li>
  *   <li>{@code sens} / {@code sensitivity}, alone or followed by {@code up} / {@code down} / a 1–10
  *       number: motion-detection sensitivity, see {@link SensitivityAction};</li>
+ *   <li>{@code alerts} / {@code alarm}, alone or followed by {@code on} / {@code off} (also
+ *       {@code resume} / {@code pause}): pause and resume alerts, see {@link AlertsState};</li>
  *   <li>{@code guard} plus one word ({@code on} / {@code off} / {@code home} / {@code home clear} /
  *       {@code auto off|ask|then|on} / {@code then}): the forgotten-sentry block, see
  *       {@link GuardAction}.</li>
@@ -89,6 +93,17 @@ public final class TelegramCommand {
          * Motion-detection sensitivity ({@code /sens …}): report it, move it a step, or set a number.
          */
         SENSITIVITY,
+        /**
+         * 暂停或者恢复警报（{@code /alerts …}）。
+         *
+         * <p>暂停<b>不动</b>总开关：命令就是从聊天里来的，把总开关关掉等于把回程路一起关掉。</p>
+         *
+         * Pause or resume alerts ({@code /alerts …}).
+         *
+         * <p>A pause leaves the master switch alone: commands arrive through the chat, and turning the
+         * master switch off would close the way back.</p>
+         */
+        ALERTS,
         /**
          * 不是命令，或者不认识。
          *
@@ -151,6 +166,24 @@ public final class TelegramCommand {
     }
 
     /**
+     * {@code /alerts} 后面跟的那一个词。
+     *
+     * <p>光写 {@code alerts} 是 {@link #REPORT}。认不出来的词整句 {@link Verb#UNKNOWN} ——
+     * 「alerts maybe」既不是开也不是关，猜一个方向比不回更糟。</p>
+     *
+     * The one word after {@code /alerts}. A bare {@code alerts} is {@link #REPORT}; an unrecognized word
+     * makes the whole message {@link Verb#UNKNOWN}, because guessing a direction is worse than silence.
+     */
+    public enum AlertsState {
+        /** 光写一个 {@code alerts}：报一句现在是开是停。 Bare {@code alerts}: say whether they run. */
+        REPORT,
+        /** {@code alerts on}：恢复。 Resume. */
+        ON,
+        /** {@code alerts off}：暂停。 Pause. */
+        OFF
+    }
+
+    /**
      * 不指定某一路。
      *
      * No specific lane.
@@ -199,6 +232,12 @@ public final class TelegramCommand {
      * Set only for {@link SensitivityAction#SET}: which level, already checked to be inside 1–10.
      */
     public final int sensitivityLevel;
+    /**
+     * 只有 {@link Verb#ALERTS} 有值；别的命令全是 {@code null}。
+     *
+     * Set only for {@link Verb#ALERTS}; {@code null} for every other verb.
+     */
+    public final AlertsState alerts;
 
     private TelegramCommand(Verb verb, int lane) {
         this(verb, lane, null, "");
@@ -214,12 +253,18 @@ public final class TelegramCommand {
 
     private TelegramCommand(Verb verb, int lane, GuardAction guard, String timeWord,
                             SensitivityAction sensitivity, int sensitivityLevel) {
+        this(verb, lane, guard, timeWord, sensitivity, sensitivityLevel, null);
+    }
+
+    private TelegramCommand(Verb verb, int lane, GuardAction guard, String timeWord,
+                            SensitivityAction sensitivity, int sensitivityLevel, AlertsState alerts) {
         this.verb = verb;
         this.lane = lane;
         this.guard = guard;
         this.timeWord = timeWord == null ? "" : timeWord;
         this.sensitivity = sensitivity;
         this.sensitivityLevel = sensitivityLevel;
+        this.alerts = alerts;
     }
 
     /**
@@ -277,6 +322,9 @@ public final class TelegramCommand {
         if ("sens".equals(verb) || "sensitivity".equals(verb)) {
             return parseSensitivity(words);
         }
+        if ("alerts".equals(verb) || "alarm".equals(verb)) {
+            return parseAlerts(words);
+        }
         if (!"pic".equals(verb) && !"photo".equals(verb) && !"picture".equals(verb)
                 && !"snap".equals(verb) && !"snapshot".equals(verb)) {
             return new TelegramCommand(Verb.UNKNOWN, ANY_LANE);
@@ -301,6 +349,32 @@ public final class TelegramCommand {
             }
         }
         return new TelegramCommand(Verb.PICTURE, lane, null, timeWord);
+    }
+
+    /**
+     * {@code alerts} 及后面的词：不写、{@code on} / {@code resume}、{@code off} / {@code pause}。
+     *
+     * <p>只收一个词。多写一个词（{@code alerts off now}）整句不认 —— 和 {@code guard} 同一条规矩。</p>
+     *
+     * {@code alerts} and the words after it: nothing, {@code on} / {@code resume}, or {@code off} /
+     * {@code pause}. Exactly one word is accepted; {@code alerts off now} is {@link Verb#UNKNOWN}, the
+     * same rule {@code guard} follows.
+     */
+    private static TelegramCommand parseAlerts(String[] words) {
+        if (words.length == 1) {
+            return new TelegramCommand(Verb.ALERTS, ANY_LANE, null, "", null, 0, AlertsState.REPORT);
+        }
+        if (words.length != 2) {
+            return new TelegramCommand(Verb.UNKNOWN, ANY_LANE);
+        }
+        String word = words[1].toLowerCase(java.util.Locale.US);
+        if ("on".equals(word) || "resume".equals(word) || "start".equals(word)) {
+            return new TelegramCommand(Verb.ALERTS, ANY_LANE, null, "", null, 0, AlertsState.ON);
+        }
+        if ("off".equals(word) || "pause".equals(word) || "stop".equals(word)) {
+            return new TelegramCommand(Verb.ALERTS, ANY_LANE, null, "", null, 0, AlertsState.OFF);
+        }
+        return new TelegramCommand(Verb.UNKNOWN, ANY_LANE);
     }
 
     /**
@@ -427,6 +501,7 @@ public final class TelegramCommand {
     @Override
     public String toString() {
         return verb + (guard == null ? "" : ":" + guard)
+                + (alerts == null ? "" : ":" + alerts)
                 + (sensitivity == null ? "" : ":" + sensitivity
                         + (sensitivity == SensitivityAction.SET ? "=" + sensitivityLevel : ""))
                 + (lane == ANY_LANE ? "" : "#" + lane);

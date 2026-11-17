@@ -189,6 +189,55 @@ public class TelegramCommandTest {
         assertEquals(TelegramCommand.ANY_LANE, pic.lane);
     }
 
+    // ------------------------------------------------------------------ 暂停 / 恢复警报
+
+    @Test
+    public void alertsParsesOffOnAndPastTenseWords() {
+        assertEquals(TelegramCommand.AlertsState.REPORT, alerts("alerts"));
+        assertEquals(TelegramCommand.AlertsState.REPORT, alerts("/alarm"));
+        assertEquals(TelegramCommand.AlertsState.OFF, alerts("alerts off"));
+        assertEquals(TelegramCommand.AlertsState.OFF, alerts("alerts pause"));
+        assertEquals(TelegramCommand.AlertsState.OFF, alerts("alerts stop"));
+        assertEquals(TelegramCommand.AlertsState.ON, alerts("alerts on"));
+        assertEquals(TelegramCommand.AlertsState.ON, alerts("alerts resume"));
+        assertEquals(TelegramCommand.AlertsState.ON, alerts("ALERTS start"));
+    }
+
+    @Test
+    public void aSlashAndABotMentionDoNotMatterForAlerts() {
+        assertEquals(TelegramCommand.AlertsState.OFF, alerts("/alerts@ZeekrSentry_bot off"));
+        assertEquals(TelegramCommand.AlertsState.REPORT, alerts("  /Alerts  "));
+    }
+
+    @Test
+    public void anAlertsWordThatMeansNothingIsUnknown() {
+        // 不猜：「maybe」不是开也不是关，猜一个方向比不回更糟
+        // No guessing: "maybe" is neither on nor off, and guessing a direction is worse than silence
+        notAlerts("alerts maybe");
+        notAlerts("alerts off now");
+        notAlerts("alerts on please");
+        notAlerts("alerts 1");
+    }
+
+    @Test
+    public void onlyAlertsCommandsCarryAnAlertsState() {
+        assertEquals(null, TelegramCommand.parseText("pic").alerts);
+        assertEquals(null, TelegramCommand.parseText("status").alerts);
+        assertEquals(null, TelegramCommand.parseText("sens up").alerts);
+        assertEquals(null, TelegramCommand.parseText("hello").alerts);
+    }
+
+    private static TelegramCommand.AlertsState alerts(String text) {
+        TelegramCommand command = TelegramCommand.parseText(text);
+        assertEquals("这句该是警报开关命令: " + text, TelegramCommand.Verb.ALERTS, command.verb);
+        return command.alerts;
+    }
+
+    private static void notAlerts(String text) {
+        assertEquals("不该认成警报开关命令: " + text,
+                TelegramCommand.Verb.UNKNOWN, TelegramCommand.parseText(text).verb);
+    }
+
     private static TelegramCommand.SensitivityAction sensitivity(String text) {
         TelegramCommand command = TelegramCommand.parseText(text);
         assertEquals("这句该是灵敏度命令: " + text, TelegramCommand.Verb.SENSITIVITY, command.verb);

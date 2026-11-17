@@ -601,6 +601,11 @@ public final class SentryAlerts implements Telemetry.Listener {
                                               long requestedAt) {
                         onSensitivityCommand(action, level);
                     }
+
+                    @Override
+                    public void onAlerts(TelegramCommand.AlertsState state, long requestedAt) {
+                        onAlertsCommand(state);
+                    }
                 });
             }
             // 它自己知道手里那条线程还活着没有（TelegramPoller.start）：活着就等它落地，不再起一条
@@ -749,8 +754,16 @@ public final class SentryAlerts implements Telemetry.Listener {
     private void requestStatusInner(AlertChannel channel) {
         VehicleState state = Telemetry.get().latest();
         String gear = state == null || state.gear == null ? "?" : state.gear;
-        String text = sentryLine(sentryValue()) + "\n"
-                + app.getString(R.string.alert_status_gear, gear);
+        // 暂停时第一行就说暂停：不然「哨兵开着 + 挡位 P」看着一切正常，其实一条都不会发。
+        // Paused says so on the first line: otherwise "sentry on + gear P" reads normal while
+        // nothing would be sent.
+        String text = (config.isAlertsPaused()
+                ? app.getString(R.string.alert_status_paused) + "\n"
+                : "")
+                + sentryLine(sentryValue()) + "\n"
+                + app.getString(R.string.alert_status_gear, gear) + "\n"
+                + app.getString(R.string.alert_status_sensitivity,
+                        config.getAlertsMotionSensitivity(), MotionSensitivity.MAX);
         deliverText(channel, text);
     }
 
@@ -857,6 +870,7 @@ public final class SentryAlerts implements Telemetry.Listener {
 
             org.json.JSONObject settingsJson = new org.json.JSONObject();
             settingsJson.put("enabled", config.isAlertsEnabled());
+            settingsJson.put("pausedFromChat", config.isAlertsPaused());
             settingsJson.put("commands", config.isAlertsCommands());
             settingsJson.put("ntfyCommands", config.alertsNtfyCommands().label());
             settingsJson.put("triggers", config.getAlertsTriggers());
@@ -2643,6 +2657,68 @@ public final class SentryAlerts implements Telemetry.Listener {
 
     /** 文字命令 {@code /guard …}（轮询那条线程上叫）。 */
     /**
+     * 聊天里暂停或者恢复警报：{@code alerts}、{@code alerts off}、{@code alerts on}。
+     *
+     * <h3>暂停为什么不关总开关</h3>
+     *
+     * <p>命令是从聊天里来的，而收命令的那条线程要求「警报开着」。真去关总开关，等于把回程路一起关掉：
+     * 车主再也发不进 {@code alerts on}，只能上车去点。所以这里动的是 {@code alerts_paused}
+     * （{@link AppConfig#isAlertsPaused()}）：停发、停看（{@link #refresh()}），命令那条路留着
+     * （{@code syncPoller} 只看总开关）。</p>
+     *
+     * <h3>为什么报一句「现在是什么状态」</h3>
+     *
+     * <p>重复一条 {@code alerts off} 不该假装又关了一次；问一句 {@code alerts} 也该有答案。
+     * 两种都回现在的事实，改成功了才说「已暂停 / 已恢复」。</p>
+     *
+     * <h3>ntfy 上的回程路</h3>
+     *
+     * <p>ntfy 的命令窗口只在发过一条警报之后开五分钟，没有常驻线程。暂停之后不会再发警报，所以那个窗口
+     * 关上以后，{@code alerts on} 就进不来了 —— 回话里明说这一点，让车主知道还能在车上恢复。</p>
+     *
+     * <h3>Why a pause and not the master switch</h3>
+     *
+     * <p>Commands arrive through the chat, and the thread that reads them needs "alerts on". Turning the
+     * master switch off would close the way back: {@code alerts on} could never arrive and the owner
+     * would have to get in the car. So this toggles {@code alerts_paused}: stop sending and stop watching
+     * ({@link #refresh()}), keep the command channel (the poller reads the master switch only).</p>
+     *
+     * <p>A repeated {@code alerts off} does not pretend to pause twice, and a bare {@code alerts} gets an
+     * answer; both reply with the fact, and only a real change says "paused" or "resumed".</p>
+     *
+     * <p>On ntfy the command window exists for five minutes after an alert and there is no resident
+     * thread, so once paused nothing reopens it: after it closes, {@code alerts on} cannot arrive. The
+     * reply says so, so the owner knows the head unit is still a way back.</p>
+     */
+    void onAlertsCommand(TelegramCommand.AlertsState state) {
+        boolean pausedNow = config.isAlertsPaused();
+        if (state == null || state == TelegramCommand.AlertsState.REPORT) {
+            deliverText(channel(), app.getString(pausedNow
+                    ? R.string.alert_cmd_alerts_paused : R.string.alert_cmd_alerts_running));
+            return;
+        }
+        boolean pause = state == TelegramCommand.AlertsState.OFF;
+        if (pause == pausedNow) {
+            deliverText(channel(), app.getString(pause
+                    ? R.string.alert_cmd_alerts_paused : R.string.alert_cmd_alerts_running));
+            return;
+        }
+        config.setAlertsPaused(pause);
+        BlackBox.noteImportant(pause
+                ? "alerts: paused from the chat (master switch untouched, commands still read)"
+                : "alerts: resumed from the chat");
+        // refresh 而不是 refreshConfig：暂停要把监听摘掉、取样停掉，那是 refresh 的活。
+        // refresh, not refreshConfig: a pause has to drop the listener and stop sampling.
+        refresh();
+        String text = app.getString(pause
+                ? R.string.alert_cmd_alerts_off : R.string.alert_cmd_alerts_on);
+        if (pause && config.isAlertsNtfy()) {
+            text = text + "\n" + app.getString(R.string.alert_cmd_alerts_off_ntfy);
+        }
+        deliverText(channel(), text);
+    }
+
+    /**
      * 聊天里改画面移动的灵敏度：{@code sens}、{@code sens up}、{@code sens down}、{@code sens 7}。
      *
      * <h3>为什么这个命令值得有</h3>
@@ -2897,6 +2973,9 @@ public final class SentryAlerts implements Telemetry.Listener {
                 return;
             case SENSITIVITY:
                 onSensitivityCommand(command.sensitivity, command.sensitivityLevel);
+                return;
+            case ALERTS:
+                onAlertsCommand(command.alerts);
                 return;
             default:
                 deliverText(channel(), app.getString(R.string.alert_cmd_help));
