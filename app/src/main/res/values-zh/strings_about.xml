@@ -20,7 +20,7 @@
     <string name="about_credits_title">开源与来源</string>
     <string name="about_credits_copyright">极氪即刻 © 2026 dts88。本应用不提供任何担保。</string>
     <string name="about_credits_evcam">本应用以 GNU GPL v3.0 发布，继承自 EVCam（作者 suyunkai）—— 相机、录制、悬浮窗这些基础部分来自它。按 GPL 的要求，本应用的源码同样公开。</string>
-    <string name="about_credits_contributors">这些朋友为本应用贡献了代码：\n\n• wysie（GitHub）—— 大量设计以及代码。\n\n• FerixzTanz（GitHub）—— 盲区画面的最初代码和实车研究，以及把盲区画面投到 HUD 上的做法（来自他的 CAMCORDER）。盲区画面默认的角度和窗口大小、HUD 上画面的默认设置，都是他在自己的 7X 上实车调出来的，非常感谢他细致的参数调整。\n\n• jlunnn（GitHub）—— 灵动贴的「后雾灯闪烁」动作（来自他的 7X-U）。\n\n• lelelolo（GitHub）—— 盲区画面的两处改进：环视暂时用不了时不显示黑框，后视镜上的灯亮着时画面描边。</string>
+    <string name="about_credits_contributors">这些朋友为本应用贡献了代码：\n\n• wysie（GitHub）—— 大量设计以及代码。\n\n• FerixzTanz（GitHub）—— 盲区画面的最初代码和实车研究，以及把盲区画面投到 HUD 上的做法（来自他的 CAMCORDER）。盲区画面默认的角度和窗口大小、HUD 上画面的默认设置，都是他在自己的 7X 上实车调出来的，非常感谢他细致的参数调整。\n\n• jlunnn（GitHub）—— 灵动贴的「后雾灯闪烁」动作（来自他的 7X-U）。\n\n• lelelolo（GitHub）—— 盲区画面的两处改进：环视暂时用不了时不显示黑框，后视镜上的灯亮着时画面描边。\n\n• Fabbbrrr（GitHub）—— 哨兵提醒走 ntfy、Telegram，直接发到车主自己的手机、不经过开发者服务器的去中心化创新建议，以及 ntfy 提醒的设计和逻辑。</string>
     <string name="about_credits_libraries">本应用还用到了以下开源组件，各自按其许可证发布：\n\n• AndroidX、Material Components、Media3 ExoPlayer、Gson、ZXing —— Apache License 2.0\n\n• Glide —— BSD、MIT 与 Apache License 2.0\n\n• NanoHTTPD —— BSD 3-Clause\n\n各组件的版本和许可证见项目地址中的 NOTICE.md。</string>
     <string name="about_coffee_title">请作者喝杯咖啡</string>
     <string name="about_coffee_body">PayNow 到 9271 6786。完全自愿，不影响任何功能。</string>

@@ -86,6 +86,8 @@
   也是 CarPiano 的作者。
 - **[calvinbui](https://github.com/calvinbui)**：在他的澳洲 7X 上实测空调、驾驶和安全相关的设置，并整理成文档。
 - **[lelelolo](https://github.com/lelelolo)**：盲区画面的两处改进：车机占用摄像头时不再显示黑框；后视镜上的灯亮着时，画面描一圈同色的边框。非常感谢。
+- **[Fabbbrrr](https://github.com/Fabbbrrr)**：哨兵提醒走 ntfy、Telegram，直接发到车主自己的手机、不经过开发者服务器的去中心化创新建议，
+  以及 ntfy 提醒的设计和逻辑（[#211](https://github.com/dts88/zeekr-shortcut-car/pull/211)）。非常感谢。
 - **SW**：积极测试和反馈，非常感谢。
 
 来源、第三方组件许可与边界说明见 [NOTICE.md](NOTICE.md)，完整条款见 [LICENSE](LICENSE)。
