@@ -228,7 +228,12 @@
     <string name="msg_accessory_no_permission">没有「附近的设备」权限，无法绑定灵动贴或X旋钮</string>
     <string name="set_x_knob_exclusive">单旋钮模式</string>
     <string name="set_x_knob_home">按下时显示</string>
-    <string name="x_knob_home_count">%1$d 项</string>
+    <string name="set_x_knob_panel">X旋钮浮窗</string>
+    <string name="set_x_knob_panel_summary">单旋钮模式下按下、转动时显示；主驾侧跟着「操作按钮位置」靠左或靠右</string>
+    <string name="opt_knob_panel_top">顶部</string>
+    <string name="opt_knob_panel_side">主驾侧</string>
+    <string name="x_knob_home_more">%1$s 等 %2$d 项</string>
+    <string name="x_knob_home_joiner">、</string>
     <string name="x_knob_summary_exclusive">单旋钮模式：按下时显示 %1$d 项</string>
     <string name="msg_x_knob_home_empty">至少勾选一项</string>
     <string name="x_knob_status_mode">模式：%1$s</string>

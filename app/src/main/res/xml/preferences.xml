@@ -253,6 +253,11 @@
                 android:title="@string/set_accessories_title"
                 android:summary="@string/set_accessories_summary" />
 
+            <com.kooo.evcam.settings.SegmentedPreference
+                android:key="pref_x_knob_panel"
+                android:title="@string/set_x_knob_panel"
+                android:summary="@string/set_x_knob_panel_summary" />
+
             <Preference
                 android:key="pref_smart_button_bind"
                 android:title="@string/set_accessory_bind_title"

@@ -202,11 +202,11 @@ public enum KnobTurn {
         }
     }
 
-    public void peek(Context app, Consumer<String> shown) {
+    void lookTS(Context app, Consumer<KnobDials.Positions> seen) {
         if (dial == null) {
-            shown.accept(null);
+            seen.accept(null);
             return;
         }
-        CarMoves.dial(app, key, dial, 0, (result, text) -> shown.accept(text));
+        CarMoves.look(app, dial, seen);
     }
 }

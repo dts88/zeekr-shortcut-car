@@ -1730,6 +1730,14 @@ public class AppConfig {
     }
 
     /** 「方向盘在哪边」问过没有。和语言一样单独记：老用户升级上来也问这一次。 */
+    public String getKnobPanel() {
+        return readEnum(SettingsRegistry.KNOB_PANEL);
+    }
+
+    public void setKnobPanel(String value) {
+        writeEnum(SettingsRegistry.KNOB_PANEL, value);
+    }
+
     public boolean isRailSideChosen() {
         return prefs.getBoolean(KEY_RAIL_SIDE_CHOSEN, false);
     }

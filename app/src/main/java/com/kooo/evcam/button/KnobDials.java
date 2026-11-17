@@ -24,6 +24,20 @@ final class KnobDials {
         CarMoves.Result turn(CarMoves.Car c, int delta);
 
         String shown(CarMoves.Car c, Context app, int delta);
+
+        default Positions positions(CarMoves.Car c, Context app) {
+            return null;
+        }
+    }
+
+    static final class Positions {
+        final String[] labels;
+        final int index;
+
+        Positions(String[] labels, int index) {
+            this.labels = labels;
+            this.index = index;
+        }
     }
 
     static final long SUSPENSION_SETTLE_MS = 500;
@@ -158,6 +172,20 @@ final class KnobDials {
             int i = index(id, read(c, id, zone));
             return i < 0 ? null : label(app, i);
         }
+
+        @Override
+        public Positions positions(CarMoves.Car c, Context app) {
+            Integer id = id(c);
+            return id == null ? null : positionsAt(c, app, id, zone(c));
+        }
+
+        Positions positionsAt(CarMoves.Car c, Context app, int id, int zone) {
+            String[] all = new String[steps.length];
+            for (int i = 0; i < steps.length; i++) {
+                all[i] = label(app, i);
+            }
+            return new Positions(all, index(id, read(c, id, zone)));
+        }
     }
 
     static class LevelDial extends ListDial {
@@ -181,6 +209,11 @@ final class KnobDials {
             @Override
             public String shown(CarMoves.Car c, Context app, int delta) {
                 return dial.shown(c, app, delta);
+            }
+
+            @Override
+            public Positions positions(CarMoves.Car c, Context app) {
+                return dial.positions(c, app);
             }
         };
     }
@@ -215,7 +248,24 @@ final class KnobDials {
                 Float t = id == null ? null : c.access.readFloat(id, c.zone(zoneNames[0]));
                 return t == null ? null : String.format(Locale.US, "%.1f°", t);
             }
+
+            @Override
+            public Positions positions(CarMoves.Car c, Context app) {
+                Integer id = c.function(CarMoves.TEMP_FIELD, "IHvac");
+                Float t = id == null ? null : c.access.readFloat(id, c.zone(zoneNames[0]));
+                return t == null ? null : temperatures(t);
+            }
         };
+    }
+
+    static Positions temperatures(float now) {
+        int n = Math.round((CarMoves.TEMP_MAX - CarMoves.TEMP_MIN) / CarMoves.TEMP_STEP) + 1;
+        String[] all = new String[n];
+        for (int i = 0; i < n; i++) {
+            all[i] = String.format(Locale.US, "%.1f°", CarMoves.TEMP_MIN + CarMoves.TEMP_STEP * i);
+        }
+        int at = Math.round((now - CarMoves.TEMP_MIN) / CarMoves.TEMP_STEP);
+        return new Positions(all, Math.max(0, Math.min(n - 1, at)));
     }
 
     static Dial fan(String zoneName, int[] manualSteps, boolean openFirst, boolean closeAtZero) {
@@ -261,6 +311,11 @@ final class KnobDials {
             @Override
             public String shown(CarMoves.Car c, Context app, int delta) {
                 return pick(c).shown(c, app, delta);
+            }
+
+            @Override
+            public Positions positions(CarMoves.Car c, Context app) {
+                return pick(c).positions(c, app);
             }
         };
     }
@@ -314,6 +369,12 @@ final class KnobDials {
                 Integer v = id == null ? null : c.read(id, c.zone(zoneName));
                 return onOff(app, v, 1, 0);
             }
+
+            @Override
+            public Positions positions(CarMoves.Car c, Context app) {
+                Integer id = c.function(field, ifaces);
+                return id == null ? null : onOff(app, c.read(id, c.zone(zoneName)), 1);
+            }
         };
     }
 
@@ -330,7 +391,18 @@ final class KnobDials {
                 Integer id = c.function("HVAC_FUNC_RAPID_COOLG_REQ", "IHvac");
                 return onOff(app, id == null ? null : c.read(id, c.all()), 0, 1);
             }
+
+            @Override
+            public Positions positions(CarMoves.Car c, Context app) {
+                Integer id = c.function("HVAC_FUNC_RAPID_COOLG_REQ", "IHvac");
+                return id == null ? null : onOff(app, c.read(id, c.all()), 0);
+            }
         };
+    }
+
+    static Positions onOff(Context app, Integer v, int on) {
+        String[] all = {app.getString(R.string.quick_off), app.getString(R.string.quick_on)};
+        return new Positions(all, v == null ? -1 : v == on ? 1 : 0);
     }
 
     static String onOff(Context app, Integer v, int on, int off) {
@@ -389,6 +461,13 @@ final class KnobDials {
                 int slot = slot(c);
                 return id == null || slot <= 0 ? null : level.shownAt(c, app, id, slot);
             }
+
+            @Override
+            public Positions positions(CarMoves.Car c, Context app) {
+                Integer id = level.id(c);
+                int slot = slot(c);
+                return id == null || slot <= 0 ? null : level.positionsAt(c, app, id, slot);
+            }
         };
     }
 
@@ -439,6 +518,11 @@ final class KnobDials {
             @Override
             public String shown(CarMoves.Car c, Context app, int delta) {
                 return driveModes(c).shownAt(c, app, Signal.DRIVE_MODE.id, c.all());
+            }
+
+            @Override
+            public Positions positions(CarMoves.Car c, Context app) {
+                return driveModes(c).positionsAt(c, app, Signal.DRIVE_MODE.id, c.all());
             }
         };
     }

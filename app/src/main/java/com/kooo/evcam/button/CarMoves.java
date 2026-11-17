@@ -193,37 +193,106 @@ final class CarMoves {
         });
     }
 
+    private static final java.util.Map<String, Turning> turning = new java.util.HashMap<>();
+
+    private static final class Turning {
+        int delta;
+        java.util.function.BiConsumer<Result, String> done;
+    }
+
     static void dial(Context app, String key, KnobDials.Dial dial, int delta,
                      java.util.function.BiConsumer<Result, String> done) {
+        if (delta != 0) {
+            synchronized (turning) {
+                Turning t = turning.get(key);
+                if (t != null) {
+                    t.delta += delta;
+                    t.done = done;
+                    return;
+                }
+                t = new Turning();
+                t.delta = delta;
+                t.done = done;
+                turning.put(key, t);
+            }
+        }
         Handler h = handler();
         Handler back = main;
         h.post(() -> {
             CarAccess access = Telemetry.get().carAccess();
-            Result result = Result.DONE;
+            Car car = access == null ? null : new Car(access, SYSTEM_NAMES, SystemClock::sleep, memory(app), app);
+            Result result = car == null ? Result.UNAVAILABLE : Result.DONE;
             String text = null;
-            String detail;
-            if (access == null) {
-                result = Result.UNAVAILABLE;
-                detail = "car interface not connected";
-            } else {
-                Car car = new Car(access, SYSTEM_NAMES, SystemClock::sleep, memory(app), app);
-                try {
-                    if (delta != 0) {
-                        result = dial.turn(car, delta);
+            int total = 0;
+            int writes = 0;
+            java.util.function.BiConsumer<Result, String> finish = done;
+            if (delta != 0) {
+                for (Turning got = claim(key); got.delta != 0; got = claim(key)) {
+                    finish = got.done;
+                    total += got.delta;
+                    writes++;
+                    if (car != null) {
+                        try {
+                            result = dial.turn(car, got.delta);
+                        } catch (RuntimeException e) {
+                            result = Result.UNAVAILABLE;
+                            car.note("failed: " + e);
+                        }
                     }
-                    text = dial.shown(car, app, delta);
+                }
+            }
+            if (car != null) {
+                try {
+                    text = dial.shown(car, app, total);
                 } catch (RuntimeException e) {
-                    result = Result.UNAVAILABLE;
                     car.note("failed: " + e);
                 }
-                detail = car.detail();
             }
             if (delta != 0) {
-                BlackBox.note("X旋钮动作 " + key + " " + delta + "：" + result + "（" + detail + "）");
+                String detail = car == null ? "car interface not connected" : car.detail();
+                BlackBox.note("X旋钮动作 " + key + " " + total + (writes > 1 ? "（并成 " + writes + " 次写）" : "")
+                        + "：" + result + "（" + detail + "）");
             }
             Result r = result;
             String t = text;
-            back.post(() -> done.accept(r, t));
+            java.util.function.BiConsumer<Result, String> callback = finish;
+            back.post(() -> callback.accept(r, t));
+        });
+    }
+
+    private static Turning claim(String key) {
+        synchronized (turning) {
+            Turning t = turning.get(key);
+            Turning got = new Turning();
+            if (t == null) {
+                return got;
+            }
+            got.delta = t.delta;
+            got.done = t.done;
+            t.delta = 0;
+            if (got.delta == 0) {
+                turning.remove(key);
+            }
+            return got;
+        }
+    }
+
+    static void look(Context app, KnobDials.Dial dial, Consumer<KnobDials.Positions> seen) {
+        Handler h = handler();
+        Handler back = main;
+        h.post(() -> {
+            CarAccess access = Telemetry.get().carAccess();
+            KnobDials.Positions positions = null;
+            if (access != null) {
+                Car car = new Car(access, SYSTEM_NAMES, SystemClock::sleep, memory(app), app);
+                try {
+                    positions = dial.positions(car, app);
+                } catch (RuntimeException e) {
+                    positions = null;
+                }
+            }
+            KnobDials.Positions p = positions;
+            back.post(() -> seen.accept(p));
         });
     }
 

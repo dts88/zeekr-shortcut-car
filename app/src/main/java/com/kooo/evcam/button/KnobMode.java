@@ -55,13 +55,13 @@ final class KnobMode {
         if (gesture == SmartButtonAd.SINGLE || gesture == SmartButtonAd.DOUBLE) {
             if (!address.equals(choosing)) {
                 choosing = address;
-                KnobPanel.choose(app, names(app, home), home.indexOf(current), CHOOSE_MS);
+                KnobPanel.choose(app, names(app, home), home.indexOf(current), 0, CHOOSE_MS);
                 main().removeCallbacks(CLOSE);
                 main().postDelayed(CLOSE, CHOOSE_MS);
                 return;
             }
             close();
-            current.peek(app, shown -> KnobPanel.show(app, current.label(app), shown));
+            show(app, current, 0);
             return;
         }
         if (!Accessory.isTurn(gesture)) {
@@ -71,13 +71,21 @@ final class KnobMode {
         if (address.equals(choosing)) {
             int i = move(home.indexOf(current), delta, home.size());
             state.edit().putString(currentKey(address), home.get(i).key).apply();
-            KnobPanel.choose(app, names(app, home), i, CHOOSE_MS);
+            KnobPanel.choose(app, names(app, home), i, delta, CHOOSE_MS);
             main().removeCallbacks(CLOSE);
             main().postDelayed(CLOSE, CHOOSE_MS);
             return;
         }
-        KnobPanel.show(app, current.label(app), null);
-        current.runTS(app, delta, shown -> KnobPanel.show(app, current.label(app), shown));
+        show(app, current, delta);
+    }
+
+    private static void show(Context app, KnobTurn current, int delta) {
+        String key = current.key;
+        int at = KnobPanel.turn(app, key, current.label(app), delta,
+                () -> current.lookTS(app, positions -> KnobPanel.seen(key, positions)));
+        if (delta != 0) {
+            current.runTS(app, delta, shown -> KnobPanel.shown(key, shown, at));
+        }
     }
 
     static void close() {

@@ -47,6 +47,7 @@ final class AccessoryRows {
     static final String CATEGORY_KEY = "cat_smart_buttons";
     static final String SWITCH_KEY = "pref_smart_buttons";
     private static final String BIND_KEY = "pref_smart_button_bind";
+    static final String PANEL_KEY = "pref_x_knob_panel";
 
     private final SettingsPreferenceFragment fragment;
     private final PreferenceCategory category;
@@ -271,12 +272,30 @@ final class AccessoryRows {
         devices.clear();
         AppConfig config = new AppConfig(context);
         expanded.retainAll(boundAddresses(config));
-        int order = 2;
+        int order = 3;
         for (Accessory kind : Accessory.values()) {
             for (String address : config.getAccessories(kind)) {
                 order = addDevice(context, config, kind, address, order);
             }
         }
+        panel(config);
+    }
+
+    private void panel(AppConfig config) {
+        Preference row = category.findPreference(PANEL_KEY);
+        if (row != null) {
+            boolean visible = config.isAccessoriesEnabled() && wanted(row, config);
+            if (row.isVisible() != visible) {
+                row.setVisible(visible);
+            }
+        }
+    }
+
+    static boolean wanted(Preference row, AppConfig config) {
+        if (row instanceof CardItemPreference) {
+            return ((CardItemPreference) row).isWanted();
+        }
+        return !PANEL_KEY.equals(row.getKey()) || !config.getAccessories(Accessory.KNOB).isEmpty();
     }
 
     private int addDevice(Context context, AppConfig config, Accessory kind, String address, int order) {
@@ -285,6 +304,7 @@ final class AccessoryRows {
         d.row.setKey(rowPrefix(kind) + address);
         d.row.setPersistent(false);
         d.row.setIconSpaceReserved(false);
+        d.row.setLead(kind == Accessory.KNOB ? R.drawable.ic_x_knob : R.drawable.ic_smart_button);
         d.row.setOrder(order++);
         d.row.setAction(context.getString(R.string.action_delete), () -> confirmDelete(address, kind));
         d.row.setOnPreferenceClickListener(p -> {
@@ -363,6 +383,7 @@ final class AccessoryRows {
         for (Map.Entry<String, Device> entry : devices.entrySet()) {
             fill(context, config, entry.getKey(), entry.getValue());
         }
+        panel(config);
     }
 
     private void fill(Context context, AppConfig config, String address, Device d) {
@@ -386,7 +407,7 @@ final class AccessoryRows {
             d.turn.setValue(config.getKnobTurn(address).label(context));
         }
         if (d.home != null) {
-            d.home.setValue(context.getString(R.string.x_knob_home_count, config.getKnobHome(address).size()));
+            d.home.setValue(homeNames(context, config.getKnobHome(address)));
         }
         show(config, address, d);
     }
@@ -485,6 +506,15 @@ final class AccessoryRows {
         String second = context.getString(R.string.x_knob_status_mode, mode) + " · "
                 + context.getString(R.string.x_knob_status_light, light);
         return first.isEmpty() ? second : first + "\n" + second;
+    }
+
+    static String homeNames(Context context, List<KnobTurn> home) {
+        List<String> names = new ArrayList<>();
+        for (int i = 0; i < Math.min(3, home.size()); i++) {
+            names.add(home.get(i).label(context));
+        }
+        String joined = String.join(context.getString(R.string.x_knob_home_joiner), names);
+        return home.size() <= 3 ? joined : context.getString(R.string.x_knob_home_more, joined, home.size());
     }
 
     private static String defaultName(Context context, Accessory kind, String address) {
