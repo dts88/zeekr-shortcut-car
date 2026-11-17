@@ -141,6 +141,7 @@ public class RearViewMirrorView extends ViewGroup {
     /** 鱼眼校正开关与目标视野，进入时读一次，设置页改了再推过来。 */
     private boolean fisheyeCorrection;
     private float fovDegrees;
+    private String projection;
     /** 分片绘制（和主界面预览、视频回看同一套）。 */
     private final FisheyeMesh mesh = new FisheyeMesh();
     private final FisheyeMesh.Painter paintTexture = this::drawTextureOnce;
@@ -221,6 +222,7 @@ public class RearViewMirrorView extends ViewGroup {
                 ViewConfiguration.get(context).getScaledMinimumFlingVelocity();
         this.fisheyeCorrection = appConfig.isRearViewFisheyeCorrection();
         this.fovDegrees = appConfig.getRearViewFov();
+        this.projection = appConfig.getFisheyeProjection();
 
         setBackgroundColor(0xFF000000);
 
@@ -1326,7 +1328,8 @@ public class RearViewMirrorView extends ViewGroup {
      * 相机的消费者始终只有它一个（为什么不上 GL，见 docs/local/zeekr-platform-notes.md §2.1）。</p>
      *
      * <p>代价是每帧 {@code N²} 次绘制。后视镜是一块小窗口，固定每边
-     * {@link FisheyeProjection#MESH_DIVISIONS} 格；投影固定是直线投影，只有视野可调。</p>
+     * {@link FisheyeProjection#MESH_DIVISIONS} 格；投影照「通用 → 鱼眼校正」选的方式（项目所有者 2026-11-17，
+     * 以前固定是直线投影），视野是自己的那一项。</p>
      *
      * <p>每个角点三步走，顺序不能换：先按取景落到「校正后画面」里，再反投影回原始鱼眼画面，
      * 最后加上这一路在合成流里的偏移。取景之所以作用在校正之后，是因为用户是对着
@@ -1336,7 +1339,7 @@ public class RearViewMirrorView extends ViewGroup {
                                RearViewGeometry.Viewport viewport) {
         RearViewGeometry.ShaderRects r =
                 RearViewGeometry.toShaderRects(plan, laneIndex, viewport);
-        mesh.setCorrection(fovDegrees, FisheyeProjection.PROJECTION_RECTILINEAR);
+        mesh.setCorrection(fovDegrees, projection);
         mesh.prepare(FisheyeProjection.MESH_DIVISIONS,
                 r.laneOffsetX * width, r.laneOffsetY * height,
                 r.laneScaleX * width, r.laneScaleY * height,
@@ -1352,8 +1355,9 @@ public class RearViewMirrorView extends ViewGroup {
     public void applyCorrectionFromConfig() {
         fisheyeCorrection = appConfig.isRearViewFisheyeCorrection();
         fovDegrees = appConfig.getRearViewFov();
+        projection = appConfig.getFisheyeProjection();
         // 两种模式下视野角度都会改变取景，所以无论开关如何都要重画
-        AppLog.i(TAG, "鱼眼校正 " + (fisheyeCorrection ? "开，视野 " + fovDegrees + "°" : "关"));
+        AppLog.i(TAG, "鱼眼校正 " + (fisheyeCorrection ? "开，" + projection + "，视野 " + fovDegrees + "°" : "关"));
         invalidate();
     }
 }

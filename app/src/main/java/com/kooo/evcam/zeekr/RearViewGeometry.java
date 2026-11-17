@@ -74,7 +74,7 @@ public final class RearViewGeometry {
      * 「校正到多大视野」，而是「取这一路的多大一块」。两种模式下拖动的手感一致。</p>
      */
     public static float visibleFractionForFov(float fovDegrees) {
-        float fov = FisheyeProjection.clampFov(fovDegrees);
+        float fov = FisheyeProjection.clampFov(fovDegrees, FisheyeProjection.PROJECTION_CYLINDRICAL);
         return Math.max(0.05f, Math.min(1f, fov / 180f));
     }
 

@@ -46,7 +46,7 @@
     <string name="set_rearview_fisheye_title">Pembetulan mata ikan</string>
     <string name="set_rearview_fisheye_summary">Membetulkan herotan tong mata ikan dalam Cermin super sahaja; rakaman tidak berubah.</string>
     <string name="set_rearview_fov_title">Medan pandangan</string>
-    <string name="set_rearview_fov_summary">Lebih luas menunjukkan lebih banyak dan nampak lebih tajam, tetapi tepinya lebih herot</string>
+    <string name="set_rearview_fov_summary">Lebih luas menunjukkan lebih banyak dan nampak lebih tajam, tetapi tepinya lebih herot. Kaedah dipilih dalam Umum → Pembetulan mata ikan: sehingga 140° untuk Garisan lurus, 180° untuk Luas dan Bulatan penuh.</string>
     <string name="set_rearview_reset_summary">Memulihkan kedudukan dan saiz tetingkap, bingkai, medan pandangan, pembetulan mata ikan dan Label arah kepada lalai, serta kembali ke pandangan belakang</string>
     <string name="set_rearview_fisheye_value">Medan pandangan %1$d°</string>
     <string name="set_rearview_window_summary">Nisbah gambar kekal; bentuk tetingkap hanya menentukan berapa banyak yang kelihatan</string>
@@ -858,7 +858,7 @@
     <string name="opt_projection_cylindrical">Luas (ufuk melengkung)</string>
     <string name="set_fisheye_fov_title">Medan pandangan dibetulkan</string>
     <string name="set_fisheye_fov_summary">Sudut lebih luas mengekalkan lebih banyak gambar. Sehingga 140° untuk Garisan lurus, 180° untuk Luas dan Bulatan penuh.</string>
-    <string name="set_fisheye_scope_summary">Untuk pratonton langsung, foto dan video</string>
+    <string name="set_fisheye_scope_summary">Untuk pratonton langsung, foto dan video; Cermin super juga menggunakan kaedah yang dipilih di sini</string>
     <string name="set_fisheye_value">%1$s · %2$d°</string>
     <string name="opt_projection_stereographic">Bulatan penuh (garisan sedikit melengkung)</string>
     <string name="dlg_rail_side_title">Tempat duduk pemandu di sebelah mana?</string>

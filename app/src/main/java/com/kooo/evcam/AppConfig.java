@@ -1300,7 +1300,10 @@ public class AppConfig {
         prefs.edit().putBoolean(KEY_CAMERA_HOLDER_SUSPECTS, on).apply();
     }
 
-    /** 鱼眼校正用哪种投影（直线 / 柱面 / 立体）。主界面预览、图片回看、视频回看共用；后视镜不用它。 */
+    /**
+     * 鱼眼校正用哪种投影（直线 / 柱面 / 立体）。主界面预览、图片回看、视频回看共用；
+     * 超级镜子的鱼眼校正也照它（项目所有者 2026-11-17），视野角度它有自己的一项。
+     */
     public String getFisheyeProjection() {
         return readEnum(SettingsRegistry.FISHEYE_PROJECTION);
     }
@@ -1327,14 +1330,19 @@ public class AppConfig {
     }
 
 
-    /** 校正的目标视野角度（度）。 */
+    /**
+     * 超级镜子的视野角度（度）。和 {@link #getFisheyeFov} 一样按<b>当前投影</b>夹：直线最大 140°，
+     * 宽视野、全圆最大 180°；从宽视野切回直线时存着的 170° 读出来就是 140°，界面写多少、生效的就是多少。
+     */
     public float getRearViewFov() {
         return FisheyeProjection.clampFov(
-                prefs.getFloat(KEY_REARVIEW_FOV, FisheyeProjection.DEFAULT_FOV_DEGREES));
+                prefs.getFloat(KEY_REARVIEW_FOV, FisheyeProjection.DEFAULT_FOV_DEGREES),
+                getFisheyeProjection());
     }
 
     public void setRearViewFov(float degrees) {
-        prefs.edit().putFloat(KEY_REARVIEW_FOV, FisheyeProjection.clampFov(degrees)).apply();
+        prefs.edit().putFloat(KEY_REARVIEW_FOV,
+                FisheyeProjection.clampFov(degrees, getFisheyeProjection())).apply();
     }
 
     /**
