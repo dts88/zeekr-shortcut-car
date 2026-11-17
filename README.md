@@ -87,8 +87,9 @@ Optional, in the same section:
   camera and sends it, refused above 10 MB. Nothing but the small picture goes out until you ask, and the
   clip's size follows the frame rate the car records sentry video at.
 - **Answer commands**: send the bot `pic` for a fresh picture, `pic front|rear|left|right` for one
-  camera, `status` for one line. Only the chat you configured is answered, and only while Sentry Mode is
-  on — that is what keeps the head unit awake.
+  camera, `status` for one line, `sens` to read the motion sensitivity and `sens up` / `sens down` /
+  `sens 7` to change it from the phone. Only the chat you configured is answered, and only while Sentry
+  Mode is on — that is what keeps the head unit awake.
 - **Start after locking**: right away, 1 minute or 3 minutes after the car locks, so walking away
   does not send you a picture of yourself.
 - **Forgot Sentry**: park away from home with Sentry Mode off and the car asks in the chat, then

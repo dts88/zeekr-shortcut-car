@@ -133,6 +133,21 @@ public final class TelegramPoller {
         void onHelp();
 
         /**
+         * {@code /sens …}：画面移动的灵敏度。
+         *
+         * @param action      {@link TelegramCommand.SensitivityAction}；不会为 {@code null}
+         * @param level       只有 {@code SET} 有意义，1–10 之内；别的动作给 0
+         * @param requestedAt 车主发命令的时刻（毫秒）；0 表示不知道
+         *
+         * {@code /sens …}: motion-detection sensitivity.
+         *
+         * @param action      never null
+         * @param level       1–10 for {@code SET}; 0 for the other actions
+         * @param requestedAt when the owner sent the command (milliseconds); 0 means unknown
+         */
+        void onSensitivity(TelegramCommand.SensitivityAction action, int level, long requestedAt);
+
+        /**
          * 一颗按钮按下了。已经回过了（手机上不转了），剩下的事在这里做。
          *
          * @param data      按钮上的 {@code callback_data}，布局见 {@code GuardToken}
@@ -466,6 +481,9 @@ public final class TelegramPoller {
                         break;
                     case GUARD:
                         handler.onGuard(command.guard, sentAt);
+                        break;
+                    case SENSITIVITY:
+                        handler.onSensitivity(command.sensitivity, command.sensitivityLevel, sentAt);
                         break;
                     default:
                         // 车主发的、但认不出来：回一句怎么用。不回的话，

@@ -30,6 +30,7 @@ import com.kooo.evcam.alarm.guard.GuardPolicy;
 import com.kooo.evcam.alarm.guard.GuardToken;
 import com.kooo.evcam.alarm.media.AlertPicture;
 import com.kooo.evcam.alarm.media.FrameDiff;
+import com.kooo.evcam.alarm.media.MotionSensitivity;
 import com.kooo.evcam.alarm.media.MotionTap;
 import com.kooo.evcam.alarm.media.PictureBudget;
 import com.kooo.evcam.alarm.media.RecordedClip;
@@ -593,6 +594,12 @@ public final class SentryAlerts implements Telemetry.Listener {
                     @Override
                     public void onGuard(TelegramCommand.GuardAction action, long requestedAt) {
                         onGuardCommand(action, requestedAt);
+                    }
+
+                    @Override
+                    public void onSensitivity(TelegramCommand.SensitivityAction action, int level,
+                                              long requestedAt) {
+                        onSensitivityCommand(action, level);
                     }
                 });
             }
@@ -2635,6 +2642,75 @@ public final class SentryAlerts implements Telemetry.Listener {
     }
 
     /** 文字命令 {@code /guard …}（轮询那条线程上叫）。 */
+    /**
+     * 聊天里改画面移动的灵敏度：{@code sens}、{@code sens up}、{@code sens down}、{@code sens 7}。
+     *
+     * <h3>为什么这个命令值得有</h3>
+     *
+     * <p>灵敏度调错了的表现是「半夜收到七条树叶」，而那时车主不在车里 —— 他手上只有手机。
+     * 一条命令就能把它调钝，比第二天上车再改好得多。</p>
+     *
+     * <h3>做三件事</h3>
+     *
+     * <ol>
+     *   <li>算新档位：{@code up}/{@code down} 各挪一档，到两头停住（{@link MotionSensitivity#step}），
+     *       {@code sens 7} 直接要那一档；</li>
+     *   <li>存进设置并当场生效 —— {@link #refreshConfig()} 会把新档位交给正在跑的移动检测，
+     *       不需要重启或者重新开关警报；</li>
+     *   <li>回一句现在几档、刚才几档。到了 1 或 10 就明说「到头了」，不要假装挪过。</li>
+     * </ol>
+     *
+     * <p>没变的时候（到头了）不写设置，也不记「改过一次」—— 黑匣子里那条要是写着改了，
+     * 事后查「为什么还是这么敏」就会被带错方向。</p>
+     *
+     * <h3>Why it is worth having</h3>
+     *
+     * <p>The owner is not in the car when sensitivity is wrong: the symptom is seven alerts about
+     * leaves at 2 a.m. and the only thing in his hand is the phone. One message turns it down.</p>
+     *
+     * <p>Three steps: work out the new level (a step each way, stopping at the ends; a number is taken
+     * as given), store it and apply it through {@link #refreshConfig()} so the running detector picks it
+     * up without a restart, then reply with the level now and the level before. At 1 or 10 the reply says
+     * so instead of pretending to move, and nothing is written when nothing changed — a blackbox line
+     * claiming a change that did not happen would mislead the next person reading it.</p>
+     */
+    void onSensitivityCommand(TelegramCommand.SensitivityAction action, int level) {
+        int before = config.getAlertsMotionSensitivity();
+        int after = before;
+        if (action == TelegramCommand.SensitivityAction.UP) {
+            after = MotionSensitivity.step(before, true);
+        } else if (action == TelegramCommand.SensitivityAction.DOWN) {
+            after = MotionSensitivity.step(before, false);
+        } else if (action == TelegramCommand.SensitivityAction.SET) {
+            after = MotionSensitivity.clamp(level);
+        }
+        if (action == TelegramCommand.SensitivityAction.REPORT) {
+            deliverText(channel(), app.getString(R.string.alert_cmd_sensitivity_now,
+                    before, MotionSensitivity.MAX));
+            return;
+        }
+        if (after == before) {
+            // 到头了就说头在哪边：往上调不动和往下调不动不是同一句话。
+            // At the end, say which end: "cannot go higher" and "cannot go lower" are not the same reply.
+            if (action == TelegramCommand.SensitivityAction.UP) {
+                deliverText(channel(), app.getString(R.string.alert_cmd_sensitivity_edge_up,
+                        after, MotionSensitivity.MAX));
+            } else if (action == TelegramCommand.SensitivityAction.DOWN) {
+                deliverText(channel(), app.getString(R.string.alert_cmd_sensitivity_edge_down,
+                        after, MotionSensitivity.MAX));
+            } else {
+                deliverText(channel(), app.getString(R.string.alert_cmd_sensitivity_now,
+                        after, MotionSensitivity.MAX));
+            }
+            return;
+        }
+        config.setAlertsMotionSensitivity(after);
+        BlackBox.noteImportant("alerts: motion sensitivity " + before + " -> " + after + " (command)");
+        refreshConfig();
+        deliverText(channel(), app.getString(R.string.alert_cmd_sensitivity_changed,
+                after, before, MotionSensitivity.MAX));
+    }
+
     void onGuardCommand(TelegramCommand.GuardAction action, long requestedAtMs) {
         if (action == null) {
             guardSend(guardReport(), "");
@@ -2818,6 +2894,9 @@ public final class SentryAlerts implements Telemetry.Listener {
                 return;
             case GUARD:
                 onGuardCommand(command.guard, System.currentTimeMillis());
+                return;
+            case SENSITIVITY:
+                onSensitivityCommand(command.sensitivity, command.sensitivityLevel);
                 return;
             default:
                 deliverText(channel(), app.getString(R.string.alert_cmd_help));

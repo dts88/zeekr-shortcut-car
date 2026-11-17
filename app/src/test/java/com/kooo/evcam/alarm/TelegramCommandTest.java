@@ -132,4 +132,77 @@ public class TelegramCommandTest {
         assertEquals(null, TelegramCommand.parseText("status").guard);
         assertEquals(null, TelegramCommand.parseText("hello").guard);
     }
+
+    // ------------------------------------------------------------------ 灵敏度 / sensitivity
+
+    @Test
+    public void sensitivityReportsMovesAndTakesANumber() {
+        assertEquals(TelegramCommand.SensitivityAction.REPORT, sensitivity("sens"));
+        assertEquals(TelegramCommand.SensitivityAction.REPORT, sensitivity("/sensitivity"));
+        assertEquals(TelegramCommand.SensitivityAction.UP, sensitivity("sens up"));
+        assertEquals(TelegramCommand.SensitivityAction.UP, sensitivity("sens higher"));
+        assertEquals(TelegramCommand.SensitivityAction.UP, sensitivity("sens +"));
+        assertEquals(TelegramCommand.SensitivityAction.DOWN, sensitivity("sens down"));
+        assertEquals(TelegramCommand.SensitivityAction.DOWN, sensitivity("SENS lower"));
+        assertEquals(TelegramCommand.SensitivityAction.DOWN, sensitivity("sens -"));
+        assertEquals(TelegramCommand.SensitivityAction.SET, sensitivity("sens 7"));
+        assertEquals(7, level("sens 7"));
+        assertEquals("set 那个词是可选的", 4, level("sens set 4"));
+        assertEquals(TelegramCommand.SensitivityAction.SET, sensitivity("sens 1"));
+        assertEquals(1, level("sens 1"));
+        assertEquals("10 是最大的一档", 10, level("sens 10"));
+    }
+
+    @Test
+    public void aSlashAndABotMentionDoNotMatterForSensitivity() {
+        assertEquals(TelegramCommand.SensitivityAction.UP, sensitivity("/sens@ZeekrSentry_bot up"));
+        assertEquals(TelegramCommand.SensitivityAction.REPORT, sensitivity("  /SENS  "));
+    }
+
+    @Test
+    public void aNumberOutsideOneToTenIsNotGuessedAt() {
+        // 不猜：11 不是「最近的 10」，0 也不是 1
+        // No guessing: 11 is not "10, nearly", and 0 is not 1
+        notASensitivity("sens 0");
+        notASensitivity("sens 11");
+        notASensitivity("sens 99");
+        notASensitivity("sens -3");
+        notASensitivity("sens ten");
+        notASensitivity("sens up up");
+        notASensitivity("sens set");
+        notASensitivity("sens set 0");
+        notASensitivity("sens set 11");
+        notASensitivity("sens auto");
+    }
+
+    @Test
+    public void onlySensitivityCommandsCarryASensitivityAction() {
+        assertEquals(null, TelegramCommand.parseText("pic").sensitivity);
+        assertEquals(null, TelegramCommand.parseText("status").sensitivity);
+        assertEquals(null, TelegramCommand.parseText("guard on").sensitivity);
+        assertEquals(null, TelegramCommand.parseText("hello").sensitivity);
+        // 数字只对 sens 有意义：pic 后面跟个 7 仍然是「拍一张」，不是「第 7 档」。
+        // A number only means something after sens: "pic 7" is still one picture, not a level.
+        TelegramCommand pic = TelegramCommand.parseText("pic 7");
+        assertEquals(TelegramCommand.Verb.PICTURE, pic.verb);
+        assertEquals(null, pic.sensitivity);
+        assertEquals(TelegramCommand.ANY_LANE, pic.lane);
+    }
+
+    private static TelegramCommand.SensitivityAction sensitivity(String text) {
+        TelegramCommand command = TelegramCommand.parseText(text);
+        assertEquals("这句该是灵敏度命令: " + text, TelegramCommand.Verb.SENSITIVITY, command.verb);
+        return command.sensitivity;
+    }
+
+    private static int level(String text) {
+        TelegramCommand command = TelegramCommand.parseText(text);
+        assertEquals("这句该是灵敏度命令: " + text, TelegramCommand.Verb.SENSITIVITY, command.verb);
+        return command.sensitivityLevel;
+    }
+
+    private static void notASensitivity(String text) {
+        assertEquals("不该认成灵敏度命令: " + text,
+                TelegramCommand.Verb.UNKNOWN, TelegramCommand.parseText(text).verb);
+    }
 }
