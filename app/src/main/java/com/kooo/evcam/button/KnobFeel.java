@@ -12,7 +12,7 @@ import java.util.Map;
 
 final class KnobFeel {
 
-    static final long IDLE_MS = 1_500L;
+    static final long IDLE_MS = 2_000L;
     static final long FLOW_MS = 500L;
     static final long EVENT_MS = 400L;
     static final int GAP_MAX = 2;
