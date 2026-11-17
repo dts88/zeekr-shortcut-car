@@ -11,6 +11,11 @@ commit message, not here.
 
 Nothing yet.
 
+## [4.11.0-alpha] - 2026-11-17
+
+- Super mirror: fisheye correction uses the method chosen in Settings → General → Fisheye correction; up to 180° with Wide or Full circle.
+- X knob: turn timing adjusted.
+
 ## [4.10.0-alpha] - 2026-11-17
 
 - Settings → Buttons: one switch and one pairing entry for smart buttons and X knobs; bound ones show an icon.
