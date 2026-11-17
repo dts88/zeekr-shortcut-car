@@ -1345,9 +1345,9 @@ public final class DiagnosticsCollector {
                     for (com.kooo.evcam.button.KnobTurn turn : config.getKnobHome(address)) {
                         keys.add(turn.key);
                     }
-                    sb.append("  专属模式=开（").append(String.join(",", keys)).append("）");
+                    sb.append("  单旋钮模式=开（").append(String.join(",", keys)).append("）");
                 } else {
-                    sb.append("  专属模式=关");
+                    sb.append("  单旋钮模式=关");
                 }
             }
             sb.append("  电量=").append(battery < 0 ? "没有过"

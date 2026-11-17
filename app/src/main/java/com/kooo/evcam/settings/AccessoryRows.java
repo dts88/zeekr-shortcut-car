@@ -517,7 +517,7 @@ final class AccessoryRows {
         }
         new AppConfig(context).setKnobExclusive(address, on);
         com.kooo.evcam.blackbox.BlackBox.noteImportant("开关变更: X旋钮 " + SmartButtonAd.shortId(address)
-                + " 专属模式 → " + (on ? "开" : "关"));
+                + " 单旋钮模式 → " + (on ? "开" : "关"));
         refresh(address);
     }
 

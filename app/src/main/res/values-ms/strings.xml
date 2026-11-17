@@ -204,14 +204,14 @@
     <string name="msg_accessory_not_found">Tiada butang pintar atau tombol X ditemui. Cuba lagi</string>
     <string name="msg_accessory_full">Sehingga %1$d butang pintar dan %1$d tombol X boleh dipasangkan</string>
     <string name="msg_accessory_no_permission">Tanpa kebenaran Peranti berdekatan, butang pintar dan tombol X tidak dapat dipasangkan</string>
-    <string name="set_x_knob_exclusive">Mod eksklusif</string>
+    <string name="set_x_knob_exclusive">Mod satu tombol</string>
     <string name="set_x_knob_home">Dipaparkan apabila ditekan</string>
     <string name="x_knob_home_count">%1$d item</string>
-    <string name="x_knob_summary_exclusive">Mod eksklusif: %1$d item dipaparkan apabila ditekan</string>
+    <string name="x_knob_summary_exclusive">Mod satu tombol: %1$d item dipaparkan apabila ditekan</string>
     <string name="msg_x_knob_home_empty">Pilih sekurang-kurangnya satu</string>
     <string name="x_knob_status_mode">Mod: %1$s</string>
     <string name="x_knob_mode_normal">Biasa</string>
-    <string name="x_knob_mode_exclusive">Mod eksklusif (kini: %1$s)</string>
+    <string name="x_knob_mode_exclusive">Mod satu tombol (kini: %1$s)</string>
     <string name="x_knob_status_light">Lampu latar: %1$s</string>
     <string name="x_knob_light_boost">Hidup, mod pacuan hingga %1$s</string>
     <string name="knob_fn_volume">Kelantangan</string>

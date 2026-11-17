@@ -226,14 +226,14 @@
     <string name="msg_accessory_not_found">未找到灵动贴或X旋钮，请重试</string>
     <string name="msg_accessory_full">灵动贴、X旋钮各最多绑定 %1$d 个</string>
     <string name="msg_accessory_no_permission">没有「附近的设备」权限，无法绑定灵动贴或X旋钮</string>
-    <string name="set_x_knob_exclusive">专属模式</string>
+    <string name="set_x_knob_exclusive">单旋钮模式</string>
     <string name="set_x_knob_home">按下时显示</string>
     <string name="x_knob_home_count">%1$d 项</string>
-    <string name="x_knob_summary_exclusive">专属模式：按下时显示 %1$d 项</string>
+    <string name="x_knob_summary_exclusive">单旋钮模式：按下时显示 %1$d 项</string>
     <string name="msg_x_knob_home_empty">至少勾选一项</string>
     <string name="x_knob_status_mode">模式：%1$s</string>
     <string name="x_knob_mode_normal">普通</string>
-    <string name="x_knob_mode_exclusive">专属模式（现在：%1$s）</string>
+    <string name="x_knob_mode_exclusive">单旋钮模式（现在：%1$s）</string>
     <string name="x_knob_status_light">背光：%1$s</string>
     <string name="x_knob_light_boost">常亮，超频中，%1$s 结束</string>
     <string name="knob_fn_volume">音量</string>
