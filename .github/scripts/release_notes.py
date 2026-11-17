@@ -93,7 +93,7 @@ def main():
     out.append("")
     out.append("Plug in a USB drive.")
     out.append("")
-    out.append("Something wrong? Export a report from **Settings \u2192 System \u2192 Diagnostics** "
+    out.append("Something wrong? Export a report from **Settings \u2192 General \u2192 Diagnostics** "
                "and attach it to an issue.")
     out.append("")
 
