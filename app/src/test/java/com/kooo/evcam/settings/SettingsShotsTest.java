@@ -282,16 +282,97 @@ public class SettingsShotsTest {
     private static final String[] GUARD_ROWS =
             {"pref_alerts_guard", "pref_alerts_guard_home", "pref_alerts_guard_everywhere"};
 
+    /**
+     * ntfy 的两行：换话题谁都看得见，命令那一行要看三道门。
+     *
+     * <p>纯函数（{@code NtfyCommandsTest}）只说「该不该开」；这一条钉的是设置页有没有照着它
+     * 画 —— 行在不在、点不点得动、那句原因在不在。三种状态各开一屏新的设置页来验：
+     * 免费档 + 开发者选项关着、免费档 + 开着、付费档 + 开着且开关打开。</p>
+     *
+     * <p>第四种是 Telegram：换话题和命令两行都不该在，因为那一组整个不出现。</p>
+     *
+     * The two ntfy rows: changing the topic is for everyone, the command row answers to three gates.
+     * The pure function only says whether it may be on; this pins that the settings page draws it that
+     * way — row present, row enabled, reason present. Four fresh pages, one per state.
+     */
+    @Test
+    public void ntfyRowsFollowTheThreeGates() {
+        android.content.Context context = RuntimeEnvironment.getApplication();
+        try {
+            // 1. 免费档 + 开发者选项关着：换话题在，命令行不出现（那一行整个不给），公开话题那句在。
+            //    Free plan, developer options closed: rotate is there, the command row is not, the note is.
+            DeveloperMode.lock(context);
+            SettingsPreferenceFragment free = alertsPage(true, com.kooo.evcam.alarm.ntfy.NtfyGate.NTFY,
+                    config -> {
+                        config.setAlertsNtfyPaid(false);
+                        config.setAlertsNtfyCommands(true);
+                    });
+            assertTrue("换话题该看得见", shown(free, "pref_alerts_ntfy_rotate"));
+            assertFalse("开发者选项关着，命令那一行不该出现",
+                    shown(free, "pref_alerts_ntfy_commands"));
+            assertTrue("免费档要把公开话题那句写出来",
+                    shown(free, "pref_alerts_ntfy_commands_note"));
+
+            // 2. 免费档 + 开发者选项开着：命令行出现、灰的，理由接在自己的说明后面。
+            //    Free plan with developer options open: the row appears, disabled, with the reason appended.
+            DeveloperMode.unlock(context, "6651");
+            SettingsPreferenceFragment freeOpen = alertsPage(true,
+                    com.kooo.evcam.alarm.ntfy.NtfyGate.NTFY, config -> {
+                        config.setAlertsNtfyPaid(false);
+                        config.setAlertsNtfyCommands(true);
+                    });
+            Preference row = freeOpen.findPreference("pref_alerts_ntfy_commands");
+            assertNotNull("少了命令那一行", row);
+            assertTrue("开发者选项开着，这一行该出现", row.isVisible());
+            assertFalse("免费档上点不动", row.isEnabled());
+            assertTrue("理由要写在行上", String.valueOf(row.getSummary())
+                    .contains(freeOpen.getString(R.string.set_alerts_ntfy_commands_needs_paid)));
+            assertTrue("免费档那句还在", shown(freeOpen, "pref_alerts_ntfy_commands_note"));
+
+            // 3. 付费档 + 开发者选项开着：命令行能点、开关跟着存的值；那句解释收起来。
+            //    Paid with developer options open: the row works and follows the stored value; the note goes.
+            SettingsPreferenceFragment paid = alertsPage(true,
+                    com.kooo.evcam.alarm.ntfy.NtfyGate.NTFY, config -> {
+                        config.setAlertsNtfyPaid(true);
+                        config.setAlertsNtfyCommands(true);
+                    });
+            Preference paidRow = paid.findPreference("pref_alerts_ntfy_commands");
+            assertTrue("付费档上该能点", paidRow.isEnabled());
+            assertTrue("开关要跟着存着的值", ((androidx.preference.SwitchPreferenceCompat) paidRow).isChecked());
+            assertFalse("付费档不再需要那句解释", shown(paid, "pref_alerts_ntfy_commands_note"));
+
+            // 4. Telegram：那一组整个不出现，两行都不在。
+            //    Telegram: the whole block is gone, so neither row shows.
+            DeveloperMode.lock(context);
+            SettingsPreferenceFragment telegram = alertsPage(true,
+                    com.kooo.evcam.alarm.ntfy.NtfyGate.TELEGRAM, config -> {
+                    });
+            assertFalse("走 Telegram 时换话题不该出现", shown(telegram, "pref_alerts_ntfy_rotate"));
+            assertFalse("走 Telegram 时命令行不该出现",
+                    shown(telegram, "pref_alerts_ntfy_commands"));
+        } finally {
+            DeveloperMode.lock(context);
+        }
+    }
+
     private ShotActivity shotActivity;
 
     /** 照着存好的状态开一屏新的「停车警报」。一条按存的这个状态绑出来的设置页。 */
     private SettingsPreferenceFragment alertsPage(boolean alertsOn, String transport) {
+        return alertsPage(alertsOn, transport, config -> {
+        });
+    }
+
+    /** 同上，但在建页之前改一点设置（付费档、命令开关）。The same page, with one tweak before it is built. */
+    private SettingsPreferenceFragment alertsPage(boolean alertsOn, String transport,
+                                                  java.util.function.Consumer<AppConfig> tweak) {
         AppConfig config = new AppConfig(RuntimeEnvironment.getApplication());
         config.setAlertsEnabled(alertsOn);
         config.setAlertsTransport(transport);
         config.setAlertsTelegramToken("123456789:AAHexampleTOKENvalue0123456789");
         config.setAlertsTelegramChatId("123456789");
         config.setAlertsQuietEnabled(true);
+        tweak.accept(config);
         RuntimeEnvironment.setQualifiers(Shots.DAY_EN);
         shotActivity = Robolectric.buildActivity(ShotActivity.class).setup().get();
         Shots.stillFrames(shotActivity);
