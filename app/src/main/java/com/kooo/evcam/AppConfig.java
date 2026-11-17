@@ -2403,7 +2403,6 @@ public class AppConfig {
      */
     private static final String KEY_SMART_BUTTON_NAME_PREFIX = "smart_button_name.";
     private static final String KEY_X_KNOBS = "x_knobs";
-    private static final String KEY_X_KNOBS_ENABLED = "x_knobs_enabled";
     private static final String KEY_X_KNOB_ACTION_PREFIX = "x_knob_action.";
     private static final String KEY_X_KNOB_NAME_PREFIX = "x_knob_name.";
     private static final String KEY_X_KNOB_TURN_PREFIX = "x_knob_turn.";
@@ -2415,12 +2414,12 @@ public class AppConfig {
     }
 
     /** 开着没有；默认开：一台都没绑的本来就不扫。 */
-    public boolean isAccessoryEnabled(com.kooo.evcam.button.Accessory kind) {
-        return prefs.getBoolean(knob(kind) ? KEY_X_KNOBS_ENABLED : KEY_SMART_BUTTONS_ENABLED, true);
+    public boolean isAccessoriesEnabled() {
+        return prefs.getBoolean(KEY_SMART_BUTTONS_ENABLED, true);
     }
 
-    public void setAccessoryEnabled(com.kooo.evcam.button.Accessory kind, boolean enabled) {
-        prefs.edit().putBoolean(knob(kind) ? KEY_X_KNOBS_ENABLED : KEY_SMART_BUTTONS_ENABLED, enabled).apply();
+    public void setAccessoriesEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_SMART_BUTTONS_ENABLED, enabled).apply();
     }
 
     /** 绑定的，按绑定先后。 */

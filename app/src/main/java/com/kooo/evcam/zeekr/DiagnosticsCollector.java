@@ -1292,8 +1292,7 @@ public final class DiagnosticsCollector {
             return;
         }
         String detail = buttons.listenDetail();
-        sb.append("  灵动贴开关=").append(config.isAccessoryEnabled(com.kooo.evcam.button.Accessory.BUTTON) ? "开" : "关")
-                .append("  X旋钮开关=").append(config.isAccessoryEnabled(com.kooo.evcam.button.Accessory.KNOB) ? "开" : "关")
+        sb.append("  开关=").append(config.isAccessoriesEnabled() ? "开" : "关")
                 .append("  听=").append(listenName(buttons.listen())).append(detail.isEmpty() ? "" : "（" + detail + "）")
                 .append("  在绑定=").append(buttons.binding() ? "是" : "否")
                 .append("  连着=").append(buttons.connecting() == null ? "没有" : buttons.connecting()).append('\n');
@@ -1346,9 +1345,9 @@ public final class DiagnosticsCollector {
                     for (com.kooo.evcam.button.KnobTurn turn : config.getKnobHome(address)) {
                         keys.add(turn.key);
                     }
-                    sb.append("  专属模式=开（").append(String.join(",", keys)).append("）");
+                    sb.append("  单旋钮模式=开（").append(String.join(",", keys)).append("）");
                 } else {
-                    sb.append("  专属模式=关");
+                    sb.append("  单旋钮模式=关");
                 }
             }
             sb.append("  电量=").append(battery < 0 ? "没有过"

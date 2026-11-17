@@ -246,32 +246,17 @@
         <!-- 灵动贴（试验性，组名旁带标签）：总开关；绑定的每一台一行（代码里加，AccessoryRows）；绑定灵动贴 -->
         <PreferenceCategory
             android:key="cat_smart_buttons"
-            android:title="@string/set_smart_buttons_title">
+            android:title="@string/set_accessories_title">
 
             <SwitchPreferenceCompat
                 android:key="pref_smart_buttons"
-                android:title="@string/set_smart_buttons_title"
-                android:summary="@string/set_smart_buttons_summary" />
+                android:title="@string/set_accessories_title"
+                android:summary="@string/set_accessories_summary" />
 
             <Preference
                 android:key="pref_smart_button_bind"
-                android:title="@string/set_smart_button_bind_title"
-                android:summary="@string/set_smart_button_bind_summary" />
-        </PreferenceCategory>
-
-        <PreferenceCategory
-            android:key="cat_x_knobs"
-            android:title="@string/set_x_knobs_title">
-
-            <SwitchPreferenceCompat
-                android:key="pref_x_knobs"
-                android:title="@string/set_x_knobs_title"
-                android:summary="@string/set_x_knobs_summary" />
-
-            <Preference
-                android:key="pref_x_knob_bind"
-                android:title="@string/set_x_knob_bind_title"
-                android:summary="@string/set_x_knob_bind_summary" />
+                android:title="@string/set_accessory_bind_title"
+                android:summary="@string/set_accessory_bind_summary" />
         </PreferenceCategory>
     </PreferenceScreen>
 

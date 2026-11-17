@@ -205,10 +205,10 @@ public final class SmartButtons {
     /** 绑定的进展给谁（主线程）。 */
     public interface BindListener {
         /** 正在连一台长按了的（{@code true}），或者没连上、接着等（{@code false}）。 */
-        void onConnecting(boolean connecting);
+        void onConnecting(boolean connecting, Accessory kind);
 
         /** 这次绑定结束了；{@code address} 是那一台，没有是 null。 */
-        void onBindResult(BindResult result, String address);
+        void onBindResult(BindResult result, String address, Accessory kind);
     }
 
     /** 这次进程里一台按过几下、最后一下（诊断报告用）。 */
@@ -309,11 +309,10 @@ public final class SmartButtons {
     // ---- 跨线程
     /** 绑定了的几台（地址）。 */
     private volatile Map<String, Accessory> bound = Collections.emptyMap();
-    private volatile boolean buttonsOn;
-    private volatile boolean knobsOn;
+    private volatile boolean enabled;
     private volatile boolean exited;
     private volatile boolean binding;
-    private volatile Accessory bindingKind = Accessory.BUTTON;
+    private volatile Accessory bindKind;
     private volatile boolean scanning;
     private volatile Listen listen = Listen.NOT_STARTED;
     private volatile String listenDetail = "";
@@ -386,8 +385,7 @@ public final class SmartButtons {
             app.registerReceiver(adapterState, filter);
         }
         AppConfig config = new AppConfig(app);
-        buttonsOn = config.isAccessoryEnabled(Accessory.BUTTON);
-        knobsOn = config.isAccessoryEnabled(Accessory.KNOB);
+        enabled = config.isAccessoriesEnabled();
         exited = UserExit.isExited(app);
         bound = loadBound();
         boolean asleepNow = ScreenState.androidOff();
@@ -524,35 +522,29 @@ public final class SmartButtons {
     }
 
     /** 设置里开、关（主线程，设置已经写好）：关了不扫、不连、不绑，连着的断开。 */
-    public void setEnabled(Accessory kind, boolean on) {
-        if (kind == Accessory.KNOB) {
-            knobsOn = on;
-        } else {
-            buttonsOn = on;
-        }
-        if (!on && binding && bindingKind == kind) {
+    public void setEnabled(boolean on) {
+        enabled = on;
+        if (!on) {
             bindListener = null;
         }
         bt.post(() -> {
             if (!on) {
-                if (binding && bindingKind == kind) {
+                if (binding) {
                     stopBinding();
                 }
-                if (link != null && link.kind == kind) {
-                    link.close(kind == Accessory.KNOB ? "X knobs turned off" : "smart buttons turned off");
+                if (link != null) {
+                    link.close("turned off");
                 }
-                if (kind == Accessory.KNOB) {
-                    dropBoosts();
-                }
+                dropBoosts();
             }
-            BlackBox.noteImportant((kind == Accessory.KNOB ? "X旋钮" : "灵动贴") + (on ? "：开启" : "：关闭（不扫描、不连接）"));
+            BlackBox.noteImportant("灵动贴、X旋钮" + (on ? "：开启" : "：关闭（不扫描、不连接）"));
             ensureScan();
         });
     }
 
     /** 开着没有。 */
-    public boolean enabled(Accessory kind) {
-        return kind == Accessory.KNOB ? knobsOn : buttonsOn;
+    public boolean enabled() {
+        return enabled;
     }
 
     /** 权限刚给了、或者别的条件变了：马上再看一次要不要扫（不等 {@link #RETRY_MS}）。在扫的不动。 */
@@ -629,16 +621,16 @@ public final class SmartButtons {
      * 开始绑定（主线程）：{@link #BIND_WINDOW_MS} 里长按一台没绑过的。进展、结果交给 {@code listener}（主线程），除非先 {@link #cancelBinding}。
      * 蓝牙、权限、开关、台数由设置页先看过。
      */
-    public void startBinding(Accessory kind, BindListener listener) {
+    public void startBinding(BindListener listener) {
         bindListener = listener;
         bt.post(() -> {
-            bindingKind = kind;
+            bindKind = null;
             binding = true;
             bindUntil = SystemClock.elapsedRealtime() + BIND_WINDOW_MS;
             bindFailures = 0;
             bt.removeCallbacks(bindTimeout);
             bt.postDelayed(bindTimeout, BIND_WINDOW_MS);
-            BlackBox.noteImportant((kind == Accessory.KNOB ? "X旋钮" : "灵动贴") + "：开始绑定（" + BIND_WINDOW_MS / 1000 + " 秒）");
+            BlackBox.noteImportant("灵动贴、X旋钮：开始绑定（" + BIND_WINDOW_MS / 1000 + " 秒）");
             ensureScan();
         });
     }
@@ -650,8 +642,7 @@ public final class SmartButtons {
             if (!binding) {
                 return;
             }
-            Accessory kind = bindingKind;
-            BlackBox.note((kind == Accessory.KNOB ? "X旋钮" : "灵动贴") + "：不绑了");
+            BlackBox.note("灵动贴、X旋钮：不绑了");
             stopBinding();
             if (link != null && link.binding && !link.wasReady()) {
                 link.close("binding cancelled");
@@ -789,15 +780,13 @@ public final class SmartButtons {
     }
 
     private Set<String> wantedNames() {
-        return namesTS(bound.values(), buttonsOn, knobsOn, binding ? bindingKind : null);
+        return namesTS(bound.values(), enabled, binding);
     }
 
-    static Set<String> namesTS(java.util.Collection<Accessory> boundKinds, boolean buttonsOn, boolean knobsOn,
-                                Accessory bindingKind) {
+    static Set<String> namesTS(java.util.Collection<Accessory> boundKinds, boolean on, boolean binding) {
         Set<String> names = new TreeSet<>();
         for (Accessory kind : Accessory.values()) {
-            boolean on = kind == Accessory.KNOB ? knobsOn : buttonsOn;
-            if (on && (boundKinds.contains(kind) || kind == bindingKind)) {
+            if (on && (binding || boundKinds.contains(kind))) {
                 names.add(kind.bleName);
             }
         }
@@ -822,7 +811,7 @@ public final class SmartButtons {
 
     /** 为什么不该扫；该扫是 null。 */
     private Listen whyNotScan() {
-        if (!buttonsOn && !knobsOn) {
+        if (!enabled) {
             return Listen.DISABLED;
         }
         if (exited) {
@@ -1250,7 +1239,7 @@ public final class SmartButtons {
         }
         Accessory boundKind = bound.get(address);
         Accessory kind = boundKind != null ? boundKind : Accessory.ofName(name);
-        if (kind == null || !enabled(kind)) {
+        if (kind == null || !enabled) {
             return;
         }
         SmartButtonAd.Advert ad = SmartButtonAd.parse(raw, kind);
@@ -1263,7 +1252,7 @@ public final class SmartButtons {
         }
         if (boundKind != null) {
             onAdvert(address, kind, ad);
-        } else if (binding && bindingKind == kind) {
+        } else if (binding) {
             onUnbound(address, kind, ad);
         }
     }
@@ -1286,9 +1275,9 @@ public final class SmartButtons {
             publishChange();
         }
         if (binding) {
-            if (ad.gesture == kind.connectGesture && bindingKind == kind) {
+            if (ad.gesture == kind.connectGesture) {
                 BlackBox.note((kind == Accessory.KNOB ? "X旋钮 " : "灵动贴 ") + SmartButtonAd.shortId(address) + "：正在绑定，长按的是绑过的这一台");
-                endBinding(BindResult.ALREADY_BOUND, address);
+                endBinding(BindResult.ALREADY_BOUND, address, kind);
             } else {
                 BlackBox.note((kind == Accessory.KNOB ? "X旋钮 " : "灵动贴 ") + SmartButtonAd.shortId(address) + "：正在绑定，绑过的按了不做");
             }
@@ -1315,7 +1304,7 @@ public final class SmartButtons {
             return;
         }
         if (boundCount(kind) >= MAX_BOUND) {
-            endBinding(BindResult.FULL, address);
+            endBinding(BindResult.FULL, address, kind);
             return;
         }
         if (link != null) {
@@ -1326,11 +1315,12 @@ public final class SmartButtons {
             return;
         }
         BlackBox.noteImportant((kind == Accessory.KNOB ? "X旋钮 " : "灵动贴 ") + SmartButtonAd.shortId(address) + "：绑定，长按了，连它");
+        bindKind = kind;
         open(new ButtonLink(app, bt, adapter, address, kind, true, linkListener));
         main.post(() -> {
             BindListener l = bindListener;
             if (l != null) {
-                l.onConnecting(true);
+                l.onConnecting(true, kind);
             }
         });
     }
@@ -1362,7 +1352,7 @@ public final class SmartButtons {
 
     /** 主线程：这一台这种按法选了什么就做什么。 */
     private void act(String address, Accessory kind, int gesture, int steps) {
-        if (!enabled(kind) || UserExit.isExited(app)) {
+        if (!enabled || UserExit.isExited(app)) {
             return;
         }
         AppConfig config = new AppConfig(app);
@@ -1523,7 +1513,7 @@ public final class SmartButtons {
                 return;
             }
             if (boundCount(kind) >= MAX_BOUND) {
-                endBinding(BindResult.FULL, l.address);
+                endBinding(BindResult.FULL, l.address, kind);
                 l.close("already " + MAX_BOUND + " bound");
                 return;
             }
@@ -1531,7 +1521,7 @@ public final class SmartButtons {
             bound = loadBound();
             BlackBox.noteImportant((kind == Accessory.KNOB ? "X旋钮 " : "灵动贴 ") + SmartButtonAd.shortId(l.address) + "：绑好了（第 " + l.attempts + " 次连上，"
                     + seconds(l.ageMs()) + " 秒）");
-            endBinding(BindResult.BOUND, l.address);
+            endBinding(BindResult.BOUND, l.address, kind);
             publishChange();
             if (kind == Accessory.KNOB) {
                 boost(l.address);
@@ -1600,12 +1590,12 @@ public final class SmartButtons {
             if (l.binding && !bound.containsKey(l.address) && binding) {
                 bindFailures = bindFailures + 1;
                 if (SystemClock.elapsedRealtime() >= bindUntil) {
-                    endBinding(BindResult.CONNECT_FAILED, l.address);
+                    endBinding(BindResult.CONNECT_FAILED, l.address, kind);
                 } else {
                     main.post(() -> {
                         BindListener listener = bindListener;
                         if (listener != null) {
-                            listener.onConnecting(false);
+                            listener.onConnecting(false, kind);
                         }
                     });
                 }
@@ -1628,21 +1618,22 @@ public final class SmartButtons {
             bt.postDelayed(bindTimeout, BIND_RECHECK_MS);
             return;
         }
-        endBinding(bindFailures > 0 ? BindResult.CONNECT_FAILED : BindResult.NOT_FOUND, null);
+        endBinding(bindFailures > 0 ? BindResult.CONNECT_FAILED : BindResult.NOT_FOUND, null,
+                bindFailures > 0 ? bindKind : null);
     }
 
-    private void endBinding(BindResult result, String address) {
+    private void endBinding(BindResult result, String address, Accessory kind) {
         if (!binding) {
             return;
         }
         stopBinding();
-        Accessory kind = bindingKind;
-        BlackBox.noteImportant((kind == Accessory.KNOB ? "X旋钮" : "灵动贴") + "：绑定结束（" + result + (address == null ? "" : "，" + SmartButtonAd.shortId(address)) + "）");
+        BlackBox.noteImportant((kind == Accessory.KNOB ? "X旋钮" : kind == Accessory.BUTTON ? "灵动贴" : "灵动贴、X旋钮")
+                + "：绑定结束（" + result + (address == null ? "" : "，" + SmartButtonAd.shortId(address)) + "）");
         main.post(() -> {
             BindListener l = bindListener;
             bindListener = null;
             if (l != null) {
-                l.onBindResult(result, address);
+                l.onBindResult(result, address, kind);
             }
         });
     }

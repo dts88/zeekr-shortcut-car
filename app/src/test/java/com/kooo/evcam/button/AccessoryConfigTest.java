@@ -55,13 +55,12 @@ public class AccessoryConfigTest {
     }
 
     @Test
-    public void bothKindsAreOnUntilTurnedOff() {
-        assertTrue(config.isAccessoryEnabled(Accessory.BUTTON));
-        assertTrue(config.isAccessoryEnabled(Accessory.KNOB));
-        config.setAccessoryEnabled(Accessory.KNOB, false);
-        assertFalse(config.isAccessoryEnabled(Accessory.KNOB));
-        assertTrue(config.isAccessoryEnabled(Accessory.BUTTON));
-        assertFalse(prefs.getBoolean("x_knobs_enabled", true));
+    public void oneSwitchIsOnUntilTurnedOff() {
+        assertTrue(config.isAccessoriesEnabled());
+        config.setAccessoriesEnabled(false);
+        assertFalse(config.isAccessoriesEnabled());
+        assertFalse(prefs.getBoolean("smart_buttons_enabled", true));
+        assertFalse(prefs.contains("x_knobs_enabled"));
     }
 
     @Test
