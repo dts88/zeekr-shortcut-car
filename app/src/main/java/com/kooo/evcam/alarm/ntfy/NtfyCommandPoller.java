@@ -48,7 +48,7 @@ import java.util.Locale;
  * <h3>安全上的实话：ntfy 没有身份</h3>
  *
  * <p><b>这一条必须写在明面上：</b>ntfy 不告诉你消息是谁发的。任何人都能往这个话题上发一句话，
- * 车会把它当成车主。所以这里只有两道门 —— <b>话题名本身就是密码</b>（{@link NtfyRequest#generateTopic()}
+ * 车会把它当成车主。所以这里只有两道门 —— <b>话题名本身就是密码</b>（{@link NtfyRequest#generateTopic(long, long, int, String)}
  * 那 238 bit），以及<b>每次警报之后五分钟的窗口</b>。话题名漏了，就等于有人能在这五分钟里
  * 指挥这辆车；过了窗口他再发什么都没人听。Telegram 那条路有会话号，这条路没有，不要以为有。</p>
  *
@@ -88,7 +88,7 @@ import java.util.Locale;
  *
  * <p><b>This must be said out loud:</b> ntfy does not tell you who published a message. Anyone can put a
  * line on this topic and the car treats it as the owner. So there are exactly two gates — <b>the topic
- * name is the password</b> (the 238 bits from {@link NtfyRequest#generateTopic()}) and <b>the five-minute
+ * name is the password</b> (the 238 bits from {@link NtfyRequest#generateTopic(long, long, int, String)}) and <b>the five-minute
  * window after each alert</b>. If the topic name leaks, someone can command this car for those five
  * minutes; outside the window nothing they send is heard. The Telegram path has a chat id; this one does
  * not, and no code here pretends otherwise.</p>

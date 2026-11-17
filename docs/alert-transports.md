@@ -57,12 +57,26 @@ no-op method.
 The price of keeping that boundary: a third transport's probe will want to add code to
 `SentryAlerts`. When it does, give it its own interface. Do not pile it on in place.
 
+## The return path, per exit
+
+Sending is one interface. Coming back is not, and the difference is a property of the transport, not
+a capability flag on an adapter:
+
+- **Telegram** answers in a chat with an identity: the poller only accepts messages from the
+  configured chat and owner id.
+- **ntfy** answers in a topic with no identity at all: ntfy does not say who published a message. So
+  the return path exists only when all three hold — developer options open, a paid plan, and the
+  owner's switch on. `alarm/ntfy/NtfyCommands` owns that rule and its order; `docs/ntfy-commands.md`
+  owns the reasoning. The free tier never gets commands, because a public topic's name is its door.
+
 ## Explicitly not done yet
 
 Deferred until a third transport is actually on the table — two copies are not evidence:
 
 1. a transport descriptor (name + channel factory + `hasReturnPath()` + capabilities) so the
-   `isAlertsNtfy()` arms in `SentryAlerts` become `transport.hasReturnPath()`
+   `isAlertsNtfy()` arms in `SentryAlerts` become `transport.hasReturnPath()`. The command gate is the
+   first piece of this (`NtfyCommands` is `hasReturnPath()` for one exit); the descriptor waits for a
+   second return path to compare against.
 2. one poller template over `telegram/TelegramPoller` and `ntfy/NtfyCommandPoller` (generation
    counters, sleep loops, `noteFailure`, restart are already identical)
 3. rename `ntfy/NtfyGate` to `AlertTransports` — it holds the `TELEGRAM` constant and is nobody's
@@ -75,3 +89,6 @@ Deferred until a third transport is actually on the table — two copies are not
 | `alarm/net/HttpCallTest` | body/method/headers leave; 4xx body comes back; reply read once, capped, UTF-8; null stream is empty |
 | `alarm/AlertChannelsTest` | stored route to exit, unknown value stays Telegram, each exit names the step it is missing, clip capability |
 | `alarm/ProviderWiringTest` | the rule above, plus a fake third exit that needs nothing from the existing two |
+| `alarm/ntfy/NtfyCommandsTest` | the three gates in order; closed developer options beat "paid and on" |
+| `alarm/ntfy/NtfyTopicRotationTest` | rotation mints a legal new name, kills the old one and clears consent; the gate is wired to settings |
+| `alarm/ntfy/NtfyRequestTest` | topic shape, tail length, and different seeds giving different names |

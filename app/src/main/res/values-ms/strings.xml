@@ -1420,6 +1420,14 @@ Kalau lupa: %3$s</string>
     <string name="set_alerts_ntfy_topic_empty">Belum disediakan</string>
     <string name="set_alerts_ntfy_topic_set">Sudah disediakan (akhir %1$s)</string>
     <string name="set_alerts_ntfy_paid_title">Akaun ntfy saya pelan berbayar</string>
+    <string name="set_alerts_ntfy_rotate_title">Tukar topik</string>
+    <string name="set_alerts_ntfy_rotate_summary">Jana nama baharu dan nama lama terus tidak digunakan; kod QR melanggan semula telefon</string>
+    <string name="set_alerts_ntfy_commands_title">Jawab arahan ntfy (pelan berbayar)</string>
+    <string name="set_alerts_ntfy_commands_summary">Hantar pic untuk gambar, status untuk satu baris. Pelan berbayar sahaja, dan hanya semasa Mod Sentri dihidupkan</string>
+    <string name="set_alerts_ntfy_commands_note_title">Pelan percuma: arahan sentiasa dimatikan</string>
+    <string name="set_alerts_ntfy_commands_needs_paid">Tidak tersedia pada pelan percuma: sesiapa boleh menghantar ke topik awam, jadi arahan itu bukan milik anda seorang.</string>
+    <string name="set_alerts_ntfy_rotate_qr_title">Topik baharu: langgan semula pada telefon</string>
+    <string name="set_alerts_ntfy_commands_note_summary">Pada topik awam, nama itulah pintunya: sesiapa yang nampak satu pemberitahuan boleh menghantar ke topik itu. Jadi pelan percuma hanya menerima amaran, dan kereta tidak menjawab sebarang arahan. Pelan berbayar dengan token akses boleh menghidupkannya.</string>
     <string name="set_alerts_ntfy_paid_summary">Pelan percuma boleh; pelan berbayar menerima gambar lebih besar dan boleh melindungi topik</string>
     <string name="set_alerts_ntfy_public_warning">Pada pelan percuma topik ini terbuka: sesiapa yang tahu nama itu boleh lihat gambar dan amaran dari kereta.</string>
     <string name="set_alerts_ntfy_token_title">Token akses</string>

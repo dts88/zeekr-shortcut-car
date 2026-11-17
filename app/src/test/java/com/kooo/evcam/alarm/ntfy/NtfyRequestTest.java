@@ -41,11 +41,48 @@ public class NtfyRequestTest {
     public void generatedTopicsAreLongUniqueAndLegal() {
         Set<String> seen = new HashSet<>();
         for (int i = 0; i < 500; i++) {
-            String topic = NtfyRequest.generateTopic();
+            String topic = NtfyRequest.generateTopic(1_700_000_000_000L + i, 1_699_000_000_000L, i + 1,
+                    "test-build");
             assertTrue("形状不对: " + topic, NtfyRequest.looksLikeTopic(topic));
             assertTrue("生成的名字太短: " + topic, topic.length() >= 32);
             assertTrue("前缀丢了: " + topic, topic.startsWith("zeekrsc_"));
             assertTrue("撞了: " + topic, seen.add(topic));
+        }
+    }
+
+    /**
+     * 名字的来源：时刻、安装时刻、第几次、机型，任何一项变了都不该还是同一个名字。
+     *
+     * <p>随机字节每次都不同，所以这里只能钉「不同输入 → 不同输出」这个方向：五次里每一次都换一个
+     * 输入，出来的名字必须全不一样。反方向（同样的输入得到同样的名字）本来就不该成立 —— 那正是
+     * 随机字节在起作用。</p>
+     *
+     * Where the name comes from: any of the clock, the install stamp, the round or the model changing
+     * should change the name. Randomness makes each call different anyway, so this pins the direction
+     * that matters: five different inputs, five different names.
+     */
+    @Test
+    public void differentSeedsGiveDifferentNames() {
+        long now = 1_700_000_000_000L;
+        long install = 1_699_000_000_000L;
+        Set<String> seen = new HashSet<>();
+        assertTrue(seen.add(NtfyRequest.generateTopic(now, install, 1, "a")));
+        assertTrue(seen.add(NtfyRequest.generateTopic(now + 1, install, 1, "a")));
+        assertTrue(seen.add(NtfyRequest.generateTopic(now, install + 1, 1, "a")));
+        assertTrue(seen.add(NtfyRequest.generateTopic(now, install, 2, "a")));
+        assertTrue(seen.add(NtfyRequest.generateTopic(now, install, 1, "b")));
+    }
+
+    /** 40 个字符每一位都在 ntfy 的字母表里，一位不多一位不少。 */
+    @Test
+    public void theTailIsExactlyFortyLegalCharacters() {
+        String topic = NtfyRequest.generateTopic(1L, 0L, 1, null);
+        assertEquals("zeekrsc_".length() + 40, topic.length());
+        String tail = topic.substring("zeekrsc_".length());
+        for (int i = 0; i < tail.length(); i++) {
+            char c = tail.charAt(i);
+            boolean legal = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9');
+            assertTrue("尾巴里有非法字符: " + c, legal);
         }
     }
 

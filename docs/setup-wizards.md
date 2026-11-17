@@ -271,6 +271,28 @@ digits from the notification; that is the only proof the whole path works (`docs
    accepting is not the phone receiving, and this step is how that is told apart.
 4. Leaving without answering is not a failure: settings shows "not confirmed yet", and the row stays tappable.
 
+### 配好之后：换话题 · After setup: rotate the topic
+
+**中文**
+
+1. 设置 → 警报 → ntfy 一组里的「换一个新话题」：按一下，车马上生成一个新名字，旧名字从此不再使用。
+2. 紧接着弹出同一张二维码，手机重新扫一次就订阅上新的。两个设备各自留着旧话题的话，它什么也不会再收到。
+3. 换完要重新接受一次风险提示：答应过「这个名字公开」不等于答应过下一个名字。
+4. 什么时候该换：有人看见了你的锁屏通知，或者你把二维码给过别人。
+5. 命令那一行（开发者选项里）在免费档上一直是灰的，下方写着原因：公开话题的名字就是门，谁看见过一条通知，谁能往这个话题里发东西 —— 所以免费档只收警报，车不回应任何命令。付费档加上访问令牌才能开。
+
+**English**
+
+1. Settings → Alerts → ntfy group → **Change the topic**: one tap mints a new name, and the old one stops
+   being used from that moment.
+2. The same QR code appears straight away, so one more scan subscribes the phone to the new name. A device
+   left on the old topic receives nothing from this car again.
+3. The risk warning is asked again: consent to one public name is not consent to the next one.
+4. When to rotate: someone saw the notification on your lock screen, or you showed the QR code to somebody.
+5. The command row (under developer options) stays greyed out on the free plan, with the reason underneath:
+   a public topic's name is its door, so anyone who saw one notification could publish to it. The free plan
+   gets alerts only and the car answers no command; a paid plan with an access token can turn them on.
+
 ## 3. 这些图怎么来的 · How these pictures were made
 
 - 图由 `WizardShotsTest` 生成：`app/build/outputs/screenshots/wizard-<transport>-<n>-<step>-<lang>.png`，中文英文各一套，文档用英文那套。

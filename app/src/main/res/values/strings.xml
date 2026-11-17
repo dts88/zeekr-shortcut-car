@@ -1436,6 +1436,14 @@
     <string name="set_alerts_ntfy_topic_empty">还没设置</string>
     <string name="set_alerts_ntfy_topic_set">已设置（末四位 %1$s）</string>
     <string name="set_alerts_ntfy_paid_title">我的 ntfy 账号是付费的</string>
+    <string name="set_alerts_ntfy_rotate_title">换一个新话题</string>
+    <string name="set_alerts_ntfy_rotate_summary">生成新名字，旧名字马上作废；二维码接着给手机重新订阅</string>
+    <string name="set_alerts_ntfy_commands_title">回应 ntfy 命令（付费档）</string>
+    <string name="set_alerts_ntfy_commands_summary">发 pic 要一张照片，发 status 要一句状态。只在付费档、只在哨兵模式开着时</string>
+    <string name="set_alerts_ntfy_commands_note_title">免费档：命令一直关着</string>
+    <string name="set_alerts_ntfy_commands_needs_paid">免费档打不开：公开话题谁都能往里发，命令就成了别人也能下的。</string>
+    <string name="set_alerts_ntfy_rotate_qr_title">新话题：在手机上重新订阅</string>
+    <string name="set_alerts_ntfy_commands_note_summary">公开话题的名字就是门：看见过一条通知的人，都能往这个话题里发东西。所以免费档只收警报，车不回应任何命令。付费档加上访问令牌才能开。</string>
     <string name="set_alerts_ntfy_paid_summary">免费档也能用；付费档图更大，话题还能保护起来</string>
     <string name="set_alerts_ntfy_public_warning">免费档的话题是公开的：知道这个名字的人，都能看到车上发来的照片和警报。</string>
     <string name="set_alerts_ntfy_token_title">访问令牌</string>

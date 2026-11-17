@@ -256,6 +256,13 @@
                 android:key="pref_alerts_ntfy_topic"
                 android:title="@string/set_alerts_ntfy_topic_title" />
 
+            <!-- 换一个新名字：旧名字作废，二维码马上给手机重新订阅（docs/ntfy-commands.md）。
+                 Mint a new name: the old one stops being used and the QR resubscribes the phone. -->
+            <Preference
+                android:key="pref_alerts_ntfy_rotate"
+                android:title="@string/set_alerts_ntfy_rotate_title"
+                android:summary="@string/set_alerts_ntfy_rotate_summary" />
+
             <SwitchPreferenceCompat
                 android:key="pref_alerts_ntfy_paid"
                 android:title="@string/set_alerts_ntfy_paid_title"
@@ -276,6 +283,22 @@
                 android:key="pref_alerts_ntfy_server"
                 android:title="@string/set_alerts_ntfy_server_title"
                 android:summary="@string/set_alerts_ntfy_server_summary" />
+
+            <!-- 命令：只给开发者选项里、付费档的人。免费档上这一行在、点不动，理由写在下面那条。
+                 Commands: developer options plus a paid plan only. On the free tier the row is there,
+                 disabled, and the reason sits in the note row below. -->
+            <SwitchPreferenceCompat
+                android:key="pref_alerts_ntfy_commands"
+                android:title="@string/set_alerts_ntfy_commands_title"
+                android:summary="@string/set_alerts_ntfy_commands_summary" />
+
+            <!-- 选中 ntfy、免费档时的那句话：公开话题的名字就是门，所以命令一直关着。
+                 Shown with ntfy on the free tier: a public topic's name is its door. -->
+            <Preference
+                android:key="pref_alerts_ntfy_commands_note"
+                android:selectable="false"
+                android:title="@string/set_alerts_ntfy_commands_note_title"
+                android:summary="@string/set_alerts_ntfy_commands_note_summary" />
         </PreferenceCategory>
 
         <PreferenceCategory

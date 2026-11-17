@@ -984,6 +984,41 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             });
         }
 
+        // 换一个新话题：生成、存下、旧名字作废，然后马上给二维码让手机重新订阅。
+        // Rotate: mint, store, kill the old name, then show the QR so the phone resubscribes.
+        Preference ntfyRotate = findPreference("pref_alerts_ntfy_rotate");
+        if (ntfyRotate != null) {
+            ntfyRotate.setPersistent(false);
+            ntfyRotate.setOnPreferenceClickListener(preference -> {
+                appConfig.rotateAlertsNtfyTopic();
+                com.kooo.evcam.blackbox.BlackBox.noteImportant(
+                        "ntfy: topic rotated (the old name is dead for this car)");
+                showAlertsRows();
+                NtfyTopicQr.show(this, appConfig, R.string.set_alerts_ntfy_rotate_qr_title,
+                        this::afterNtfyChange);
+                return true;
+            });
+        }
+
+        // ntfy 命令：开发者选项里的开关，只有付费档点得动（规则在 alarm/ntfy/NtfyCommands 一处）。
+        // The ntfy command switch: inside developer options, and only a paid plan can turn it on; the
+        // rule lives in alarm/ntfy/NtfyCommands.
+        SwitchPreferenceCompat ntfyCommands = findPreference("pref_alerts_ntfy_commands");
+        if (ntfyCommands != null) {
+            ntfyCommands.setPersistent(false);
+            ntfyCommands.setChecked(appConfig.isAlertsNtfyCommandsStored());
+            ntfyCommands.setOnPreferenceChangeListener((preference, newValue) -> {
+                boolean answered = Boolean.TRUE.equals(newValue);
+                appConfig.setAlertsNtfyCommands(answered);
+                com.kooo.evcam.blackbox.BlackBox.noteImportant(
+                        "开关变更: pref_alerts_ntfy_commands → " + (answered ? "开" : "关")
+                                + "（" + appConfig.alertsNtfyCommands().label() + "）");
+                com.kooo.evcam.alarm.SentryAlerts.get(requireContext()).refreshConfig();
+                showAlertsRows();
+                return true;
+            });
+        }
+
         SwitchPreferenceCompat commands = findPreference("pref_alerts_commands");
         if (commands != null) {
             commands.setPersistent(false);
@@ -1273,6 +1308,18 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         show("pref_alerts_ntfy_public_warning", ntfy && !appConfig.isAlertsNtfyPaid());
         show("pref_alerts_ntfy_token", ntfy && appConfig.isAlertsNtfyPaid());
         show("pref_alerts_ntfy_server", ntfy);
+        show("pref_alerts_ntfy_rotate", ntfy);
+
+        // 命令那一行只给开发者选项里的人；免费档上它还在，但点不动，理由就写在同一行下面，
+        // 不另开一句。note 那一条只在免费档出现 —— 付费档的人已经能开，不需要那句解释。
+        // The command row exists only with developer options open. On the free tier it stays and is
+        // disabled, with the reason appended to its own summary; the note row shows only on the free
+        // tier, because a paid owner can simply turn it on.
+        boolean developer = DeveloperMode.isUnlocked();
+        show("pref_alerts_ntfy_commands", ntfy && developer);
+        show("pref_alerts_ntfy_commands_note", ntfy && !appConfig.isAlertsNtfyPaid());
+        block("pref_alerts_ntfy_commands",
+                appConfig.isAlertsNtfyPaid() ? null : getString(R.string.set_alerts_ntfy_commands_needs_paid));
 
         // 起止时刻：安静时段开着才出现，行尾写着的总是当前值（改完时间也走这里刷新）。
         // Quiet hours: the two time rows appear only while quiet hours are on, with their current value.

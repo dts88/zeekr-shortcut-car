@@ -97,6 +97,26 @@ Optional, in the same section:
 **What it cannot see.** The car reports no impact, horn or tamper signal, so a knock that lights nothing
 and opens nothing stays invisible. Cameras also need Sentry Mode to keep the head unit awake.
 
+### ntfy as the other exit
+
+**Settings → Alerts → Where alerts go** swaps the bot for an ntfy topic. No account and no bot are
+needed: the car publishes, the phone's ntfy app receives. Setup generates the topic, shows it as a QR
+code, and asks for four digits it sends to that topic — the digits coming back is the proof the phone
+really receives.
+
+- **A free topic is public.** The name is the address, so anyone holding it can read the pictures and
+  publish to it. Setup says so first and refuses to send until that is accepted.
+- **Change the topic** with one row. It mints a new name (238 random bits, mixed with the install time,
+  the current time, the rotation count and the model so two cars never collide), kills the old one, asks
+  for the risk warning again, and shows the QR code so the phone can subscribe. Do this if someone saw
+  your lock screen.
+- **Commands are off and stay off on the free plan.** A public topic's name is its door, so anyone who
+  saw one notification could command the car. A paid ntfy account with an access token can turn them on
+  under developer options; nothing else can. The whole rule is `alarm/ntfy/NtfyCommands`, the reasoning
+  is in [docs/ntfy-commands.md](docs/ntfy-commands.md).
+- **Nothing else changes.** Which events fire, the armed gate, the arm delay, quiet hours and the 100 kB
+  picture are the same on both exits.
+
 ![Sentry alerts settings](docs/screenshots/alerts-settings-en.png)
 
 ![How it works](docs/screenshots/alerts-how-it-works.png)

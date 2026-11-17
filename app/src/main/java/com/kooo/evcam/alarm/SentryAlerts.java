@@ -468,7 +468,8 @@ public final class SentryAlerts implements Telemetry.Listener {
                 + " 会话号=" + (config.getAlertsTelegramChatId().isEmpty() ? "无"
                         : "…" + config.getAlertsTelegramChatId()
                                 .substring(Math.max(0, config.getAlertsTelegramChatId().length() - 4)))
-                + " 监听=" + want + " 命令=" + config.isAlertsCommands());
+                + " 监听=" + want + " 命令=" + config.isAlertsCommands()
+                + " ntfy命令=" + config.alertsNtfyCommands().label());
         Telemetry telemetry = Telemetry.get();
         if (want) {
             Readings now = telemetry.readings();
@@ -537,8 +538,10 @@ public final class SentryAlerts implements Telemetry.Listener {
      * As long as the process is alive and settings are on, there is no reason not to ask.</p>
      */
     private void syncPoller() {
-        // 命令是 Telegram 的功能：ntfy 这条路没有入口（开发者选项里先只做警报）。
-        // Commands belong to Telegram: the ntfy route has no entry point (alerts only, for now).
+        // 这里只管 Telegram 那条长轮询。ntfy 的命令是另一条路：它没有常驻线程，只在每次警报之后开
+        // 五分钟的窗口（startNtfyCommands），三道门在 alarm/ntfy/NtfyCommands。
+        // This is the Telegram long poll only. ntfy commands are a different shape: no resident thread,
+        // just a five-minute window after each alert (startNtfyCommands), gated by NtfyCommands.
         boolean want = config.isAlertsEnabled() && config.hasAlertsTelegramConfig()
                 && config.isAlertsCommands() && !config.isAlertsNtfy();
         if (want == pollerWanted) {
@@ -848,6 +851,7 @@ public final class SentryAlerts implements Telemetry.Listener {
             org.json.JSONObject settingsJson = new org.json.JSONObject();
             settingsJson.put("enabled", config.isAlertsEnabled());
             settingsJson.put("commands", config.isAlertsCommands());
+            settingsJson.put("ntfyCommands", config.alertsNtfyCommands().label());
             settingsJson.put("triggers", config.getAlertsTriggers());
             settingsJson.put("layout", config.getAlertsLayout());
             settingsJson.put("cameras", config.getAlertsCameras());
@@ -2743,9 +2747,33 @@ public final class SentryAlerts implements Telemetry.Listener {
         });
     }
 
-    /** 发完一条 ntfy 警报后开五分钟的命令窗口，每 30 秒问一趟话题。 */
+    /**
+     * 发完一条 ntfy 警报后开五分钟的命令窗口，每 30 秒问一趟话题。
+     *
+     * <p>三个条件缺一不开，判断在 {@link com.kooo.evcam.alarm.ntfy.NtfyCommands}：开发者选项开着、
+     * 付费档、开关也开着。免费档永远不开 —— 公开话题的名字就是门，那条理由写在
+     * {@code docs/ntfy-commands.md}，这里只负责不打开。</p>
+     *
+     * <p>为什么不是「一条也能收」：收命令的那一头没有身份（ntfy 不说谁发的），所以这道门只有
+     * 「开」和「不开」，没有中间档。</p>
+     *
+     * Open the five-minute command window after one ntfy alert, polling the topic every 30 seconds.
+     *
+     * <p>Three conditions or nothing, decided in {@link com.kooo.evcam.alarm.ntfy.NtfyCommands}:
+     * developer options open, paid plan, and the owner's switch on. The free tier never opens —
+     * a public topic's name is its door, and {@code docs/ntfy-commands.md} carries that reasoning.
+     * There is no middle state: the reading end has no identity, only on or off.</p>
+     */
     private void startNtfyCommands() {
-        if (!config.isAlertsCommands() || !config.isAlertsNtfy()) {
+        if (!config.isAlertsNtfy()) {
+            return;
+        }
+        if (!config.isAlertsNtfyCommandsActive()) {
+            // 只在真走过这条路时才记一行：关着的时候每条警报都写会淹掉黑匣子。
+            // One line only while ntfy is the exit in use: writing this on every Telegram alert would
+            // drown the blackbox.
+            BlackBox.note("alerts: ntfy command window skipped ("
+                    + config.alertsNtfyCommands().label() + ")");
             return;
         }
         NtfyCommandPoller existing = ntfyPoller;

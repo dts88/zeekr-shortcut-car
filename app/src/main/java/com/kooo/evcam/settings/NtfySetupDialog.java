@@ -7,13 +7,10 @@
 
 package com.kooo.evcam.settings;
 
-import android.graphics.Bitmap;
 import android.text.InputType;
-import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.EditText;
-import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -23,7 +20,6 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.R;
 import com.kooo.evcam.blackbox.BlackBox;
-import com.kooo.evcam.share.QrCode;
 import com.kooo.evcam.ui.CamDialogs;
 import com.kooo.evcam.alarm.AlertChannel;
 import com.kooo.evcam.alarm.ntfy.NtfyRequest;
@@ -92,7 +88,9 @@ public final class NtfySetupDialog {
             return;
         }
         if (!NtfyRequest.looksLikeTopic(topic)) {
-            config.setAlertsNtfyTopic(NtfyRequest.generateTopic());
+            // 第一次配：换一个名字（生成、存下、清掉旧同意），二维码用的就是它。
+            // First setup: mint a name — generated, stored, old consent cleared — and the QR uses it.
+            config.rotateAlertsNtfyTopic();
             BlackBox.noteImportant("ntfy: topic generated");
         }
         askForRisk();
@@ -139,43 +137,7 @@ public final class NtfySetupDialog {
 
     /** 第二步：二维码。扫一下就订阅，谁也不用抄字符串。 */
     private void showQr() {
-        if (!fragment.isAdded() || fragment.getContext() == null) {
-            return;
-        }
-        String topic = config.getAlertsNtfyTopic();
-        String link = NtfyRequest.deepLink(config.getAlertsNtfyServer(), topic, "Zeekr");
-
-        LinearLayout column = new LinearLayout(fragment.requireContext());
-        column.setOrientation(LinearLayout.VERTICAL);
-        int pad = (int) (16 * fragment.getResources().getDisplayMetrics().density);
-        column.setPadding(pad, pad / 2, pad, pad / 2);
-
-        Bitmap qr = QrCode.encode(link, QR_SIZE_PX);
-        if (qr != null) {
-            ImageView image = new ImageView(fragment.requireContext());
-            image.setImageBitmap(qr);
-            image.setAdjustViewBounds(true);
-            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            params.gravity = Gravity.CENTER_HORIZONTAL;
-            image.setLayoutParams(params);
-            column.addView(image);
-        }
-        // 二维码画不出来也不能卡在这：把深链接原样给出来，仍然能订阅。
-        // A QR that will not draw must not block setup: show the deep link itself, which still works.
-        TextView steps = new TextView(fragment.requireContext());
-        steps.setText(fragment.getString(R.string.set_alerts_ntfy_qr_body)
-                + (qr == null ? "\n\n" + link : ""));
-        steps.setLineSpacing(0f, 1.15f);
-        column.addView(steps);
-
-        CamDialogs.show(new MaterialAlertDialogBuilder(fragment.requireContext(),
-                R.style.Theme_Cam_MaterialAlertDialog)
-                .setTitle(R.string.set_alerts_ntfy_qr_title)
-                .setView(column)
-                .setPositiveButton(R.string.set_alerts_ntfy_qr_open, (dialog, which) -> askForCode())
-                .setNegativeButton(R.string.action_cancel, (dialog, which) -> onFinished.run())
-                .setOnCancelListener(dialog -> onFinished.run()));
+        NtfyTopicQr.show(fragment, config, R.string.set_alerts_ntfy_qr_title, this::askForCode);
     }
 
     /** 第三步：发一条带四位数的，让车主填回来。 */

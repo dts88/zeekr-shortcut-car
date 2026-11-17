@@ -1444,6 +1444,14 @@ If I forget: %3$s</string>
     <string name="set_alerts_ntfy_topic_empty">Not set up yet</string>
     <string name="set_alerts_ntfy_topic_set">Set up (ends in %1$s)</string>
     <string name="set_alerts_ntfy_paid_title">My ntfy account is on a paid plan</string>
+    <string name="set_alerts_ntfy_rotate_title">Change the topic</string>
+    <string name="set_alerts_ntfy_rotate_summary">Makes a new name and the old one stops at once; the QR code resubscribes the phone</string>
+    <string name="set_alerts_ntfy_commands_title">Answer ntfy commands (paid plan)</string>
+    <string name="set_alerts_ntfy_commands_summary">Send pic for a picture, status for one line. Paid plans only, and only while Sentry Mode is on</string>
+    <string name="set_alerts_ntfy_commands_note_title">Free plan: commands stay off</string>
+    <string name="set_alerts_ntfy_commands_needs_paid">Not available on the free plan: anyone can publish to a public topic, so the command would not be yours alone.</string>
+    <string name="set_alerts_ntfy_rotate_qr_title">New topic: subscribe again on the phone</string>
+    <string name="set_alerts_ntfy_commands_note_summary">On a public topic the name is the door: whoever saw one notification can publish to it. So the free plan gets alerts only, and the car answers no command. A paid plan with an access token can turn this on.</string>
     <string name="set_alerts_ntfy_paid_summary">The free plan works; a paid one takes bigger pictures and can protect the topic</string>
     <string name="set_alerts_ntfy_public_warning">On the free plan the topic is public: anyone who knows the name can see the photos and alerts the car sends.</string>
     <string name="set_alerts_ntfy_token_title">Access token</string>

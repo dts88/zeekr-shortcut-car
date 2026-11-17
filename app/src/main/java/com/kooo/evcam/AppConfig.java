@@ -164,6 +164,11 @@ public class AppConfig {
     private static final String KEY_ALERTS_NTFY_RISK_ACK = "alerts_ntfy_risk_ack";  // 版本|话题末八位
     private static final String KEY_ALERTS_NTFY_TOPIC = "alerts_ntfy_topic";   // 存在凭据文件里（是钥匙）
     private static final String KEY_ALERTS_NTFY_TOKEN = "alerts_ntfy_token";   // 存在凭据文件里
+    // ntfy 命令（2026-11-16）：只给开发者、只在付费档。判断在 alarm/ntfy/NtfyCommands 一处。
+    // ntfy commands (2026-11-16): developer options plus a paid plan only; the rule lives in NtfyCommands.
+    private static final String KEY_ALERTS_NTFY_COMMANDS = "alerts_ntfy_commands";  // DEVELOPER_KEYS
+    private static final String KEY_ALERTS_NTFY_TOPIC_ROUND = "alerts_ntfy_topic_round";   // 第几次换话题
+    private static final String KEY_ALERTS_NTFY_INSTALL_AT = "alerts_ntfy_install_at";     // 这份安装第一次换话题的时刻
 
     // 亮度/降噪调节配置
     private static final String KEY_IMAGE_ADJUST_ENABLED = "image_adjust_enabled";  // 是否启用亮度/降噪调节
@@ -764,11 +769,11 @@ public class AppConfig {
                 KEY_SIDE_VIEW_UP,
                 KEY_SIDE_VIEW_FOV,
                 KEY_VEHICLE_STATUS,                   // 主界面的车辆状态面板 → 关（2026-10-23 挪进开发者选项）
-                // ntfy 警报（2026-11-15）：开发者选项里才选得了，关着时按 telegram 算 ——
-                // 免费话题是公开的，先只给开发者用，等实测过再说（docs/ntfy/DECISIONS.md D14）
-                // ntfy alerts: selectable only under developer options; reads as telegram when closed.
-                // A free topic is public, so this stays developer-only until it has been tested.
-                KEY_ALERTS_TRANSPORT,
+                // ntfy 命令（2026-11-16）：开发者选项关着时按关算 —— 关掉之后不能留下一个没人看得见、
+                // 也停不掉的轮询线程。免费档本来就不给，判断在 NtfyCommands。
+                // ntfy commands (2026-11-16): reads as off with developer options closed, so closing them
+                // can never leave a poller running unseen. The free tier never gets it; NtfyCommands owns both.
+                KEY_ALERTS_NTFY_COMMANDS,
                 // 4.0（项目所有者 2026-11-12）：当初两种做法都做出来、上车比了再定的两项，对所有人固定为默认的那一种，
                 // 另一种只在开发者选项「声音」一组里选得到。同一次收进来的听感、转速变化方式、变速箱 4.1.1 放回
                 // 「通用 → 模拟声浪」，所有人都能选（项目所有者 2026-11-13）
@@ -808,7 +813,13 @@ public class AppConfig {
                 KEY_LAST_DETECTED_SD_PATH,
                 KEY_REARVIEW_GUIDE_SEEN,
                 KEY_PHOTO_VIA_JPEG_RESET,
-                KEY_ALERTS_COMMAND_OFFSET)));
+                KEY_ALERTS_COMMAND_OFFSET,
+                // 话题轮换的两个记号（2026-11-16）：安装时刻和换到第几次。不是设置，不进导出 ——
+                // 备份恢复到另一台车上不该带着别人的时刻和计数，那正是「两台车撞名」的来路。
+                // The two rotation marks: when this install first rotated and how many times. Not
+                // settings, not exported — a backup restored onto another car must not carry them.
+                KEY_ALERTS_NTFY_TOPIC_ROUND,
+                KEY_ALERTS_NTFY_INSTALL_AT)));
     }
 
     /**
@@ -2291,6 +2302,104 @@ public class AppConfig {
     /** ntfy 这条路配好了没有：有没有一个像样的话题名。Whether ntfy has a usable topic yet. */
     public boolean hasAlertsNtfyConfig() {
         return com.kooo.evcam.alarm.ntfy.NtfyRequest.looksLikeTopic(getAlertsNtfyTopic());
+    }
+
+    // ---------------- ntfy 命令（开发者选项 + 付费档才开） ----------------
+
+    /**
+     * ntfy 命令这个开关<b>存着</b>的值。开发者选项关着时这里读出来也是关的（{@code DEVELOPER_KEYS}）。
+     *
+     * <p>存着和生效分开：开关那一行要如实显示车主上次选的，而真正能不能收命令看
+     * {@link #alertsNtfyCommands()}。</p>
+     *
+     * The stored value of the ntfy command switch; it reads as off with developer options closed
+     * ({@code DEVELOPER_KEYS}). Stored and effective are kept apart: the row shows what the owner chose,
+     * while {@link #alertsNtfyCommands()} says whether anything is read back.
+     */
+    public boolean isAlertsNtfyCommandsStored() {
+        // 开发者选项关着时按关算，和别的开发者设置同一条规矩；存着的值不动。
+        // Reads as off with developer options closed, the same rule as every other developer setting;
+        // the stored value is left alone.
+        if (readsAsUnset(KEY_ALERTS_NTFY_COMMANDS)) {
+            return false;
+        }
+        return prefs.getBoolean(KEY_ALERTS_NTFY_COMMANDS, false);
+    }
+
+    public void setAlertsNtfyCommands(boolean enabled) {
+        prefs.edit().putBoolean(KEY_ALERTS_NTFY_COMMANDS, enabled).apply();
+        AppLog.i(TAG, "ntfy 命令回应设为 " + (enabled ? "开" : "关"));
+    }
+
+    /**
+     * ntfy 命令现在是什么状态：开发者选项、付费档、开关，三个条件都在
+     * {@link com.kooo.evcam.alarm.ntfy.NtfyCommands} 一处判断。
+     *
+     * <p>为什么免费档不行：公开话题的名字就是门，看见过一次通知的人都能往里发 —— 那就等于谁都能让车拍照。
+     * 整段理由和顺序见 {@code docs/ntfy-commands.md}。</p>
+     *
+     * What the ntfy command support is doing now; the three conditions live in
+     * {@link com.kooo.evcam.alarm.ntfy.NtfyCommands}. A free topic is public, so anyone who saw one
+     * notification could command the car — the reasoning is in {@code docs/ntfy-commands.md}.
+     */
+    public com.kooo.evcam.alarm.ntfy.NtfyCommands.State alertsNtfyCommands() {
+        return com.kooo.evcam.alarm.ntfy.NtfyCommands.of(
+                com.kooo.evcam.settings.DeveloperMode.isUnlocked(),
+                isAlertsNtfyPaid(),
+                isAlertsNtfyCommandsStored());
+    }
+
+    /** 现在真能读回 ntfy 命令吗。Whether ntfy commands are read back right now. */
+    public boolean isAlertsNtfyCommandsActive() {
+        return alertsNtfyCommands() == com.kooo.evcam.alarm.ntfy.NtfyCommands.State.ON;
+    }
+
+    /**
+     * 换一个新话题：生成、存下、把风险同意清掉，返回新名字。
+     *
+     * <h3>三件事一起做，少一件都不行</h3>
+     *
+     * <ol>
+     *   <li><b>新名字</b>。四个输入见 {@link com.kooo.evcam.alarm.ntfy.NtfyRequest#generateTopic(long, long, int, String)}：
+     *       随机字节管保密，安装时刻、当前时刻、第几次、机型管不撞车。</li>
+     *   <li><b>旧名字作废</b>。车以后只往存着的那个名字发。</li>
+     *   <li><b>风险同意清掉</b>。{@link com.kooo.evcam.alarm.ntfy.NtfyRisk} 按话题存同意：
+     *       答应过「这个名字公开」不等于答应过下一个名字，所以换完要重新问一次。</li>
+     * </ol>
+     *
+     * <p>换名字是「有人看见了你的锁屏」的答案：换一个、重新扫码，旧的从这个车这里彻底断掉。</p>
+     *
+     * Mint a new topic: generate, store, clear the risk consent, return the name. The old name stops
+     * being used, and consent is per topic by design ({@link com.kooo.evcam.alarm.ntfy.NtfyRisk}), so a
+     * new name asks again. This is the answer to "someone saw my lock screen".
+     */
+    public String rotateAlertsNtfyTopic() {
+        long now = System.currentTimeMillis();
+        long installAt = prefs.getLong(KEY_ALERTS_NTFY_INSTALL_AT, 0L);
+        if (installAt <= 0L) {
+            installAt = now;
+            prefs.edit().putLong(KEY_ALERTS_NTFY_INSTALL_AT, installAt).apply();
+        }
+        int round = prefs.getInt(KEY_ALERTS_NTFY_TOPIC_ROUND, 0) + 1;
+        String previous = getAlertsNtfyTopic();
+        // 机型 + 编译指纹：同车型、同一秒装的两台车也不同。Build 在某些单测里是 null 值，无所谓。
+        // Model plus build fingerprint: two cars on the same model and the same install second still
+        // differ. Build is a stub under some unit tests, which is harmless here.
+        String salt = android.os.Build.MODEL + "|" + android.os.Build.FINGERPRINT;
+        String topic = com.kooo.evcam.alarm.ntfy.NtfyRequest.generateTopic(now, installAt, round, salt);
+        if (topic.equals(previous)) {
+            // 概率 2^-238，仍然不交出一个「换完和没换一样」的结果：换一次计数再要一次。
+            // Probability 2^-238, and still never hand back "rotated to the same name": take the next round.
+            round++;
+            topic = com.kooo.evcam.alarm.ntfy.NtfyRequest.generateTopic(now, installAt, round, salt);
+        }
+        setAlertsNtfyTopic(topic);
+        prefs.edit().putInt(KEY_ALERTS_NTFY_TOPIC_ROUND, round).apply();
+        setAlertsNtfyRiskAck("");
+        // 名字本身不进日志，只记「换过、第几次」—— 黑匣子会被导出。
+        // The name never reaches a log; only "rotated, which round" — the blackbox gets exported.
+        AppLog.i(TAG, "ntfy 话题已更换（第 " + round + " 次），风险提示需重新接受");
+        return topic;
     }
 
     /** 发一张 2×2，还是勾选的那几路各一张（{@link com.kooo.evcam.alarm.media.AlertPicture}）。 */
