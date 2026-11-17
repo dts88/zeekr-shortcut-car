@@ -61,7 +61,7 @@
     <string name="set_rearview_fisheye_title">鱼眼校正</string>
     <string name="set_rearview_fisheye_summary">校正鱼眼镜头的桶形畸变，仅作用于超级镜子，不影响录像。</string>
     <string name="set_rearview_fov_title">视野角度</string>
-    <string name="set_rearview_fov_summary">角度越大，视野越宽、画面越清晰，但边缘变形越明显</string>
+    <string name="set_rearview_fov_summary">角度越大，视野越宽、画面越清晰，但边缘变形越明显。方式在「通用 → 鱼眼校正」里选：「直线」最大 140°，「宽视野」和「全圆」最大 180°</string>
     <string name="set_rearview_reset_summary">恢复窗口位置、大小、取景、视野角度、鱼眼校正和「方向标签」的默认值，并切回后视</string>
     <string name="set_rearview_fisheye_value">视野 %1$d°</string>
     <string name="set_rearview_window_summary">画面比例不变，窗口形状只决定可见范围</string>
@@ -873,7 +873,7 @@
     <string name="opt_projection_cylindrical">宽视野（地平线弯曲）</string>
     <string name="set_fisheye_fov_title">校正视野</string>
     <string name="set_fisheye_fov_summary">角度越大，保留的画面越多。「直线」最大 140°，「宽视野」和「全圆」最大 180°。</string>
-    <string name="set_fisheye_scope_summary">用于主界面预览、照片回放和录像回放</string>
+    <string name="set_fisheye_scope_summary">用于主界面预览、照片回放和录像回放；超级镜子也用这里选的方式</string>
     <string name="set_fisheye_value">%1$s · %2$d°</string>
     <string name="opt_projection_stereographic">全圆（直线略弯）</string>
     <string name="dlg_rail_side_title">驾驶座在哪一侧？</string>

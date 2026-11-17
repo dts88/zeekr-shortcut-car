@@ -121,9 +121,10 @@ public class RearViewGeometryTest {
     public void theFractionMatchesTheAngle() {
         assertEquals(0.5f, RearViewGeometry.visibleFractionForFov(90), EPS);
         assertEquals(140f / 180f, RearViewGeometry.visibleFractionForFov(140), EPS);
-        // 超出范围先被夹进 90..140
+        // 超出范围先被夹进 90..180（直线投影的 140° 上限在读设置时就夹过了）
         assertEquals(0.5f, RearViewGeometry.visibleFractionForFov(10), EPS);
-        assertEquals(140f / 180f, RearViewGeometry.visibleFractionForFov(999), EPS);
+        assertEquals(1f, RearViewGeometry.visibleFractionForFov(180), EPS);
+        assertEquals(1f, RearViewGeometry.visibleFractionForFov(999), EPS);
     }
 
     @Test

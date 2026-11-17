@@ -1090,7 +1090,8 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
      */
     private void editFov(SwitchNavPreference pref) {
         SliderDialog.Slider fov = new SliderDialog.Slider(null,
-                (int) FisheyeProjectionBounds.MIN, (int) FisheyeProjectionBounds.MAX,
+                (int) FisheyeProjectionBounds.MIN,
+                (int) com.kooo.evcam.zeekr.FisheyeProjection.maxFovFor(appConfig.getFisheyeProjection()),
                 Math.round(appConfig.getRearViewFov()), "°", getString(R.string.set_rearview_fov_summary),
                 true, true, value -> {
                     appConfig.setRearViewFov(value);
@@ -1717,6 +1718,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                     appConfig.setFisheyeProjection(projection[0]);
                     appConfig.setFisheyeFov(fov[0].value());
                     showInterfaceFisheye(pref);
+                    pushCorrection();
                 })
                 .setNegativeButton(R.string.action_cancel, null));
     }
@@ -2758,6 +2760,5 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     /** 视野角度的取值范围，避免这里再写一遍数字。 */
     private static final class FisheyeProjectionBounds {
         static final float MIN = com.kooo.evcam.zeekr.FisheyeProjection.MIN_FOV_DEGREES;
-        static final float MAX = com.kooo.evcam.zeekr.FisheyeProjection.MAX_FOV_DEGREES;
     }
 }

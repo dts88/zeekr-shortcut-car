@@ -46,7 +46,7 @@
     <string name="set_rearview_fisheye_title">Fisheye correction</string>
     <string name="set_rearview_fisheye_summary">Corrects fisheye barrel distortion in the Super mirror only; recordings are unchanged.</string>
     <string name="set_rearview_fov_title">Field of view</string>
-    <string name="set_rearview_fov_summary">Wider shows more and looks sharper, with more distortion at the edges</string>
+    <string name="set_rearview_fov_summary">Wider shows more and looks sharper, with more distortion at the edges. The method is chosen in General → Fisheye correction: up to 140° for Straight lines, 180° for Wide and Full circle.</string>
     <string name="set_rearview_reset_summary">Restores the default window position and size, framing, field of view, fisheye correction and Direction label, and switches back to the rear view</string>
     <string name="set_rearview_fisheye_value">Field of view %1$d°</string>
     <string name="set_rearview_window_summary">The picture keeps its proportions; the window shape only sets how much is visible</string>
@@ -869,7 +869,7 @@
     <string name="opt_projection_cylindrical">Wide (curved horizon)</string>
     <string name="set_fisheye_fov_title">Corrected field of view</string>
     <string name="set_fisheye_fov_summary">A wider angle keeps more of the picture. Up to 140° for Straight lines, 180° for Wide and Full circle.</string>
-    <string name="set_fisheye_scope_summary">Applies to the live preview, photos and videos</string>
+    <string name="set_fisheye_scope_summary">Applies to the live preview, photos and videos; Super mirror uses the method chosen here too</string>
     <string name="set_fisheye_value">%1$s · %2$d°</string>
     <string name="opt_projection_stereographic">Full circle (lines slightly curved)</string>
     <string name="dlg_rail_side_title">Which side is the driver\'s seat on?</string>
