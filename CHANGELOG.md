@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [4.10.0-alpha] - 2026-11-17
+
+- Settings → Buttons: one switch and one pairing entry for smart buttons and X knobs; bound ones show an icon.
+- X knob: Exclusive mode is now Single-knob mode; its panel shows at the top or on the driver side (X knob display).
+- X knob: turning follows the knob more closely.
+
 ## [4.9.1-alpha] - 2026-11-17
 
 - Settings → Buttons: tap a bound smart button or X knob to expand its settings inline.
