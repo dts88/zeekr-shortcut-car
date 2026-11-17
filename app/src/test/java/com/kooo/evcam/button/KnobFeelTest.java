@@ -52,8 +52,8 @@ public class KnobFeelTest {
         KnobFeel feel = new KnobFeel();
         assertEquals(1, feel.feelTS(KNOB, 1, 1, 0, 10_000));
         assertEquals(2, feel.feelTS(KNOB, 1, 1, 0, 10_300));
-        assertEquals(1, feel.feelTS(KNOB, 1, 1, 0, 12_000));
-        assertEquals(2, feel.feelTS(KNOB, 1, 1, 0, 12_200));
+        assertEquals(1, feel.feelTS(KNOB, 1, 1, 0, 12_400));
+        assertEquals(2, feel.feelTS(KNOB, 1, 1, 0, 12_600));
     }
 
     @Test
