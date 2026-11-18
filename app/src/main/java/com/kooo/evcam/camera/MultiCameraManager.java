@@ -5385,6 +5385,14 @@ public class MultiCameraManager {
         default void onNoCameraEnabled() {
             onPhotoResult(0, 0, 0);
         }
+
+        /**
+         * 这一张每一路存到了哪（相机的 key → 文件）：拍完收尾时紧挨着在 {@link #onPhotoResult} 前面叫一次，一路都没存下时是空的；
+         * 当场就回绝的（管线放掉了、配置里一路都没启用、没有地方存）不叫。
+         * 哨兵提醒（{@code alarm.SentryAlerts}）要把环视那一张发到手机上，别处用不着。
+         */
+        default void onPhotoFiles(Map<String, File> files) {
+        }
     }
 
     /** 等各路出画面最多多久：冷开相机，加上调度第一次救（8 秒没画面就重建会话，{@link CameraLiveness#STUCK_MS}）都等得到。 */
@@ -5413,6 +5421,8 @@ public class MultiCameraManager {
         int pressed;
         int saved;
         final Set<String> reported = new HashSet<>();
+        /** 存下的那几路各是哪个文件（{@link PhotoCallback#onPhotoFiles}）。 */
+        final Map<String, File> files = new LinkedHashMap<>();
 
         PhotoJob(PhotoCallback callback) {
             this.callback = callback;
@@ -5433,7 +5443,8 @@ public class MultiCameraManager {
      * （项目所有者 2026-10-06：不允许存到内置存储）。和拒录是同一个判断（存储快照的 {@code available}）；
      * 查盘在存储线程上，查完回主线程接着拍。以前不查，拍完存进内置存储。</p>
      *
-     * @return false：上一张还在拍，这一次不接
+     * @return false：这一次没拍 —— 上一张还在拍（{@code callback} 不会被叫），或者管线放掉了、配置里一路都没启用
+     *         （{@code callback} 已经当场回报过）
      */
     public boolean takePhoto(PhotoCallback callback) {
         if (android.os.Looper.myLooper() != android.os.Looper.getMainLooper()) {
@@ -5560,7 +5571,7 @@ public class MultiCameraManager {
                 }
                 SingleCamera camera = cameras.get(key);
                 if (camera == null) {
-                    onCameraPhotoDone(job, key, false);
+                    onCameraPhotoDone(job, key, null);
                     return;
                 }
                 camera.takePicture(timestamp,
@@ -5570,12 +5581,13 @@ public class MultiCameraManager {
         mainHandler.postDelayed(photoTick, PHOTO_SAVE_TIMEOUT_MS + (keys.size() - 1) * PHOTO_STAGGER_MS);
     }
 
-    private void onCameraPhotoDone(PhotoJob job, String key, boolean saved) {
+    private void onCameraPhotoDone(PhotoJob job, String key, File saved) {
         if (photoJob != job || !job.reported.add(key)) {
             return;   // 这一张已经收尾了（到点），或者同一路报了两次
         }
-        if (saved) {
+        if (saved != null) {
             job.saved++;
+            job.files.put(key, saved);
         }
         if (job.reported.size() >= job.pressed) {
             finishPhoto(job);
@@ -5594,6 +5606,7 @@ public class MultiCameraManager {
                 + "，用时 " + ms + "ms" + (job.toldWaiting ? "（等了相机）" : ""));
         // 拍完就注销：开着的路什么都不动、出帧口不摘（减输出能拖就拖）；没人要了的路由调度照「保持」的规矩关
         CameraNeeds.current().release(CameraNeeds.Holder.PHOTO);
+        job.callback.onPhotoFiles(java.util.Collections.unmodifiableMap(new LinkedHashMap<>(job.files)));
         job.callback.onPhotoResult(job.saved, job.pressed, job.expected);
     }
 

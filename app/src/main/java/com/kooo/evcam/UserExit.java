@@ -80,6 +80,8 @@ public final class UserExit {
         if (buttons != null) {
             buttons.resumeAfterExit();
         }
+        // 哨兵提醒退出以后不看（进程起来时看的这个记号），清掉就接着看
+        com.kooo.evcam.alarm.SentryAlerts.settingsChanged(context);
     }
 
     /**

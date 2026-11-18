@@ -1323,4 +1323,46 @@
     <string name="setup_record_note">以下各项可在「设置 → 录制」中修改</string>
     <string name="setup_features_note">按需开启，可在「设置 → 超级镜子」「设置 → 盲区画面」「设置 → 按键」中修改</string>
     <string name="setup_done_title">设置完成</string>
+
+    <!-- 哨兵提醒（设置 → 录制 最下面一组；项目所有者 2026-11-17 / 11-18 批准，ui-text-style §9） -->
+    <string name="set_group_sentry_alerts">哨兵提醒</string>
+    <string name="set_sentry_alerts_mode_title">手机订阅模式</string>
+    <string name="set_sentry_alerts_mode_summary">哨兵模式布防满 30 秒后，车辆闪烁双闪或车灯自行亮起，推送一条提醒到手机。提醒直接发送，不经过开发者的服务器。</string>
+    <string name="opt_sentry_alerts_ntfy">ntfy</string>
+    <string name="opt_sentry_alerts_telegram">Telegram</string>
+    <string name="set_sentry_alerts_last">上次提醒：%1$s</string>
+    <string name="set_sentry_alerts_last_failed">上次提醒发送失败：%1$s</string>
+    <string name="set_sentry_alerts_picture_title">附带画面</string>
+    <string name="set_sentry_alerts_picture_summary">每条提醒附一张环视拼图，大小不超过 100 KB。需开启「熄屏持续录制」，且锁车时正在录制。</string>
+    <string name="set_ntfy_topic_title">ntfy 话题</string>
+    <string name="set_ntfy_topic_value">尾号 %1$s</string>
+    <string name="set_ntfy_topic_summary">点击显示二维码，用手机上的 ntfy 应用扫码订阅</string>
+    <string name="set_ntfy_server_title">ntfy 服务器</string>
+    <string name="set_ntfy_server_summary">仅支持 https；更换后需重新扫码订阅</string>
+    <string name="msg_ntfy_server_https_only">仅支持 https</string>
+    <string name="dlg_sentry_alerts_risk_title">开启哨兵提醒？</string>
+    <string name="dlg_sentry_alerts_risk_body">提醒和画面会发到公开的 ntfy 服务器，知道话题名的人都能查看。话题名随机生成，只保存在本机，请勿分享二维码或截图。如有泄露，可随时更换话题。</string>
+    <string name="sentry_alerts_action_turn_on">开启</string>
+    <string name="dlg_ntfy_subscribe_title">用手机订阅</string>
+    <string name="dlg_ntfy_subscribe_steps">在手机上安装 ntfy 应用，扫描二维码订阅。</string>
+    <string name="dlg_ntfy_subscribe_tail">话题尾号 %1$s</string>
+    <string name="sentry_alerts_action_rotate">更换话题</string>
+    <string name="sentry_alerts_action_done">完成</string>
+    <string name="sentry_alerts_action_test">发送测试</string>
+    <string name="dlg_ntfy_rotate_title">更换话题？</string>
+    <string name="dlg_ntfy_rotate_body">更换后，旧话题不再收到提醒，手机需重新扫码订阅。新话题同样公开，请勿分享二维码或截图。</string>
+    <string name="sentry_alerts_action_rotate_confirm">更换</string>
+    <string name="msg_sentry_alerts_test_sent">已发送测试提醒</string>
+    <string name="msg_sentry_alerts_test_failed">测试提醒发送失败：%1$s</string>
+    <!-- 手机上收到的那一条：标题、正文（时刻是「11-17 21:05」） -->
+    <string name="sentry_alert_title">哨兵提醒</string>
+    <string name="sentry_alert_hazard">双闪亮起 · %1$s</string>
+    <string name="sentry_alert_lamps">车灯亮起 · %1$s</string>
+    <!-- 写代码时多出来的，待项目所有者确认（ui-text-style §9）：「发送测试」发出的那一条、发送失败的原因 -->
+    <string name="sentry_alert_test">测试提醒 · %1$s</string>
+    <string name="sentry_alerts_reason_unreachable">无法连接服务器</string>
+    <string name="sentry_alerts_reason_timeout">连接超时</string>
+    <string name="sentry_alerts_reason_refused">服务器拒绝（HTTP %1$d）</string>
+    <string name="sentry_alerts_qr_failed">无法生成二维码</string>
+    <string name="msg_ntfy_server_address_only">只填服务器地址，如 ntfy.sh</string>
 </resources>

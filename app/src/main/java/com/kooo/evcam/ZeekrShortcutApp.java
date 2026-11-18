@@ -52,6 +52,8 @@ public class ZeekrShortcutApp extends Application {
         com.kooo.evcam.sound.DriveSound.install(this);
         // 灵动贴（试验性）：开着、有绑定的就开始听它们的广播，按下去照选的动作做；关着、没绑定的、用户退出了的不扫（上一个进程留下的扫描也停掉）
         com.kooo.evcam.button.SmartButtons.install(this);
+        // 哨兵提醒（试验性）：开着、配好了就在车辆信号的核心上听双闪、车灯；关着、用户退出了的什么都不做
+        com.kooo.evcam.alarm.SentryAlerts.install(this);
         // 相机管家（要相机做什么都向它请求）在这里起来：「这一趟」的录像选择从盘上读回来（规格 §2.5：进程被杀又拉回来时还在）；
         // 车机真正开机是新的一趟
         com.kooo.evcam.camera.CameraKeeper keeper = com.kooo.evcam.camera.CameraKeeper.get(this);
