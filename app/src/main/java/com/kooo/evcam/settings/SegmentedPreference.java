@@ -50,6 +50,8 @@ public class SegmentedPreference extends Preference implements PreferenceRows.Ow
     /** 选中它就是关着（{@link #setOffValue}）；null：这一行没有「关闭」。 */
     private String offValue;
     private CharSequence note;
+    /** 单独不可用的那几段（{@link #setUnusable}）。 */
+    private java.util.Set<String> unusable = java.util.Collections.emptySet();
 
     public SegmentedPreference(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -80,6 +82,14 @@ public class SegmentedPreference extends Preference implements PreferenceRows.Ow
         boolean wasOff = shouldDisableDependents();
         this.offValue = offValue;
         dependentsFollow(wasOff);
+    }
+
+    /**
+     * 这几段摆出来、置灰、点不动（整排照旧可用）：哨兵提醒的「Telegram」还没做（项目所有者 2026-11-18 点名摆出来）。
+     */
+    void setUnusable(String... values) {
+        unusable = new java.util.HashSet<>(java.util.Arrays.asList(values));
+        notifyChanged();
     }
 
     /** 说明下面一行小字（盲区画面：选中的这一档什么时候显示）；空就不写。 */
@@ -120,8 +130,13 @@ public class SegmentedPreference extends Preference implements PreferenceRows.Ow
         if (!(holder.findViewById(R.id.segments) instanceof ViewGroup)) {
             return;
         }
-        // 依赖的那一行关着（android:dependency）时整行置灰：段也跟着灰、点了不动（超级镜子「关闭」时的切换方式）
-        Segments.fill((ViewGroup) holder.findViewById(R.id.segments), entries, indexOf(value), isEnabled(),
+        // 依赖的那一行关着（android:dependency）时整行置灰：段也跟着灰、点了不动（超级镜子「关闭」时的切换方式）；
+        // 单独不可用的那几段另外置灰
+        boolean[] usable = new boolean[values.length];
+        for (int i = 0; i < values.length; i++) {
+            usable[i] = !unusable.contains(values[i]);
+        }
+        Segments.fill((ViewGroup) holder.findViewById(R.id.segments), entries, indexOf(value), isEnabled(), usable,
                 index -> pick(values[index]));
     }
 

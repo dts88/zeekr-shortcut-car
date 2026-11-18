@@ -23,7 +23,10 @@ import com.kooo.evcam.ui.SegmentThumb;
  * 选中的那一段实心能量色、白字，其余透明、次要文字色；点一下就切，不能拖。选中的那一块是底槽上单独的一层
  * （{@link SegmentThumb}）：换了一段，它滑过去，不跳（ui-spec §十四「值变了」）。
  *
- * <p>摆在 {@link SegmentedPreference} 的行尾：显示位置、超级镜子、切换方式、盲区画面、操作按钮位置。</p>
+ * <p>摆在 {@link SegmentedPreference} 的行尾：显示位置、超级镜子、切换方式、盲区画面、操作按钮位置、哨兵提醒。</p>
+ *
+ * <p>不可用的段置灰、点了不动：整排不可用时每一段都这样；也可以只有其中一段不可用（哨兵提醒的「Telegram」还没做，
+ * 项目所有者 2026-11-18 点名摆出来、置灰）。</p>
  */
 final class Segments {
 
@@ -48,18 +51,31 @@ final class Segments {
      * @param enabled 可用；不可用时段置灰、点了不动
      */
     static void fill(ViewGroup track, CharSequence[] labels, int chosen, boolean enabled, OnPick onPick) {
+        fill(track, labels, chosen, enabled, null, onPick);
+    }
+
+    /**
+     * 同上，另外有几段单独不可用。
+     *
+     * @param usable 每一段可不可用（和 {@code labels} 一样长）；null 是每一段都跟着 {@code enabled}
+     */
+    static void fill(ViewGroup track, CharSequence[] labels, int chosen, boolean enabled, boolean[] usable,
+                     OnPick onPick) {
         SegmentThumb.on(track).show(track, labels, chosen, enabled);
         track.removeAllViews();
         Context context = track.getContext();
         float density = context.getResources().getDisplayMetrics().density;
         for (int i = 0; i < labels.length; i++) {
             int index = i;
-            TextView view = segment(context, density, labels[i], i == chosen, enabled);
-            view.setOnClickListener(v -> {
-                if (index != chosen) {
-                    onPick.pick(index);
-                }
-            });
+            boolean on = enabled && (usable == null || i >= usable.length || usable[i]);
+            TextView view = segment(context, density, labels[i], i == chosen, on);
+            if (on) {
+                view.setOnClickListener(v -> {
+                    if (index != chosen) {
+                        onPick.pick(index);
+                    }
+                });
+            }
             track.addView(view);
         }
     }

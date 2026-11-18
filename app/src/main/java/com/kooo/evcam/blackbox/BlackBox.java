@@ -225,7 +225,8 @@ public final class BlackBox {
                     + " 超级镜子=" + onOff(c.isRearViewEnabled())
                     + " 按键模式=" + onOff(c.isRearViewButtonMode())
                     + " 盲区画面=" + onOff(c.isSideViewEnabled())
-                    + " 录制悬浮按钮=" + onOff(c.isRecordingFloatingEnabled());
+                    + " 录制悬浮按钮=" + onOff(c.isRecordingFloatingEnabled())
+                    + " 哨兵提醒=" + sentryAlerts(context);
         } catch (Throwable t) {
             return "(读开关失败: " + t + ")";
         }
@@ -233,6 +234,15 @@ public final class BlackBox {
 
     private static String onOff(boolean on) {
         return on ? "开" : "关";
+    }
+
+    /** 哨兵提醒开没开、用哪个服务、附不附画面；话题、服务器不写（{@code alarm.AlertStore}）。 */
+    private static String sentryAlerts(Context context) {
+        com.kooo.evcam.alarm.AlertStore alerts = com.kooo.evcam.alarm.AlertStore.of(context);
+        if (!alerts.isOn()) {
+            return "关";
+        }
+        return alerts.service() + (alerts.picture() ? "(附带画面)" : "") + (alerts.ready() ? "" : "(没配好)");
     }
 
     /**
