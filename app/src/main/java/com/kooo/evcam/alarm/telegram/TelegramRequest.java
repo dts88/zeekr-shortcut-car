@@ -15,6 +15,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import com.kooo.evcam.alarm.guard.GuardToken;
 
 /**
  * 发往 Telegram 的那一次请求 —— 拼地址、拼表单、擦掉令牌。纯字符串和字节，便于单测。
@@ -204,7 +205,7 @@ public final class TelegramRequest {
      * 一条消息下面那排能回话的按钮（Telegram 的 inline keyboard）。
      *
      * <p>和 {@link #keyboardMarkup()} 不是一回事：那排是把文字发回来，这排是 {@code callback_query}，
-     * 按下去不进聊天记录，也不经过命令解析。所以每一颗必须带上这一次警报的号
+     * 按下去不进聊天记录，也不经过命令解析。所以每一颗必须带上这一次提醒的号
      * （{@code alarm.GuardToken}），否则一周前的按钮按下去也算数。</p>
      *
      * <p>手写 JSON 而不是用 {@code org.json}：这里只要可预期的字节，JVM 单测也不用 Robolectric。

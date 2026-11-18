@@ -361,6 +361,52 @@ public class SettingsShotsTest {
     }
 
     /**
+     * 「忘了开哨兵」那三行在「什么时候发」那一组里，排在安静时段之后；只跟着警报总开关走，
+     * 换到 ntfy 也还在（它们不是 Telegram 独有的）。滚到它们另出一张图。
+     *
+     * <p>三种状态各开一屏新的设置页来验：总开关开着（在、位置对）、换成 ntfy（还在）、
+     * 总开关关着（三行一起收起来）。</p>
+     *
+     * The three Forgot Sentry rows sit in the "When it fires" group after quiet hours, follow the master
+     * switch only, and stay when the transport is ntfy. Each state is checked on a freshly opened page.
+     */
+    @Test
+    public void forgotSentryRowsSitUnderWhenItFires() {
+        SettingsPreferenceFragment on = alertsPage(true, com.kooo.evcam.alarm.ntfy.NtfyGate.TELEGRAM);
+        androidx.preference.PreferenceGroup when = (androidx.preference.PreferenceGroup)
+                on.findPreference("cat_alerts_when");
+        assertNotNull("少了「什么时候发」那一组", when);
+        for (String key : GUARD_ROWS) {
+            Preference row = on.findPreference(key);
+            assertNotNull("少了 " + key, row);
+            assertTrue(key + " 该在「什么时候发」那一组里", row.getParent() == when);
+            assertTrue(key + " 该看得见", row.isVisible());
+            assertTrue(key + " 该排在安静时段之后",
+                    indexIn(when, key) > indexIn(when, "pref_alerts_quiet_end"));
+        }
+        on.scrollToPreference("pref_alerts_guard_everywhere");
+        File file = Shots.save(shotActivity, "settings-alerts-day-guard");
+        assertTrue(file + " 是空的", file.length() > 10_000);
+
+        // 换成 ntfy：两条出口的组互相换位置，但那三行不动 —— 它们说的和发到哪儿无关。
+        // Switch to ntfy: the two transport blocks swap, the three rows stay — they are not exit-specific.
+        SettingsPreferenceFragment ntfy = alertsPage(true, com.kooo.evcam.alarm.ntfy.NtfyGate.NTFY);
+        assertTrue("ntfy 时「哪一组出现」照旧", ntfy.findPreference("cat_alerts_ntfy").isVisible());
+        for (String key : GUARD_ROWS) {
+            assertTrue("ntfy 时 " + key + " 还在", ntfy.findPreference(key).isVisible());
+        }
+
+        // 总开关关着：三行一起收起来。Master off: all three go with it.
+        SettingsPreferenceFragment off = alertsPage(false, com.kooo.evcam.alarm.ntfy.NtfyGate.TELEGRAM);
+        for (String key : GUARD_ROWS) {
+            assertFalse("总开关关着时 " + key + " 该收起来", off.findPreference(key).isVisible());
+        }
+    }
+
+    private static final String[] GUARD_ROWS =
+            {"pref_alerts_guard", "pref_alerts_guard_home", "pref_alerts_guard_everywhere"};
+
+    /**
      * 「警报附一张照片」关掉之后，下面三行跟着收起来。
      *
      * <p>排版（一张四宫格 / 每路一张）、那几路、掰直 —— 不拍照的时候三行都没有意义，留着只会让人以为

@@ -145,6 +145,24 @@
                 android:key="pref_alerts_quiet_end"
                 android:title="@string/set_alerts_quiet_end_title" />
 
+            <!-- 忘了开哨兵：问不问、在家问不问（alarm.GuardPolicy 判，见 docs/sentry-alerts-spec.md §1.8）。
+                 它跟「什么时候发」有关，跟哪条出口无关，所以在这个组里，不在 Telegram 那组。
+                 Forgot Sentry: when parking should be caught, independent of the exit, so it lives here. -->
+            <ListPreference
+                android:key="pref_alerts_guard"
+                android:title="@string/set_alerts_guard_title"
+                android:summary="%s" />
+
+            <Preference
+                android:key="pref_alerts_guard_home"
+                android:title="@string/set_alerts_guard_home_title" />
+
+            <SwitchPreferenceCompat
+                android:key="pref_alerts_guard_everywhere"
+                android:title="@string/set_alerts_guard_everywhere_title"
+                android:summary="@string/set_alerts_guard_everywhere_summary"
+                android:defaultValue="false" />
+
             <SeekBarPreference
                 android:key="pref_alerts_motion_sensitivity"
                 android:title="@string/set_alerts_motion_sensitivity_title"

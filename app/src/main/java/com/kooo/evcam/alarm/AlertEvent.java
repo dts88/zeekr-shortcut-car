@@ -16,18 +16,19 @@ import com.kooo.evcam.R;
  * <h3>为什么是一张表</h3>
  *
  * <p>「发一张测试照片」只证明图片那条路通。车主真正要确认的是<b>每一种</b>消息长什么样：
- * 双闪那一条、片段按需来的那一条。所以这一项做成一张表，
+ * 双闪那一条、忘了开哨兵那一条问、开了之后那张回执、片段按需来的那一条。所以这一项做成一张表，
  * 测试那一屏照着表逐条发出去，发的是真消息、真按钮，只是触发器由人点，不是车自己。</p>
  *
  * <h3>表的顺序就是屏上的顺序</h3>
  *
- * <p>先是警报（车被动了），再是按需要的东西（HD、片段），最后是纯文字那几条。
+ * <p>先是警报（车被动了），再是按需要的东西（HD、片段），最后是「忘了开哨兵」和纯文字那几条。
  * 每一行的描述写清楚「真的什么时候会发」和「这一条是模拟的」。</p>
  *
  * <h3>One row per message the car can send</h3>
  *
  * <p>"Send a test picture" only proves the picture path. What the owner needs to check is what every
- * message looks like: the hazard alert, the clip on demand. So the events are a table, and the test screen walks it, sending real messages with
+ * message looks like: the hazard alert, the reminder's question, the receipt after it switched sentry on,
+ * the clip on demand. So the events are a table, and the test screen walks it, sending real messages with
  * real buttons — only the trigger is a finger instead of the car.</p>
  */
 public enum AlertEvent {
@@ -48,6 +49,13 @@ public enum AlertEvent {
     CLIP_REAR(R.string.alert_event_clip_rear_title, R.string.alert_event_clip_rear),
     CLIP_LEFT(R.string.alert_event_clip_left_title, R.string.alert_event_clip_left),
     CLIP_RIGHT(R.string.alert_event_clip_right_title, R.string.alert_event_clip_right),
+
+    /* ---- 忘了开哨兵 / the Sentry reminder ---- */
+    GUARD_ASK(R.string.alert_event_guard_ask_title, R.string.alert_event_guard_ask),
+    GUARD_ON(R.string.alert_event_guard_on_title, R.string.alert_event_guard_on),
+    GUARD_OFF(R.string.alert_event_guard_off_title, R.string.alert_event_guard_off),
+    GUARD_LATE(R.string.alert_event_guard_late_title, R.string.alert_event_guard_late),
+    GUARD_ARMED(R.string.alert_event_guard_armed_title, R.string.alert_event_guard_armed),
 
     /* ---- 纯文字 / text only ---- */
     STATUS(R.string.alert_event_status_title, R.string.alert_event_status),

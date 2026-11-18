@@ -17,6 +17,7 @@ import com.kooo.evcam.profile.ProfileStore;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
+import com.kooo.evcam.alarm.guard.GuardPolicy;
 import com.kooo.evcam.alarm.policy.TriggerSet;
 import com.kooo.evcam.alarm.SentryAlerts;
 
@@ -1022,6 +1023,65 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             });
         }
 
+        // 忘了开哨兵：四档（关 / 先问我 / 问一句就自己开 / 不问就开），存的是 0..3。
+        // 取值怎么算在 alarm.GuardPolicy 一处，这里只写设置。
+        // Forgot Sentry: four modes stored 0..3; GuardPolicy owns what each one does, this row only saves it.
+        ListPreference guard = findPreference("pref_alerts_guard");
+        if (guard != null) {
+            guard.setPersistent(false);
+            guard.setEntries(new CharSequence[] {
+                    getString(R.string.set_alerts_guard_mode_off),
+                    getString(R.string.set_alerts_guard_mode_ask),
+                    getString(R.string.set_alerts_guard_mode_ask_then_on),
+                    getString(R.string.set_alerts_guard_mode_on)});
+            guard.setEntryValues(new CharSequence[] {"0", "1", "2", "3"});
+            guard.setValue(String.valueOf(appConfig.getAlertsGuardMode().stored()));
+            guard.setOnPreferenceChangeListener((preference, newValue) -> {
+                int value = 0;
+                try {
+                    value = Integer.parseInt(String.valueOf(newValue));
+                } catch (NumberFormatException e) {
+                    value = com.kooo.evcam.alarm.guard.GuardPolicy.DEFAULT_MODE.stored();
+                }
+                appConfig.setAlertsGuardMode(com.kooo.evcam.alarm.guard.GuardPolicy.Mode.of(value));
+                com.kooo.evcam.blackbox.BlackBox.noteImportant(
+                        "设置变更: pref_alerts_guard → " + value);
+                return true;
+            });
+        }
+
+        // 把车此刻的位置记成家：结果由 SentryAlerts 回话，显示在行尾并弹一句
+        // Store the car's current position as home; SentryAlerts answers, the row shows it and a toast repeats it.
+        Preference guardHome = findPreference("pref_alerts_guard_home");
+        if (guardHome != null) {
+            guardHome.setPersistent(false);
+            guardHome.setOnPreferenceClickListener(preference -> {
+                com.kooo.evcam.alarm.SentryAlerts.get(requireContext()).setGuardHomeHere((ok, message) -> {
+                    if (isAdded()) {
+                        guardHome.setSummary(message);
+                        toast(message);
+                    }
+                });
+                return true;
+            });
+        }
+
+        // 在哪都开：在家也照样问、照样开。默认关，代价写在 summary 里（车机在车库里也不睡）。
+        // Everywhere: ask and switch on at home too. Off by default, and its summary states the cost.
+        androidx.preference.SwitchPreferenceCompat guardEverywhere =
+                findPreference("pref_alerts_guard_everywhere");
+        if (guardEverywhere != null) {
+            guardEverywhere.setPersistent(false);
+            guardEverywhere.setChecked(appConfig.isAlertsGuardEverywhere());
+            guardEverywhere.setOnPreferenceChangeListener((preference, newValue) -> {
+                boolean everywhere = Boolean.TRUE.equals(newValue);
+                appConfig.setAlertsGuardEverywhere(everywhere);
+                com.kooo.evcam.blackbox.BlackBox.noteImportant(
+                        "设置变更: pref_alerts_guard_everywhere → " + everywhere);
+                return true;
+            });
+        }
+
         // 这一栏的显示规则全写在这里（ui-spec §三：可见性只在一处）。
         // 总开关关着时，下面那些设置没有意义；下层的选项只在它自己的上一层选中时才出现。
         boolean alertsOn = appConfig.isAlertsEnabled();
@@ -1060,6 +1120,10 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         // 所以 ntfy / Telegram 那两组怎么收起来都不带它们。
         // The three Forgot Sentry rows follow the master switch only: they are about when the car asks,
         // not where alerts go, so the transport blocks hiding does not touch them.
+        boolean guardRows = alertsOn;
+        show("pref_alerts_guard", guardRows);
+        show("pref_alerts_guard_home", guardRows);
+        show("pref_alerts_guard_everywhere", guardRows);
 
         Preference triggersRow = findPreference("pref_alerts_triggers");
         if (triggersRow != null) {
@@ -1329,6 +1393,11 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         // 家的位置：记过就写「记下了」，没记过就写「还不知道家在哪」。那一行不设成不可点 ——
         // 没记过时点一下就是唯一的办法，点了会给一句原因（没有定位）。
         // The home point: say it is stored, or that it is not; the row stays tappable and answers with a reason.
+        Preference guardHome = findPreference("pref_alerts_guard_home");
+        if (guardHome != null) {
+            guardHome.setSummary(appConfig.getAlertsGuardHome().isEmpty()
+                    ? R.string.set_alerts_guard_home_none : R.string.set_alerts_guard_home_set);
+        }
     }
 
     /** 哪些事情算「有事」（TriggerSet）。 */

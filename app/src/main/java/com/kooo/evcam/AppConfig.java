@@ -13,6 +13,7 @@ package com.kooo.evcam;
 import android.content.Context;
 import android.content.SharedPreferences;
 
+import com.kooo.evcam.alarm.guard.GuardPolicy;
 import com.kooo.evcam.alarm.ntfy.NtfyGate;
 import com.kooo.evcam.camera.CameraNames;
 import com.kooo.evcam.settings.LicensePlate;
@@ -150,6 +151,10 @@ public class AppConfig {
     private static final String KEY_ALERTS_STRAIGHTEN = "alerts_straighten";  // 发之前掰直
     private static final String KEY_ALERTS_SEND_PICTURE = "alerts_send_picture";  // 发警报时附一张压缩图
     private static final String KEY_ALERTS_COMMANDS = "alerts_commands";   // 回应 Telegram 里的命令
+    // 忘了开哨兵：提醒哪一档（存 0..3，见 alarm.GuardPolicy）
+    private static final String KEY_ALERTS_GUARD_MODE = "alerts_guard_mode";
+    private static final String KEY_ALERTS_GUARD_HOME = "alerts_guard_home";  // "lat,lon"，存在 secrets 里
+    private static final String KEY_ALERTS_GUARD_EVERYWHERE = "alerts_guard_everywhere";  // 在家也开
     private static final String KEY_ALERTS_COMMAND_OFFSET = "alerts_command_offset";  // 轮询到哪一条（运行状态）
     // ntfy（开发者选项里才选得了；规格见 docs/ntfy/）：走哪条路、服务器、档位、话题、令牌、风险提示的接受记录。
     // ntfy (selectable only under developer options; see docs/ntfy/): route, server, tier, topic, token,
@@ -2561,6 +2566,82 @@ public class AppConfig {
     public void setAlertsArmDelayMinutes(int minutes) {
         prefs.edit().putInt(KEY_ALERTS_ARM_DELAY,
                 com.kooo.evcam.alarm.policy.ArmDelay.clamp(minutes)).apply();
+    }
+
+    /**
+     * 「忘了开哨兵」提醒哪一档：关 / 只问 / 问了就开 / 直接开。存 0..3，默认关。
+     *
+     * <p>默认关是有意的：没打开这一项的车上，行为和以前一模一样。打开了之后默认是「问了就开」——
+     * 车主忘了才是这一项要治的病，等他按按钮不是。</p>
+     *
+     * <p>Which mode the Forgot Sentry reminder is in. Stored 0..3, off by default, so a car that never
+     * touches this row behaves exactly as before. Once switched on, "ask then on" is the default:
+     * forgetting is the problem being solved, waiting for a tap is not the cure.</p>
+     */
+    public com.kooo.evcam.alarm.guard.GuardPolicy.Mode getAlertsGuardMode() {
+        return com.kooo.evcam.alarm.guard.GuardPolicy.Mode.of(prefs.getInt(KEY_ALERTS_GUARD_MODE,
+                com.kooo.evcam.alarm.guard.GuardPolicy.DEFAULT_MODE.stored()));
+    }
+
+    public void setAlertsGuardMode(com.kooo.evcam.alarm.guard.GuardPolicy.Mode mode) {
+        com.kooo.evcam.alarm.guard.GuardPolicy.Mode value =
+                mode == null ? com.kooo.evcam.alarm.guard.GuardPolicy.DEFAULT_MODE : mode;
+        prefs.edit().putInt(KEY_ALERTS_GUARD_MODE, value.stored()).apply();
+    }
+
+    /**
+     * 家的坐标（{@code "lat,lon"}），设过才有。
+     *
+     * <p>存 {@link #secrets()} 那一份，和令牌同理：家的位置是最私人的一条数据，不该随「导出设置」
+     * 和一份诊断报告出门。空的字符串表示没设过 —— 没设过照样会提醒，只是不会自己开。</p>
+     *
+     * <p>The home point, kept in the secrets file for the same reason as the token: an exported settings
+     * file or a diagnostics report must not carry where the owner lives. Empty means never set.</p>
+     */
+    public String getAlertsGuardHome() {
+        String raw = secrets().getString(KEY_ALERTS_GUARD_HOME, "");
+        return raw == null ? "" : raw.trim();
+    }
+
+    /**
+     * 记下家的位置。认不出来的坐标不收（{@link com.kooo.evcam.alarm.guard.GuardHome#parse} 说了不算）。
+     *
+     * @return 收下了没有
+     */
+    public boolean setAlertsGuardHome(double latitude, double longitude) {
+        com.kooo.evcam.alarm.guard.GuardHome.Point point =
+                com.kooo.evcam.alarm.guard.GuardHome.parse(
+                        com.kooo.evcam.alarm.guard.GuardHome.format(latitude, longitude));
+        if (point == null) {
+            return false;
+        }
+        secrets().edit().putString(KEY_ALERTS_GUARD_HOME,
+                com.kooo.evcam.alarm.guard.GuardHome.format(point.lat, point.lon)).apply();
+        return true;
+    }
+
+    /** 忘掉家的位置（换房子的时候）。Forget the home point. */
+    public void clearAlertsGuardHome() {
+        secrets().edit().remove(KEY_ALERTS_GUARD_HOME).apply();
+    }
+
+    /**
+     * 在哪都开：在家也照样问、照样开。默认关。
+     *
+     * <p>关着时在家什么都不做 —— 车库里天天提醒一次，这一项活不过一周。车主自己愿意把这一条放开时
+     * 才开：代价是每次停进车库哨兵也跟着开，车机被它顶着不睡，用掉的是 12V 电瓶。</p>
+     *
+     * <p>"Everywhere": ask and switch on at home too. Off by default, because a reminder every evening in
+     * the owner's own driveway would not survive a week. Turning it on means sentry also comes on there,
+     * and the head unit then stays awake on the 12V battery.</p>
+     */
+    public boolean isAlertsGuardEverywhere() {
+        return prefs.getBoolean(KEY_ALERTS_GUARD_EVERYWHERE, false);
+    }
+
+    public void setAlertsGuardEverywhere(boolean everywhere) {
+        prefs.edit().putBoolean(KEY_ALERTS_GUARD_EVERYWHERE, everywhere).apply();
+        AppLog.i(TAG, "忘了开哨兵：在哪都开 = " + everywhere);
     }
 
     /** 令牌和会话号都填了：可以试着发一条。 */

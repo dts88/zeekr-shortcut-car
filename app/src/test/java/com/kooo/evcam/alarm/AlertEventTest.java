@@ -45,7 +45,7 @@ public class AlertEventTest {
         assertEquals(1, AlertEvent.CLIP_REAR.lane());
         assertEquals(2, AlertEvent.CLIP_LEFT.lane());
         assertEquals(3, AlertEvent.CLIP_RIGHT.lane());
-        assertEquals(-1, AlertEvent.STATUS.lane());
+        assertEquals(-1, AlertEvent.GUARD_ASK.lane());
     }
 
     @Test
@@ -56,7 +56,7 @@ public class AlertEventTest {
             assertTrue(event.name(), event.isPicture());
         }
         for (AlertEvent event : new AlertEvent[] {AlertEvent.STATUS, AlertEvent.HELP,
-                AlertEvent.CLIP_FRONT}) {
+                AlertEvent.GUARD_ON, AlertEvent.GUARD_LATE, AlertEvent.CLIP_FRONT}) {
             assertFalse(event.name(), event.isPicture());
         }
     }

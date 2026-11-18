@@ -10,6 +10,7 @@ package com.kooo.evcam.alarm.telegram;
 
 import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.AppLog;
+import com.kooo.evcam.alarm.guard.GuardToken;
 import com.kooo.evcam.blackbox.BlackBox;
 
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -143,7 +144,22 @@ public final class TelegramPoller {
          * @param data      the button's {@code callback_data}, layout in {@code GuardToken}
          * @param pressedAt the time of the message carrying the button (milliseconds); 0 means unknown
          */
-        void onButton(String data, long pressedAt);    }
+        void onButton(String data, long pressedAt);
+
+        /**
+         * {@code /guard …}。
+         *
+         * @param action      后面那个词；{@code null} 不会出现在这里（光写 {@code guard} 是 {@code REPORT}）
+         * @param requestedAt 车主发命令的时刻（毫秒）；0 表示不知道
+         *
+         * {@code /guard …}.
+         *
+         * @param action      the word after it; {@code null} never arrives here (a bare {@code guard} is
+         *                    {@code REPORT})
+         * @param requestedAt when the owner sent the command (milliseconds); 0 means unknown
+         */
+        void onGuard(TelegramCommand.GuardAction action, long requestedAt);
+    }
 
     private final AppConfig config;
     private final Handler handler;
@@ -447,6 +463,9 @@ public final class TelegramPoller {
                         break;
                     case STATUS:
                         handler.onStatus(sentAt);
+                        break;
+                    case GUARD:
+                        handler.onGuard(command.guard, sentAt);
                         break;
                     default:
                         // 车主发的、但认不出来：回一句怎么用。不回的话，

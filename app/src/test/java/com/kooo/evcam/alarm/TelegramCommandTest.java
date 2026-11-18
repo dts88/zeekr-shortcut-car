@@ -17,10 +17,11 @@ import org.junit.Test;
 import com.kooo.evcam.alarm.telegram.TelegramCommand;
 
 /**
- * 车主发来的一句话怎么读（{@link TelegramCommand}）：只认配好的那个会话，只认命令和四个方向。
+ * 车主发来的一句话怎么读（{@link TelegramCommand}）：只认配好的那个会话，只认命令、四个方向和
+ * {@code guard} 那一族。
  *
  * How to read a message the owner sends ({@link TelegramCommand}): only the configured chat counts, and
- * only the commands and the four directions are recognized.
+ * only the commands, the four directions, and the {@code guard} family are recognized.
  */
 public class TelegramCommandTest {
 
@@ -74,5 +75,61 @@ public class TelegramCommandTest {
         assertFalse("没配好之前谁都不是主人", TelegramCommand.fromOwner("7761390174", ""));
         assertFalse(TelegramCommand.fromOwner(null, "7761390174"));
         assertFalse(TelegramCommand.fromOwner("7761390174", null));
+    }
+
+    private static TelegramCommand.GuardAction guard(String text) {
+        TelegramCommand command = TelegramCommand.parseText(text);
+        assertEquals(text, TelegramCommand.Verb.GUARD, command.verb);
+        return command.guard;
+    }
+
+    private static void notAGuard(String text) {
+        TelegramCommand command = TelegramCommand.parseText(text);
+        assertEquals(text, TelegramCommand.Verb.UNKNOWN, command.verb);
+        assertEquals(text, null, command.guard);
+    }
+
+    @Test
+    public void everyGuardPhraseMeansOneAction() {
+        assertEquals(TelegramCommand.GuardAction.REPORT, guard("guard"));
+        assertEquals(TelegramCommand.GuardAction.ON, guard("guard on"));
+        assertEquals(TelegramCommand.GuardAction.OFF, guard("guard off"));
+        assertEquals(TelegramCommand.GuardAction.HOME_SET, guard("guard home"));
+        assertEquals(TelegramCommand.GuardAction.HOME_CLEAR, guard("guard home clear"));
+        assertEquals(TelegramCommand.GuardAction.AUTO_OFF, guard("guard auto off"));
+        assertEquals(TelegramCommand.GuardAction.AUTO_ASK, guard("guard auto ask"));
+        assertEquals(TelegramCommand.GuardAction.AUTO_ASK_THEN_ON, guard("guard auto then"));
+        assertEquals(TelegramCommand.GuardAction.AUTO_ON, guard("guard auto on"));
+        assertEquals("guard then 是 guard auto then 的短写法",
+                TelegramCommand.GuardAction.AUTO_ASK_THEN_ON, guard("guard then"));
+    }
+
+    @Test
+    public void aSlashABotMentionCaseAndWhitespaceDoNotMatterForGuard() {
+        assertEquals("群里会写成 /guard@BotName on",
+                TelegramCommand.GuardAction.ON, guard("/guard@ZeekrSentry_bot on"));
+        assertEquals(TelegramCommand.GuardAction.REPORT, guard("/GUARD"));
+        assertEquals(TelegramCommand.GuardAction.AUTO_ASK, guard("  /Guard   Auto   ASK  "));
+        assertEquals(TelegramCommand.GuardAction.HOME_CLEAR, guard("guard HOME clear"));
+    }
+
+    @Test
+    public void aWordAfterGuardThatMeansNothingIsUnknown() {
+        // 不猜：认不出来的词不会撑到某个最近的意思上
+        // No guessing: an unrecognized word does not snap to a nearby meaning
+        notAGuard("guard nonsense");
+        notAGuard("guard off now");
+        notAGuard("guard home on");
+        notAGuard("guard auto");
+        notAGuard("guard auto maybe");
+        notAGuard("guard home clear now");
+    }
+
+    @Test
+    public void theOlderCommandsDoNotGrowAGuardAction() {
+        assertEquals(null, TelegramCommand.parseText("pic").guard);
+        assertEquals(null, TelegramCommand.parseText("pic left").guard);
+        assertEquals(null, TelegramCommand.parseText("status").guard);
+        assertEquals(null, TelegramCommand.parseText("hello").guard);
     }
 }

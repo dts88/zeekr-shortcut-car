@@ -124,6 +124,107 @@ signal changes (`SignalAges`), and if still unknown, **send as usual** — bette
 noisy than to swallow a real event because it was unknown. Alerts blocked by this wait write one
 line in the black box (`alerts: armed N s ago, waiting for M min`).
 
+## 1.8 忘了开哨兵
+
+下车那一刻哨兵模式还关着、车又不在家 —— 车在会话里问一句，没人反对就自己打开。
+触发点是「车主走了」这一刻（`alarm.GuardEdge`）：主驾座椅从有人变成没人算离开；屏幕熄灭
+（`SCREEN_POWER_EVENT 0 → 1`，这台车上和点火 ON → ACC 同一毫秒，`Signal.java:143`）只在主驾座椅**已经空着**的时候才算。
+**车里还坐着人时一律不算** —— 在车里按锁车，屏幕一样会黑，那不是下车。屏幕黑了而座椅读数读不到，也不动。
+两者都要在停着车的时候，而且这一趟真的开过车 —— 从上次停车起没动过的车不提醒，那是「停了一星期」，不是「刚下车」。
+哪一条挡住了、哪一档，都会往黑匣子记一行（`alarm.GuardPolicy.Block`），不做事也要能看出为什么。
+
+设置里四档（`alarm.GuardPolicy.Mode`，存 0..3，默认 0 关）：
+
+| 档 | 存 | 做什么 |
+|---|---|---|
+| 关 | 0 | 什么都不做 |
+| 先问我 | 1 | 只发问，按钮说开才开 |
+| 问一句，一分钟没人反对就自己开 | 2 | 发问，60 秒没人否决就自己开 |
+| 不问，自己开 | 3 | 直接开，发一条收据 |
+
+数字：下车 **5 秒**后发问（`GuardPolicy.ASK_AT_MS`，让关门那一下过去）、问出去 **60 秒**没人否决就自己开
+（`AUTO_ON_MS`）、下车 **180 秒**之后按的按钮一律拒绝并说明原因（`ACT_WINDOW_MS`）。窗口按实测的
+4–6 分钟往短里取，永远在窗口关掉之前就结束，不会出现按了没反应的按钮。
+
+家是一个点（`alarm.GuardHome`）：**离家 200 m** 以内算在家，定位超过 **10 分钟**没更新算不知道在哪。
+在家不动；在外面、或者根本不知道在哪，可以问；只有「在外面」或者「压根没设过家」才会自己开。
+
+「在哪都开哨兵」（`pref_alerts_guard_everywhere`，存 `alerts_guard_everywhere`，默认关）把「在家不动」这一条
+放开：在家也照样问、照样开。关着时是车库里安安静静；开着时是每次停进自家车道哨兵也跟着开，
+车机就一直在那儿醒着 —— 这就是它默认关、summary 明写代价的原因。
+
+它**不是 AlertPolicy 的一次警报**：没有布防门、没有冷却、安静时段也不管 —— 那三样是为「车被人动了」写的，
+这一件事是「车主自己忘了」，按那套算只会让该说的话不说。它要的是 Telegram 那条路：按钮是回调
+（`callback_query`），别的传输方式没有回程，这一版只做 Telegram（`DECISIONS.md` D8）。
+
+实测（2026-11-15，车上，加油站外）：离开家以后车机还醒着的时候，这个写是被受理的 ——
+问出去没人按，60 秒后自己开，回执读回来是「Sentry Mode: on」；随后 `pic` 取回四路一张图。
+截图见 `docs/screenshots/alerts-forgot-sentry-chat.jpg`。**还没测到的**：那一刻读数有没有走到 2（布防），
+以及离车更久、车机睡过一轮之后再写会怎样。
+
+###### 图片
+
+![忘了开哨兵与按需取图](screenshots/alerts-forgot-sentry-chat.jpg)
+
+已知的两条限：
+
+- 进程那一刻没在跑，就没有提醒 —— 提醒是应用进程里的一段代码（`DECISIONS.md` D7）。
+- 车机睡了叫不醒，没有任何手段能把它叫回来；所以按钮的寿命只有三分钟，晚了的按键会收到一句「太晚了」。
+
+##### English
+
+The owner walks away with Sentry Mode still off and the car not at home — the car asks in the chat and
+switches it on by itself unless the owner objects. The trigger is the moment the owner leaves
+(`alarm.GuardEdge`): the driver seat going from occupied to empty is a departure; the screen going black
+(`SCREEN_POWER_EVENT 0 → 1`, the same millisecond as ignition ON → ACC on this car, `Signal.java:143`)
+counts only when the driver seat is **already empty**, and **nothing counts while someone is still sitting
+in the driver seat** — locking from inside blacks the screen too, and that is not leaving. A black screen
+with an unreadable seat decides nothing either. Both edges have to happen while parked, and only after a
+real drive — a car that has not moved since the last park is "parked since Tuesday", not "just left".
+Every blocked departure writes one black-box line naming the rule and the mode
+(`alarm.GuardPolicy.Block`), so doing nothing is still readable.
+
+Four modes in the settings (`alarm.GuardPolicy.Mode`, stored 0..3, default 0 = off):
+
+| Mode | Stored | What it does |
+|---|---|---|
+| Off | 0 | nothing |
+| Ask | 1 | send the ask; only the button switches it on |
+| Ask then on | 2 | send the ask, switch it on 60 s later unless vetoed |
+| On | 3 | switch it on silently and send a receipt |
+
+The numbers: ask **5 s** after leaving (`GuardPolicy.ASK_AT_MS`, so the door-close noise has passed),
+switch on **60 s** after the ask unless vetoed (`AUTO_ON_MS`), and any button pressed more than
+**180 s** after leaving is refused with a reason (`ACT_WINDOW_MS`). The window is deliberately shorter
+than the measured 4–6 minutes, so the refusal always lands before the car can sleep, never after.
+
+Home is one point (`alarm.GuardHome`): within **200 m** counts as home, and a fix older than
+**10 minutes** counts as unknown. Home never acts; away or unknown may ask; only away — or no home set
+at all — may switch it on by itself.
+
+"Also at home" (`pref_alerts_guard_everywhere`, stored as `alerts_guard_everywhere`, off by default)
+lifts that one rule: at home the car asks and switches on just the same. Off means a quiet garage; on
+means sentry also comes on in the owner's own driveway and the head unit stays awake there — which is
+why it is off by default and why its summary states the cost.
+
+This is **not an AlertPolicy alert**: no armed gate, no cooldown, and quiet hours do not apply — those
+three were written for "someone touched the car", and this one is "the owner forgot". It needs the
+Telegram transport: the buttons are callbacks (`callback_query`), the other transport has no return
+path, so this version is Telegram only (`DECISIONS.md` D8).
+
+Measured (2026-11-15, in the car, outside a petrol station): while the head unit is still awake after
+the owner leaves, the write is accepted — nobody pressed the button, it switched on by itself 60 s later,
+and the receipt reads back "Sentry Mode: on"; `pic` then returned the four cameras as one picture. The
+screenshot is `docs/screenshots/alerts-forgot-sentry-chat.jpg`. **Still unmeasured**: whether the value
+reached 2 (armed) at that moment, and what the write does once the head unit has slept and woken again.
+
+Two known limits:
+
+- If the process was not running at that moment, nothing reminds anyone — the feature is code inside
+the app process (`DECISIONS.md` D7).
+- A sleeping head unit cannot be woken by anything, which is why a button lives only three minutes; a
+  late press gets the honest "too late" answer.
+
 ## 1.9 第一张只有 100 kB，要看更多再点
 
 车主 2026-11-15 定的：**第一条消息只发一张压到 100 kB 以下的照片**，看得见发生什么，小到可以完全不管；
@@ -168,7 +269,7 @@ re-encoded. One clip at a time, because the sample ring is shared.
 不是假的：一样的照片、一样的按钮、一样的文案。
 
 覆盖：六项触发器各自那一条警报（双闪 / 远光 / 车门 / 车灯 / 中控屏 / 画面移动）、`pic` 那一张、HD 那一张、
-四路片段、状态一句话、帮助。
+四路片段、忘了开哨兵的五条（问、开了的回执、关掉的回执、按得太晚、已布防关不掉）、状态一句话、帮助。
 表在 `alarm.AlertEvent` 里（标题 + 描述各一个字符串资源），`AlertEventTest` 钉住「每行都有自己的一句」和
 「六项触发器一行不少」。表是配好之后「它到底发什么」；配好之前那三步（令牌 → 找到聊天 → 试一张）
 每一屏的截图在 `docs/setup-wizards.md`。
