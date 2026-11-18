@@ -36,8 +36,8 @@ import java.io.File;
 public class SettingsShotsTest {
 
     private static final String[] SECTIONS = {
-            "screen_recording", "screen_storage", "screen_rearview", "screen_side_view", "screen_floating",
-            "screen_general", "screen_update",
+            "screen_recording", "screen_alerts", "screen_storage", "screen_rearview",
+            "screen_side_view", "screen_floating", "screen_general", "screen_update",
     };
 
     @Test
@@ -62,6 +62,8 @@ public class SettingsShotsTest {
         config.setRearViewEnabled(true);
         config.setSideViewEnabled(true);
         config.setDriveSoundEnabled(true);
+        // 停车警报开着时下面四组才出现：这张图就是用来看那一屏的
+        config.setAlertsEnabled(true);
         shoot(Shots.DAY, "day-on");
     }
 
@@ -71,6 +73,8 @@ public class SettingsShotsTest {
         config.setRearViewEnabled(true);
         config.setSideViewEnabled(true);
         config.setDriveSoundEnabled(true);
+        config.setAlertsEnabled(true);
+        config.setAlertsQuietEnabled(true);
         shoot(Shots.DAY_EN, "day-on-en");
     }
 
@@ -347,6 +351,109 @@ public class SettingsShotsTest {
         }
         assertFalse("开发者选项关着时按关算，存着的值不动",
                 new AppConfig(RuntimeEnvironment.getApplication()).isPlaybackReadDurations());
+    }
+
+    /**
+     * 「警报附一张照片」关掉之后，下面三行跟着收起来。
+     *
+     * <p>排版（一张四宫格 / 每路一张）、那几路、掰直 —— 不拍照的时候三行都没有意义，留着只会让人以为
+     * 自己在设置里能改到已经不發生的事。片段那两行不动：它是聊天里点出来的，跟这条警报带不带图无关。</p>
+     *
+     * <p>开关本身还在，而且跟着存着的值：关掉之后重新进来，它就该是关的。</p>
+     *
+     * With "send a picture with each alert" off, the three rows below it collapse: layout, which lanes,
+     * and straightening all mean nothing when no picture is taken. The switch itself stays and shows
+     * the stored value.
+     */
+    @Test
+    public void thePictureSwitchCollapsesTheRowsBelowIt() {
+        RuntimeEnvironment.setQualifiers(Shots.DAY_EN);
+        SettingsPreferenceFragment on = alertsPage(true, config -> {
+            config.setAlertsPictureEnabled(true);
+            config.setAlertsLayout(com.kooo.evcam.alarm.media.AlertPicture.layoutValue(
+                    com.kooo.evcam.alarm.media.AlertPicture.Layout.SEPARATE));
+        });
+        assertTrue("开着时该看得见", shown(on, "pref_alerts_send_picture"));
+        assertTrue("排版该在", shown(on, "pref_alerts_picture"));
+        assertTrue("每路一张时那几路该在", shown(on, "pref_alerts_cameras"));
+        assertTrue("掰直该在", shown(on, "pref_alerts_straighten"));
+
+        SettingsPreferenceFragment off = alertsPage(true, config -> {
+            config.setAlertsPictureEnabled(false);
+        });
+        androidx.preference.Preference switchRow = off.findPreference("pref_alerts_send_picture");
+        assertNotNull("少了附图那一行", switchRow);
+        assertTrue("开关本身要留着", switchRow.isVisible());
+        assertFalse("存着关，开关就该是关的",
+                ((androidx.preference.SwitchPreferenceCompat) switchRow).isChecked());
+        assertFalse("不拍照就不该有排版", shown(off, "pref_alerts_picture"));
+        assertFalse("不拍照就不该有那几路", shown(off, "pref_alerts_cameras"));
+        assertFalse("不拍照就不该有掰直", shown(off, "pref_alerts_straighten"));
+
+        // 收尾：这几项是存在同一份设置里的，别把后面的测试带跑。
+        // Clean up: these live in the shared settings file.
+        AppConfig config = new AppConfig(RuntimeEnvironment.getApplication());
+        config.setAlertsPictureEnabled(true);
+        config.setAlertsLayout(com.kooo.evcam.alarm.media.AlertPicture.layoutValue(
+                com.kooo.evcam.alarm.media.AlertPicture.Layout.GRID));
+    }
+
+    /**
+     * ntfy 的换话题那一行：总开关开着就在，关着就不在。
+     *
+     * The ntfy topic row: present while the master switch is on, gone with it.
+     */
+    @Test
+    public void ntfyTopicRowFollowsTheMasterSwitch() {
+        SettingsPreferenceFragment on = alertsPage(true, config -> {
+            config.setAlertsNtfyPaid(false);
+        });
+        assertTrue("换话题该看得见", shown(on, "pref_alerts_ntfy_rotate"));
+        assertTrue("免费档要把公开话题那句写出来", shown(on, "pref_alerts_ntfy_public_warning"));
+
+        SettingsPreferenceFragment off = alertsPage(false, config -> {
+        });
+        assertFalse("总开关关着时换话题不该出现", shown(off, "pref_alerts_ntfy_rotate"));
+    }
+
+    private ShotActivity shotActivity;
+
+    /** 照着存好的状态开一屏新的「停车警报」。一条按存的这个状态绑出来的设置页。 */
+    private SettingsPreferenceFragment alertsPage(boolean alertsOn) {
+        return alertsPage(alertsOn, config -> {
+        });
+    }
+
+    /** 同上，但在建页之前改一点设置（付费档）。The same page, with one tweak before it is built. */
+    private SettingsPreferenceFragment alertsPage(boolean alertsOn,
+                                                  java.util.function.Consumer<AppConfig> tweak) {
+        AppConfig config = new AppConfig(RuntimeEnvironment.getApplication());
+        config.setAlertsEnabled(alertsOn);
+        config.setAlertsQuietEnabled(true);
+        tweak.accept(config);
+        RuntimeEnvironment.setQualifiers(Shots.DAY_EN);
+        shotActivity = Robolectric.buildActivity(ShotActivity.class).setup().get();
+        Shots.stillFrames(shotActivity);
+        SettingsShellFragment shell = new SettingsShellFragment();
+        shotActivity.getSupportFragmentManager().beginTransaction()
+                .replace(shotActivity.container, shell).commitNow();
+        Shots.settle();
+        shell.showSection("screen_alerts");
+        Shots.settle();
+        SettingsPreferenceFragment section = (SettingsPreferenceFragment) shell.getChildFragmentManager()
+                .findFragmentById(R.id.settings_detail);
+        assertNotNull("「停车警报」那一屏", section);
+        return section;
+    }
+
+    /** 这一行在组里的第几行。Where a row sits inside its group. */
+    private static int indexIn(androidx.preference.PreferenceGroup group, String key) {
+        for (int i = 0; i < group.getPreferenceCount(); i++) {
+            if (key.equals(group.getPreference(i).getKey())) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     private static boolean shown(SettingsPreferenceFragment section, String key) {
