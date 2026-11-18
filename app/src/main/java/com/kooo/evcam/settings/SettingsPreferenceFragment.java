@@ -1,6 +1,7 @@
 /*
  * Zeekr Shortcut - https://github.com/dts88/zeekr-shortcut-car
  * Copyright (C) 2026 dts88
+ * Portions Copyright (C) 2026 Fab (Fabbbrrr) - https://github.com/Fabbbrrr
  * SPDX-License-Identifier: GPL-3.0-only
  * Additional terms under GPL-3.0 section 7 apply to dts88's code; see NOTICE.md.
  */
@@ -13,7 +14,11 @@ import android.os.Bundle;
 import android.text.InputType;
 import com.kooo.evcam.profile.ProfileMigration;
 import com.kooo.evcam.profile.ProfileStore;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 import android.widget.Toast;
+import com.kooo.evcam.alarm.policy.TriggerSet;
+import com.kooo.evcam.alarm.SentryAlerts;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -24,6 +29,7 @@ import androidx.preference.PreferenceFragmentCompat;
 import androidx.preference.SeekBarPreference;
 import androidx.preference.SwitchPreferenceCompat;
 import androidx.appcompat.app.AlertDialog;
+import com.google.android.material.button.MaterialButton;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import com.kooo.evcam.AppConfig;
@@ -32,8 +38,8 @@ import com.kooo.evcam.MainActivity;
 import com.kooo.evcam.R;
 import com.kooo.evcam.StorageHelper;
 import com.kooo.evcam.WakeUpHelper;
-import com.kooo.evcam.overlay.OverlayCoordinator;
 import com.kooo.evcam.button.ButtonAction;
+import com.kooo.evcam.overlay.OverlayCoordinator;
 import com.kooo.evcam.service.RecordingFloatingService;
 import com.kooo.evcam.zeekr.DiagnosticsActivity;
 import com.kooo.evcam.zeekr.RearViewMirrorService;
@@ -195,6 +201,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         boundUnlocked = DeveloperMode.isUnlocked();
 
         bindRecording();
+        bindAlerts();
         bindStorage();
         bindRearView();
         bindSideView();
@@ -846,6 +853,523 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     //     return String.format(java.util.Locale.US, "%.1f", minutes / 60.0);
     // }
 
+    /**
+     * 停车警报（{@code screen_alerts}）：一个开关，加上把 Telegram 那头配好的四行。
+     *
+     * <h3>为什么令牌要在这辆车上敲</h3>
+     *
+     * <p>谁的车谁自己配，不靠重编一次 APK：令牌从 @BotFather 拿来已是随手可得的，
+     * 会话号用「找会话号」从 {@code getUpdates} 自动取 —— 车主只需先在手机上给机器人说一句话。
+     * 令牌存进 {@link AppConfig} 的另一个文件（{@code app_config_secrets}），
+     * 不进设置导出、不进诊断报告；设置页只显示末四位。</p>
+     */
+    private void bindAlerts() {
+        SwitchPreferenceCompat on = findPreference("pref_alerts");
+        if (on == null) {
+            return;
+        }
+        on.setPersistent(false);
+        on.setChecked(appConfig.isAlertsEnabled());
+        on.setOnPreferenceChangeListener((preference, newValue) -> {
+            boolean enabled = Boolean.TRUE.equals(newValue);
+            appConfig.setAlertsEnabled(enabled);
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("开关变更: pref_alerts → "
+                    + (enabled ? "开" : "关"));
+            com.kooo.evcam.alarm.SentryAlerts.get(requireContext()).refresh();
+            showAlertsRows();
+            return true;
+        });
+
+        // 每条警报附不附一张图（车主 2026-11-17，上游维护者提的那一条）。默认附。
+        // Whether each alert carries a picture (2026-11-17, the maintainer's point). On by default.
+        bindSwitch("pref_alerts_send_picture", appConfig.isAlertsPictureEnabled(), value -> {
+            appConfig.setAlertsPictureEnabled(value);
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("开关变更: pref_alerts_send_picture → "
+                    + (value ? "开" : "关（只发文字）"));
+            showAlertsRows();
+        });
+
+        // 发几张：一张四宫格，还是每一路各一张。合法取值在 SettingsRegistry.ALERTS_LAYOUT 一处
+        bindEnum("pref_alerts_picture", SettingsRegistry.ALERTS_LAYOUT, appConfig.getAlertsLayout(),
+                value -> appConfig.setAlertsLayout(value));
+
+        // 要哪几路（只在「每一路各一张」时用得上）
+        Preference cameras = findPreference("pref_alerts_cameras");
+        if (cameras != null) {
+            cameras.setPersistent(false);
+            cameras.setOnPreferenceClickListener(preference -> {
+                pickAlertsCameras();
+                return true;
+            });
+        }
+
+        SwitchPreferenceCompat straighten = findPreference("pref_alerts_straighten");
+        if (straighten != null) {
+            straighten.setPersistent(false);
+            straighten.setChecked(appConfig.isAlertsStraighten());
+            straighten.setOnPreferenceChangeListener((preference, newValue) -> {
+                appConfig.setAlertsStraighten(Boolean.TRUE.equals(newValue));
+                com.kooo.evcam.blackbox.BlackBox.noteImportant("开关变更: pref_alerts_straighten → "
+                        + (Boolean.TRUE.equals(newValue) ? "开" : "关"));
+                return true;
+            });
+        }
+
+        // ------------------------------------------------------------------ ntfy（试验）
+        // 整组只在开发者选项里那个开关打开时出现（D11/D14）；关着时下面这些行都在，只是不显示。
+        // The whole group only appears while the developer switch is on (D11/D14); closed, these rows
+        // exist but do not render.
+        Preference ntfySetup = findPreference("pref_alerts_ntfy_setup");
+        if (ntfySetup != null) {
+            ntfySetup.setPersistent(false);
+            ntfySetup.setOnPreferenceClickListener(preference -> {
+                NtfySetupDialog.show(this, appConfig, this::afterNtfyChange);
+                return true;
+            });
+        }
+
+        Preference ntfyTopic = findPreference("pref_alerts_ntfy_topic");
+        if (ntfyTopic != null) {
+            ntfyTopic.setPersistent(false);
+            // 点这一行就是「重新配一遍」：换话题、重新接受提醒、重新确认收到。
+            // Tapping this row means "set it up again": new topic, warning accepted again, delivery
+            // confirmed again.
+            ntfyTopic.setOnPreferenceClickListener(preference -> {
+                NtfySetupDialog.show(this, appConfig, this::afterNtfyChange);
+                return true;
+            });
+        }
+
+        bindSwitch("pref_alerts_ntfy_paid", appConfig.isAlertsNtfyPaid(), value -> {
+            appConfig.setAlertsNtfyPaid(value);
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("设置变更: pref_alerts_ntfy_paid → "
+                    + (value ? "付费" : "免费"));
+            afterNtfyChange();
+        });
+
+        Preference ntfyToken = findPreference("pref_alerts_ntfy_token");
+        if (ntfyToken != null) {
+            ntfyToken.setPersistent(false);
+            ntfyToken.setOnPreferenceClickListener(preference -> {
+                editAlertsNtfyToken();
+                return true;
+            });
+        }
+
+        Preference ntfyServer = findPreference("pref_alerts_ntfy_server");
+        if (ntfyServer != null) {
+            ntfyServer.setPersistent(false);
+            ntfyServer.setOnPreferenceClickListener(preference -> {
+                editAlertsNtfyServer();
+                return true;
+            });
+        }
+
+        // 换一个新话题：生成、存下、旧名字作废，然后马上给二维码让手机重新订阅。
+        // Rotate: mint, store, kill the old name, then show the QR so the phone resubscribes.
+        Preference ntfyRotate = findPreference("pref_alerts_ntfy_rotate");
+        if (ntfyRotate != null) {
+            ntfyRotate.setPersistent(false);
+            ntfyRotate.setOnPreferenceClickListener(preference -> {
+                appConfig.rotateAlertsNtfyTopic();
+                com.kooo.evcam.blackbox.BlackBox.noteImportant(
+                        "ntfy: topic rotated (the old name is dead for this car)");
+                showAlertsRows();
+                NtfyTopicQr.show(this, appConfig, R.string.set_alerts_ntfy_rotate_qr_title,
+                        this::afterNtfyChange);
+                return true;
+            });
+        }
+
+        // 这一栏的显示规则全写在这里（ui-spec §三：可见性只在一处）。
+        // 总开关关着时，下面那些设置没有意义；下层的选项只在它自己的上一层选中时才出现。
+        boolean alertsOn = appConfig.isAlertsEnabled();
+        com.kooo.evcam.alarm.policy.TriggerSet shownTriggers =
+                com.kooo.evcam.alarm.policy.TriggerSet.parse(appConfig.getAlertsTriggers());
+        boolean quietOn = appConfig.isAlertsQuietEnabled();
+        // 总开关关着时整组收起来：只留总开关和「检查」，
+        // 不要留下一排空的分组标题。两条出口各自的组按选中的那条路出现，规则在 showAlertsRows。
+        // With the master switch off the groups collapse; which exit group shows is decided in
+        // showAlertsRows, from the transport.
+        for (String key : new String[] {"cat_alerts_when", "cat_alerts_picture"}) {
+            show(key, alertsOn);
+        }
+        show("pref_alerts_motion_sensitivity", alertsOn && shownTriggers.has(
+                com.kooo.evcam.alarm.policy.TriggerSet.MOTION));
+        show("pref_alerts_arm_delay", alertsOn);
+        // 起止时刻只看「安静时段」那个开关（车主 2026-11-15）：安静时段关着时两行收起来，
+        // 打开才出现；行尾的时刻在 showAlertsRows 里写，出现时总是当前值。
+        // The two times follow the quiet-hours switch: visible only while quiet hours are on, and their
+        // summaries are written in showAlertsRows so they are current whenever they appear.
+        show("pref_alerts_quiet_start", alertsOn && quietOn);
+        show("pref_alerts_quiet_end", alertsOn && quietOn);
+        // 不拍照时，排版、那几路、掰直三行都没有意义，一起收起来。
+        // With pictures off the layout, the lanes and straightening mean nothing, so they collapse
+        // together.
+        boolean picturesOn = appConfig.isAlertsPictureEnabled();
+        show("pref_alerts_picture", alertsOn && picturesOn);
+        show("pref_alerts_straighten", alertsOn && picturesOn);
+        // 「那几路」的可见性只写在下面那一处（它还要写行尾的名单），这里不要重复判一次。
+        // The lanes row is decided in one place below, which also writes its summary; do not judge it twice.
+
+        Preference triggersRow = findPreference("pref_alerts_triggers");
+        if (triggersRow != null) {
+            triggersRow.setPersistent(false);
+            triggersRow.setOnPreferenceClickListener(preference -> {
+                pickAlertsTriggers(triggersRow);
+                return true;
+            });
+        }
+
+
+        ListPreference armDelay = findPreference("pref_alerts_arm_delay");
+        if (armDelay != null) {
+            armDelay.setPersistent(false);
+            armDelay.setEntries(new CharSequence[] {
+                    getString(R.string.opt_alerts_arm_now),
+                    getString(R.string.opt_alerts_arm_1),
+                    getString(R.string.opt_alerts_arm_3)});
+            armDelay.setEntryValues(new CharSequence[] {"0", "1", "3"});
+            armDelay.setValue(String.valueOf(appConfig.getAlertsArmDelayMinutes()));
+            armDelay.setOnPreferenceChangeListener((preference, newValue) -> {
+                try {
+                    appConfig.setAlertsArmDelayMinutes(Integer.parseInt(String.valueOf(newValue)));
+                } catch (NumberFormatException e) {
+                    appConfig.setAlertsArmDelayMinutes(com.kooo.evcam.alarm.policy.ArmDelay.DEFAULT_MIN);
+                }
+                com.kooo.evcam.blackbox.BlackBox.noteImportant(
+                        "设置变更: pref_alerts_arm_delay → " + newValue);
+                return true;
+            });
+        }
+
+        SwitchPreferenceCompat quiet = findPreference("pref_alerts_quiet");
+        if (quiet != null) {
+            quiet.setPersistent(false);
+            quiet.setChecked(appConfig.isAlertsQuietEnabled());
+            quiet.setOnPreferenceChangeListener((preference, newValue) -> {
+                boolean quietWanted = Boolean.TRUE.equals(newValue);
+                appConfig.setAlertsQuietEnabled(quietWanted);
+                com.kooo.evcam.blackbox.BlackBox.noteImportant("设置变更: pref_alerts_quiet → "
+                        + (quietWanted ? "开" : "关"));
+                showAlertsRows();
+                return true;
+            });
+        }
+        bindAlertsQuietRow("pref_alerts_quiet_start", true);
+        bindAlertsQuietRow("pref_alerts_quiet_end", false);
+
+        androidx.preference.SeekBarPreference sensitivity =
+                findPreference("pref_alerts_motion_sensitivity");
+        if (sensitivity != null) {
+            sensitivity.setPersistent(false);
+            sensitivity.setMin(com.kooo.evcam.alarm.media.MotionSensitivity.MIN);
+            sensitivity.setMax(com.kooo.evcam.alarm.media.MotionSensitivity.MAX);
+            sensitivity.setSeekBarIncrement(1);
+            sensitivity.setShowSeekBarValue(true);
+            sensitivity.setValue(appConfig.getAlertsMotionSensitivity());
+            sensitivity.setOnPreferenceChangeListener((preference, newValue) -> {
+                int level = newValue instanceof Integer ? (Integer) newValue : 0;
+                appConfig.setAlertsMotionSensitivity(level);
+                com.kooo.evcam.blackbox.BlackBox.noteImportant("设置变更: pref_alerts_motion_sensitivity → " + level);
+                com.kooo.evcam.alarm.SentryAlerts.get(requireContext()).refreshConfig();
+                return true;
+            });
+        }
+
+
+        showAlertsRows();
+    }
+
+    /** 行尾写当前填了什么。 */
+    private void showAlertsRows() {
+        // 真的走哪一档：免费还是付费，和发送那边读的是同一个值，说法不会打架。
+        // Which tier really applies: free or paid, read from the same value the sender uses.
+        Preference channelStatus = findPreference("pref_alerts_channel_status");
+        if (channelStatus != null) {
+            if (!appConfig.isAlertsNtfyPaid()) {
+                channelStatus.setSummary(R.string.set_alerts_channel_status_ntfy_public);
+            } else {
+                channelStatus.setSummary(R.string.set_alerts_channel_status_ntfy_paid);
+            }
+        }
+
+        // ntfy 那一组只跟着警报总开关走：总开关关着时整组收起来。
+        // The ntfy block follows the master switch only: with it off the whole block collapses.
+        boolean alertsOn = appConfig.isAlertsEnabled();
+        boolean ntfy = alertsOn;
+        show("cat_alerts_ntfy", alertsOn);
+        show("pref_alerts_ntfy_topic", ntfy);
+        show("pref_alerts_ntfy_paid", ntfy);
+        // 免费档的话题名就是地址：付费开关关着时把这一点写在付费开关下面，开着就不用说了。
+        // On the free plan the topic name is the address; say so under the paid switch while it is off.
+        show("pref_alerts_ntfy_public_warning", ntfy && !appConfig.isAlertsNtfyPaid());
+        show("pref_alerts_ntfy_token", ntfy && appConfig.isAlertsNtfyPaid());
+        show("pref_alerts_ntfy_server", ntfy);
+        show("pref_alerts_ntfy_rotate", ntfy);
+
+        // 起止时刻：安静时段开着才出现，行尾写着的总是当前值（改完时间也走这里刷新）。
+        // Quiet hours: the two time rows appear only while quiet hours are on, with their current value.
+        boolean quietOn = alertsOn && appConfig.isAlertsQuietEnabled();
+        show("pref_alerts_quiet_start", quietOn);
+        show("pref_alerts_quiet_end", quietOn);
+        Preference quietStart = findPreference("pref_alerts_quiet_start");
+        if (quietStart != null) {
+            quietStart.setSummary(com.kooo.evcam.alarm.policy.QuietHours.format(
+                    appConfig.getAlertsQuietStart()));
+        }
+        Preference quietEnd = findPreference("pref_alerts_quiet_end");
+        if (quietEnd != null) {
+            quietEnd.setSummary(com.kooo.evcam.alarm.policy.QuietHours.format(
+                    appConfig.getAlertsQuietEnd()));
+        }
+
+        Preference ntfyTopic = findPreference("pref_alerts_ntfy_topic");
+        if (ntfyTopic != null) {
+            String topic = appConfig.getAlertsNtfyTopic();
+            ntfyTopic.setSummary(topic.isEmpty() ? getString(R.string.set_alerts_ntfy_topic_empty)
+                    : getString(R.string.set_alerts_ntfy_topic_set, tail(topic)));
+        }
+        Preference ntfyToken = findPreference("pref_alerts_ntfy_token");
+        if (ntfyToken != null) {
+            String token = appConfig.getAlertsNtfyToken();
+            ntfyToken.setSummary(token.isEmpty() ? getString(R.string.set_alerts_ntfy_token_empty)
+                    : getString(R.string.set_alerts_ntfy_token_set, tail(token)));
+        }
+
+        Preference triggersRow = findPreference("pref_alerts_triggers");
+        if (triggersRow != null) {
+            com.kooo.evcam.alarm.policy.TriggerSet set =
+                    com.kooo.evcam.alarm.policy.TriggerSet.parse(appConfig.getAlertsTriggers());
+            StringBuilder text = new StringBuilder();
+            for (String name : com.kooo.evcam.alarm.policy.TriggerSet.ALL) {
+                if (!set.has(name)) {
+                    continue;
+                }
+                if (text.length() > 0) {
+                    text.append(" · ");
+                }
+                text.append(triggerLabel(name));
+            }
+            triggersRow.setSummary(text.length() == 0
+                    ? getString(R.string.set_alerts_triggers_none) : text.toString());
+        }
+
+        Preference cameras = findPreference("pref_alerts_cameras");
+        if (cameras != null) {
+            com.kooo.evcam.alarm.media.AlertPicture.Layout layout =
+                    com.kooo.evcam.alarm.media.AlertPicture.layout(appConfig.getAlertsLayout());
+            // 不拍照时这一行没有意义：它选的是「分开发的时候要哪几路」。
+            // With pictures off this row means nothing: it picks lanes for a mode that never runs.
+            cameras.setVisible(appConfig.isAlertsPictureEnabled()
+                    && layout == com.kooo.evcam.alarm.media.AlertPicture.Layout.SEPARATE);
+            int[] lanes = com.kooo.evcam.alarm.media.AlertPicture.lanes(appConfig.getAlertsCameras());
+            StringBuilder names = new StringBuilder();
+            for (int lane : lanes) {
+                if (names.length() > 0) {
+                    names.append(" · ");
+                }
+                names.append(com.kooo.evcam.camera.CameraNames.ofLane(requireContext(), lane));
+            }
+            cameras.setSummary(com.kooo.evcam.alarm.media.AlertPicture.allLanes(lanes)
+                    ? getString(R.string.set_alerts_cameras_all) : names.toString());
+        }
+
+    }
+
+    /** 哪些事情算「有事」（TriggerSet）。 */
+    private void pickAlertsTriggers(Preference row) {
+        com.kooo.evcam.alarm.policy.TriggerSet current =
+                com.kooo.evcam.alarm.policy.TriggerSet.parse(appConfig.getAlertsTriggers());
+        String[] names = com.kooo.evcam.alarm.policy.TriggerSet.ALL;
+        CharSequence[] labels = new CharSequence[names.length];
+        boolean[] checked = new boolean[names.length];
+        for (int i = 0; i < names.length; i++) {
+            labels[i] = triggerLabel(names[i]);
+            checked[i] = current.has(names[i]);
+        }
+        new MaterialAlertDialogBuilder(requireContext(), R.style.Theme_Cam_MaterialAlertDialog)
+                .setTitle(R.string.set_alerts_triggers_title)
+                .setMultiChoiceItems(labels, checked, (dialog, which, isChecked) -> checked[which] = isChecked)
+                .setPositiveButton(R.string.action_save, (dialog, which) -> {
+                    java.util.Set<String> picked = new java.util.LinkedHashSet<>();
+                    for (int i = 0; i < names.length; i++) {
+                        if (checked[i]) {
+                            picked.add(names[i]);
+                        }
+                    }
+                    appConfig.setAlertsTriggers(com.kooo.evcam.alarm.policy.TriggerSet.value(picked));
+                    com.kooo.evcam.blackbox.BlackBox.noteImportant("设置变更: pref_alerts_triggers → "
+                            + (picked.isEmpty() ? "（一项都没选）" : picked));
+                    com.kooo.evcam.alarm.SentryAlerts.get(requireContext()).refreshConfig();
+                    showAlertsRows();
+                })
+                .setNegativeButton(R.string.action_cancel, null)
+                .show();
+    }
+
+    /** 触发项的名字（存的是英文 key，界面上说人话）。 */
+    private CharSequence triggerLabel(String name) {
+        switch (name) {
+            case com.kooo.evcam.alarm.policy.TriggerSet.MOTION:
+                return getString(R.string.alert_trigger_motion);
+            case com.kooo.evcam.alarm.policy.TriggerSet.HAZARD:
+                return getString(R.string.alert_trigger_hazard);
+            case com.kooo.evcam.alarm.policy.TriggerSet.FLASH:
+                return getString(R.string.alert_trigger_flash);
+            case com.kooo.evcam.alarm.policy.TriggerSet.DOORS:
+                return getString(R.string.alert_trigger_doors);
+            case com.kooo.evcam.alarm.policy.TriggerSet.LAMPS:
+                return getString(R.string.alert_trigger_lamps);
+            default:
+                return getString(R.string.alert_trigger_screen);
+        }
+    }
+
+    /** 安静时段的一头（{@code HH:mm}）。 */
+    private void bindAlertsQuietRow(String key, boolean start) {
+        Preference row = findPreference(key);
+        if (row == null) {
+            return;
+        }
+        row.setPersistent(false);
+        row.setOnPreferenceClickListener(preference -> {
+            int current = start ? appConfig.getAlertsQuietStart() : appConfig.getAlertsQuietEnd();
+            showTextDialog(key, getString(start ? R.string.set_alerts_quiet_start_title
+                            : R.string.set_alerts_quiet_end_title),
+                    getString(R.string.set_alerts_quiet_hint),
+                    com.kooo.evcam.alarm.policy.QuietHours.format(current), value -> {
+                        int minute = com.kooo.evcam.alarm.policy.QuietHours.parse(value);
+                        if (minute < 0) {
+                            toast(getString(R.string.set_alerts_quiet_bad_time));
+                            return;
+                        }
+                        if (start) {
+                            appConfig.setAlertsQuietStart(minute);
+                        } else {
+                            appConfig.setAlertsQuietEnd(minute);
+                        }
+                        showAlertsRows();
+                    });
+            return true;
+        });
+    }
+
+    /** 勾要哪几路。四路都勾就等于「全部」。 */
+    private void pickAlertsCameras() {
+        int[] selected = com.kooo.evcam.alarm.media.AlertPicture.lanes(appConfig.getAlertsCameras());
+        CharSequence[] names = new CharSequence[com.kooo.evcam.alarm.media.AlertPicture.LANES];
+        boolean[] checked = new boolean[names.length];
+        for (int lane = 0; lane < names.length; lane++) {
+            names[lane] = com.kooo.evcam.camera.CameraNames.ofLane(requireContext(), lane);
+            checked[lane] = contains(selected, lane);
+        }
+        new MaterialAlertDialogBuilder(requireContext(), R.style.Theme_Cam_MaterialAlertDialog)
+                .setTitle(R.string.set_alerts_cameras_title)
+                .setMultiChoiceItems(names, checked, (dialog, which, isChecked) -> checked[which] = isChecked)
+                .setPositiveButton(R.string.action_save, (dialog, which) -> {
+                    int count = 0;
+                    for (boolean on : checked) {
+                        if (on) {
+                            count++;
+                        }
+                    }
+                    if (count == 0) {
+                        // 一路都不勾等于没有图可发：按「全部」算，别让警报静悄悄地变成哑巴
+                        toast(getString(R.string.set_alerts_cameras_none));
+                        appConfig.setAlertsCameras("0,1,2,3");
+                    } else {
+                        StringBuilder value = new StringBuilder();
+                        for (int lane = 0; lane < checked.length; lane++) {
+                            if (checked[lane]) {
+                                if (value.length() > 0) {
+                                    value.append(',');
+                                }
+                                value.append(lane);
+                            }
+                        }
+                        appConfig.setAlertsCameras(value.toString());
+                    }
+                    com.kooo.evcam.blackbox.BlackBox.noteImportant("设置变更: pref_alerts_cameras → "
+                            + appConfig.getAlertsCameras());
+                    showAlertsRows();
+                })
+                .setNegativeButton(R.string.action_cancel, null)
+                .show();
+    }
+
+    private static boolean contains(int[] values, int wanted) {
+        if (values == null) {
+            return false;
+        }
+        for (int value : values) {
+            if (value == wanted) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * ntfy 那条路存完之后的收尾：让对方重新读设置、重画行。
+     *
+     * <p>换出口只写一个键（{@link com.kooo.evcam.alarm.ntfy.NtfyGate}），这边只负责通知。</p>
+     *
+     * The tidy-up after ntfy settings change: make the sender re-read its config and repaint the rows.
+     * Switching exits writes one key; this only tells the rest.
+     */
+    private void afterNtfyChange() {
+        if (getContext() == null) {
+            return;
+        }
+        com.kooo.evcam.alarm.SentryAlerts.get(requireContext()).refreshConfig();
+        showAlertsRows();
+    }
+
+    /** ntfy 访问令牌（付费档才用得上）。只存在凭据文件里，界面上只露末四位以外什么都不说。 */
+    private void editAlertsNtfyToken() {
+        showTextDialog("pref_alerts_ntfy_token", getString(R.string.set_alerts_ntfy_token_title),
+                getString(R.string.set_alerts_ntfy_token_summary),
+                appConfig.getAlertsNtfyToken(), value -> {
+                    appConfig.setAlertsNtfyToken(value);
+                    com.kooo.evcam.blackbox.BlackBox.noteImportant("设置变更: pref_alerts_ntfy_token → "
+                            + (value.isEmpty() ? "（空）" : "已填写"));
+                    afterNtfyChange();
+                });
+    }
+
+    /** ntfy 服务器地址。自己搭的才改；改完当场试一路，认不出来现在就说。 */
+    private void editAlertsNtfyServer() {
+        showTextDialog("pref_alerts_ntfy_server", getString(R.string.set_alerts_ntfy_server_title),
+                getString(R.string.set_alerts_ntfy_server_summary),
+                appConfig.getAlertsNtfyServer(), value -> {
+                    appConfig.setAlertsNtfyServer(value);
+                    com.kooo.evcam.blackbox.BlackBox.noteImportant("设置变更: pref_alerts_ntfy_server → "
+                            + (value.isEmpty() ? "（默认）" : "已填写"));
+                    afterNtfyChange();
+                });
+    }
+
+    /** 末四位：话题名和令牌都只这样露。The last four characters: topics and tokens are only shown this way. */
+    private static String tail(String value) {
+        if (value == null || value.length() <= 4) {
+            return "…";
+        }
+        return value.substring(value.length() - 4);
+    }
+
+    /**
+     * ntfy 那个开关：换出口，不是开关一个功能。
+     *
+     * <p>打开而且还没有话题时，先走一遍设置流程（提醒 → 扫码 → 四位数）；中途退出就回到关着。</p>
+     *
+     * The ntfy switch: it switches exits, it does not toggle a feature. Turning it on with no topic
+     * walks through setup first; leaving setup puts it back to off.
+     */
+
+    /** 开关之后的共同收尾：把勾选状态、行尾说明、发送那边一起对齐。 */
+
+    
     /**
      * 车牌号水印（开关加下一层，ui-spec §三，项目所有者 2026-10-23）：开关管录像和照片上显不显示车牌号；
      * 点这一行改车牌号，行尾写车牌号（没填写「未填写」）。开着就一定有车牌号：还没填时打开，先弹输入框、填了才算打开；
@@ -1923,6 +2447,12 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         // 这里原来先找一个 key 为 cat_developer 的分类，找不到就整个返回 ——
         // 而 0.21.0 把分区改成嵌套 PreferenceScreen 之后，这个 key 就不存在了。
         // 于是下面四个入口一个都没接上，点了毫无反应，也不报错。
+        // ntfy 的出口开关（2026-11-15）：换出口，不擦设置（D14）
+        // The ntfy exit switch: switches exits and erases nothing (D14)
+
+        onClick("pref_alerts_debug", pref -> startActivity(
+                new Intent(getContext(), com.kooo.evcam.alarm.AlertsDebugActivity.class)));
+
         onClick("pref_permissions",
                 pref -> openFragment(new PermissionsPreferenceFragment(), R.string.dev_permissions_title));
 
@@ -1940,6 +2470,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         // 车辆状态面板（2026-10-23 从界面页挪来）：主界面那个控件自己听这个开关
         bindSwitch("pref_vehicle_status", appConfig.isVehicleStatusEnabled(),
                 value -> appConfig.setVehicleStatusEnabled(value));
+
 
         bindSwitch("pref_raw_frame_dump", appConfig.isRawFrameDumpEnabled(),
                 appConfig::setRawFrameDumpEnabled);

@@ -20,6 +20,80 @@ its own previews as a distorted strip. Zeekr Shortcut splits it back into four v
 
 Every feature, setting and tip is described in the **[wiki](../../wiki)**.
 
+## Alerts while parked
+
+With the car parked and Sentry Mode on, the app can send you a picture when something happens to it.
+Off by default; set it up once, from the car screen, and nothing needs rebuilding.
+
+- One picture of all four cameras, taken by the same photo path the shutter button uses, so it looks
+  like a photo you would have taken yourself.
+- It is published to a private ntfy topic when: something moves in view, the hazards come on, the high
+  beams flash, a door / frunk / trunk opens, the car lights come on by themselves, or the centre screen
+  lights up while parked. Pick which of those count under **Settings → Alerts → What counts**.
+- **Settings → Alerts → Set up ntfy** runs the wizard: it generates the topic, shows it as a QR code
+  for the phone's ntfy app to scan, and asks for four digits it sends to that topic — the digits coming
+  back is the proof the phone really receives.
+- One alert per minute at most, six an hour. The cooldown is there because one event trips several
+  signals at once.
+- Coming back to the car does not send anything: unlocking drops Sentry Mode out of its armed value
+  before the screen or the lamps come back on, and the alert needs the armed value.
+- The topic name stays on this car, in its own store: it is not in the exported settings, not in a
+  diagnostics report, and not in the log. The name is the address, so treat it like a password.
+
+This car has no impact, horn, airbag or tamper signal on the bus that this app can read, so a knock
+that never lights the hazards and never opens a door will not be seen. The picture is the four
+surround cameras stitched into the 2×2 grid, not the cabin cameras.
+
+## Sentry alerts
+
+With Sentry Mode on, the car already keeps recording. Turn this on and it also tells you: one picture
+of the four surround cameras is published to your ntfy topic when something happens to the car while
+you are away.
+
+Off by default. Settings → **Alerts**.
+
+### Setting up ntfy, step by step
+
+The guided wizard's every screen, with one picture per step, is in
+**[docs/setup-wizards.md](docs/setup-wizards.md)**. The list below is the same path written out.
+
+1. **Accept the honest warning.** A free topic is public: the name is the address, so anyone holding
+   it can read the pictures and publish to it. Setup says so first and refuses to send until that is
+   accepted.
+2. **Scan the QR code.** The car generates the topic and shows it as a QR code; the phone's ntfy app
+   scans it and subscribes.
+3. **Prove the path.** The car sends four digits to that topic; type them back into the wizard. The
+   digits coming back is the proof the phone really receives — if they arrive, everything works:
+   the car, its 4G, the topic, the phone.
+4. **Choose what counts** under **What counts as something**: movement in view, hazards, high beams, a
+   door, the car lights, the centre screen. By default only the three the car itself reacts with are on.
+5. **Park, lock, walk away.** Unlock the car and nothing is sent — unlocking drops Sentry Mode out of
+   its armed value before the lights come back on.
+
+Optional, in the same section:
+
+- **A picture, or just the line**: on by default. Turn it off and each alert publishes the sentence
+  alone and the car never takes the picture.
+- **Pictures**: one 2×2 of all four cameras, or one picture per camera so each fills the phone screen.
+- **Straighten**: the same fisheye correction playback uses.
+- **The picture is small.** Each alert is one picture compressed on the car to under 100 kB: enough to
+  see what is happening, small enough to ignore. Data per alert, by default: 100 kB.
+- **Start after locking**: right away, 1 minute or 3 minutes after the car locks, so walking away
+  does not send you a picture of yourself.
+- **Quiet hours**: no alerts between two times, for the nights the car is at home.
+- **Change the topic** with one row. It mints a new name (238 random bits, mixed with the install time,
+  the current time, the rotation count and the model so two cars never collide), kills the old one, asks
+  for the risk warning again, and shows the QR code so the phone can subscribe. Do this if someone saw
+  your lock screen.
+- **Paid tier.** A paid ntfy plan allows protected topics; the paid switch tells the car the topic is
+  protected and lifts the free tier's message size cap.
+
+**What it cannot see.** The car reports no impact, horn or tamper signal, so a knock that lights nothing
+and opens nothing stays invisible. Cameras also need Sentry Mode to keep the head unit awake.
+
+---
+
+## Download
 ---
 
 ## Download

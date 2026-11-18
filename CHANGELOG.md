@@ -9,7 +9,24 @@ commit message, not here.
 
 ## [Unreleased]
 
-Nothing yet.
+- Alerts (new section in Settings, off by default): with the car parked and Sentry Mode armed, the app
+  publishes one picture of all four cameras, one way, to a private ntfy topic when something happens to
+  the car — hazards, high beams, a door, the lights, the screen, or movement in view. The topic is
+  generated on the car, subscribed by the phone's ntfy app from a QR code, and proven with four digits
+  the car sends to it.
+- The ntfy setup wizard runs the whole path: it states the free-topic risk first (a free topic is
+  public — the name is the address) and refuses to send until that is accepted, then shows the QR code,
+  then asks for the digits. The topic name lives in the car's credential store — never in the settings
+  export, a diagnostic report, or the log — and one row rotates it if it ever leaked.
+- Alerts: every trigger is a switch under Settings → Alerts → What counts; movement in view is read
+  from the encoder's own frames and has its own 1–10 sensitivity.
+- Alerts: nothing is sent when you come back to the car. Unlocking drops Sentry Mode out of its armed
+  value before the screen and the lamps come on, and an alert needs the armed value.
+- Alerts: arm delay (right away, 1 or 3 minutes after locking) and quiet hours between two times.
+- Alerts: a picture or just the line — on by default; one 2×2 or one picture per camera; the same
+  fisheye correction playback uses; every picture squeezed under 100 kB on the car.
+- Alerts: a diagnostics screen under Developer options shows the switch, the topic, the motion
+  detector and the car's state as one JSON plus the recent log.
 
 ## [4.11.0-alpha] - 2026-11-17
 
