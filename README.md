@@ -27,14 +27,15 @@ Every feature, setting and tip is described in the **[wiki](../../wiki)**.
 Get the APK from **[Releases](../../releases/latest)**. Once installed, the app can check for newer
 versions itself: Settings → Updates & about → Check for updates.
 
-- You need to know how to sideload an app through App Lab. This page does not cover that.
+- The first install goes through App Lab (sideloading): see [First install](../../wiki/First-install) in the wiki,
+  or brotatochip's [video guide](https://youtu.be/m2o2HcqdsOY).
 - When the installer finishes, tap **Back** at the top left, not **Open**. Otherwise the head unit's
   installer gets stuck and later installs or updates fail.
 
 Building from source: see the [wiki](../../wiki/Build-from-source).
 
-Questions and ideas: [Discussions](../../discussions). Problems: [open an issue](../../issues) and attach
-a report from Settings → General → Diagnostics.
+Questions and ideas: [Discussions](../../discussions). Problems: [open an issue](../../issues). Please don't post
+the diagnostics report in public; send it to dts88 by private message in the owners' group chat.
 
 ---
 
@@ -84,6 +85,9 @@ EngineV1 only supplied facts (see [NOTICE.md](NOTICE.md)).
 - **[Fabbbrrr](https://github.com/Fabbbrrr)** — the innovative idea of decentralised ntfy and Telegram alerts that go
   straight to the owner's phone and never through a developer's server, and the design and logic of the ntfy alerts
   ([#211](https://github.com/dts88/zeekr-shortcut-car/pull/211)). Many thanks.
+- **[brotatochip](https://www.youtube.com/@equinoxau)** — the video
+  [Zeekr 7X Shortcut Dashcam App Installation & Usage Guide](https://youtu.be/m2o2HcqdsOY): a detailed walkthrough of
+  sideloading as it works today, and an introduction to Zeekr Shortcut. Many thanks.
 - **SW** — active testing and feedback. Many thanks.
 
 Origins, third-party licences and boundaries: [NOTICE.md](NOTICE.md).
