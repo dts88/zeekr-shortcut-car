@@ -9,29 +9,31 @@
 package com.kooo.evcam.alarm.ntfy;
 
 /**
- * 免费话题的风险提示接受过没有 —— 纯函数，一个字符串。
+ * 话题的风险提示同意过没有 —— 纯函数，一个字符串。
  *
  * <h3>为什么按话题、按版本存</h3>
  *
- * <p>接受的是「这个话题是公开的，风险我担」，不是「以后都别再问我」。所以存的是
- * {@code 版本|话题末八位}：换话题、换服务器、或者改了一版提醒的措辞，都要重新问一次。
- * 设置备份恢复到另一台车上也带不走同意 —— 那是故意的。</p>
+ * <p>同意的是「这个话题是公开的，风险我担」，不是「以后都别再问我」。所以存的是
+ * {@code 版本|话题末八位}：换了话题、改了一版提示的措辞，都要重新同意 —— 换话题时的「更换话题？」本身就是这一句
+ * （新话题同样公开），点了「更换」就记下新话题的同意。同意和话题一起存在不导出的那一份里（{@code alarm.AlertStore}），
+ * 设置备份恢复到另一台车上带不走 —— 那是故意的。</p>
  *
  * <h3>Why per topic and per version</h3>
  *
  * <p>What was agreed is "this topic is public and the risk is mine", not "never ask me again". So the
- * stored form is {@code version|last eight of topic}: a new topic, a new server, or a new wording all
- * ask again. A settings backup restored onto another car carries no consent with it — deliberately.</p>
+ * stored form is {@code version|last eight of topic}: a new topic or a new wording asks again — the
+ * change-topic confirmation says the same thing about the new topic, so confirming it records consent for
+ * that topic. Consent lives with the topic in the store that is never exported ({@code alarm.AlertStore}),
+ * so a settings backup restored onto another car carries none of it — deliberately.</p>
  */
 public final class NtfyRisk {
 
     /**
-     * 提醒的措辞版本。改了那段话就把它加一：不能让人替自己没读过的字点头。
+     * 提示的措辞版本。「开启哨兵提醒？」那段话（{@code dlg_sentry_alerts_risk_body}）改了意思就把它加一：
+     * 不能让人替自己没读过的字点头。
      *
-     * <p>{@code docs/ntfy/WIZARD-COPY.md} 里那段六条理由改了字，就要动这个数字。</p>
-     *
-     * The wording version. Bump it when the warning text changes: nobody should be counted as having
-     * accepted words they never read.
+     * The wording version. Bump it when the meaning of the risk notice ({@code dlg_sentry_alerts_risk_body})
+     * changes: nobody should be counted as having accepted words they never read.
      */
     public static final String WARNING_VERSION = "1";
 

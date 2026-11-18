@@ -27,12 +27,6 @@ public class PictureBudgetTest {
     }
 
     @Test
-    public void hdKeepsTheOldLadderAndAClipIsTenMegabytes() {
-        assertEquals(900 * 1024, PictureBudget.HIGH_BYTES);
-        assertEquals(10 * 1024 * 1024, PictureBudget.CLIP_BYTES);
-    }
-
-    @Test
     public void qualityDropsBeforeThePictureShrinks() {
         // 前四步都是全尺寸，只是画质一档档往下
         for (int step = 0; step < 4; step++) {

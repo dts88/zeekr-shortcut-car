@@ -17,56 +17,38 @@ import org.junit.Test;
 import com.kooo.evcam.alarm.policy.ArmDelay;
 
 /**
- * 锁车之后等多久才发（{@link ArmDelay}）：等的那一分钟是自己走开的时间，不是把真事吞掉的时间。
+ * 锁车之后等多久才发（{@link ArmDelay}）：锁车满 3 分钟。读得到的是布防的那一刻（锁车后约 90 秒），
+ * 所以从布防起再等 90 秒。等的是自己走开的时间，不是把真事吞掉的时间。
  *
- * How long after locking the car to wait before sending ({@link ArmDelay}):
- * that waiting minute is time for you to walk away, not time that swallows a
- * real event.
+ * How long after locking the car to wait before sending ({@link ArmDelay}): 3 minutes after locking,
+ * which is 90 seconds after the car arms itself. That waiting time is for walking away, not time that
+ * swallows a real event.
  */
 public class ArmDelayTest {
 
     @Test
-    public void rightAwayMeansRightAway() {
-        assertTrue(ArmDelay.allows(0, 0));
-        assertTrue(ArmDelay.allows(0, -1));
+    public void threeMinutesAfterLockingIsNinetySecondsAfterArming() {
+        assertEquals(3 * 60_000L, ArmDelay.AFTER_LOCK_MS);
+        assertEquals(90_000L, ArmDelay.AFTER_ARMED_MS);
+        assertFalse(ArmDelay.allows(0));
+        assertFalse(ArmDelay.allows(89_999L));
+        assertTrue(ArmDelay.allows(90_000L));
+        assertTrue(ArmDelay.allows(10 * 60_000L));
     }
 
     @Test
-    public void aMinuteIsAMinute() {
-        assertFalse(ArmDelay.allows(1, 0));
-        assertFalse(ArmDelay.allows(1, 59_000L));
-        assertTrue(ArmDelay.allows(1, 60_000L));
-        assertTrue(ArmDelay.allows(1, 10 * 60_000L));
-    }
-
-    @Test
-    public void threeMinutesIsThreeMinutes() {
-        assertFalse(ArmDelay.allows(3, 2 * 60_000L));
-        assertTrue(ArmDelay.allows(3, 3 * 60_000L));
-    }
-
-    @Test
-    public void notKnowingHowLongItHasBeenLockedDoesNotSilenceTheCar() {
-        // 进程刚起来、车本来就锁着：不知道等了多久，宁可偶尔吵一下，也不能吞掉真事
-        // The process just started and the car was already locked: we don't know
-        // how long it has been, so it is better to occasionally sound off than to
-        // swallow a real event.
-        assertTrue(ArmDelay.allows(3, -1));
-        assertEquals(0, ArmDelay.remainingMs(3, -1));
-    }
-
-    @Test
-    public void anythingElseFallsBackToTheDefault() {
-        assertEquals(ArmDelay.DEFAULT_MIN, ArmDelay.clamp(7));
-        assertEquals(ArmDelay.DEFAULT_MIN, ArmDelay.clamp(-5));
-        assertEquals(3, ArmDelay.clamp(3));
-        assertEquals(0, ArmDelay.clamp(0));
+    public void notKnowingHowLongItHasBeenArmedDoesNotSilenceTheCar() {
+        // 进程刚起来、车本来就布防着：不知道等了多久，宁可偶尔吵一下，也不能吞掉真事
+        // The process just started and the car was already armed: we don't know how long it has been,
+        // so it is better to occasionally sound off than to swallow a real event.
+        assertTrue(ArmDelay.allows(-1));
+        assertEquals(0, ArmDelay.remainingMs(-1));
     }
 
     @Test
     public void remainingCountsDownAndStopsAtZero() {
-        assertEquals(45_000L, ArmDelay.remainingMs(1, 15_000L));
-        assertEquals(0, ArmDelay.remainingMs(1, 90_000L));
-        assertEquals(0, ArmDelay.remainingMs(0, 0));
+        assertEquals(75_000L, ArmDelay.remainingMs(15_000L));
+        assertEquals(0, ArmDelay.remainingMs(90_000L));
+        assertEquals(0, ArmDelay.remainingMs(5 * 60_000L));
     }
 }

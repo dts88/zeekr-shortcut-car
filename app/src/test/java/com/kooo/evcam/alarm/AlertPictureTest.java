@@ -8,71 +8,102 @@
 
 package com.kooo.evcam.alarm;
 
-import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNotSame;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Paint;
+
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.robolectric.RobolectricTestRunner;
+import org.robolectric.annotation.Config;
+import org.robolectric.annotation.GraphicsMode;
 
 import com.kooo.evcam.alarm.media.AlertPicture;
+import com.kooo.evcam.alarm.media.PictureBudget;
+
+import java.util.Random;
 
 /**
- * 警报发几张、发哪几路（{@link AlertPicture}）：排版和勾选的存法。
+ * 提醒附带的那张图（{@link AlertPicture}）：压进 100 KB、压不进就不附，盖时间不动源图，开关关着不掰直。
  *
- * <p>位图那部分（切格子、掰直、压缩）要 Robolectric 的原生绘图，这里只钉读写的规矩 ——
- * 一串设置值无论怎么写坏，落到「要发哪几路」上都必须是能发出去的那几路。</p>
- *
- * How many pictures an alert sends, and which lanes it sends them to
- * ({@link AlertPicture}): how the layout and the checked boxes are stored.
- *
- * The bitmap part (splitting the grid, straightening, compressing) needs
- * Robolectric's native drawing, so here we only pin the read/write rules; no
- * matter how a settings value is mangled, when it lands on "which lanes to send"
- * it must resolve to lanes that can actually be sent.
+ * The picture attached to an alert ({@link AlertPicture}): squeezed under 100 KB or not attached at all,
+ * the time stamp drawn on a copy, and no straightening when the switch is off.
  */
+@RunWith(RobolectricTestRunner.class)
+@Config(sdk = 34, application = android.app.Application.class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 public class AlertPictureTest {
 
     @Test
-    public void layoutRoundTripsAndFallsBackToTheGrid() {
-        assertEquals(AlertPicture.Layout.GRID, AlertPicture.layout("grid"));
-        assertEquals(AlertPicture.Layout.SEPARATE, AlertPicture.layout("separate"));
-        assertEquals("grid", AlertPicture.layoutValue(AlertPicture.Layout.GRID));
-        assertEquals("separate", AlertPicture.layoutValue(AlertPicture.Layout.SEPARATE));
-        assertEquals("认不出来按四宫格算", AlertPicture.Layout.GRID, AlertPicture.layout("nonsense"));
-        assertEquals(AlertPicture.Layout.GRID, AlertPicture.layout(null));
+    public void aSurroundSizedPictureFitsTheBudget() {
+        Bitmap grid = scene(1280, 1280);
+        byte[] jpeg = AlertPicture.jpegUnder(grid, PictureBudget.ALERT_BYTES);
+        assertNotNull("压不进 100 KB", jpeg);
+        assertTrue("超了: " + jpeg.length, jpeg.length <= PictureBudget.ALERT_BYTES);
+        assertFalse("源图被回收了", grid.isRecycled());
     }
 
     @Test
-    public void anEmptySelectionMeansAllFour() {
-        assertArrayEquals(new int[] {0, 1, 2, 3}, AlertPicture.lanes(""));
-        assertArrayEquals(new int[] {0, 1, 2, 3}, AlertPicture.lanes(null));
-        assertArrayEquals(new int[] {0, 1, 2, 3}, AlertPicture.lanes(" , ,"));
-        assertArrayEquals("越界的号不算，剩下一个都没有时回到全部",
-                new int[] {0, 1, 2, 3}, AlertPicture.lanes("9,-1,abc"));
+    public void nothingIsAttachedWhenNoStepFits() {
+        // 满屏噪点、预算只有 1 KB：哪一档都压不进去，宁可不附图
+        assertNull(AlertPicture.jpegUnder(noise(800, 800), 1024));
     }
 
     @Test
-    public void lanesComeBackSortedAndDeduplicated() {
-        assertArrayEquals(new int[] {0, 2}, AlertPicture.lanes("2,0,2"));
-        assertArrayEquals(new int[] {1}, AlertPicture.lanes("1"));
-        assertEquals("0,2", AlertPicture.lanesValue(new int[] {2, 0, 2}));
+    public void theStampGoesOnACopy() {
+        Bitmap source = scene(640, 640);
+        Bitmap stamped = AlertPicture.stamped(source, "2026-11-18 21:05:33");
+        assertNotNull(stamped);
+        assertNotSame(source, stamped);
+        assertEquals(source.getWidth(), stamped.getWidth());
+        assertEquals(source.getHeight(), stamped.getHeight());
+        assertFalse(source.isRecycled());
+        assertNull(AlertPicture.stamped(null, "x"));
     }
 
     @Test
-    public void allLanesOnlyWhenFourDistinct() {
-        assertTrue(AlertPicture.allLanes(new int[] {0, 1, 2, 3}));
-        assertFalse(AlertPicture.allLanes(new int[] {0, 1, 2}));
-        assertFalse(AlertPicture.allLanes(null));
+    public void theSwitchOffMeansTheSamePicture() {
+        Bitmap grid = scene(640, 640);
+        assertSame(grid, AlertPicture.straighten(grid, false, 120f, null));
+        assertNull(AlertPicture.straighten(null, true, 120f, null));
     }
 
-    @Test
-    public void quadrantsMatchTheSavedGridOrder() {
-        // 2×2 四宫格的座次：左上 0 前、右上 1 后、左下 2 左、右下 3 右（CompositeBitmapComposer 的默认排列）
-        // 2×2 grid seating: top-left 0 front, top-right 1 rear, bottom-left 2 left,
-        // bottom-right 3 right (CompositeBitmapComposer's default layout)
-        assertEquals(2, AlertPicture.COLUMNS);
-        assertEquals(2, AlertPicture.ROWS);
-        assertEquals(4, AlertPicture.LANES);
+    /** 像一张四宫格：四块不同的底色，上面几道线。Four tinted cells with a few lines, like a 2x2 grid. */
+    private static Bitmap scene(int width, int height) {
+        Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bitmap);
+        Paint paint = new Paint();
+        int[] colors = {Color.rgb(90, 110, 130), Color.rgb(120, 100, 80), Color.rgb(70, 90, 70),
+                Color.rgb(140, 140, 150)};
+        for (int i = 0; i < 4; i++) {
+            paint.setColor(colors[i]);
+            float left = (i % 2) * width / 2f;
+            float top = (i / 2) * height / 2f;
+            canvas.drawRect(left, top, left + width / 2f, top + height / 2f, paint);
+        }
+        paint.setColor(Color.WHITE);
+        paint.setStrokeWidth(4f);
+        for (int x = 0; x < width; x += 80) {
+            canvas.drawLine(x, 0, width - x, height, paint);
+        }
+        return bitmap;
+    }
+
+    private static Bitmap noise(int width, int height) {
+        Random random = new Random(7);
+        int[] pixels = new int[width * height];
+        for (int i = 0; i < pixels.length; i++) {
+            pixels[i] = 0xFF000000 | random.nextInt(0xFFFFFF);
+        }
+        return Bitmap.createBitmap(pixels, width, height, Bitmap.Config.ARGB_8888);
     }
 }

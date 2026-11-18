@@ -26,13 +26,14 @@ import com.kooo.evcam.alarm.AlertChannel;
  *
  * <ol>
  *   <li>话题名的形状与长度（它就是密码，短了等于没门）；</li>
- *   <li>配图的说明走查询串、真换行编成 {@code %0A} —— 这是量出来的（docs/ntfy/FINDINGS.md）；</li>
- *   <li>令牌擦得干净。</li>
+ *   <li>只走 https，填错的不悄悄改发默认的服务器；</li>
+ *   <li>标题、配图的说明走查询串（HTTP 头只能装 ASCII），出错说明里不留话题名。</li>
  * </ol>
  *
  * The shape of an ntfy request, tested as pure strings. Three things pinned: the topic name's shape
- * and length (it is the password, and a short one is no door), the caption travelling in the query
- * string with real newlines as {@code %0A} (measured), and the token being redacted.
+ * and length (it is the password, and a short one is no door), https only with no silent fallback to
+ * the default server, and the title and caption travelling in the query string (a header only carries
+ * ASCII) with the topic kept out of error details.
  */
 public class NtfyRequestTest {
 
@@ -101,49 +102,75 @@ public class NtfyRequestTest {
     }
 
     @Test
-    public void serverAddressIsNormalised() {
+    public void serverAddressIsHttpsOnly() {
         assertEquals("", NtfyRequest.normalizeServer(""));
         assertEquals("", NtfyRequest.normalizeServer(null));
         assertEquals("https://ntfy.sh", NtfyRequest.normalizeServer("ntfy.sh"));
         assertEquals("https://ntfy.sh", NtfyRequest.normalizeServer("  https://ntfy.sh/  "));
-        assertEquals("http://car.local:8080", NtfyRequest.normalizeServer("http://car.local:8080/"));
-        assertEquals("空地址按默认算", "https://ntfy.sh", NtfyRequest.server(""));
+        assertEquals("https://ntfy.sh", NtfyRequest.normalizeServer("HTTPS://NTFY.SH"));
+        assertEquals("https://car.example:8443", NtfyRequest.normalizeServer("https://car.example:8443/"));
+        assertEquals("http 不收", "", NtfyRequest.normalizeServer("http://car.local:8080/"));
+        assertEquals("别的协议不收", "", NtfyRequest.normalizeServer("ftp://ntfy.sh"));
         assertEquals("带路径的不收", "", NtfyRequest.normalizeServer("https://example.com/ntfy"));
+        assertEquals("带查询串的不收", "", NtfyRequest.normalizeServer("https://example.com?x=1"));
+        assertEquals("带用户名的不收", "", NtfyRequest.normalizeServer("https://me@example.com"));
+        assertEquals("有空格的不收", "", NtfyRequest.normalizeServer("ntfy sh"));
     }
 
     @Test
-    public void textGoesInTheBodyAndTheCaptionGoesInTheQuery() {
-        assertEquals("https://ntfy.sh/" + TOPIC, NtfyRequest.textUrl("", TOPIC));
+    public void anEmptyServerIsTheDefaultButABadOneIsNeverReplacedByIt() {
+        assertEquals("https://ntfy.sh", NtfyRequest.server(""));
+        assertEquals("https://ntfy.sh", NtfyRequest.server(null));
+        assertEquals("ntfy.sh", NtfyRequest.host(""));
+        assertEquals("填坏的不改发默认的", "", NtfyRequest.server("http://car.local"));
+        assertEquals("", NtfyRequest.textUrl("http://car.local", TOPIC, "t"));
+        assertEquals("", NtfyRequest.deepLink("http://car.local", TOPIC, "Zeekr"));
+    }
 
-        String caption = "Motion at the car\n2026-11-15 11:46\nSentry: armed";
-        String url = NtfyRequest.photoUrl("https://ntfy.sh", TOPIC, caption, "Zeekr", "alert.jpg");
+    @Test
+    public void theTitleAndTheCaptionGoInTheQuery() {
+        String text = NtfyRequest.textUrl("", TOPIC, "哨兵提醒");
+        assertTrue("文字发到话题上: " + text, text.startsWith("https://ntfy.sh/" + TOPIC + "?"));
+        assertTrue("中文标题编进查询串: " + text, text.contains("title=%E5%93%A8%E5%85%B5%E6%8F%90%E9%86%92"));
+        assertTrue("高优先级: " + text, text.contains("priority=4"));
+        assertTrue("写明了是车、是警报: " + text, text.contains("tags=car%2Cwarning"));
+
+        String caption = "双闪亮起 · 11-17 21:05\nline two";
+        String url = NtfyRequest.photoUrl("https://ntfy.sh", TOPIC, "Sentry alert", caption, "alert.jpg");
         assertTrue("换行必须编成 %0A: " + url, url.contains("%0A"));
-        assertTrue("说明在查询串里: " + url, url.contains("message=Motion+at+the+car"));
+        assertTrue("说明在查询串里: " + url, url.contains("message=%E5%8F%8C%E9%97%AA"));
+        assertTrue("标题在: " + url, url.contains("title=Sentry+alert"));
         assertTrue("文件名在: " + url, url.contains("filename=alert.jpg"));
         assertTrue("高优先级: " + url, url.contains("priority=4"));
         assertTrue("写明了是车、是警报: " + url, url.contains("tags=car%2Cwarning"));
     }
 
     @Test
+    public void nothingIsBuiltForATopicThatDoesNotLookLikeOne() {
+        assertEquals("", NtfyRequest.textUrl("", "short", "t"));
+        assertEquals("", NtfyRequest.photoUrl("", "", "t", "c", "a.jpg"));
+        assertEquals("", NtfyRequest.deepLink("", "short", "Zeekr"));
+    }
+
+    @Test
     public void deepLinkMatchesTheFormatTheAppUnderstands() {
         assertEquals("ntfy://ntfy.sh/" + TOPIC + "?display=Zeekr",
                 NtfyRequest.deepLink("https://ntfy.sh", TOPIC, "Zeekr"));
-        assertEquals("ntfy://car.local:8080/" + TOPIC,
-                NtfyRequest.deepLink("http://car.local:8080", TOPIC, ""));
+        assertEquals("ntfy://ntfy.sh/" + TOPIC + "?display=%E6%9E%81%E6%B0%AA%E5%8D%B3%E5%88%BB",
+                NtfyRequest.deepLink("", TOPIC, "极氪即刻"));
+        assertEquals("ntfy://car.example:8443/" + TOPIC,
+                NtfyRequest.deepLink("https://car.example:8443", TOPIC, ""));
     }
 
     @Test
-    public void theTokenIsRedacted() {
-        String token = "tk_secret_value_123";
-        assertFalse(NtfyRequest.redact("failed with " + token, token).contains(token));
-        assertTrue(NtfyRequest.redact("failed with " + token, token).contains(NtfyRequest.REDACTED));
-        assertEquals("空令牌时原样返回", "nothing here", NtfyRequest.redact("nothing here", ""));
-    }
-
-    @Test
-    public void photoCeilingFollowsTheTier() {
-        assertEquals(2 * 1024 * 1024, NtfyRequest.maxPhotoBytes(false));
-        assertEquals(25 * 1024 * 1024, NtfyRequest.maxPhotoBytes(true));
+    public void theTopicAndTheServerAreScrubbedOutOfErrorDetails() {
+        String detail = "java.net.UnknownHostException: Unable to resolve host \"ntfy.example.com\" for /" + TOPIC;
+        String scrubbed = NtfySender.scrub(detail, TOPIC, "ntfy.example.com");
+        assertFalse(scrubbed.contains(TOPIC));
+        assertFalse(scrubbed.contains("ntfy.example.com"));
+        assertTrue(scrubbed.contains(NtfySender.TOPIC_SCRUBBED));
+        assertTrue(scrubbed.contains(NtfySender.SERVER_SCRUBBED));
+        assertEquals("没有话题、服务器时原样返回", "nothing here", NtfySender.scrub("nothing here", "", ""));
     }
 
     @Test
@@ -153,6 +180,7 @@ public class NtfyRequestTest {
         assertEquals(AlertChannel.Kind.NOT_FOUND, NtfySender.kind(404));
         assertEquals(AlertChannel.Kind.TOO_LARGE, NtfySender.kind(413));
         assertEquals(AlertChannel.Kind.RATE_LIMITED, NtfySender.kind(429));
-        assertEquals(AlertChannel.Kind.NETWORK, NtfySender.kind(500));
+        assertEquals(AlertChannel.Kind.REFUSED, NtfySender.kind(500));
+        assertEquals(AlertChannel.Kind.REFUSED, NtfySender.kind(400));
     }
 }

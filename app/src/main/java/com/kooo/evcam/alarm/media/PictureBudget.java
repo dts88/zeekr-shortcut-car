@@ -19,7 +19,7 @@ package com.kooo.evcam.alarm.media;
  * <h3>顺序：先降画质，再降尺寸</h3>
  *
  * <p>先降画质只丢噪声，先降尺寸丢的是车牌上的笔画。所以一档档降到最差的画质还不进预算，才缩一次图，
- * 再从较高的画质重来。缩得越狠，一张图越不像证据，所以缩到 {@link #MIN_SCALE} 就停，报「发不出这么小的」。</p>
+ * 再从较高的画质重来。缩得越狠，一张图越不像证据，所以缩到 {@link #MIN_SCALE} 就停：还不进预算就不附图，只发文字。</p>
  *
  * <h3>Why a budget and not a fixed quality</h3>
  *
@@ -30,14 +30,8 @@ package com.kooo.evcam.alarm.media;
  */
 public final class PictureBudget {
 
-    /** 警报第一张的上限：不超过 100 kB（车主的原话「小到可以完全不管」）。 */
+    /** 提醒附带的那张图的上限：不超过 100 KB（设置里「附带画面」的说明就是这么写的）。 */
     public static final int ALERT_BYTES = 100 * 1024;
-
-    /** 「HD 一下」那张的上限：还是老样子，看得清车牌比省流量重要。 */
-    public static final int HIGH_BYTES = 900 * 1024;
-
-    /** 一段按需视频的上限：10 MB（车主的原话「within ~10MB」）。 */
-    public static final int CLIP_BYTES = 10 * 1024 * 1024;
 
     /** 画质一档档往下试。The quality steps, best first. */
     static final int[] QUALITIES = {70, 60, 50, 45};
@@ -45,7 +39,7 @@ public final class PictureBudget {
     /** 画质降到底还不够时，缩一次图再从头试。The scales, full size first. */
     static final float[] SCALES = {1.0f, 0.85f, 0.7f};
 
-    /** 再小就不像证据了：到这里还不进预算就报最大的一张。Below this the picture stops being evidence. */
+    /** 再小就不像证据了：到这里还不进预算就不附图。Below this the picture stops being evidence. */
     static final float MIN_SCALE = 0.7f;
 
     private PictureBudget() {
