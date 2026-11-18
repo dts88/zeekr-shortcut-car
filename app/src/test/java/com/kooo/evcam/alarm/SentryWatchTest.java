@@ -16,7 +16,7 @@ import static org.junit.Assert.assertTrue;
 import org.junit.Test;
 
 /**
- * 「锁车满 3 分钟且哨兵模式开启时，车辆闪烁双闪或车灯自行亮起」从读数里怎么认（{@link SentryWatch}）。
+ * 「哨兵模式布防满 30 秒后，车辆闪烁双闪或车灯自行亮起」从读数里怎么认（{@link SentryWatch}）。
  *
  * How the moment is recognised from readings ({@link SentryWatch}).
  */
@@ -55,12 +55,12 @@ public class SentryWatchTest {
     }
 
     @Test
-    public void threeMinutesAfterLockingIsNinetySecondsAfterArming() {
+    public void thirtySecondsAfterArming() {
         feed(ON, 0, 0);
         feed(ARMED, 0, 10_000);
-        assertEquals(90_000L, watch.waitMs(10_000));
-        assertEquals(30_000L, watch.waitMs(70_000));
-        assertEquals(0L, watch.waitMs(100_000));
+        assertEquals(30_000L, watch.waitMs(10_000));
+        assertEquals(10_000L, watch.waitMs(30_000));
+        assertEquals(0L, watch.waitMs(40_000));
         assertEquals(0L, watch.waitMs(500_000));
     }
 
@@ -78,7 +78,7 @@ public class SentryWatchTest {
         feed(ARMED, 0, 1_000);
         feed(ON, 0, 200_000);
         feed(ARMED, 0, 300_000);
-        assertEquals(90_000L, watch.waitMs(300_000));
+        assertEquals(30_000L, watch.waitMs(300_000));
     }
 
     @Test

@@ -1335,7 +1335,7 @@
     <!-- Sentry alerts (bottom of Settings → Recording) -->
     <string name="set_group_sentry_alerts">Sentry alerts</string>
     <string name="set_sentry_alerts_mode_title">Phone subscription</string>
-    <string name="set_sentry_alerts_mode_summary">Sends an alert to the phone when the hazard lights flash or the lights come on by themselves after the car has been locked for 3 minutes with Sentry Mode on. Alerts are sent directly, not through the developer\'s servers.</string>
+    <string name="set_sentry_alerts_mode_summary">Sends an alert to the phone when the hazard lights flash or the lights come on by themselves once Sentry Mode has been armed for 30 seconds. Alerts are sent directly, not through the developer\'s servers.</string>
     <string name="opt_sentry_alerts_ntfy">ntfy</string>
     <string name="opt_sentry_alerts_telegram">Telegram</string>
     <string name="set_sentry_alerts_last">Last alert: %1$s</string>

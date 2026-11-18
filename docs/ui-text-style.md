@@ -682,7 +682,7 @@
 - 2026-11-17 / 11-18 批准（「设置 → 录制」最下面一组哨兵提醒；项目所有者看过样稿：「文字同意」，11-18 改了结构后再「文字同意」）。中文是批准的原文，英文、马来文照本规范起草：
   set_group_sentry_alerts「哨兵提醒」/ Sentry alerts / Amaran Sentry；
   set_sentry_alerts_mode_title「手机订阅模式」/ Phone subscription / Langganan telefon，三段 opt_off、opt_sentry_alerts_ntfy「ntfy」、opt_sentry_alerts_telegram「Telegram」（两个服务名三种语言都照写）；
-  set_sentry_alerts_mode_summary「锁车满 3 分钟且哨兵模式开启时，车辆闪烁双闪或车灯自行亮起，推送一条提醒到手机。提醒直接发送，不经过开发者的服务器。」；
+  set_sentry_alerts_mode_summary：11-18 项目所有者把时间改成布防满 30 秒，新句见下面「待项目所有者确认」；
   set_sentry_alerts_last「上次提醒：%1$s」、set_sentry_alerts_last_failed「上次提醒发送失败：%1$s」；
   set_sentry_alerts_picture_title「附带画面」、set_sentry_alerts_picture_summary「每条提醒附一张环视拼图，大小不超过 100 KB」；
   set_ntfy_topic_title「ntfy 话题」、set_ntfy_topic_value「尾号 %1$s」、set_ntfy_topic_summary「点击显示二维码，用手机上的 ntfy 应用扫码订阅」；
@@ -704,6 +704,11 @@
   sentry_alert_test「测试提醒 · %1$s」/ Test alert · %1$s / Amaran ujian · %1$s（「发送测试」发到手机上的那一条）；
   发送失败的原因：sentry_alerts_reason_unreachable「无法连接服务器」/ can't reach the server / tidak dapat menghubungi pelayan，sentry_alerts_reason_timeout「连接超时」（§6 固定说法），sentry_alerts_reason_refused「服务器拒绝（HTTP %1$d）」/ the server refused it (HTTP %1$d) / pelayan menolaknya (HTTP %1$d)；
   关于页「隐私与联网」（about_privacy_body，中文、英文两份）：加上哨兵提醒这一种联网，「不会上传」「均需手动发起」两处跟着改。
+- 2026-11-18 项目所有者把等待时间从「锁车满 3 分钟」改成「布防后 30 秒」，批过的那句说明跟着改（草稿，三种语言都上了；关于页那一段同样改）：
+  set_sentry_alerts_mode_summary「哨兵模式布防满 30 秒后，车辆闪烁双闪或车灯自行亮起，推送一条提醒到手机。提醒直接发送，不经过开发者的服务器。」/
+  Sends an alert to the phone when the hazard lights flash or the lights come on by themselves once Sentry Mode has been armed for 30 seconds. Alerts are sent directly, not through the developer's servers. /
+  Menghantar amaran ke telefon apabila lampu kecemasan berkelip atau lampu menyala sendiri selepas Mod Sentry bersiaga selama 30 saat. Amaran dihantar terus, tidak melalui pelayan pembangun.
+  「布防」照哨兵状态「已布防」（sentry_status_armed：armed / bersiaga）。
 
 ---
 
@@ -766,5 +771,5 @@
 | 画面调节 | 画面调节；画面调节窗口 | Image adjustment | Pelarasan imej | 不用「亮度 / 降噪调节」 |
 | 设置分区与页面 | 4.0 起：录制、存储、超级镜子、盲区画面、按键、通用、更新与关于、开发者选项；页：详细参数、车辆信号、关于与致谢、初始设置（4.0 以前的「悬浮键与灵动贴」「界面」「系统」「检查更新」不再是页名） | Recording、Storage、Super mirror、Blind spot view、Buttons、General、Updates & about、Developer options（草稿） | Rakaman、Storan、Cermin super、Paparan titik buta、Butang、Umum、Kemas kini & perihal、Pilihan pembangun（草稿） | 英文、马来文 4.0 全部做完后统一整理 |
 | 灵动贴 | 灵动贴（只有页名里和「悬浮键」连着写，别处的悬浮按钮照旧） | smart button | butang pintar | — |
-| 哨兵提醒 | 哨兵提醒（锁车满 3 分钟且哨兵模式开启时，车辆闪烁双闪或车灯自行亮起，推送到手机的提醒）；手机订阅模式；话题（ntfy 的订阅名）、服务器；订阅（手机扫码收提醒） | Sentry alerts（单条 Sentry alert）；Phone subscription；topic、server；subscribe | Amaran Sentry；Langganan telefon；topik、pelayan；langgan | 2026-11-17 加；「哨兵模式」是原厂功能名，马来文照已有的 Mod Sentry 写 Sentry；ntfy、Telegram 三种语言都照写 |
+| 哨兵提醒 | 哨兵提醒（哨兵模式布防满 30 秒后，车辆闪烁双闪或车灯自行亮起，推送到手机的提醒）；手机订阅模式；话题（ntfy 的订阅名）、服务器；订阅（手机扫码收提醒） | Sentry alerts（单条 Sentry alert）；Phone subscription；topic、server；subscribe | Amaran Sentry；Langganan telefon；topik、pelayan；langgan | 2026-11-17 加；「哨兵模式」是原厂功能名，马来文照已有的 Mod Sentry 写 Sentry；ntfy、Telegram 三种语言都照写 |
 | 绑定（灵动贴） | 绑定：绑定灵动贴、已绑定 | pair：Pair smart button、paired | pasangkan：Pasangkan butang pintar、dipasangkan | 「连接」只指连上蓝牙的那一下（长按时）；不用「搜索」「登记」「配对」（2026-11-04 加，2026-11-05 项目所有者批准） |

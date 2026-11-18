@@ -1327,7 +1327,7 @@
     <!-- 哨兵提醒（设置 → 录制 最下面一组；项目所有者 2026-11-17 / 11-18 批准，ui-text-style §9） -->
     <string name="set_group_sentry_alerts">哨兵提醒</string>
     <string name="set_sentry_alerts_mode_title">手机订阅模式</string>
-    <string name="set_sentry_alerts_mode_summary">锁车满 3 分钟且哨兵模式开启时，车辆闪烁双闪或车灯自行亮起，推送一条提醒到手机。提醒直接发送，不经过开发者的服务器。</string>
+    <string name="set_sentry_alerts_mode_summary">哨兵模式布防满 30 秒后，车辆闪烁双闪或车灯自行亮起，推送一条提醒到手机。提醒直接发送，不经过开发者的服务器。</string>
     <string name="opt_sentry_alerts_ntfy">ntfy</string>
     <string name="opt_sentry_alerts_telegram">Telegram</string>
     <string name="set_sentry_alerts_last">上次提醒：%1$s</string>

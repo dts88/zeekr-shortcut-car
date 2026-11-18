@@ -41,7 +41,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * 哨兵提醒（「设置 → 录制 → 哨兵提醒」，试验性）：锁车满 3 分钟且哨兵模式开启时，车辆闪烁双闪或车灯自行亮起，推送一条提醒到手机。
+ * 哨兵提醒（「设置 → 录制 → 哨兵提醒」，试验性）：哨兵模式布防满 30 秒后，车辆闪烁双闪或车灯自行亮起，推送一条提醒到手机。
  * 设计和逻辑来自 Fab（Fabbbrrr）的 PR #211，这里照他的逻辑只留单向的 ntfy（NOTICE.md §8）。
  *
  * <h3>框架</h3>
@@ -49,7 +49,7 @@ import java.util.concurrent.Executors;
  * <ul>
  *   <li><b>看不看</b>（{@link #update}）：「手机订阅模式」不是「关闭」、话题和同意都有（{@link AlertStore#ready}）、用户没退出，
  *       就在 {@link Telemetry} 上听读数；车辆信号的核心进程活着一直在读（熄屏判断登记的），这里只挂一个监听，不另外登记。</li>
- *   <li><b>认</b>（{@link SentryWatch}）：布防着、锁车满 3 分钟，双闪或车灯从不亮变亮。</li>
+ *   <li><b>认</b>（{@link SentryWatch}）：布防满 30 秒，双闪或车灯从不亮变亮。</li>
  *   <li><b>限</b>（{@link AlertPolicy}）：两条之间至少 60 秒、一小时最多 6 条、发失败后 5 分钟不发。</li>
  *   <li><b>再看一眼</b>：亮起之后等 {@link #CONFIRM_MS} 再看一次还布防不布防 —— 解锁那一下车也会闪灯，
  *       哨兵读数回到「开启」和闪灯的读数谁先到没核实过；车主回来了就不发，也不拍。</li>
@@ -62,7 +62,7 @@ import java.util.concurrent.Executors;
  *
  * <p>话题、服务器不写黑匣子、不写日志（{@link AlertStore}）；黑匣子只记亮起、发没发、为什么没发。</p>
  *
- * Sentry alerts: when the car has been locked for 3 minutes with Sentry Mode on and the hazard lights flash
+ * Sentry alerts: when Sentry Mode has been armed for 30 seconds and the hazard lights flash
  * or the lights come on by themselves, push one alert to the phone. Designed by Fab (Fabbbrrr) in PR #211;
  * this keeps his logic for one-way ntfy only. It listens on {@link Telemetry} while set up, recognises the
  * moment with {@link SentryWatch}, rate-limits with {@link AlertPolicy}, asks the camera keeper for a photo
@@ -168,7 +168,7 @@ public final class SentryAlerts implements Telemetry.Listener {
         long waitMs = watch.waitMs(now);
         if (waitMs > 0) {
             BlackBox.note("哨兵提醒：" + (trigger == SentryWatch.Trigger.HAZARD ? "双闪亮起" : "车灯亮起")
-                    + "，锁车不满 3 分钟（还差 " + (waitMs + 999) / 1000 + " 秒），不发");
+                    + "，布防不满 30 秒（还差 " + (waitMs + 999) / 1000 + " 秒），不发");
             return;
         }
         policy.setParked(true);

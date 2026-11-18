@@ -1311,7 +1311,7 @@
     <!-- Amaran Sentry (bahagian bawah Tetapan → Rakaman) -->
     <string name="set_group_sentry_alerts">Amaran Sentry</string>
     <string name="set_sentry_alerts_mode_title">Langganan telefon</string>
-    <string name="set_sentry_alerts_mode_summary">Menghantar amaran ke telefon apabila lampu kecemasan berkelip atau lampu menyala sendiri selepas kereta dikunci selama 3 minit dengan Mod Sentry dihidupkan. Amaran dihantar terus, tidak melalui pelayan pembangun.</string>
+    <string name="set_sentry_alerts_mode_summary">Menghantar amaran ke telefon apabila lampu kecemasan berkelip atau lampu menyala sendiri selepas Mod Sentry bersiaga selama 30 saat. Amaran dihantar terus, tidak melalui pelayan pembangun.</string>
     <string name="opt_sentry_alerts_ntfy">ntfy</string>
     <string name="opt_sentry_alerts_telegram">Telegram</string>
     <string name="set_sentry_alerts_last">Amaran terakhir: %1$s</string>
