@@ -36,6 +36,8 @@
 
 ## 推荐
 
+**[Zeekr 7X Shortcut Dashcam App Installation & Usage Guide](https://youtu.be/m2o2HcqdsOY)**：brotatochip 制作的完整入门视频（英文），从怎么侧载到应用怎么用，讲得非常详尽。非常推荐一开始对侧载和极氪即刻还不太熟悉的用户观看。
+
 **[Zeekr Companion](https://github.com/wysie/zeekr-shortcut-car)**：wysie 针对极氪 009 车机优化的极氪即刻版本。Wysie 也是提供了大量极氪基础信息的重要贡献者，很开心能与 Wysie 一同探索极氪车机系统的可能性。
 
 **[CAMCORDER](https://github.com/FerixzTanz/CAMCORDER)**：FerixzTanz 在极氪即刻基础上开发的版本，有一系列领先于极氪即刻的功能。本项目的盲区画面起步于 FerixzTanz 的代码和实车研究；把盲区画面投到抬头显示（HUD）上的做法、HUD 的设置和他细致的实车标定，也来自 CAMCORDER。感谢 FerixzTanz 对本项目的支持和贡献。
