@@ -25,12 +25,12 @@
 
 在 **[Releases](../../releases/latest)** 下载 APK。装好之后，应用可以自己检查新版本：设置 → 更新与关于 → 检查更新。
 
-- 你需要事先知道怎么通过 App Lab 把应用侧载到车机上，本页不介绍这一步。
+- 第一次安装要通过 App Lab 侧载：见 wiki 的 [First install](../../wiki/First-install)，或 brotatochip 的[视频教程](https://youtu.be/m2o2HcqdsOY)（都是英文）。
 - 安装完成后请点左上角「返回」，不要点「打开」，否则车机安装器会卡住，之后的安装或更新会失败。
 
 从源码构建：见 [wiki](../../wiki/%E4%BB%8E%E6%BA%90%E7%A0%81%E6%9E%84%E5%BB%BA)。
 
-提问和建议：[讨论区](../../discussions)。遇到问题：[提交 issue](../../issues)，并附上「设置 → 通用 → 诊断信息」导出的报告。
+提问和建议：[讨论区](../../discussions)。遇到问题：[提交 issue](../../issues)。诊断报告请不要公开贴出，在车主群里私信 dts88。
 
 ---
 
@@ -88,6 +88,8 @@
 - **[lelelolo](https://github.com/lelelolo)**：盲区画面的两处改进：车机占用摄像头时不再显示黑框；后视镜上的灯亮着时，画面描一圈同色的边框。非常感谢。
 - **[Fabbbrrr](https://github.com/Fabbbrrr)**：哨兵提醒走 ntfy、Telegram，直接发到车主自己的手机、不经过开发者服务器的去中心化创新建议，
   以及 ntfy 提醒的设计和逻辑（[#211](https://github.com/dts88/zeekr-shortcut-car/pull/211)）。非常感谢。
+- **[brotatochip](https://www.youtube.com/@equinoxau)**：视频 [Zeekr 7X Shortcut Dashcam App Installation & Usage Guide](https://youtu.be/m2o2HcqdsOY)，
+  详细讲解了现阶段怎么侧载，并介绍了极氪即刻。非常感谢。
 - **SW**：积极测试和反馈，非常感谢。
 
 来源、第三方组件许可与边界说明见 [NOTICE.md](NOTICE.md)，完整条款见 [LICENSE](LICENSE)。
