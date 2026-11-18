@@ -169,6 +169,20 @@
             android:theme="@style/Theme.Cam"
             android:exported="false" />
 
+        <!-- 车能发给机器人的每一条消息：一行一条，点一条发一条真的（设置 → 停车警报 → 事件清单） -->
+        <activity
+            android:name=".alarm.AlertEventsActivity"
+            android:label="@string/alerts_events_title"
+            android:theme="@style/Theme.Cam"
+            android:exported="false" />
+
+        <!-- 停车警报调试（开发者选项）：一屏 JSON + 最近黑匣子，可截屏 / 复制 / 存盘 -->
+        <activity
+            android:name=".alarm.AlertsDebugActivity"
+            android:label="@string/alerts_debug_title"
+            android:theme="@style/Theme.Cam"
+            android:exported="false" />
+
         <!-- 关于与致谢：说明本应用两个功能来源及其许可证 -->
         <activity
             android:name=".zeekr.AboutActivity"

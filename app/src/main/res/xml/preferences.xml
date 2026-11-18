@@ -88,6 +88,254 @@
         </PreferenceCategory>
     </PreferenceScreen>
 
+    <!--
+      ==================== 停车警报 ====================
+
+      这一栏默认关，和录制无关：它要联网、要手机那头有一个 Telegram 机器人，所以得车主自己打开、自己填令牌。
+      填令牌、找会话号、发一张测试照片都在这里做完，不需要重编一次 APK —— 谁的车谁自己配。
+    -->
+    <PreferenceScreen
+        android:key="screen_alerts"
+        android:title="@string/set_section_alerts">
+
+        <SwitchPreferenceCompat
+            android:key="pref_alerts"
+            android:title="@string/set_alerts_on_title"
+            android:summary="@string/set_alerts_on_summary" />
+
+        <!-- 聊天里 alerts off 之后那一行：总开关还开着，但车没在看。点一下恢复。
+             一个看不见的静音是最糟的状态，所以它必须写在屏上（见 AppConfig.isAlertsPaused）。 -->
+        <Preference
+            android:key="pref_alerts_paused"
+            android:title="@string/set_alerts_paused_title"
+            android:summary="@string/set_alerts_paused_summary" />
+
+        <!--
+          警报发到哪儿（车主 2026-11-15 从开发者选项搬到这里）：这一栏最上面的一行，先选路，
+          下面各组按选中的那条路出现。
+          Where alerts go: the first row under the master switch, so the exit is chosen before the details.
+        -->
+        <ListPreference
+            android:key="pref_alerts_transport"
+            android:title="@string/set_alerts_transport_title"
+            android:summary="@string/set_alerts_transport_summary" />
+
+        <!-- 真的发到哪儿（D11 的状态行）：读生效的出口，不是存着的值 -->
+        <Preference
+            android:key="pref_alerts_channel_status"
+            android:selectable="false"
+            android:title="@string/set_alerts_channel_status_title" />
+
+        <PreferenceCategory
+            android:key="cat_alerts_when"
+            android:title="@string/set_group_alerts_when">
+
+            <Preference
+                android:key="pref_alerts_triggers"
+                android:title="@string/set_alerts_triggers_title" />
+
+            <ListPreference
+                android:key="pref_alerts_arm_delay"
+                android:title="@string/set_alerts_arm_delay_title"
+                android:summary="@string/set_alerts_arm_delay_summary" />
+
+            <SwitchPreferenceCompat
+                android:key="pref_alerts_quiet"
+                android:title="@string/set_alerts_quiet_title"
+                android:summary="@string/set_alerts_quiet_summary" />
+
+            <Preference
+                android:key="pref_alerts_quiet_start"
+                android:title="@string/set_alerts_quiet_start_title" />
+
+            <Preference
+                android:key="pref_alerts_quiet_end"
+                android:title="@string/set_alerts_quiet_end_title" />
+
+            <!-- 忘了开哨兵：问不问、在家问不问（alarm.GuardPolicy 判，见 docs/sentry-alerts-spec.md §1.8）。
+                 它跟「什么时候发」有关，跟哪条出口无关，所以在这个组里，不在 Telegram 那组。
+                 Forgot Sentry: when parking should be caught, independent of the exit, so it lives here. -->
+            <ListPreference
+                android:key="pref_alerts_guard"
+                android:title="@string/set_alerts_guard_title"
+                android:summary="%s" />
+
+            <Preference
+                android:key="pref_alerts_guard_home"
+                android:title="@string/set_alerts_guard_home_title" />
+
+            <SwitchPreferenceCompat
+                android:key="pref_alerts_guard_everywhere"
+                android:title="@string/set_alerts_guard_everywhere_title"
+                android:summary="@string/set_alerts_guard_everywhere_summary"
+                android:defaultValue="false" />
+
+            <SeekBarPreference
+                android:key="pref_alerts_motion_sensitivity"
+                android:title="@string/set_alerts_motion_sensitivity_title"
+                android:summary="@string/set_alerts_motion_sensitivity_summary"
+                app:min="1"
+                android:max="10" />
+        </PreferenceCategory>
+
+        <PreferenceCategory
+            android:key="cat_alerts_picture"
+            android:title="@string/set_group_alerts_picture">
+
+            <!-- 每条警报附不附一张图（车主 2026-11-17）。关掉之后下面三行收起来：不拍照，
+                 排版、那几路、掰直都没有意义。The picture switch; with it off the three rows below hide. -->
+            <SwitchPreferenceCompat
+                android:key="pref_alerts_send_picture"
+                android:title="@string/set_alerts_send_picture_title"
+                android:summary="@string/set_alerts_send_picture_summary"
+                android:defaultValue="true" />
+
+            <ListPreference
+                android:key="pref_alerts_picture"
+                android:title="@string/set_alerts_picture_title"
+                android:summary="%s" />
+
+            <Preference
+                android:key="pref_alerts_cameras"
+                android:title="@string/set_alerts_cameras_title" />
+
+            <SwitchPreferenceCompat
+                android:key="pref_alerts_straighten"
+                android:title="@string/set_alerts_straighten_title"
+                android:summary="@string/set_alerts_straighten_summary" />
+        </PreferenceCategory>
+
+        <PreferenceCategory
+            android:key="cat_alerts_clip"
+            android:title="@string/set_group_alerts_clip">
+
+            <ListPreference
+                android:key="pref_alerts_clip"
+                android:title="@string/set_alerts_clip_title"
+                android:summary="%s" />
+
+            <SwitchPreferenceCompat
+                android:key="pref_alerts_clip_audio"
+                android:title="@string/set_alerts_clip_audio_title"
+                android:summary="@string/set_alerts_clip_audio_summary" />
+
+            <Preference
+                android:key="pref_alerts_clip_data"
+                android:selectable="false"
+                android:summary="@string/set_alerts_clip_data_note" />
+        </PreferenceCategory>
+
+        <!--
+          Telegram 那一组：只在「警报发到哪儿」选的是 Telegram 时出现（规则在 SettingsPreferenceFragment
+          .showAlertsRows），和下面的 ntfy 组二选一。
+          The Telegram block: shown only while the transport is Telegram; one of the two exclusive blocks.
+        -->
+        <PreferenceCategory
+            android:key="cat_alerts_telegram"
+            android:title="@string/set_group_alerts_telegram">
+
+            <Preference
+                android:key="pref_alerts_token"
+                android:title="@string/set_alerts_token_title" />
+
+            <Preference
+                android:key="pref_alerts_chat"
+                android:title="@string/set_alerts_chat_title" />
+
+            <Preference
+                android:key="pref_alerts_find_chat"
+                android:title="@string/set_alerts_find_title"
+                android:summary="@string/set_alerts_find_summary" />
+
+            <SwitchPreferenceCompat
+                android:key="pref_alerts_commands"
+                android:title="@string/set_alerts_commands_title"
+                android:summary="@string/set_alerts_commands_summary" />
+        </PreferenceCategory>
+
+        <!--
+          ntfy：同样只在「警报发到哪儿」选的是 ntfy 时出现，紧跟在 Telegram 组后面，两组不会同时在屏上
+          （规格见 docs/ntfy/DECISIONS.md D11/D14）。
+          The ntfy block, right after the Telegram one; the two never show at the same time.
+        -->
+        <PreferenceCategory
+            android:key="cat_alerts_ntfy"
+            android:title="@string/set_group_alerts_ntfy">
+
+            <Preference
+                android:key="pref_alerts_ntfy_setup"
+                android:title="@string/set_alerts_ntfy_setup_title"
+                android:summary="@string/set_alerts_ntfy_setup_summary" />
+
+            <Preference
+                android:key="pref_alerts_ntfy_topic"
+                android:title="@string/set_alerts_ntfy_topic_title" />
+
+            <!-- 换一个新名字：旧名字作废，二维码马上给手机重新订阅（docs/ntfy-commands.md）。
+                 Mint a new name: the old one stops being used and the QR resubscribes the phone. -->
+            <Preference
+                android:key="pref_alerts_ntfy_rotate"
+                android:title="@string/set_alerts_ntfy_rotate_title"
+                android:summary="@string/set_alerts_ntfy_rotate_summary" />
+
+            <SwitchPreferenceCompat
+                android:key="pref_alerts_ntfy_paid"
+                android:title="@string/set_alerts_ntfy_paid_title"
+                android:summary="@string/set_alerts_ntfy_paid_summary" />
+
+            <!-- 免费档的实话：名字就是地址，知道名字的人就能看（付费开关开着时这一行不出现） -->
+            <Preference
+                android:key="pref_alerts_ntfy_public_warning"
+                android:selectable="false"
+                android:title="@string/set_alerts_ntfy_risk_title"
+                android:summary="@string/set_alerts_ntfy_public_warning" />
+
+            <Preference
+                android:key="pref_alerts_ntfy_token"
+                android:title="@string/set_alerts_ntfy_token_title" />
+
+            <Preference
+                android:key="pref_alerts_ntfy_server"
+                android:title="@string/set_alerts_ntfy_server_title"
+                android:summary="@string/set_alerts_ntfy_server_summary" />
+
+            <!-- 命令：只给开发者选项里、付费档的人。免费档上这一行在、点不动，理由写在下面那条。
+                 Commands: developer options plus a paid plan only. On the free tier the row is there,
+                 disabled, and the reason sits in the note row below. -->
+            <SwitchPreferenceCompat
+                android:key="pref_alerts_ntfy_commands"
+                android:title="@string/set_alerts_ntfy_commands_title"
+                android:summary="@string/set_alerts_ntfy_commands_summary" />
+
+            <!-- 选中 ntfy、免费档时的那句话：公开话题的名字就是门，所以命令一直关着。
+                 Shown with ntfy on the free tier: a public topic's name is its door. -->
+            <Preference
+                android:key="pref_alerts_ntfy_commands_note"
+                android:selectable="false"
+                android:title="@string/set_alerts_ntfy_commands_note_title"
+                android:summary="@string/set_alerts_ntfy_commands_note_summary" />
+        </PreferenceCategory>
+
+        <PreferenceCategory
+            android:key="cat_alerts_checks"
+            android:title="@string/set_group_alerts_checks">
+
+            <Preference
+                android:key="pref_alerts_probe"
+                android:title="@string/set_alerts_probe_title"
+                android:summary="@string/set_alerts_probe_summary" />
+
+
+            <!-- 车能发给机器人的每一条消息：一行一条，点一条发一条真的（车主 2026-11-15）。
+                 两条出口都能看，所以它不跟着 Telegram 那一组走。
+                 Every message the car can send; it belongs to neither exit, so it stays here. -->
+            <Preference
+                android:key="pref_alerts_events"
+                android:title="@string/alerts_events_title"
+                android:summary="@string/alerts_events_summary" />
+        </PreferenceCategory>
+    </PreferenceScreen>
+
     <!-- ==================== 存储 ==================== -->
     <PreferenceScreen
         android:key="screen_storage"
@@ -420,9 +668,21 @@
         android:title="@string/set_section_developer">
 
         <Preference
+            android:key="pref_alerts_debug"
+            android:title="@string/alerts_debug_row_title"
+            android:summary="@string/alerts_debug_row_summary" />
+
+        <!--
+          ntfy 警报的开关（2026-11-15）：这是「走哪条路」，也是「这个功能现在有没有」。
+          键在 AppConfig.DEVELOPER_KEYS 里，开发者选项一关就按 telegram 算；换路不擦任何设置。
+          ntfy alerts toggle: the transport selector AND the feature gate. Its key is in
+          DEVELOPER_KEYS, so closing developer options reads as telegram; switching erases nothing.
+        -->
+        <Preference
             android:key="pref_permissions"
             android:title="@string/dev_permissions_title"
             android:summary="@string/dev_permissions_summary" />
+
 
         <!-- 车辆状态（试验性，名称旁带标签） -->
         <SwitchPreferenceCompat
