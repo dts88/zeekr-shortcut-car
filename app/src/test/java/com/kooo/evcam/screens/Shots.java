@@ -41,6 +41,11 @@ public final class Shots {
     public static final String NIGHT = "zh-rCN-w1600dp-h848dp-land-night-xhdpi";
     /** 车机应用区域，英文，白天（wiki 的英文页配图用，文件名后面加 -en）。 */
     public static final String DAY_EN = "en-w1600dp-h848dp-land-notnight-xhdpi";
+    /**
+     * 排版从右往左（阿拉伯语那样），看哪些跟着镜像、哪些不动（ui-spec §十七）。借希伯来语：它从右往左写、数字是 0–9；
+     * 应用里没有希伯来语，文字退回默认的中文。（「英文 + ldrtl」在这里排不成从右往左：语言把方向改回去了。）
+     */
+    public static final String DAY_RTL = "iw-w1600dp-h848dp-land-notnight-xhdpi";
 
     private static final File FOLDER = new File("build/outputs/screenshots");
 

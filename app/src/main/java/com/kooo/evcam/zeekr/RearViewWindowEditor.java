@@ -113,7 +113,9 @@ public final class RearViewWindowEditor {
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
                         | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
                 PixelFormat.TRANSLUCENT);
-        params.gravity = Gravity.TOP | Gravity.START;
+        // 照屏幕上的实际位置摆：从右往左的语言里也不镜像（ui-spec §十七）
+        params.gravity = Gravity.TOP | Gravity.LEFT;
+        root.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
         // 出现和收起：淡入淡出（ui-spec §十四），不放装饰动效时不放
         params.windowAnimations = com.kooo.evcam.ui.MotionPolicy.overlayWindowAnimations(root.getContext());
         try {

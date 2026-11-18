@@ -122,7 +122,8 @@ public class ImageAdjustFloatingWindow {
         );
         
         // 设置初始位置（屏幕右侧中间）
-        layoutParams.gravity = Gravity.TOP | Gravity.START;
+        // 窗口照屏幕上的实际位置摆（里面的文字跟着语言方向）
+        layoutParams.gravity = Gravity.TOP | Gravity.LEFT;
         layoutParams.x = 50;
         layoutParams.y = 100;
         

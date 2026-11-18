@@ -53,6 +53,18 @@ public final class SharedSegmentName {
     /** 名字的格式：和各路第一个文件、MediaRecorder 模式用的是同一个。 */
     public static final String PATTERN = "yyyyMMdd_HHmmss";
 
+    /**
+     * 文件名里的时刻按 {@link #PATTERN} 写、读：数字固定是 0–9，不跟界面语言、系统语言走 —— 阿拉伯语等默认写成别的数字
+     * （٠–٩），那样回放、清理都认不出来（项目所有者 2026-11-18：文件名固定用 0–9）。录像、照片起名和读名都用它；时区每次现取。
+     *
+     * The time in file names, written and read with {@link #PATTERN}: always the digits 0-9, whatever the UI or
+     * system language. Arabic and some other languages would otherwise write digits that playback and cleanup
+     * cannot read. Every recording and photo name is made and read with this.
+     */
+    public static SimpleDateFormat fileTime() {
+        return new SimpleDateFormat(PATTERN, Locale.US);
+    }
+
     /** 一次要名字的结果。 */
     public static final class Name {
         /** 名字：只有时刻那一段，不带路的后缀。 */
@@ -86,8 +98,8 @@ public final class SharedSegmentName {
         if (text != null && nowMs - mintedAtMs < SHARE_MS) {
             return new Name(text, false, count);
         }
-        // 时区、语言每次现取，和各路第一个文件起名时一样（车机改了时区，新名字跟着变）
-        text = new SimpleDateFormat(PATTERN, Locale.getDefault()).format(new Date(wallMs));
+        // 时区每次现取，和各路第一个文件起名时一样（车机改了时区，新名字跟着变）；数字固定 0–9
+        text = fileTime().format(new Date(wallMs));
         mintedAtMs = nowMs;
         count++;
         return new Name(text, true, count);

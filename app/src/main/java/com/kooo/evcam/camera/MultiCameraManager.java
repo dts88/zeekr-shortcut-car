@@ -5547,7 +5547,7 @@ public class MultiCameraManager {
 
     private void pressShutter(PhotoJob job, List<String> keys) {
         // 时间戳取按快门这一刻（不是按键那一刻：中间可能等了开相机）。几路同一个，回看按它分组
-        String timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
+        String timestamp = SharedSegmentName.fileTime().format(new Date());
         job.shutterPressed = true;
         job.pressed = keys.size();
         AppLog.d(TAG, "拍照：按快门 " + keys + " ts=" + timestamp);

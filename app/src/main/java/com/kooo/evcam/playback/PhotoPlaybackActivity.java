@@ -777,7 +777,8 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
         Collections.sort(allGroups, (g1, g2) -> g2.getCaptureTime().compareTo(g1.getCaptureTime()));
 
         // 第二步：按日期分组
-        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+        // 分组用的键，不上界面：数字固定 0–9
+        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
         Map<String, DateSection<PhotoGroup>> dateSectionMap = new LinkedHashMap<>();
         
         for (PhotoGroup group : allGroups) {

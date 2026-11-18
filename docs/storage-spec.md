@@ -6,6 +6,8 @@
 
 U 盘上可能有用户自己的东西。清理只认本应用写出来的文件名：录像 `yyyyMMdd_HHmmss_<那一路>.mp4`、
 照片 `yyyyMMdd_HHmmss_<那一路>.jpg`（`StoragePlan.isOwnClip / isOwnPhoto`）。
+名字里的数字固定写 0–9，不跟界面语言、系统语言走（阿拉伯语等默认写成 ٠–٩；项目所有者 2026-11-18：文件名固定用 0–9）：
+起名、读名都走同一处（`SharedSegmentName.fileTime`）。画进录像、照片的时间也一样。
 
 ## 2. 自动清理
 

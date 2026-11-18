@@ -109,8 +109,9 @@
                     android:paddingBottom="8dp" />
             </LinearLayout>
 
-            <!-- 右：播放器 -->
+            <!-- 右：播放器。画面照车上的方位摆，进度条、播放键照时间方向，从右往左的语言里也不镜像（ui-spec §十七） -->
             <LinearLayout
+                android:layoutDirection="ltr"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
                 android:layout_weight="1"

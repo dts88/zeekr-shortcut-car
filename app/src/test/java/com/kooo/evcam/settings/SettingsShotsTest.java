@@ -50,6 +50,12 @@ public class SettingsShotsTest {
         shoot(Shots.DAY_EN, "day-en");
     }
 
+    /** 从右往左的语言：设置这类文字界面跟着镜像（左栏到右边、行尾的 › 翻过来；ui-spec §十七）。 */
+    @Test
+    public void everySectionRightToLeft() {
+        shoot(Shots.DAY_RTL, "day-rtl");
+    }
+
     @Test
     public void everySectionByNight() {
         shoot(Shots.NIGHT, "night");

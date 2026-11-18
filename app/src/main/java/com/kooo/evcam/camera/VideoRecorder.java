@@ -24,7 +24,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
-import java.util.Locale;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -767,7 +766,7 @@ public final class VideoRecorder {
 
     /** 以这一刻命名的文件路径；撞名就往后挪一秒 —— 不能覆盖已有的文件。 */
     private String pathNamedAt(long wallMs) {
-        SimpleDateFormat format = new SimpleDateFormat(SharedSegmentName.PATTERN, Locale.getDefault());
+        SimpleDateFormat format = SharedSegmentName.fileTime();
         String tail = "_" + suffix + ".mp4";
         for (int i = 0; ; i++) {
             File file = new File(dir, format.format(new Date(wallMs + i * 1000L)) + tail);

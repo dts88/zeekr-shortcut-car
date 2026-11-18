@@ -465,7 +465,9 @@ public class RearViewMirrorView extends ViewGroup {
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
                         | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
                 PixelFormat.TRANSLUCENT);
-        params.gravity = Gravity.TOP | Gravity.START;
+        // 照屏幕上的实际位置摆：从右往左的语言里也不镜像（ui-spec §十七）
+        params.gravity = Gravity.TOP | Gravity.LEFT;
+        setLayoutDirection(LAYOUT_DIRECTION_LTR);
 
         int savedX = appConfig.getRearViewX();
         int savedY = appConfig.getRearViewY();
