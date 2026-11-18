@@ -725,7 +725,7 @@
 | 车辆状态 / 车辆信号 | 车辆状态（试验性）只作主界面面板的功能名；泛指读到的数据用「车辆信号」 | Vehicle status (experimental)；vehicle signals | Status kenderaan (percubaan)；isyarat kenderaan | — |
 | 车机 / 车辆 / 车 | 车机 = 运行本应用的中控主机；车辆 = 整车；单字「车」只在固定词里（下车、锁车、车门、车速、车牌、左舵车） | head unit；vehicle | unit kepala；kenderaan | 休眠、重启、占用摄像头的是车机；日常短语可用 car / kereta（leave the car） |
 | 熄屏 / 休眠 | 熄屏、亮屏（屏幕）；休眠、唤醒（车机）；保持唤醒状态（车机，哨兵模式）；熄屏录制（阻止休眠）（开发者选项）；熄屏持续录制（录制）；熄屏后的帧率（熄屏持续录制的下一层） | screen off / on；sleep / wake；keep the head unit awake；Screen-off recording (keep awake)；Keep recording when the screen goes off；Screen-off frame rate | skrin padam / hidup；tidur / bangun；unit kepala kekal berjaga；Rakaman skrin padam (kekal berjaga)；Terus merakam apabila skrin padam；Kadar bingkai skrin padam | 不用「睡」「不让车机睡」；马来文不用 skrin mati |
-| 中控屏 | 中控屏（车机的那块屏幕；系统信息页屏幕电源事件 0x20290300 那一行就叫它，值写熄屏 / 亮屏） | Center screen | Skrin tengah | 2.11.2 加；只在要指那块屏幕本身时用，说状态仍用熄屏 / 亮屏 |
+| 中控屏 | 中控屏（车机的那块屏幕；系统信息页屏幕电源事件那一行就叫它，值写熄屏 / 亮屏） | Center screen | Skrin tengah | 2.11.2 加；只在要指那块屏幕本身时用，说状态仍用熄屏 / 亮屏 |
 | HUD | HUD（抬头显示，投在前挡风玻璃上的那块屏；盲区画面可以投到上面） | HUD | HUD | 2026-10-21 加；三种语言都写 HUD，界面上不写「抬头显示」「平视显示」 |
 | 主界面 | 主界面；返回主界面 | Main screen；Back to main screen | Skrin utama；Kembali ke skrin utama | 不用「录制界面」 |
 | 应用 | 应用；需区分时「本应用」「其他应用」 | app；this app | apl；apl ini | 不用「软件」「程序」（关于页致谢原文除外） |
