@@ -36,8 +36,8 @@ import java.io.File;
 public class SettingsShotsTest {
 
     private static final String[] SECTIONS = {
-            "screen_recording", "screen_storage", "screen_rearview", "screen_side_view", "screen_floating",
-            "screen_general", "screen_update",
+            "screen_recording", "screen_alerts", "screen_storage", "screen_rearview",
+            "screen_side_view", "screen_floating", "screen_general", "screen_update",
     };
 
     @Test
@@ -62,6 +62,11 @@ public class SettingsShotsTest {
         config.setRearViewEnabled(true);
         config.setSideViewEnabled(true);
         config.setDriveSoundEnabled(true);
+        // 停车警报开着时下面四组才出现：这张图就是用来看那一屏的
+        config.setAlertsEnabled(true);
+        config.setAlertsTelegramToken("123456789:AAHexampleTOKENvalue0123456789");
+        config.setAlertsTelegramChatId("123456789");
+        config.setAlertsClipSeconds(5);
         shoot(Shots.DAY, "day-on");
     }
 
@@ -71,6 +76,12 @@ public class SettingsShotsTest {
         config.setRearViewEnabled(true);
         config.setSideViewEnabled(true);
         config.setDriveSoundEnabled(true);
+        config.setAlertsEnabled(true);
+        config.setAlertsTelegramToken("123456789:AAHexampleTOKENvalue0123456789");
+        config.setAlertsTelegramChatId("123456789");
+        config.setAlertsOwnerId("123456789");
+        config.setAlertsClipSeconds(10);
+        config.setAlertsQuietEnabled(true);
         shoot(Shots.DAY_EN, "day-on-en");
     }
 
@@ -347,6 +358,203 @@ public class SettingsShotsTest {
         }
         assertFalse("开发者选项关着时按关算，存着的值不动",
                 new AppConfig(RuntimeEnvironment.getApplication()).isPlaybackReadDurations());
+    }
+
+    /**
+     * 「忘了开哨兵」那三行在「什么时候发」那一组里，排在安静时段之后；只跟着警报总开关走，
+     * 换到 ntfy 也还在（它们不是 Telegram 独有的）。滚到它们另出一张图。
+     *
+     * <p>三种状态各开一屏新的设置页来验：总开关开着（在、位置对）、换成 ntfy（还在）、
+     * 总开关关着（三行一起收起来）。</p>
+     *
+     * The three Forgot Sentry rows sit in the "When it fires" group after quiet hours, follow the master
+     * switch only, and stay when the transport is ntfy. Each state is checked on a freshly opened page.
+     */
+    @Test
+    public void forgotSentryRowsSitUnderWhenItFires() {
+        SettingsPreferenceFragment on = alertsPage(true, com.kooo.evcam.alarm.ntfy.NtfyGate.TELEGRAM);
+        androidx.preference.PreferenceGroup when = (androidx.preference.PreferenceGroup)
+                on.findPreference("cat_alerts_when");
+        assertNotNull("少了「什么时候发」那一组", when);
+        for (String key : GUARD_ROWS) {
+            Preference row = on.findPreference(key);
+            assertNotNull("少了 " + key, row);
+            assertTrue(key + " 该在「什么时候发」那一组里", row.getParent() == when);
+            assertTrue(key + " 该看得见", row.isVisible());
+            assertTrue(key + " 该排在安静时段之后",
+                    indexIn(when, key) > indexIn(when, "pref_alerts_quiet_end"));
+        }
+        on.scrollToPreference("pref_alerts_guard_everywhere");
+        File file = Shots.save(shotActivity, "settings-alerts-day-guard");
+        assertTrue(file + " 是空的", file.length() > 10_000);
+
+        // 换成 ntfy：两条出口的组互相换位置，但那三行不动 —— 它们说的和发到哪儿无关。
+        // Switch to ntfy: the two transport blocks swap, the three rows stay — they are not exit-specific.
+        SettingsPreferenceFragment ntfy = alertsPage(true, com.kooo.evcam.alarm.ntfy.NtfyGate.NTFY);
+        assertTrue("ntfy 时「哪一组出现」照旧", ntfy.findPreference("cat_alerts_ntfy").isVisible());
+        for (String key : GUARD_ROWS) {
+            assertTrue("ntfy 时 " + key + " 还在", ntfy.findPreference(key).isVisible());
+        }
+
+        // 总开关关着：三行一起收起来。Master off: all three go with it.
+        SettingsPreferenceFragment off = alertsPage(false, com.kooo.evcam.alarm.ntfy.NtfyGate.TELEGRAM);
+        for (String key : GUARD_ROWS) {
+            assertFalse("总开关关着时 " + key + " 该收起来", off.findPreference(key).isVisible());
+        }
+    }
+
+    /**
+     * 聊天里 {@code alerts off} 之后，设置里那一行必须在屏上，而且点一下就恢复。
+     *
+     * <p>一个看不见的静音是最糟的状态：总开关写着「开」，车主以为车在看着，其实一条都不会发。
+     * 所以暂停必须是一行看得见的东西，而不是藏在聊天记录里的一个词。</p>
+     *
+     * The row after "alerts off" in the chat must be on screen, and one tap resumes. An invisible mute is
+     * the worst state: the master switch reads "on" while nothing is sent. So a pause is a visible row,
+     * not a word someone said in a chat once.
+     */
+    @Test
+    public void thePauseRowAppearsAndResumesOnTap() {
+        RuntimeEnvironment.setQualifiers(Shots.DAY_EN);
+        SettingsPreferenceFragment pausedPage = alertsPage(true,
+                com.kooo.evcam.alarm.ntfy.NtfyGate.TELEGRAM, config -> config.setAlertsPaused(true));
+        assertTrue("暂停时那一行该出现", shown(pausedPage, "pref_alerts_paused"));
+        androidx.preference.Preference row = pausedPage.findPreference("pref_alerts_paused");
+        assertNotNull(row);
+        assertNotNull("那一行该点得动", row.getOnPreferenceClickListener());
+        row.getOnPreferenceClickListener().onPreferenceClick(row);
+        assertFalse("点一下就该恢复",
+                new AppConfig(RuntimeEnvironment.getApplication()).isAlertsPaused());
+        assertFalse("恢复之后那一行收起来", shown(pausedPage, "pref_alerts_paused"));
+
+        SettingsPreferenceFragment runningPage = alertsPage(true,
+                com.kooo.evcam.alarm.ntfy.NtfyGate.TELEGRAM, config -> config.setAlertsPaused(false));
+        assertFalse("没暂停时不该出现", shown(runningPage, "pref_alerts_paused"));
+    }
+
+    private static final String[] GUARD_ROWS =
+            {"pref_alerts_guard", "pref_alerts_guard_home", "pref_alerts_guard_everywhere"};
+
+    /**
+     * 「警报附一张照片」关掉之后，下面三行跟着收起来。
+     *
+     * <p>排版（一张四宫格 / 每路一张）、那几路、掰直 —— 不拍照的时候三行都没有意义，留着只会让人以为
+     * 自己在设置里能改到已经不發生的事。片段那两行不动：它是聊天里点出来的，跟这条警报带不带图无关。</p>
+     *
+     * <p>开关本身还在，而且跟着存着的值：关掉之后重新进来，它就该是关的。</p>
+     *
+     * With "send a picture with each alert" off, the three rows below it collapse: layout, which lanes,
+     * and straightening all mean nothing when no picture is taken. The clip rows stay — those are asked
+     * for from the chat. The switch itself stays and shows the stored value.
+     */
+    @Test
+    public void thePictureSwitchCollapsesTheRowsBelowIt() {
+        RuntimeEnvironment.setQualifiers(Shots.DAY_EN);
+        SettingsPreferenceFragment on = alertsPage(true,
+                com.kooo.evcam.alarm.ntfy.NtfyGate.TELEGRAM, config -> {
+                    config.setAlertsPictureEnabled(true);
+                    config.setAlertsLayout(com.kooo.evcam.alarm.media.AlertPicture.layoutValue(
+                            com.kooo.evcam.alarm.media.AlertPicture.Layout.SEPARATE));
+                    config.setAlertsClipSeconds(5);
+                });
+        assertTrue("开着时该看得见", shown(on, "pref_alerts_send_picture"));
+        assertTrue("排版该在", shown(on, "pref_alerts_picture"));
+        assertTrue("每路一张时那几路该在", shown(on, "pref_alerts_cameras"));
+        assertTrue("掰直该在", shown(on, "pref_alerts_straighten"));
+
+        SettingsPreferenceFragment off = alertsPage(true,
+                com.kooo.evcam.alarm.ntfy.NtfyGate.TELEGRAM, config -> {
+                    config.setAlertsPictureEnabled(false);
+                    config.setAlertsClipSeconds(5);
+                });
+        androidx.preference.Preference switchRow = off.findPreference("pref_alerts_send_picture");
+        assertNotNull("少了附图那一行", switchRow);
+        assertTrue("开关本身要留着", switchRow.isVisible());
+        assertFalse("存着关，开关就该是关的",
+                ((androidx.preference.SwitchPreferenceCompat) switchRow).isChecked());
+        assertFalse("不拍照就不该有排版", shown(off, "pref_alerts_picture"));
+        assertFalse("不拍照就不该有那几路", shown(off, "pref_alerts_cameras"));
+        assertFalse("不拍照就不该有掰直", shown(off, "pref_alerts_straighten"));
+        assertTrue("片段是聊天里点的，跟这条不图无关", shown(off, "pref_alerts_clip"));
+
+        // 收尾：这几项是存在同一份设置里的，别把后面的测试带跑。
+        // Clean up: these live in the shared settings file.
+        AppConfig config = new AppConfig(RuntimeEnvironment.getApplication());
+        config.setAlertsPictureEnabled(true);
+        config.setAlertsClipSeconds(0);
+        config.setAlertsLayout(com.kooo.evcam.alarm.media.AlertPicture.layoutValue(
+                com.kooo.evcam.alarm.media.AlertPicture.Layout.GRID));
+    }
+
+    /**
+     * ntfy 的换话题那一行：走 ntfy 就在，走 Telegram 就不在。
+     *
+     * The ntfy topic row: present when ntfy is the exit, absent when Telegram is.
+     */
+    @Test
+    public void ntfyTopicRowFollowsTheTransport() {
+        android.content.Context context = RuntimeEnvironment.getApplication();
+        try {
+            DeveloperMode.lock(context);
+            SettingsPreferenceFragment ntfy = alertsPage(true,
+                    com.kooo.evcam.alarm.ntfy.NtfyGate.NTFY, config -> {
+                        config.setAlertsNtfyPaid(false);
+                    });
+            assertTrue("换话题该看得见", shown(ntfy, "pref_alerts_ntfy_rotate"));
+            assertTrue("免费档要把公开话题那句写出来", shown(ntfy, "pref_alerts_ntfy_public_warning"));
+
+            // Telegram：那一组整个不出现，换话题也不在。
+            //    Telegram: the whole block is gone, so the row does not show.
+            SettingsPreferenceFragment telegram = alertsPage(true,
+                    com.kooo.evcam.alarm.ntfy.NtfyGate.TELEGRAM, config -> {
+                    });
+            assertFalse("走 Telegram 时换话题不该出现", shown(telegram, "pref_alerts_ntfy_rotate"));
+        } finally {
+            DeveloperMode.lock(context);
+        }
+    }
+
+    private ShotActivity shotActivity;
+
+    /** 照着存好的状态开一屏新的「停车警报」。一条按存的这个状态绑出来的设置页。 */
+    private SettingsPreferenceFragment alertsPage(boolean alertsOn, String transport) {
+        return alertsPage(alertsOn, transport, config -> {
+        });
+    }
+
+    /** 同上，但在建页之前改一点设置（付费档、命令开关）。The same page, with one tweak before it is built. */
+    private SettingsPreferenceFragment alertsPage(boolean alertsOn, String transport,
+                                                  java.util.function.Consumer<AppConfig> tweak) {
+        AppConfig config = new AppConfig(RuntimeEnvironment.getApplication());
+        config.setAlertsEnabled(alertsOn);
+        config.setAlertsTransport(transport);
+        config.setAlertsTelegramToken("123456789:AAHexampleTOKENvalue0123456789");
+        config.setAlertsTelegramChatId("123456789");
+        config.setAlertsQuietEnabled(true);
+        tweak.accept(config);
+        RuntimeEnvironment.setQualifiers(Shots.DAY_EN);
+        shotActivity = Robolectric.buildActivity(ShotActivity.class).setup().get();
+        Shots.stillFrames(shotActivity);
+        SettingsShellFragment shell = new SettingsShellFragment();
+        shotActivity.getSupportFragmentManager().beginTransaction()
+                .replace(shotActivity.container, shell).commitNow();
+        Shots.settle();
+        shell.showSection("screen_alerts");
+        Shots.settle();
+        SettingsPreferenceFragment section = (SettingsPreferenceFragment) shell.getChildFragmentManager()
+                .findFragmentById(R.id.settings_detail);
+        assertNotNull("「停车警报」那一屏", section);
+        return section;
+    }
+
+    /** 这一行在组里的第几行。Where a row sits inside its group. */
+    private static int indexIn(androidx.preference.PreferenceGroup group, String key) {
+        for (int i = 0; i < group.getPreferenceCount(); i++) {
+            if (key.equals(group.getPreference(i).getKey())) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     private static boolean shown(SettingsPreferenceFragment section, String key) {

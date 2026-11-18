@@ -20,6 +20,116 @@ its own previews as a distorted strip. Zeekr Shortcut splits it back into four v
 
 Every feature, setting and tip is described in the **[wiki](../../wiki)**.
 
+## Alerts while parked
+
+With the car parked and Sentry Mode on, the app can send you a picture when something happens to it.
+Off by default; set it up once, from the car screen, and nothing needs rebuilding.
+
+- One picture of all four cameras, taken by the same photo path the shutter button uses, so it looks
+  like a photo you would have taken yourself.
+- It goes to a Telegram chat when: something moves in view, the hazards come on, the high beams flash,
+  a door / frunk / trunk opens, the car lights come on by themselves, or the centre screen lights up
+  while parked. Pick which of those count under **Settings → Alerts → What counts**.
+- **Settings → Alerts**: paste the bot token from @BotFather, then tap **Find chat id** — send the bot
+  one message from your phone first, and the row fills in the chat it came from. **Send a test picture**
+  proves the whole path before you rely on it.
+- One alert per minute at most, six an hour. The cooldown is there because one event trips several
+  signals at once.
+- Coming back to the car does not send anything: unlocking drops Sentry Mode out of its armed value
+  before the screen or the lamps come back on, and the alert needs the armed value.
+- The bot token stays on this car, in its own store: it is not in the exported settings, not in a
+  diagnostics report, and not in the log.
+
+This car has no impact, horn, airbag or tamper signal on the bus that this app can read, so a knock
+that never lights the hazards and never opens a door will not be seen. The picture is the four
+surround cameras stitched into the 2×2 grid, not the cabin cameras.
+
+## Sentry alerts
+
+With Sentry Mode on, the car already keeps recording. Turn this on and it also tells you: one picture
+of the four surround cameras arrives in Telegram when something happens to the car while you are away,
+and you can ask for a fresh picture from anywhere.
+
+Off by default. Settings → **Alerts**.
+
+### Setting up the Telegram bot, step by step
+
+The car has two guided wizards — Telegram and ntfy — and every screen of both, with one picture per step,
+is in **[docs/setup-wizards.md](docs/setup-wizards.md)**. The list below is the same path written out.
+
+1. **Make a bot.** In Telegram, open **@BotFather**, send `/newbot`, give it a name and a user name
+   ending in `bot`. BotFather replies with a token that looks like `123456789:AAH...` — that string is
+   the bot.
+2. **Say hello to it.** Open the bot you just made and send it any message. A bot cannot talk to a chat
+   that has never spoken to it, so this one message is what gives it a chat to answer.
+3. **Type the token into the car.** Settings → Alerts → **Bot token**. Paste the whole string. The row
+   shows only whether it is set, never the token.
+4. **Let the car find the chat.** Tap **Find chat id**. The car asks Telegram which chat last messaged
+   the bot and fills it in. If the bot has been quiet, send it another message and tap again.
+5. **Prove the path.** Open **Events the car can send** and tap any row: every message the bot can
+   receive is listed with when it really goes out, and each one sends for real when tapped. If a photo arrives on your phone, everything works:
+   the car, its 4G, the bot, the chat.
+6. **Choose what counts** under **What counts as something**: movement in view, hazards, high beams, a
+   door, the car lights, the centre screen. By default only the three the car itself reacts with are on.
+7. **Park, lock, walk away.** Unlock the car and nothing is sent — unlocking drops Sentry Mode out of
+   its armed value before the lights come back on.
+
+Optional, in the same section:
+
+- **A picture, or just the line**: on by default. Turn it off and each alert sends the sentence alone and
+  the car never takes the picture — asking for one in the chat still works.
+- **Pictures**: one 2×2 of all four cameras, or one picture per camera so each fills the phone screen.
+- **Straighten**: the same fisheye correction playback uses.
+- **The first picture is small.** Every alert opens with one picture compressed on the car to under
+  100 kB: enough to see what is happening, small enough to ignore. Data per alert, by default: 100 kB.
+- **Ask for more from the chat.** The picture carries buttons: **HD picture** sends the same view at the
+  400–600 kB ladder, sharper plates; **Clip front / rear / left / right** cuts those few seconds for one
+  camera and sends it, refused above 10 MB. Nothing but the small picture goes out until you ask, and the
+  clip's size follows the frame rate the car records sentry video at.
+- **Answer commands**: send the bot `pic` for a fresh picture, `pic front|rear|left|right` for one
+   camera, `status` for one line, `sens` to read the motion sensitivity and `sens up` / `sens down` /
+   `sens 7` to change it from the phone, `alerts off` / `alerts on` to pause and resume without touching
+   the master switch (the settings screen shows the pause and resumes on a tap). Only the chat you
+   configured is answered, and only while Sentry Mode is on — that is what keeps the head unit awake.
+- **Start after locking**: right away, 1 minute or 3 minutes after the car locks, so walking away
+  does not send you a picture of yourself.
+- **Forgot Sentry**: park away from home with Sentry Mode off and the car asks in the chat, then
+  switches it on 60 s later unless you say no. It only works while the car is awake — about five
+  minutes — so a button refuses politely after three. "Also at home" makes it apply everywhere.
+- **Quiet hours**: no alerts between two times, for the nights the car is at home.
+
+**What it cannot see.** The car reports no impact, horn or tamper signal, so a knock that lights nothing
+and opens nothing stays invisible. Cameras also need Sentry Mode to keep the head unit awake.
+
+### ntfy as the other exit
+
+**Settings → Alerts → Where alerts go** swaps the bot for an ntfy topic. No account and no bot are
+needed: the car publishes, the phone's ntfy app receives. Setup generates the topic, shows it as a QR
+code, and asks for four digits it sends to that topic — the digits coming back is the proof the phone
+really receives.
+
+- **A free topic is public.** The name is the address, so anyone holding it can read the pictures and
+  publish to it. Setup says so first and refuses to send until that is accepted.
+- **Change the topic** with one row. It mints a new name (238 random bits, mixed with the install time,
+  the current time, the rotation count and the model so two cars never collide), kills the old one, asks
+  for the risk warning again, and shows the QR code so the phone can subscribe. Do this if someone saw
+  your lock screen.
+- **Nothing else changes.** Which events fire, the armed gate, the arm delay, quiet hours and the 100 kB
+  picture are the same on both exits.
+
+![Sentry alerts settings](docs/screenshots/alerts-settings-en.png)
+
+![How it works](docs/screenshots/alerts-how-it-works.png)
+
+Forgot Sentry, on a real car outside a petrol station: the ask arrives, nobody answers, so it switches
+Sentry Mode on one minute later and reads the new state back from the car; then `pic` on demand returns
+the four cameras as one picture.
+
+![Forgot Sentry and a picture on request](docs/screenshots/alerts-forgot-sentry-chat.jpg)
+
+---
+
+## Download
 ---
 
 ## Download

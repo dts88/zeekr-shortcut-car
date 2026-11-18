@@ -1,6 +1,7 @@
 /*
  * Zeekr Shortcut - https://github.com/dts88/zeekr-shortcut-car
  * Copyright (C) 2026 dts88
+ * Portions Copyright (C) 2026 Fab (Fabbbrrr) - https://github.com/Fabbbrrr
  * Portions Copyright (C) suyunkai and the EVCam contributors - https://github.com/suyunkai/EVCam
  * Portions Copyright (C) 2026 wysie - https://github.com/wysie
  * SPDX-License-Identifier: GPL-3.0-only
@@ -12,11 +13,13 @@ package com.kooo.evcam;
 import android.content.Context;
 import android.content.SharedPreferences;
 
+import com.kooo.evcam.alarm.guard.GuardPolicy;
+import com.kooo.evcam.alarm.ntfy.NtfyGate;
 import com.kooo.evcam.camera.CameraNames;
-import com.kooo.evcam.zeekr.FisheyeProjection;
-import com.kooo.evcam.settings.SettingSpec;
 import com.kooo.evcam.settings.LicensePlate;
+import com.kooo.evcam.settings.SettingSpec;
 import com.kooo.evcam.settings.SettingsRegistry;
+import com.kooo.evcam.zeekr.FisheyeProjection;
 
 /**
  * 应用配置管理类
@@ -25,7 +28,9 @@ import com.kooo.evcam.settings.SettingsRegistry;
 public class AppConfig {
     private static final String TAG = "AppConfig";
     /** 设置存在这个文件里（导出、导入设置时也读写它，{@code settings.SettingsBackup}）。 */
-    public static final String PREF_NAME = "app_config";
+    public static final String PREF_NAME = "app_config";  // 设置与运行状态
+    /** 只放凭据（现在是 Telegram 令牌）：不进设置导出、不进诊断报告、不进黑匣子。 */
+    public static final String SECRETS_PREF_NAME = "app_config_secrets";
     
     // 配置项键名
     private static final String KEY_FIRST_LAUNCH = "first_launch";  // 首次启动标记
@@ -128,6 +133,41 @@ public class AppConfig {
     private static final String KEY_FORCE_H264_ENCODING = "force_h264_encoding";  // 拍照走相机 JPEG 通道
     private static final String KEY_LICENSE_PLATE = "license_plate";  // 车牌号（可选）
     private static final String KEY_LICENSE_PLATE_ENABLED = "license_plate_enabled";
+    // 停车警报（Telegram）：开关、机器人令牌、会话号
+    private static final String KEY_ALERTS_ENABLED = "alerts_enabled";
+    private static final String KEY_ALERTS_PAUSED = "alerts_paused";  // 聊天里临时关掉，总开关不动
+    private static final String KEY_ALERTS_TRIGGERS = "alerts_triggers";
+    private static final String KEY_ALERTS_MOTION_SENSITIVITY = "alerts_motion_sensitivity";
+    private static final String KEY_ALERTS_CLIP_SECONDS = "alerts_clip_seconds";  // 0 关 / 5 / 10
+    private static final String KEY_ALERTS_CLIP_AUDIO = "alerts_clip_audio";
+    private static final String KEY_ALERTS_ARM_DELAY = "alerts_arm_delay_minutes";  // 0 / 1 / 3
+    private static final String KEY_ALERTS_QUIET_ENABLED = "alerts_quiet_enabled";
+    private static final String KEY_ALERTS_QUIET_START = "alerts_quiet_start";
+    private static final String KEY_ALERTS_QUIET_END = "alerts_quiet_end";  // 哪些事情算「有事」
+    private static final String KEY_ALERTS_TELEGRAM_TOKEN = "alerts_telegram_token";
+    private static final String KEY_ALERTS_TELEGRAM_CHAT = "alerts_telegram_chat";
+    private static final String KEY_ALERTS_OWNER_ID = "alerts_owner_id";  // 谁能发命令（私聊里就是会话号）
+    private static final String KEY_ALERTS_LAYOUT = "alerts_layout";       // 一张四宫格 / 每路一张
+    private static final String KEY_ALERTS_CAMERAS = "alerts_cameras";     // 分开发时要哪几路（"0,1,2,3"）
+    private static final String KEY_ALERTS_STRAIGHTEN = "alerts_straighten";  // 发之前掰直
+    private static final String KEY_ALERTS_SEND_PICTURE = "alerts_send_picture";  // 发警报时附一张压缩图
+    private static final String KEY_ALERTS_COMMANDS = "alerts_commands";   // 回应 Telegram 里的命令
+    // 忘了开哨兵：提醒哪一档（存 0..3，见 alarm.GuardPolicy）
+    private static final String KEY_ALERTS_GUARD_MODE = "alerts_guard_mode";
+    private static final String KEY_ALERTS_GUARD_HOME = "alerts_guard_home";  // "lat,lon"，存在 secrets 里
+    private static final String KEY_ALERTS_GUARD_EVERYWHERE = "alerts_guard_everywhere";  // 在家也开
+    private static final String KEY_ALERTS_COMMAND_OFFSET = "alerts_command_offset";  // 轮询到哪一条（运行状态）
+    // ntfy（开发者选项里才选得了；规格见 docs/ntfy/）：走哪条路、服务器、档位、话题、令牌、风险提示的接受记录。
+    // ntfy (selectable only under developer options; see docs/ntfy/): route, server, tier, topic, token,
+    // and the record of the accepted free-topic warning.
+    private static final String KEY_ALERTS_TRANSPORT = "alerts_transport";  // "telegram" / "ntfy"（DEVELOPER_KEYS）
+    private static final String KEY_ALERTS_NTFY_SERVER = "alerts_ntfy_server";  // 空 = https://ntfy.sh
+    private static final String KEY_ALERTS_NTFY_TIER = "alerts_ntfy_tier";  // "free" / "paid"
+    private static final String KEY_ALERTS_NTFY_RISK_ACK = "alerts_ntfy_risk_ack";  // 版本|话题末八位
+    private static final String KEY_ALERTS_NTFY_TOPIC = "alerts_ntfy_topic";   // 存在凭据文件里（是钥匙）
+    private static final String KEY_ALERTS_NTFY_TOKEN = "alerts_ntfy_token";   // 存在凭据文件里
+    private static final String KEY_ALERTS_NTFY_TOPIC_ROUND = "alerts_ntfy_topic_round";   // 第几次换话题
+    private static final String KEY_ALERTS_NTFY_INSTALL_AT = "alerts_ntfy_install_at";     // 这份安装第一次换话题的时刻
 
     // 亮度/降噪调节配置
     private static final String KEY_IMAGE_ADJUST_ENABLED = "image_adjust_enabled";  // 是否启用亮度/降噪调节
@@ -766,7 +806,14 @@ public class AppConfig {
                 KEY_FRONT_CABIN_IN_USE,
                 KEY_LAST_DETECTED_SD_PATH,
                 KEY_REARVIEW_GUIDE_SEEN,
-                KEY_PHOTO_VIA_JPEG_RESET)));
+                KEY_PHOTO_VIA_JPEG_RESET,
+                KEY_ALERTS_COMMAND_OFFSET,
+                // 话题轮换的两个记号（2026-11-16）：安装时刻和换到第几次。不是设置，不进导出 ——
+                // 备份恢复到另一台车上不该带着别人的时刻和计数，那正是「两台车撞名」的来路。
+                // The two rotation marks: when this install first rotated and how many times. Not
+                // settings, not exported — a backup restored onto another car must not carry them.
+                KEY_ALERTS_NTFY_TOPIC_ROUND,
+                KEY_ALERTS_NTFY_INSTALL_AT)));
     }
 
     /**
@@ -2027,6 +2074,622 @@ public class AppConfig {
         String clean = LicensePlate.sanitize(value);
         prefs.edit().putString(KEY_LICENSE_PLATE, clean).apply();
         AppLog.i(TAG, "车牌号设为 " + (clean.isEmpty() ? "（空）" : clean));
+    }
+
+    // ------------------------------------------------------------------ 停车警报（Telegram）
+
+    /**
+     * 令牌单独存一个文件，和设置分开。
+     *
+     * <h3>为什么不用上面那个 prefs</h3>
+     *
+     * <p>设置会整个导出去（{@code SettingsBackup} 把 {@code app_config} 里的每一个键都写进备份文件），
+     * 诊断报告和黑匣子也都从那一份读。令牌进了那里，就等于随着“导出设置”和“发一份报告”一起出门了。
+     * 存另一个文件之后，导出、诊断、黑匣子都不经过它 —— 这份秘密只在这辆车上。</p>
+     */
+    private android.content.SharedPreferences secrets() {
+        return this.context.getSharedPreferences(SECRETS_PREF_NAME, Context.MODE_PRIVATE);
+    }
+
+    /**
+     * 停车警报开着没有。默认关：这是要联网、要填令牌的功能，不该在没答应它的车上跑。
+     *
+     * <p>开着也未必发得出去 —— 令牌或会话号缺一个就不发，判断在
+     * {@link com.kooo.evcam.alarm.policy.AlertPolicy}，那一条规则有单测。</p>
+     */
+    /**
+     * 聊天里临时关掉的警报（{@code alerts off}），和总开关分开存。
+     *
+     * <h3>为什么必须是另一个键</h3>
+     *
+     * <p>命令是从聊天里来的，而收命令那条线程又要「警报开着」。把总开关关掉就是把自己的回程路
+     * 一起关掉 —— 车主再也 {@code alerts on} 不回来，只能上车去点。所以这里是一个暂停标记：
+     * 停发、停看，但命令那条路留着。</p>
+     *
+     * <p>它也<b>不动</b>总开关：车主的设置还是「开」，只是暂时不发。设置页会单独一行写出来，
+     * 点一下就恢复，所以这个状态不会变成一个看不见的静音。</p>
+     *
+     * <h3>Why a separate key</h3>
+     *
+     * <p>Commands arrive through the channel, and the thread that reads them needs "alerts on".
+     * Flipping the master switch would close the way back: {@code alerts on} could never arrive again
+     * and the owner would have to get in the car. So this is a pause: stop sending and stop watching,
+     * keep the command channel. It leaves the master switch alone — the owner's setting still reads
+     * "on", it is just not sending right now — and the settings screen shows a row for it, tappable to
+     * resume, so the state never becomes an invisible mute.
+     */
+    public boolean isAlertsPaused() {
+        return prefs.getBoolean(KEY_ALERTS_PAUSED, false);
+    }
+
+    public void setAlertsPaused(boolean paused) {
+        prefs.edit().putBoolean(KEY_ALERTS_PAUSED, paused).apply();
+        AppLog.i(TAG, "警报" + (paused ? "已暂停（聊天里关的，命令仍然收）" : "已恢复"));
+    }
+
+    /**
+     * 警报现在真的在跑吗：总开关开着、而且没被暂停。
+     *
+     * <p>「发不发」「看不看信号」都读这一个值，{@link #isAlertsEnabled()} 留给「命令那条路要不要留」。</p>
+     *
+     * Whether alerts are actually running: master switch on and not paused. Sending and watching read
+     * this; the master switch alone decides whether the command channel stays.
+     */
+    public boolean isAlertsActive() {
+        return isAlertsEnabled() && !isAlertsPaused();
+    }
+
+    public boolean isAlertsEnabled() {
+        return prefs.getBoolean(KEY_ALERTS_ENABLED, false);
+    }
+
+    public void setAlertsEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_ALERTS_ENABLED, enabled).apply();
+        AppLog.i(TAG, "停车警报设为 " + (enabled ? "开" : "关"));
+    }
+
+    /**
+     * Telegram 机器人令牌。
+     *
+     * <p><b>这个值不进日志、不进故障报告。</b>写进来的第一个动作就是夹掉首尾空白；
+     * 外形不像令牌（{@code 数字:一串字符}）时原样存着，让设置界面去说“填得不对”，
+     * 而不是偷偷把用户敲的东西改掉。</p>
+     */
+    public String getAlertsTelegramToken() {
+        String raw = secrets().getString(KEY_ALERTS_TELEGRAM_TOKEN, "");
+        return raw == null ? "" : raw.trim();
+    }
+
+    public void setAlertsTelegramToken(String value) {
+        // 粘贴最容易带进来的东西：前后的空白、不断行空格、零宽字符、弯引号、从网页复制来的换行。
+        // 真令牌只有数字、冒号、字母、下划线、横线，所以别的字符一律丢掉 —— 存进去的必须就是能用的那一串。
+        StringBuilder kept = new StringBuilder();
+        if (value != null) {
+            for (int i = 0; i < value.length(); i++) {
+                char c = value.charAt(i);
+                boolean ok = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+                        || c == ':' || c == '_' || c == '-';
+                if (ok) {
+                    kept.append(c);
+                }
+            }
+        }
+        String clean = kept.toString();
+        secrets().edit().putString(KEY_ALERTS_TELEGRAM_TOKEN, clean).apply();
+        // 只记“填了还是清空了”：令牌本身绝不落进日志。
+        AppLog.i(TAG, "Telegram 令牌" + (clean.isEmpty() ? "已清空" : "已填写"));
+    }
+
+    /** 消息发到哪个会话。群组是负数，所以这里只去空白，不要求是正数。 */
+    public String getAlertsTelegramChatId() {
+        String raw = secrets().getString(KEY_ALERTS_TELEGRAM_CHAT, "");
+        if (raw == null || raw.trim().isEmpty()) {
+            // 会话号一度存在普通设置里，后来挪到了凭据文件。升级上来的那一份还在老地方，
+            // 不搬过来就是“令牌填了、会话号没了” —— 警报与命令都不会开始。
+            String legacy = prefs.getString(KEY_ALERTS_TELEGRAM_CHAT, "");
+            if (legacy != null && !legacy.trim().isEmpty()) {
+                String clean = legacy.trim();
+                secrets().edit().putString(KEY_ALERTS_TELEGRAM_CHAT, clean).apply();
+                prefs.edit().remove(KEY_ALERTS_TELEGRAM_CHAT).apply();
+                AppLog.i(TAG, "Telegram 会话号已从设置挪到凭据文件");
+                return clean;
+            }
+        }
+        return raw == null ? "" : raw.trim();
+    }
+
+    public void setAlertsTelegramChatId(String value) {
+        String clean = value == null ? "" : value.trim();
+        secrets().edit().putString(KEY_ALERTS_TELEGRAM_CHAT, clean).apply();
+        // 会话号也是身份：只记末四位，完整的不落日志
+        AppLog.i(TAG, "Telegram 会话号" + (clean.isEmpty() ? "已清空"
+                : "已填写（末四位 " + clean.substring(Math.max(0, clean.length() - 4)) + "）"));
+    }
+
+    // ==================== ntfy 警报（开发者选项里才选得了） ====================
+
+    /**
+     * 存着的「走哪条路」：{@code telegram} 或 {@code ntfy}。
+     *
+     * <p>设置里那个开关显示的是这个值，不是生效的值 —— 开发者选项关着时两者不同，
+     * 开关要如实显示「存着什么」，否则重新打开开发者选项就看不见自己上次选的那一条了。</p>
+     *
+     * The stored route. The developer switch shows this, not the effective value: with developer
+     * options closed the two differ, and the switch must show what is stored or the previous choice
+     * becomes invisible when developer options are reopened.
+     */
+    public String getAlertsTransportStored() {
+        return com.kooo.evcam.alarm.ntfy.NtfyGate.stored(
+                prefs.getString(KEY_ALERTS_TRANSPORT, com.kooo.evcam.alarm.ntfy.NtfyGate.TELEGRAM));
+    }
+
+    /**
+     * 真正在用的那条路。开发者选项关着时一律 telegram（{@link com.kooo.evcam.alarm.ntfy.NtfyGate#effective}）。
+     *
+     * <p>发送、界面上的状态行都读这一个值 —— 两处读同一个函数，说法就不会打架。</p>
+     *
+     * The route actually in use: telegram whenever developer options are closed. The sender and the
+     * status row both read this one function, so they cannot disagree.
+     */
+    public String getAlertsTransport() {
+        // 2026-11-15：这一项从开发者选项搬到「停车警报」里，成了车主的普通选择，
+        // 所以不再跟着开发者选项开关走；存坏的值仍然按 telegram 算（NtfyGate.stored）。
+        // 2026-11-15: the choice moved out of Developer options into the alerts section, so it no longer
+        // follows that switch; a stored value that makes no sense still reads as telegram.
+        return com.kooo.evcam.alarm.ntfy.NtfyGate.stored(getAlertsTransportStored());
+    }
+
+    /**
+     * 换一条路。只写这一个键，另一边的设置一个字都不动（{@code docs/ntfy/DECISIONS.md} D14）。
+     *
+     * Switch routes. Writes this one key and touches nothing on the other side.
+     */
+    public void setAlertsTransport(String value) {
+        String clean = com.kooo.evcam.alarm.ntfy.NtfyGate.stored(value);
+        prefs.edit().putString(KEY_ALERTS_TRANSPORT, clean).apply();
+        AppLog.i(TAG, "警报出口设为 " + clean);
+    }
+
+    /** 现在是不是走 ntfy。Whether the effective route is ntfy. */
+    public boolean isAlertsNtfy() {
+        return com.kooo.evcam.alarm.ntfy.NtfyGate.NTFY.equals(getAlertsTransport());
+    }
+
+    /** ntfy 服务器地址；空表示用默认的 ntfy.sh。The ntfy server; empty means the default. */
+    public String getAlertsNtfyServer() {
+        String raw = readString(KEY_ALERTS_NTFY_SERVER, "");
+        return raw == null ? "" : raw.trim();
+    }
+
+    public void setAlertsNtfyServer(String value) {
+        String clean = value == null ? "" : value.trim();
+        prefs.edit().putString(KEY_ALERTS_NTFY_SERVER, clean).apply();
+        AppLog.i(TAG, "ntfy 服务器" + (clean.isEmpty() ? "已清空（用默认）" : "已填写"));
+    }
+
+    /**
+     * 免费档还是付费档。图的上限、能不能保护话题，都看这一个值。
+     *
+     * Free tier or paid: the picture ceiling and whether a topic can be protected hang off this.
+     */
+    public boolean isAlertsNtfyPaid() {
+        return "paid".equals(readString(KEY_ALERTS_NTFY_TIER, "free"));
+    }
+
+    public void setAlertsNtfyPaid(boolean paid) {
+        prefs.edit().putString(KEY_ALERTS_NTFY_TIER, paid ? "paid" : "free").apply();
+        AppLog.i(TAG, "ntfy 档位设为 " + (paid ? "付费" : "免费"));
+    }
+
+    /**
+     * ntfy 话题名。<b>它就是钥匙</b>：和令牌一起存在凭据文件里，不进设置导出、不进诊断报告、
+     * 不进黑匣子；界面上只露末四位。
+     *
+     * The ntfy topic name. It <b>is</b> the key, so it lives with the token in the secrets file: not in
+     * the settings export, not in diagnostics, not in the blackbox; the screen shows the last four
+     * characters only.
+     */
+    public String getAlertsNtfyTopic() {
+        String raw = secrets().getString(KEY_ALERTS_NTFY_TOPIC, "");
+        return raw == null ? "" : raw.trim();
+    }
+
+    public void setAlertsNtfyTopic(String value) {
+        // 话题名只允许字母、数字、下划线、横线；粘贴带进来的引号、空格、零宽字符一律丢掉。
+        // Only letters, digits, underscore and dash; anything a paste brings along is dropped.
+        StringBuilder kept = new StringBuilder();
+        if (value != null) {
+            for (int i = 0; i < value.length(); i++) {
+                char c = value.charAt(i);
+                boolean ok = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+                        || c == '_' || c == '-';
+                if (ok) {
+                    kept.append(c);
+                }
+            }
+        }
+        String clean = kept.length() > 64 ? kept.substring(0, 64) : kept.toString();
+        secrets().edit().putString(KEY_ALERTS_NTFY_TOPIC, clean).apply();
+        AppLog.i(TAG, "ntfy 话题" + (clean.isEmpty() ? "已清空"
+                : "已填写（末四位 " + clean.substring(Math.max(0, clean.length() - 4)) + "）"));
+    }
+
+    /**
+     * ntfy 访问令牌（付费档才用得上）。<b>绝不进日志</b>：只记「填了还是清空了」。
+     *
+     * The ntfy access token, only needed on a paid plan. Never logged: only "filled" or "cleared".
+     */
+    public String getAlertsNtfyToken() {
+        String raw = secrets().getString(KEY_ALERTS_NTFY_TOKEN, "");
+        return raw == null ? "" : raw.trim();
+    }
+
+    public void setAlertsNtfyToken(String value) {
+        StringBuilder kept = new StringBuilder();
+        if (value != null) {
+            for (int i = 0; i < value.length(); i++) {
+                char c = value.charAt(i);
+                if (c > ' ' && c != 127) {
+                    kept.append(c);
+                }
+            }
+        }
+        String clean = kept.toString();
+        secrets().edit().putString(KEY_ALERTS_NTFY_TOKEN, clean).apply();
+        AppLog.i(TAG, "ntfy 令牌" + (clean.isEmpty() ? "已清空" : "已填写"));
+    }
+
+    /** 免费话题的风险提示接受记录：{@code 版本|话题末八位}（{@link com.kooo.evcam.alarm.ntfy.NtfyRisk}）。 */
+    public String getAlertsNtfyRiskAck() {
+        String raw = readString(KEY_ALERTS_NTFY_RISK_ACK, "");
+        return raw == null ? "" : raw.trim();
+    }
+
+    public void setAlertsNtfyRiskAck(String value) {
+        String clean = value == null ? "" : value.trim();
+        prefs.edit().putString(KEY_ALERTS_NTFY_RISK_ACK, clean).apply();
+        AppLog.i(TAG, "免费话题风险提示" + (clean.isEmpty() ? "已清除" : "已接受"));
+    }
+
+    /** ntfy 这条路配好了没有：有没有一个像样的话题名。Whether ntfy has a usable topic yet. */
+    public boolean hasAlertsNtfyConfig() {
+        return com.kooo.evcam.alarm.ntfy.NtfyRequest.looksLikeTopic(getAlertsNtfyTopic());
+    }
+
+    /**
+     * 换一个新话题：生成、存下、把风险同意清掉，返回新名字。
+     *
+     * <h3>三件事一起做，少一件都不行</h3>
+     *
+     * <ol>
+     *   <li><b>新名字</b>。四个输入见 {@link com.kooo.evcam.alarm.ntfy.NtfyRequest#generateTopic(long, long, int, String)}：
+     *       随机字节管保密，安装时刻、当前时刻、第几次、机型管不撞车。</li>
+     *   <li><b>旧名字作废</b>。车以后只往存着的那个名字发。</li>
+     *   <li><b>风险同意清掉</b>。{@link com.kooo.evcam.alarm.ntfy.NtfyRisk} 按话题存同意：
+     *       答应过「这个名字公开」不等于答应过下一个名字，所以换完要重新问一次。</li>
+     * </ol>
+     *
+     * <p>换名字是「有人看见了你的锁屏」的答案：换一个、重新扫码，旧的从这个车这里彻底断掉。</p>
+     *
+     * Mint a new topic: generate, store, clear the risk consent, return the name. The old name stops
+     * being used, and consent is per topic by design ({@link com.kooo.evcam.alarm.ntfy.NtfyRisk}), so a
+     * new name asks again. This is the answer to "someone saw my lock screen".
+     */
+    public String rotateAlertsNtfyTopic() {
+        long now = System.currentTimeMillis();
+        long installAt = prefs.getLong(KEY_ALERTS_NTFY_INSTALL_AT, 0L);
+        if (installAt <= 0L) {
+            installAt = now;
+            prefs.edit().putLong(KEY_ALERTS_NTFY_INSTALL_AT, installAt).apply();
+        }
+        int round = prefs.getInt(KEY_ALERTS_NTFY_TOPIC_ROUND, 0) + 1;
+        String previous = getAlertsNtfyTopic();
+        // 机型 + 编译指纹：同车型、同一秒装的两台车也不同。Build 在某些单测里是 null 值，无所谓。
+        // Model plus build fingerprint: two cars on the same model and the same install second still
+        // differ. Build is a stub under some unit tests, which is harmless here.
+        String salt = android.os.Build.MODEL + "|" + android.os.Build.FINGERPRINT;
+        String topic = com.kooo.evcam.alarm.ntfy.NtfyRequest.generateTopic(now, installAt, round, salt);
+        if (topic.equals(previous)) {
+            // 概率 2^-238，仍然不交出一个「换完和没换一样」的结果：换一次计数再要一次。
+            // Probability 2^-238, and still never hand back "rotated to the same name": take the next round.
+            round++;
+            topic = com.kooo.evcam.alarm.ntfy.NtfyRequest.generateTopic(now, installAt, round, salt);
+        }
+        setAlertsNtfyTopic(topic);
+        prefs.edit().putInt(KEY_ALERTS_NTFY_TOPIC_ROUND, round).apply();
+        setAlertsNtfyRiskAck("");
+        // 名字本身不进日志，只记「换过、第几次」—— 黑匣子会被导出。
+        // The name never reaches a log; only "rotated, which round" — the blackbox gets exported.
+        AppLog.i(TAG, "ntfy 话题已更换（第 " + round + " 次），风险提示需重新接受");
+        return topic;
+    }
+
+    /** 发一张 2×2，还是勾选的那几路各一张（{@link com.kooo.evcam.alarm.media.AlertPicture}）。 */
+    public String getAlertsLayout() {
+        return prefs.getString(KEY_ALERTS_LAYOUT, com.kooo.evcam.alarm.media.AlertPicture.layoutValue(
+                com.kooo.evcam.alarm.media.AlertPicture.Layout.GRID));
+    }
+
+    public void setAlertsLayout(String value) {
+        String clean = com.kooo.evcam.alarm.media.AlertPicture.layoutValue(
+                com.kooo.evcam.alarm.media.AlertPicture.layout(value));
+        prefs.edit().putString(KEY_ALERTS_LAYOUT, clean).apply();
+    }
+
+    /** 分开发时要哪几路。空表示全都要。 */
+    public String getAlertsCameras() {
+        return prefs.getString(KEY_ALERTS_CAMERAS, "0,1,2,3");
+    }
+
+    public void setAlertsCameras(String value) {
+        prefs.edit().putString(KEY_ALERTS_CAMERAS,
+                com.kooo.evcam.alarm.media.AlertPicture.lanesValue(
+                        com.kooo.evcam.alarm.media.AlertPicture.lanes(value))).apply();
+    }
+
+    /** 发之前把鱼眼掰直（和回看界面同一个校正）。 */
+    public boolean isAlertsStraighten() {
+        return prefs.getBoolean(KEY_ALERTS_STRAIGHTEN, false);
+    }
+
+    public void setAlertsStraighten(boolean enabled) {
+        prefs.edit().putBoolean(KEY_ALERTS_STRAIGHTEN, enabled).apply();
+    }
+
+    /**
+     * 每条警报要不要附一张压缩过的照片。默认<b>要</b>：一张 100 kB 的图比一句话有用得多，而这是这个功能当初的样子。
+     *
+     * <p>关掉之后警报只发一句文字，车<b>根本不去拍</b> —— 不是拍完再丢掉。差别是实的：拍一张要走四路相机、
+     * 拼一张 2×2、压到 100 kB 以下，在车机上是几百毫秒和一块内存；有人只想要一句「双闪亮了」，那就一步都不做。</p>
+     *
+     * <p>关掉不影响<b>要</b>图：聊天里的 {@code pic}、HD、片段仍然照旧，那是车主自己开口要的。
+     * 也不影响测试那一屏里叫「一张测试照片」的那一行 —— 它本来就写着「一张照片」。</p>
+     *
+     * Whether each alert carries one compressed picture. On by default. With it off the car does not
+     * take the picture at all — it does not take one and throw it away. That matters on a head unit:
+     * four lanes, a 2×2 stitch and a squeeze under 100 kB cost a few hundred milliseconds and a bitmap.
+     * Asking for a picture still works: {@code pic} in the chat, HD and clips are the owner asking, and
+     * the row named "a test picture" still sends one.
+     */
+    public boolean isAlertsPictureEnabled() {
+        return prefs.getBoolean(KEY_ALERTS_SEND_PICTURE, true);
+    }
+
+    public void setAlertsPictureEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_ALERTS_SEND_PICTURE, enabled).apply();
+        AppLog.i(TAG, "警报附图设为 " + (enabled ? "开" : "关（只发文字）"));
+    }
+
+    /**
+     * 回应 Telegram 里发来的命令（{@code pic}、{@code status}）。默认关。
+     *
+     * <p>开着的时候车会定期去问一次「有人找我吗」—— 长轮询，25 秒一次，车一直是客户端。
+     * 车机睡着时不问（进程本来就没了），所以那条命令要等车醒过来才有回音。</p>
+     */
+    public boolean isAlertsCommands() {
+        return prefs.getBoolean(KEY_ALERTS_COMMANDS, false);
+    }
+
+    public void setAlertsCommands(boolean enabled) {
+        prefs.edit().putBoolean(KEY_ALERTS_COMMANDS, enabled).apply();
+        AppLog.i(TAG, "停车警报命令回应设为 " + (enabled ? "开" : "关"));
+    }
+
+    /** 已经处理到哪一条更新：重启之后不能把上一条命令再执行一次。 */
+    public long getAlertsCommandOffset() {
+        return prefs.getLong(KEY_ALERTS_COMMAND_OFFSET, 0L);
+    }
+
+    /**
+     * 处理到哪一条。用 {@code commit()} 而不是 {@code apply()}：
+     * 这条命令接下来就要拍照发图，进程半路被杀时磁盘上必须已经写着「这条处理过了」，
+     * 否则重启会把同一张照片再发一遍。
+     */
+    public void setAlertsCommandOffset(long offset) {
+        prefs.edit().putLong(KEY_ALERTS_COMMAND_OFFSET, Math.max(0L, offset)).commit();
+    }
+
+    /**
+     * 谁能发命令 —— 车主自己的 Telegram 用户号。
+     *
+     * <p>为什么不只看会话号：会话可以是一个群，群里不只有车主。
+     * 配了这个号，群聊里只有车主自己能要照片，别人按一下那排按钮不算数。</p>
+     *
+     * <p>私聊里它和会话号是同一个数；「找会话号」会顺手把它一起记下来。</p>
+     */
+    public String getAlertsOwnerId() {
+        String raw = secrets().getString(KEY_ALERTS_OWNER_ID, "");
+        return raw == null ? "" : raw.trim();
+    }
+
+    public void setAlertsOwnerId(String value) {
+        String clean = value == null ? "" : value.trim();
+        secrets().edit().putString(KEY_ALERTS_OWNER_ID, clean).apply();
+        AppLog.i(TAG, "Telegram 车主号" + (clean.isEmpty() ? "已清空"
+                : "已填写（末四位 " + clean.substring(Math.max(0, clean.length() - 4)) + "）"));
+    }
+
+    /** 会话号与车主号都有；群聊里要靠后者才能分出是谁。 */
+    public boolean hasAlertsOwner() {
+        return !getAlertsOwnerId().isEmpty();
+    }
+
+    /**
+     * 哪些事情算「有事」（{@link com.kooo.evcam.alarm.policy.TriggerSet}）。
+     *
+     * <p>存的是一串逗号分开的名字；空串按全开算。每台车上能看到的信号不一样，
+     * 能不能看到那一项由车主自己选。</p>
+     */
+    public String getAlertsTriggers() {
+        return prefs.getString(KEY_ALERTS_TRIGGERS, com.kooo.evcam.alarm.policy.TriggerSet.DEFAULT);
+    }
+
+    public void setAlertsTriggers(String value) {
+        String clean = com.kooo.evcam.alarm.policy.TriggerSet.value(
+                parseTriggers(com.kooo.evcam.alarm.policy.TriggerSet.parse(value)));
+        prefs.edit().putString(KEY_ALERTS_TRIGGERS, clean).apply();
+    }
+
+    private static java.util.Set<String> parseTriggers(com.kooo.evcam.alarm.policy.TriggerSet set) {
+        java.util.Set<String> names = new java.util.LinkedHashSet<>();
+        for (String name : com.kooo.evcam.alarm.policy.TriggerSet.ALL) {
+            if (set.has(name)) {
+                names.add(name);
+            }
+        }
+        return names;
+    }
+
+    /** 画面移动的灵敏度（1–10，默认 5）。 */
+    public int getAlertsMotionSensitivity() {
+        return com.kooo.evcam.alarm.media.MotionSensitivity.clamp(
+                prefs.getInt(KEY_ALERTS_MOTION_SENSITIVITY, com.kooo.evcam.alarm.media.MotionSensitivity.DEFAULT));
+    }
+
+    public void setAlertsMotionSensitivity(int level) {
+        prefs.edit().putInt(KEY_ALERTS_MOTION_SENSITIVITY,
+                com.kooo.evcam.alarm.media.MotionSensitivity.clamp(level)).apply();
+    }
+
+    /** 警报时发一段短视频吗：0 关，5 或 10 秒。 */
+    public int getAlertsClipSeconds() {
+        int value = prefs.getInt(KEY_ALERTS_CLIP_SECONDS, 0);
+        return value == 5 || value == 10 ? value : 0;
+    }
+
+    public void setAlertsClipSeconds(int seconds) {
+        int clean = seconds == 5 || seconds == 10 ? seconds : 0;
+        prefs.edit().putInt(KEY_ALERTS_CLIP_SECONDS, clean).apply();
+    }
+
+    /** 短视频带不带声音（车上录着声音时才有）。 */
+    public boolean isAlertsClipAudio() {
+        return prefs.getBoolean(KEY_ALERTS_CLIP_AUDIO, true);
+    }
+
+    public void setAlertsClipAudio(boolean enabled) {
+        prefs.edit().putBoolean(KEY_ALERTS_CLIP_AUDIO, enabled).apply();
+    }
+
+    /** 安静时段开不开。默认关。 */
+    public boolean isAlertsQuietEnabled() {
+        return prefs.getBoolean(KEY_ALERTS_QUIET_ENABLED, false);
+    }
+
+    public void setAlertsQuietEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_ALERTS_QUIET_ENABLED, enabled).apply();
+    }
+
+    public int getAlertsQuietStart() {
+        return com.kooo.evcam.alarm.policy.QuietHours.clampMinute(
+                prefs.getInt(KEY_ALERTS_QUIET_START, com.kooo.evcam.alarm.policy.QuietHours.DEFAULT_START_MIN));
+    }
+
+    public void setAlertsQuietStart(int minute) {
+        prefs.edit().putInt(KEY_ALERTS_QUIET_START,
+                com.kooo.evcam.alarm.policy.QuietHours.clampMinute(minute)).apply();
+    }
+
+    public int getAlertsQuietEnd() {
+        return com.kooo.evcam.alarm.policy.QuietHours.clampMinute(
+                prefs.getInt(KEY_ALERTS_QUIET_END, com.kooo.evcam.alarm.policy.QuietHours.DEFAULT_END_MIN));
+    }
+
+    public void setAlertsQuietEnd(int minute) {
+        prefs.edit().putInt(KEY_ALERTS_QUIET_END,
+                com.kooo.evcam.alarm.policy.QuietHours.clampMinute(minute)).apply();
+    }
+
+    /** 锁车之后等几分钟才开始发警报（0 / 1 / 3）。 */
+    public int getAlertsArmDelayMinutes() {
+        return com.kooo.evcam.alarm.policy.ArmDelay.clamp(
+                prefs.getInt(KEY_ALERTS_ARM_DELAY, com.kooo.evcam.alarm.policy.ArmDelay.DEFAULT_MIN));
+    }
+
+    public void setAlertsArmDelayMinutes(int minutes) {
+        prefs.edit().putInt(KEY_ALERTS_ARM_DELAY,
+                com.kooo.evcam.alarm.policy.ArmDelay.clamp(minutes)).apply();
+    }
+
+    /**
+     * 「忘了开哨兵」提醒哪一档：关 / 只问 / 问了就开 / 直接开。存 0..3，默认关。
+     *
+     * <p>默认关是有意的：没打开这一项的车上，行为和以前一模一样。打开了之后默认是「问了就开」——
+     * 车主忘了才是这一项要治的病，等他按按钮不是。</p>
+     *
+     * <p>Which mode the Forgot Sentry reminder is in. Stored 0..3, off by default, so a car that never
+     * touches this row behaves exactly as before. Once switched on, "ask then on" is the default:
+     * forgetting is the problem being solved, waiting for a tap is not the cure.</p>
+     */
+    public com.kooo.evcam.alarm.guard.GuardPolicy.Mode getAlertsGuardMode() {
+        return com.kooo.evcam.alarm.guard.GuardPolicy.Mode.of(prefs.getInt(KEY_ALERTS_GUARD_MODE,
+                com.kooo.evcam.alarm.guard.GuardPolicy.DEFAULT_MODE.stored()));
+    }
+
+    public void setAlertsGuardMode(com.kooo.evcam.alarm.guard.GuardPolicy.Mode mode) {
+        com.kooo.evcam.alarm.guard.GuardPolicy.Mode value =
+                mode == null ? com.kooo.evcam.alarm.guard.GuardPolicy.DEFAULT_MODE : mode;
+        prefs.edit().putInt(KEY_ALERTS_GUARD_MODE, value.stored()).apply();
+    }
+
+    /**
+     * 家的坐标（{@code "lat,lon"}），设过才有。
+     *
+     * <p>存 {@link #secrets()} 那一份，和令牌同理：家的位置是最私人的一条数据，不该随「导出设置」
+     * 和一份诊断报告出门。空的字符串表示没设过 —— 没设过照样会提醒，只是不会自己开。</p>
+     *
+     * <p>The home point, kept in the secrets file for the same reason as the token: an exported settings
+     * file or a diagnostics report must not carry where the owner lives. Empty means never set.</p>
+     */
+    public String getAlertsGuardHome() {
+        String raw = secrets().getString(KEY_ALERTS_GUARD_HOME, "");
+        return raw == null ? "" : raw.trim();
+    }
+
+    /**
+     * 记下家的位置。认不出来的坐标不收（{@link com.kooo.evcam.alarm.guard.GuardHome#parse} 说了不算）。
+     *
+     * @return 收下了没有
+     */
+    public boolean setAlertsGuardHome(double latitude, double longitude) {
+        com.kooo.evcam.alarm.guard.GuardHome.Point point =
+                com.kooo.evcam.alarm.guard.GuardHome.parse(
+                        com.kooo.evcam.alarm.guard.GuardHome.format(latitude, longitude));
+        if (point == null) {
+            return false;
+        }
+        secrets().edit().putString(KEY_ALERTS_GUARD_HOME,
+                com.kooo.evcam.alarm.guard.GuardHome.format(point.lat, point.lon)).apply();
+        return true;
+    }
+
+    /** 忘掉家的位置（换房子的时候）。Forget the home point. */
+    public void clearAlertsGuardHome() {
+        secrets().edit().remove(KEY_ALERTS_GUARD_HOME).apply();
+    }
+
+    /**
+     * 在哪都开：在家也照样问、照样开。默认关。
+     *
+     * <p>关着时在家什么都不做 —— 车库里天天提醒一次，这一项活不过一周。车主自己愿意把这一条放开时
+     * 才开：代价是每次停进车库哨兵也跟着开，车机被它顶着不睡，用掉的是 12V 电瓶。</p>
+     *
+     * <p>"Everywhere": ask and switch on at home too. Off by default, because a reminder every evening in
+     * the owner's own driveway would not survive a week. Turning it on means sentry also comes on there,
+     * and the head unit then stays awake on the 12V battery.</p>
+     */
+    public boolean isAlertsGuardEverywhere() {
+        return prefs.getBoolean(KEY_ALERTS_GUARD_EVERYWHERE, false);
+    }
+
+    public void setAlertsGuardEverywhere(boolean everywhere) {
+        prefs.edit().putBoolean(KEY_ALERTS_GUARD_EVERYWHERE, everywhere).apply();
+        AppLog.i(TAG, "忘了开哨兵：在哪都开 = " + everywhere);
+    }
+
+    /** 令牌和会话号都填了：可以试着发一条。 */
+    public boolean hasAlertsTelegramConfig() {
+        return !getAlertsTelegramToken().isEmpty() && !getAlertsTelegramChatId().isEmpty();
     }
 
     /**
