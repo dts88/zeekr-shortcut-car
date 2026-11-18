@@ -1317,7 +1317,7 @@
     <string name="set_sentry_alerts_last">Amaran terakhir: %1$s</string>
     <string name="set_sentry_alerts_last_failed">Amaran terakhir gagal: %1$s</string>
     <string name="set_sentry_alerts_picture_title">Sertakan gambar</string>
-    <string name="set_sentry_alerts_picture_summary">Menambah gambar paparan sekeliling hingga 100 KB pada setiap amaran</string>
+    <string name="set_sentry_alerts_picture_summary">Menambah gambar paparan sekeliling hingga 100 KB pada setiap amaran. Memerlukan Terus merakam apabila skrin padam dan rakaman berjalan semasa kereta dikunci.</string>
     <string name="set_ntfy_topic_title">Topik ntfy</string>
     <string name="set_ntfy_topic_value">Berakhir dengan %1$s</string>
     <string name="set_ntfy_topic_summary">Ketik untuk memaparkan kod QR, kemudian imbas dengan apl ntfy pada telefon untuk melanggan</string>
@@ -1345,4 +1345,6 @@
     <string name="sentry_alerts_reason_unreachable">tidak dapat menghubungi pelayan</string>
     <string name="sentry_alerts_reason_timeout">sambungan tamat masa</string>
     <string name="sentry_alerts_reason_refused">pelayan menolaknya (HTTP %1$d)</string>
+    <string name="sentry_alerts_qr_failed">Tidak dapat mencipta kod QR</string>
+    <string name="msg_ntfy_server_address_only">Masukkan alamat pelayan sahaja, contohnya ntfy.sh</string>
 </resources>

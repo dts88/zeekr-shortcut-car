@@ -5387,7 +5387,8 @@ public class MultiCameraManager {
         }
 
         /**
-         * 这一张每一路存到了哪（相机的 key → 文件），紧挨着在 {@link #onPhotoResult} 前面叫一次；一路都没存下时是空的。
+         * 这一张每一路存到了哪（相机的 key → 文件）：拍完收尾时紧挨着在 {@link #onPhotoResult} 前面叫一次，一路都没存下时是空的；
+         * 当场就回绝的（管线放掉了、配置里一路都没启用、没有地方存）不叫。
          * 哨兵提醒（{@code alarm.SentryAlerts}）要把环视那一张发到手机上，别处用不着。
          */
         default void onPhotoFiles(Map<String, File> files) {
@@ -5442,7 +5443,8 @@ public class MultiCameraManager {
      * （项目所有者 2026-10-06：不允许存到内置存储）。和拒录是同一个判断（存储快照的 {@code available}）；
      * 查盘在存储线程上，查完回主线程接着拍。以前不查，拍完存进内置存储。</p>
      *
-     * @return false：上一张还在拍，这一次不接
+     * @return false：这一次没拍 —— 上一张还在拍（{@code callback} 不会被叫），或者管线放掉了、配置里一路都没启用
+     *         （{@code callback} 已经当场回报过）
      */
     public boolean takePhoto(PhotoCallback callback) {
         if (android.os.Looper.myLooper() != android.os.Looper.getMainLooper()) {

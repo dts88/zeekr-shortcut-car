@@ -50,7 +50,8 @@ import java.util.concurrent.Executors;
  *   <li><b>看不看</b>（{@link #update}）：「手机订阅模式」不是「关闭」、话题和同意都有（{@link AlertStore#ready}）、用户没退出，
  *       就在 {@link Telemetry} 上听读数；车辆信号的核心进程活着一直在读（熄屏判断登记的），这里只挂一个监听，不另外登记。</li>
  *   <li><b>认</b>（{@link SentryWatch}）：布防满 30 秒，双闪或车灯从不亮变亮。</li>
- *   <li><b>限</b>（{@link AlertPolicy}）：两条之间至少 60 秒、一小时最多 6 条、发失败后 5 分钟不发。</li>
+ *   <li><b>限</b>（{@link AlertPolicy}）：两条之间至少 60 秒、一小时最多 6 条、发失败后 5 分钟不发。亮起时只看能不能发，
+ *       再看一眼还布防着才占名额 —— 车主回来解锁时闪的那一下不占。</li>
  *   <li><b>再看一眼</b>：亮起之后等 {@link #CONFIRM_MS} 再看一次还布防不布防 —— 解锁那一下车也会闪灯，
  *       哨兵读数回到「开启」和闪灯的读数谁先到没核实过；车主回来了就不发，也不拍。</li>
  *   <li><b>拍</b>：「附带画面」开着就向相机管家要一张（{@link CameraKeeper#takePhoto}，和拍照键同一条路，开不开相机、拍哪几路
@@ -173,7 +174,8 @@ public final class SentryAlerts implements Telemetry.Listener {
         }
         policy.setParked(true);
         policy.setArmed(true);
-        AlertPolicy.Decision decision = policy.reserve(now);
+        // 这里只看能不能发；名额等再看一眼、确认还布防着再占（confirmed）
+        AlertPolicy.Decision decision = policy.decide(now);
         if (decision != AlertPolicy.Decision.ALLOW) {
             BlackBox.note("哨兵提醒：" + (trigger == SentryWatch.Trigger.HAZARD ? "双闪亮起" : "车灯亮起")
                     + "，不发（" + decision + "）");
@@ -219,6 +221,12 @@ public final class SentryAlerts implements Telemetry.Listener {
             }
             if (!watch.armed()) {
                 BlackBox.note("哨兵提醒：哨兵已不在布防（车解锁了），不发");
+                return;
+            }
+            // 到这里才占名额：2 秒里先亮起的那一条占了，后面的就是冷却
+            AlertPolicy.Decision decision = policy.reserve(SystemClock.elapsedRealtime());
+            if (decision != AlertPolicy.Decision.ALLOW) {
+                BlackBox.note("哨兵提醒：不发（" + decision + "）");
                 return;
             }
             if (!AlertStore.of(app).picture()) {
@@ -287,27 +295,32 @@ public final class SentryAlerts implements Telemetry.Listener {
             float fov = config.getFisheyeFov();
             String projection = config.getFisheyeProjection();
             sender.execute(() -> {
-                byte[] jpeg = photo == null ? null : picture(photo, straighten, fov, projection);
                 AlertChannel.Result result;
-                if (jpeg == null) {
-                    if (photo != null) {
-                        BlackBox.note("哨兵提醒：环视那一张压不进 " + PictureBudget.size(PictureBudget.ALERT_BYTES)
-                                + "，只发文字");
-                    }
-                    result = channel.sendText(title, body);
-                } else {
-                    result = channel.sendPhoto(title, body, jpeg);
-                    if (!result.ok && result.kind != AlertChannel.Kind.NETWORK
-                            && result.kind != AlertChannel.Kind.TIMEOUT) {
-                        // 服务器回了话、不收这张图（自建的服务器没开附件、图太大）：退一步只发文字
-                        BlackBox.note("哨兵提醒：服务器不收图（" + result.kind + " " + result.httpCode
-                                + "），改发文字");
+                int pictureBytes = 0;
+                try {
+                    // 做不成图的原因 picture 自己记进黑匣子
+                    byte[] jpeg = photo == null ? null : picture(photo, straighten, fov, projection);
+                    if (jpeg == null) {
                         result = channel.sendText(title, body);
+                    } else {
+                        result = channel.sendPhoto(title, body, jpeg);
+                        if (result.ok) {
+                            pictureBytes = jpeg.length;
+                        } else if (result.kind != AlertChannel.Kind.NETWORK
+                                && result.kind != AlertChannel.Kind.TIMEOUT) {
+                            // 服务器回了话、不收这张图（自建的服务器没开附件、图太大）：退一步只发文字
+                            BlackBox.note("哨兵提醒：服务器不收图（" + result.kind + " " + result.httpCode
+                                    + "），改发文字");
+                            result = channel.sendText(title, body);
+                        }
                     }
+                } catch (RuntimeException e) {
+                    // 发送线程上抛出去整个应用会退出：当作这一条没发出去
+                    result = AlertChannel.Result.fail(AlertChannel.Kind.NETWORK, 0, e.getClass().getSimpleName());
                 }
                 AlertChannel.Result outcome = result;
-                int pictureBytes = outcome.ok && jpeg != null ? jpeg.length : 0;
-                main.post(() -> sent(outcome, pictureBytes));
+                int sentBytes = pictureBytes;
+                main.post(() -> sent(outcome, sentBytes));
             });
         }
 
@@ -343,10 +356,17 @@ public final class SentryAlerts implements Telemetry.Listener {
         String title = text.getString(R.string.sentry_alert_title);
         String body = text.getString(R.string.sentry_alert_test, moment(System.currentTimeMillis()));
         INSTANCE.sender.execute(() -> {
-            AlertChannel.Result result = channel.sendText(title, body);
-            BlackBox.note("哨兵提醒：发送测试" + (result.ok ? "，已发送"
-                    : "，失败 " + result.kind + " " + result.httpCode + " " + result.detail));
-            INSTANCE.main.post(() -> reply.done(result));
+            AlertChannel.Result result;
+            try {
+                result = channel.sendText(title, body);
+            } catch (RuntimeException e) {
+                // 发送线程上抛出去整个应用会退出：当作没发出去，按钮也要回来
+                result = AlertChannel.Result.fail(AlertChannel.Kind.NETWORK, 0, e.getClass().getSimpleName());
+            }
+            AlertChannel.Result outcome = result;
+            BlackBox.note("哨兵提醒：发送测试" + (outcome.ok ? "，已发送"
+                    : "，失败 " + outcome.kind + " " + outcome.httpCode + " " + outcome.detail));
+            INSTANCE.main.post(() -> reply.done(outcome));
         });
     }
 
@@ -374,7 +394,7 @@ public final class SentryAlerts implements Telemetry.Listener {
 
     /**
      * 环视那一张做成提醒的图：先缩到长边 {@link #MAX_SIDE_PX}，掰直（开关跟着屏幕上的鱼眼校正），左下角打上拍下的时刻，
-     * 压进 100 KB。做不成返回 null（只发文字）。在发送线程上。
+     * 压进 100 KB。做不成返回 null（只发文字），为什么做不成记进黑匣子。在发送线程上。
      */
     static byte[] picture(File file, boolean straighten, float fov, String projection) {
         Bitmap decoded = null;
@@ -385,19 +405,26 @@ public final class SentryAlerts implements Telemetry.Listener {
             bounds.inJustDecodeBounds = true;
             BitmapFactory.decodeFile(file.getAbsolutePath(), bounds);
             if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
+                BlackBox.note("哨兵提醒：照片读不出来（文件不在了，或者不是 JPEG），只发文字");
                 return null;
             }
             BitmapFactory.Options options = new BitmapFactory.Options();
             options.inSampleSize = sampleFor(bounds.outWidth, bounds.outHeight, MAX_SIDE_PX);
             decoded = BitmapFactory.decodeFile(file.getAbsolutePath(), options);
             if (decoded == null) {
+                BlackBox.note("哨兵提醒：照片解不开，只发文字");
                 return null;
             }
             straight = AlertPicture.straighten(decoded, straighten, fov, projection);
             stamped = AlertPicture.stamped(straight, shotAt(file));
-            return AlertPicture.jpegUnder(stamped != null ? stamped : straight, PictureBudget.ALERT_BYTES);
+            byte[] jpeg = AlertPicture.jpegUnder(stamped != null ? stamped : straight, PictureBudget.ALERT_BYTES);
+            if (jpeg == null) {
+                BlackBox.note("哨兵提醒：环视那一张压不进 " + PictureBudget.size(PictureBudget.ALERT_BYTES) + "，只发文字");
+            }
+            return jpeg;
         } catch (RuntimeException | OutOfMemoryError e) {
             AppLog.w(TAG, "could not make the alert picture: " + e);
+            BlackBox.note("哨兵提醒：做图出错（" + e.getClass().getSimpleName() + "），只发文字");
             return null;
         } finally {
             if (stamped != null && stamped != straight) {

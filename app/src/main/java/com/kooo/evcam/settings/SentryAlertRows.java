@@ -247,7 +247,7 @@ final class SentryAlertRows {
         qr.setLayoutParams(qrParams);
         root.addView(qr);
 
-        TextView failed = line(context, context.getString(R.string.share_phone_qr_failed), R.dimen.text_caption, true);
+        TextView failed = line(context, context.getString(R.string.sentry_alerts_qr_failed), R.dimen.text_caption, true);
         failed.setVisibility(View.GONE);
         root.addView(failed);
         root.addView(line(context, context.getString(R.string.dlg_ntfy_subscribe_steps), R.dimen.text_body, false));
@@ -368,8 +368,12 @@ final class SentryAlertRows {
             CamDialogs.paintNow(dialog);
             // 填错不关框：默认行为点了就关
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
-                String normalized = NtfyRequest.normalizeServer(input.getText().toString());
+                String typed = input.getText().toString();
+                String normalized = NtfyRequest.normalizeServer(typed);
                 if (normalized.isEmpty()) {
+                    // 写了别的协议说「仅支持 https」；其余（带路径、用户名，端口不对……）说只填服务器地址
+                    error.setText(NtfyRequest.wrongScheme(typed)
+                            ? R.string.msg_ntfy_server_https_only : R.string.msg_ntfy_server_address_only);
                     error.setVisibility(View.VISIBLE);
                     return;
                 }

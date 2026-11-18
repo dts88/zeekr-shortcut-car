@@ -1341,7 +1341,7 @@
     <string name="set_sentry_alerts_last">Last alert: %1$s</string>
     <string name="set_sentry_alerts_last_failed">Last alert failed: %1$s</string>
     <string name="set_sentry_alerts_picture_title">Include a picture</string>
-    <string name="set_sentry_alerts_picture_summary">Adds a surround view picture of up to 100 KB to each alert</string>
+    <string name="set_sentry_alerts_picture_summary">Adds a surround view picture of up to 100 KB to each alert. Requires Keep recording when the screen goes off and recording to be running when you lock the car.</string>
     <string name="set_ntfy_topic_title">ntfy topic</string>
     <string name="set_ntfy_topic_value">Ends in %1$s</string>
     <string name="set_ntfy_topic_summary">Tap to show a QR code, then scan it with the ntfy app on the phone to subscribe</string>
@@ -1369,4 +1369,6 @@
     <string name="sentry_alerts_reason_unreachable">can\'t reach the server</string>
     <string name="sentry_alerts_reason_timeout">connection timed out</string>
     <string name="sentry_alerts_reason_refused">the server refused it (HTTP %1$d)</string>
+    <string name="sentry_alerts_qr_failed">Couldn\'t create the QR code</string>
+    <string name="msg_ntfy_server_address_only">Enter only the server address, for example ntfy.sh</string>
 </resources>

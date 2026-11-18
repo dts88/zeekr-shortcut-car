@@ -221,12 +221,13 @@ public final class NtfyRequest {
     /**
      * 车主填的服务器地址统一成一个样子：去掉首尾空白和末尾斜杠，没写协议补 https。
      *
-     * <p>只收 https：写了 http:// 的、带路径或查询串的、主机名里有别的字符的，都不认。</p>
+     * <p>只收 https：写了 http:// 的、带路径或查询串的、主机名里有别的字符的、端口不在 1–65535 的，都不认。</p>
      *
      * @return {@code https://主机名[:端口]}；不认的返回空串
      *
      * Normalise what the owner typed: trim, drop a trailing slash, default the scheme to https. https
-     * only: an http:// address, a path, a query or any other character in the host is refused.
+     * only: an http:// address, a path, a query, any other character in the host or a port outside 1-65535 is
+     * refused.
      *
      * @return {@code https://host[:port]}, or an empty string when it is refused
      */
@@ -247,7 +248,28 @@ public final class NtfyRequest {
         if (value.isEmpty() || !HOST.matcher(value).matches()) {
             return "";
         }
+        int colon = value.indexOf(':');
+        if (colon >= 0) {
+            // HOST 已经保证冒号后面是 1–5 位数字
+            int port = Integer.parseInt(value.substring(colon + 1));
+            if (port < 1 || port > 65535) {
+                return "";
+            }
+        }
         return "https://" + value.toLowerCase(java.util.Locale.ROOT);
+    }
+
+    /**
+     * 写了 https 以外的协议（http://、ftp://……）：填错的是协议，不是地址的样子。
+     *
+     * Whether the typed address names a scheme other than https: then the scheme is what is wrong.
+     */
+    public static boolean wrongScheme(String server) {
+        if (server == null) {
+            return false;
+        }
+        String lower = server.trim().toLowerCase(java.util.Locale.ROOT);
+        return lower.contains("://") && !lower.startsWith("https://");
     }
 
     /**

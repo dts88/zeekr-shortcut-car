@@ -114,4 +114,30 @@ public class AlertStoreTest {
         assertFalse("话题不在导出的设置里", text.contains(topic));
         assertFalse("服务器不在导出的设置里", text.contains("ntfy.example.com"));
     }
+
+    @Test
+    public void androidsOwnBackupLeavesTheFileOut() throws Exception {
+        String file = AlertStore.FILE + ".xml";
+        assertEquals("备份规则排除了这个文件", 1, excludes(com.kooo.evcam.R.xml.backup_rules, file));
+        assertEquals("云备份、换机两段都排除了", 2, excludes(com.kooo.evcam.R.xml.data_extraction_rules, file));
+    }
+
+    /** 规则文件里排除这个共享设置文件的有几处。How many rules in the file leave this shared-prefs file out. */
+    private int excludes(int xml, String file) throws Exception {
+        int found = 0;
+        android.content.res.XmlResourceParser parser = app.getResources().getXml(xml);
+        try {
+            for (int event = parser.getEventType(); event != org.xmlpull.v1.XmlPullParser.END_DOCUMENT;
+                    event = parser.next()) {
+                if (event == org.xmlpull.v1.XmlPullParser.START_TAG && "exclude".equals(parser.getName())
+                        && "sharedpref".equals(parser.getAttributeValue(null, "domain"))
+                        && file.equals(parser.getAttributeValue(null, "path"))) {
+                    found++;
+                }
+            }
+        } finally {
+            parser.close();
+        }
+        return found;
+    }
 }

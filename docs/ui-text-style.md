@@ -684,7 +684,7 @@
   set_sentry_alerts_mode_title「手机订阅模式」/ Phone subscription / Langganan telefon，三段 opt_off、opt_sentry_alerts_ntfy「ntfy」、opt_sentry_alerts_telegram「Telegram」（两个服务名三种语言都照写）；
   set_sentry_alerts_mode_summary：11-18 项目所有者把时间改成布防满 30 秒，新句见下面「待项目所有者确认」；
   set_sentry_alerts_last「上次提醒：%1$s」、set_sentry_alerts_last_failed「上次提醒发送失败：%1$s」；
-  set_sentry_alerts_picture_title「附带画面」、set_sentry_alerts_picture_summary「每条提醒附一张环视拼图，大小不超过 100 KB」；
+  set_sentry_alerts_picture_title「附带画面」；set_sentry_alerts_picture_summary 11-18 审查后补了条件，新句见下面「待项目所有者确认」；
   set_ntfy_topic_title「ntfy 话题」、set_ntfy_topic_value「尾号 %1$s」、set_ntfy_topic_summary「点击显示二维码，用手机上的 ntfy 应用扫码订阅」；
   set_ntfy_server_title「ntfy 服务器」、set_ntfy_server_summary「仅支持 https；更换后需重新扫码订阅」、msg_ntfy_server_https_only「仅支持 https」；
   dlg_sentry_alerts_risk_title「开启哨兵提醒？」、dlg_sentry_alerts_risk_body「提醒和画面会发到公开的 ntfy 服务器，知道话题名的人都能查看。话题名随机生成，只保存在本机，请勿分享二维码或截图。如有泄露，可随时更换话题。」、sentry_alerts_action_turn_on「开启」；
@@ -709,6 +709,16 @@
   Sends an alert to the phone when the hazard lights flash or the lights come on by themselves once Sentry Mode has been armed for 30 seconds. Alerts are sent directly, not through the developer's servers. /
   Menghantar amaran ke telefon apabila lampu kecemasan berkelip atau lampu menyala sendiri selepas Mod Sentry bersiaga selama 30 saat. Amaran dihantar terus, tidak melalui pelayan pembangun.
   「布防」照哨兵状态「已布防」（sentry_status_armed：armed / bersiaga）。
+- 2026-11-18 本地审查后改的（草稿，三种语言都上了）：
+  set_sentry_alerts_picture_summary 补上条件「每条提醒附一张环视拼图，大小不超过 100 KB。需开启「熄屏持续录制」，且锁车时正在录制。」/
+  Adds a surround view picture of up to 100 KB to each alert. Requires Keep recording when the screen goes off and recording to be running when you lock the car. /
+  Menambah gambar paparan sekeliling hingga 100 KB pada setiap amaran. Memerlukan Terus merakam apabila skrin padam dan rakaman berjalan semasa kereta dikunci.
+  （布防时屏幕是黑的，相机管家不为拍照开相机：环视还在录制才有图）；
+  sentry_alerts_qr_failed「无法生成二维码」/ Couldn't create the QR code / Tidak dapat mencipta kod QR（原来借用「发到手机」那句，叫人去浏览器输入地址，这里没有地址）；
+  msg_ntfy_server_address_only「只填服务器地址，如 ntfy.sh」/ Enter only the server address, for example ntfy.sh / Masukkan alamat pelayan sahaja, contohnya ntfy.sh
+  （https 但带了路径、用户名，端口不对时；写了别的协议的仍是「仅支持 https」）；
+  about_credits_copyright 加一行 NOTICE §8 要求的署名：「ntfy 提醒由 Fab（Fabbbrrr）设计 - https://github.com/Fabbbrrr」/
+  ntfy alerts designed by Fab (Fabbbrrr) - https://github.com/Fabbbrrr（马来文界面用英文那份）。
 
 ---
 

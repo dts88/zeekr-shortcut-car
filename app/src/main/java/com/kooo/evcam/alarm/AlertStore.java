@@ -23,7 +23,8 @@ import com.kooo.evcam.alarm.ntfy.NtfyRisk;
  *
  * <p>话题名就是钥匙：知道它就能看到提醒和画面。设置备份整份带走 app_config（导出的文件、诊断报告里都有这一份），
  * 诊断报告还逐项列出 app_config 的原始值 —— 话题、服务器放在那里就会跟着出去；导入别人的设置文件还能把提醒改发到别处。
- * 所以这一份单独一个文件（{@link #FILE}）：不导出、不进诊断报告，话题、服务器也不写黑匣子。开没开也放在这里：
+ * 所以这一份单独一个文件（{@link #FILE}）：不导出、不进诊断报告、不进安卓系统的备份（backup_rules、data_extraction_rules
+ * 里排除了），话题、服务器也不写黑匣子。开没开也放在这里：
  * 导入设置不会把提醒打开。</p>
  *
  * <h3>开没开、用哪个服务</h3>
@@ -34,7 +35,8 @@ import com.kooo.evcam.alarm.ntfy.NtfyRisk;
  * <p>The sentry alerts' own store: on or off, which phone subscription service, whether to attach a
  * picture, the ntfy topic and server, which topic the risk notice was accepted for, and the last result.
  * It is a separate file on purpose: the topic name is the key to the alerts, and the settings backup and
- * the diagnostics report both carry app_config whole. Nothing here is exported, put in a report or (topic
+ * the diagnostics report both carry app_config whole. Nothing here is exported, put in a report, kept in
+ * Android's own backup or (topic
  * and server) written to the blackbox, and importing settings never turns alerts on.</p>
  */
 public final class AlertStore {

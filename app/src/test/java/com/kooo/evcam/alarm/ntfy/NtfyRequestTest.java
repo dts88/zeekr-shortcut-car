@@ -109,6 +109,9 @@ public class NtfyRequestTest {
         assertEquals("https://ntfy.sh", NtfyRequest.normalizeServer("  https://ntfy.sh/  "));
         assertEquals("https://ntfy.sh", NtfyRequest.normalizeServer("HTTPS://NTFY.SH"));
         assertEquals("https://car.example:8443", NtfyRequest.normalizeServer("https://car.example:8443/"));
+        assertEquals("https://car.example:65535", NtfyRequest.normalizeServer("car.example:65535"));
+        assertEquals("端口 0 不收", "", NtfyRequest.normalizeServer("https://car.example:0"));
+        assertEquals("端口超过 65535 不收", "", NtfyRequest.normalizeServer("https://car.example:84430"));
         assertEquals("http 不收", "", NtfyRequest.normalizeServer("http://car.local:8080/"));
         assertEquals("别的协议不收", "", NtfyRequest.normalizeServer("ftp://ntfy.sh"));
         assertEquals("带路径的不收", "", NtfyRequest.normalizeServer("https://example.com/ntfy"));
@@ -163,14 +166,23 @@ public class NtfyRequestTest {
     }
 
     @Test
-    public void theTopicAndTheServerAreScrubbedOutOfErrorDetails() {
-        String detail = "java.net.UnknownHostException: Unable to resolve host \"ntfy.example.com\" for /" + TOPIC;
-        String scrubbed = NtfySender.scrub(detail, TOPIC, "ntfy.example.com");
-        assertFalse(scrubbed.contains(TOPIC));
-        assertFalse(scrubbed.contains("ntfy.example.com"));
-        assertTrue(scrubbed.contains(NtfySender.TOPIC_SCRUBBED));
-        assertTrue(scrubbed.contains(NtfySender.SERVER_SCRUBBED));
-        assertEquals("没有话题、服务器时原样返回", "nothing here", NtfySender.scrub("nothing here", "", ""));
+    public void errorDetailsKeepOnlyTheExceptionsName() {
+        // 异常的文字里带着主机名、IP、话题：一样都不留
+        assertEquals("ConnectException", NtfySender.detail(new java.net.ConnectException(
+                "Failed to connect to ntfy.myhome.example/203.0.113.7:8443 for /" + TOPIC)));
+        assertEquals("UnknownHostException", NtfySender.detail(
+                new java.net.UnknownHostException("Unable to resolve host \"ntfy.myhome.example\"")));
+        assertEquals("SecurityException", NtfySender.detail(new SecurityException("Permission denied")));
+    }
+
+    @Test
+    public void aSchemeOtherThanHttpsIsToldApartFromABadAddress() {
+        assertTrue(NtfyRequest.wrongScheme("http://car.local:8080"));
+        assertTrue(NtfyRequest.wrongScheme(" FTP://ntfy.sh"));
+        assertFalse(NtfyRequest.wrongScheme("https://example.com/ntfy"));
+        assertFalse(NtfyRequest.wrongScheme("example.com/ntfy"));
+        assertFalse(NtfyRequest.wrongScheme(""));
+        assertFalse(NtfyRequest.wrongScheme(null));
     }
 
     @Test

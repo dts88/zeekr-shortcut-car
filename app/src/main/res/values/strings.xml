@@ -1333,7 +1333,7 @@
     <string name="set_sentry_alerts_last">上次提醒：%1$s</string>
     <string name="set_sentry_alerts_last_failed">上次提醒发送失败：%1$s</string>
     <string name="set_sentry_alerts_picture_title">附带画面</string>
-    <string name="set_sentry_alerts_picture_summary">每条提醒附一张环视拼图，大小不超过 100 KB</string>
+    <string name="set_sentry_alerts_picture_summary">每条提醒附一张环视拼图，大小不超过 100 KB。需开启「熄屏持续录制」，且锁车时正在录制。</string>
     <string name="set_ntfy_topic_title">ntfy 话题</string>
     <string name="set_ntfy_topic_value">尾号 %1$s</string>
     <string name="set_ntfy_topic_summary">点击显示二维码，用手机上的 ntfy 应用扫码订阅</string>
@@ -1363,4 +1363,6 @@
     <string name="sentry_alerts_reason_unreachable">无法连接服务器</string>
     <string name="sentry_alerts_reason_timeout">连接超时</string>
     <string name="sentry_alerts_reason_refused">服务器拒绝（HTTP %1$d）</string>
+    <string name="sentry_alerts_qr_failed">无法生成二维码</string>
+    <string name="msg_ntfy_server_address_only">只填服务器地址，如 ntfy.sh</string>
 </resources>
