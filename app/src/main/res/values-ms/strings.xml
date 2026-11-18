@@ -123,7 +123,19 @@
     <string name="alert_headline_motion">Ada pergerakan dalam pandangan semasa letak kereta</string>
     <string name="alert_headline_test">Ujian</string>
     <string name="alert_headline_request">Gambar diambil atas permintaan</string>
-    <string name="alert_cmd_help">Hantar pic untuk gambar (tambah front / rear / left / right), pic 18:22 untuk satu bingkai rakaman pada masa itu, atau status untuk satu baris</string>
+    <string name="alert_cmd_alerts_on">Amaran dihidupkan semula: kereta memantau lagi dan akan menghantar apabila ada kejadian</string>
+    <string name="alert_cmd_alerts_off">Amaran dijeda: kereta tidak memantau dan tidak menghantar apa-apa. Hantar alerts on untuk menyambung</string>
+    <string name="alert_cmd_alerts_running">Amaran sedang berjalan. Hantar alerts off untuk menjeda</string>
+    <string name="alert_cmd_alerts_paused">Amaran dijeda (suis utama masih hidup; kereta tidak memantau). Hantar alerts on untuk menyambung</string>
+    <string name="alert_status_paused">Amaran: dijeda (dijeda dari sembang; kereta tidak memantau)</string>
+    <string name="alert_status_sensitivity">Kepekaan: %1$d/%2$d</string>
+    <string name="set_alerts_paused_title">Dijeda dari sembang</string>
+    <string name="set_alerts_paused_summary">Tidak memantau, tidak menghantar. Ketik untuk menyambung</string>
+    <string name="alert_cmd_sensitivity_now">Kepekaan gerakan ialah %1$d/%2$d. 1 = hanya gerakan besar dicetuskan, %2$d = hujan dan daun juga dikira</string>
+    <string name="alert_cmd_sensitivity_changed">Kepekaan gerakan kini %1$d/%3$d (sebelum ini %2$d)</string>
+    <string name="alert_cmd_sensitivity_edge_up">Kepekaan gerakan sudah %1$d/%2$d, langkah paling sensitif</string>
+    <string name="alert_cmd_sensitivity_edge_down">Kepekaan gerakan sudah %1$d/%2$d, langkah paling kurang sensitif</string>
+    <string name="alert_cmd_help">Hantar pic untuk gambar (tambah front / rear / left / right), pic 18:22 untuk satu bingkai rakaman pada masa itu, atau status untuk satu baris. sens melaporkan kepekaan gerakan, sens up / sens down bergerak satu langkah, sens 7 menetapkan tahap; alerts off menjeda amaran, alerts on menyambung semula</string>
     <string name="alert_cmd_no_sentry">Mod Sentri mati, jadi kepala unit akan tidur dan tiada gambar boleh diambil</string>
     <string name="alert_cmd_not_parked">Kereta tidak diletakkan, jadi tiada gambar diambil</string>
     <string name="alert_cmd_too_soon">Tunggu %1$d saat sebelum minta lagi</string>

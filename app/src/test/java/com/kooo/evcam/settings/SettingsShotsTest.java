@@ -403,6 +403,35 @@ public class SettingsShotsTest {
         }
     }
 
+    /**
+     * 聊天里 {@code alerts off} 之后，设置里那一行必须在屏上，而且点一下就恢复。
+     *
+     * <p>一个看不见的静音是最糟的状态：总开关写着「开」，车主以为车在看着，其实一条都不会发。
+     * 所以暂停必须是一行看得见的东西，而不是藏在聊天记录里的一个词。</p>
+     *
+     * The row after "alerts off" in the chat must be on screen, and one tap resumes. An invisible mute is
+     * the worst state: the master switch reads "on" while nothing is sent. So a pause is a visible row,
+     * not a word someone said in a chat once.
+     */
+    @Test
+    public void thePauseRowAppearsAndResumesOnTap() {
+        RuntimeEnvironment.setQualifiers(Shots.DAY_EN);
+        SettingsPreferenceFragment pausedPage = alertsPage(true,
+                com.kooo.evcam.alarm.ntfy.NtfyGate.TELEGRAM, config -> config.setAlertsPaused(true));
+        assertTrue("暂停时那一行该出现", shown(pausedPage, "pref_alerts_paused"));
+        androidx.preference.Preference row = pausedPage.findPreference("pref_alerts_paused");
+        assertNotNull(row);
+        assertNotNull("那一行该点得动", row.getOnPreferenceClickListener());
+        row.getOnPreferenceClickListener().onPreferenceClick(row);
+        assertFalse("点一下就该恢复",
+                new AppConfig(RuntimeEnvironment.getApplication()).isAlertsPaused());
+        assertFalse("恢复之后那一行收起来", shown(pausedPage, "pref_alerts_paused"));
+
+        SettingsPreferenceFragment runningPage = alertsPage(true,
+                com.kooo.evcam.alarm.ntfy.NtfyGate.TELEGRAM, config -> config.setAlertsPaused(false));
+        assertFalse("没暂停时不该出现", shown(runningPage, "pref_alerts_paused"));
+    }
+
     private static final String[] GUARD_ROWS =
             {"pref_alerts_guard", "pref_alerts_guard_home", "pref_alerts_guard_everywhere"};
 

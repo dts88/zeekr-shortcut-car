@@ -62,7 +62,12 @@ public class AlertPictureToggleTest {
     private AppConfig config;
 
     @Before
-    public void setUp() {
+    public void setUp() throws Exception {
+        // 单例活在整个沙箱里，而每个测试方法换一个 Application（理由见 AlertSensitivityCommandTest）。
+        // The singleton outlives the Application, which is replaced per test method.
+        java.lang.reflect.Field field = SentryAlerts.class.getDeclaredField("instance");
+        field.setAccessible(true);
+        field.set(null, null);
         context = RuntimeEnvironment.getApplication();
         ShadowSnapshotTaker.reset();
         ShadowNtfySender.reset();

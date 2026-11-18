@@ -137,7 +137,19 @@
     <string name="alert_headline_motion">停车时画面里有东西在动</string>
     <string name="alert_headline_test">测试</string>
     <string name="alert_headline_request">按你的要求拍的</string>
-    <string name="alert_cmd_help">发 pic 要一张照片（后面可加 front / rear / left / right），pic 18:22 要那一刻录像里的一帧，status 要一句话。只有你，只有配好的会话</string>
+    <string name="alert_cmd_alerts_on">警报已恢复：车又开始看着了，有动静就发</string>
+    <string name="alert_cmd_alerts_off">警报已暂停：车不再看信号，也不会发消息。发 alerts on 恢复</string>
+    <string name="alert_cmd_alerts_running">警报在跑。发 alerts off 可以暂停</string>
+    <string name="alert_cmd_alerts_paused">警报暂停中（总开关还开着，车没在看着）。发 alerts on 恢复</string>
+    <string name="alert_status_paused">警报：已暂停（只在聊天里关的，车没在看信号）</string>
+    <string name="alert_status_sensitivity">灵敏度：%1$d/%2$d</string>
+    <string name="set_alerts_paused_title">聊天里暂停了警报</string>
+    <string name="set_alerts_paused_summary">现在不看不发。点一下恢复</string>
+    <string name="alert_cmd_sensitivity_now">画面移动的灵敏度是 %1$d/%2$d。1 = 只有大动静才响，%2$d = 雨和树叶也算</string>
+    <string name="alert_cmd_sensitivity_changed">画面移动的灵敏度改成 %1$d/%3$d（刚才是 %2$d）</string>
+    <string name="alert_cmd_sensitivity_edge_up">画面移动的灵敏度已经是 %1$d/%2$d，最敏的一档，调不上去了</string>
+    <string name="alert_cmd_sensitivity_edge_down">画面移动的灵敏度已经是 %1$d/%2$d，最不敏的一档，调不下去了</string>
+    <string name="alert_cmd_help">发 pic 要一张照片（后面可加 front / rear / left / right），pic 18:22 要那一刻录像里的一帧，status 要一句话。sens 报灵敏度，sens up / sens down 各挪一档，sens 7 直接要第七档；alerts off 暂停警报，alerts on 恢复。只有你，只有配好的会话</string>
     <string name="alert_cmd_no_sentry">哨兵模式没开：车机要睡了，拍不了</string>
     <string name="alert_cmd_not_parked">车没停着，这一张不拍</string>
     <string name="alert_cmd_too_soon">等一下：%1$d 秒后再要</string>

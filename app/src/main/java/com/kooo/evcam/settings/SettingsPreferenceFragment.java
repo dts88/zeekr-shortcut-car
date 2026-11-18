@@ -881,6 +881,21 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             return true;
         });
 
+        // 聊天里 alerts off 之后那一行：点一下恢复，不依赖聊天能不能进来。
+        // The row after "alerts off" in the chat: one tap resumes, without depending on the chat.
+        Preference paused = findPreference("pref_alerts_paused");
+        if (paused != null) {
+            paused.setPersistent(false);
+            paused.setOnPreferenceClickListener(preference -> {
+                appConfig.setAlertsPaused(false);
+                com.kooo.evcam.blackbox.BlackBox.noteImportant("警报已从设置恢复（聊天里暂停的）");
+                com.kooo.evcam.alarm.SentryAlerts.get(requireContext()).refresh();
+                showAlertsRows();
+                toast(getString(R.string.alert_cmd_alerts_on));
+                return true;
+            });
+        }
+
         Preference token = findPreference("pref_alerts_token");
         if (token != null) {
             token.setPersistent(false);
@@ -1294,6 +1309,9 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         // gone; with the master switch off neither shows.
         boolean alertsOn = appConfig.isAlertsEnabled();
         boolean ntfy = appConfig.isAlertsNtfy();
+        // 暂停那一行只在真暂停、而且总开关开着的时候出现。
+        // The paused row shows only while it really is paused and the master switch is on.
+        show("pref_alerts_paused", alertsOn && appConfig.isAlertsPaused());
         show("cat_alerts_telegram", alertsOn && !ntfy);
         show("cat_alerts_ntfy", alertsOn && ntfy);
         show("pref_alerts_ntfy_topic", ntfy);

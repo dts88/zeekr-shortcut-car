@@ -9,6 +9,7 @@
 package com.kooo.evcam.alarm.telegram;
 
 import com.kooo.evcam.alarm.guard.AlertMoment;
+import com.kooo.evcam.alarm.media.MotionSensitivity;
 
 /**
  * 车主发来的一句话是什么意思 —— 纯解析，不碰网络、不碰车。
@@ -19,6 +20,10 @@ import com.kooo.evcam.alarm.guard.AlertMoment;
  *   <li>{@code pic} / {@code photo} / {@code picture} / {@code snap} / {@code snapshot}：现在拍一张；</li>
  *   <li>后面可以跟一路：{@code front} / {@code rear} / {@code left} / {@code right}；</li>
  *   <li>{@code status} / {@code state}：只回一句话，不拍；</li>
+ *   <li>{@code sens} / {@code sensitivity}，可空，或跟 {@code up} / {@code down} / 一个 1–10 的数字：
+ *       画面移动的灵敏度，见 {@link SensitivityAction}；</li>
+ *   <li>{@code alerts} / {@code alarm}，可空，或跟 {@code on} / {@code off}（{@code resume} /
+ *       {@code pause} 也算）：暂停警报、恢复警报，见 {@link AlertsState}；</li>
  *   <li>{@code guard} 及后面一个词（{@code on} / {@code off} / {@code home} / {@code home clear} /
  *       {@code auto off|ask|then|on} / {@code then}）：忘了开哨兵那一块的事，见 {@link GuardAction}。</li>
  * </ul>
@@ -39,6 +44,10 @@ import com.kooo.evcam.alarm.guard.AlertMoment;
  *   <li>{@code pic} / {@code photo} / {@code picture} / {@code snap} / {@code snapshot}: take one picture now;</li>
  *   <li>optionally followed by one lane: {@code front} / {@code rear} / {@code left} / {@code right};</li>
  *   <li>{@code status} / {@code state}: reply with one line, no picture;</li>
+ *   <li>{@code sens} / {@code sensitivity}, alone or followed by {@code up} / {@code down} / a 1–10
+ *       number: motion-detection sensitivity, see {@link SensitivityAction};</li>
+ *   <li>{@code alerts} / {@code alarm}, alone or followed by {@code on} / {@code off} (also
+ *       {@code resume} / {@code pause}): pause and resume alerts, see {@link AlertsState};</li>
  *   <li>{@code guard} plus one word ({@code on} / {@code off} / {@code home} / {@code home clear} /
  *       {@code auto off|ask|then|on} / {@code then}): the forgotten-sentry block, see
  *       {@link GuardAction}.</li>
@@ -78,6 +87,23 @@ public final class TelegramCommand {
          * The forgotten-sentry block's verb ({@code /guard …}).
          */
         GUARD,
+        /**
+         * 画面移动的灵敏度（{@code /sens …}）：问一句、往上挪、往下挪，或者直接给一个数。
+         *
+         * Motion-detection sensitivity ({@code /sens …}): report it, move it a step, or set a number.
+         */
+        SENSITIVITY,
+        /**
+         * 暂停或者恢复警报（{@code /alerts …}）。
+         *
+         * <p>暂停<b>不动</b>总开关：命令就是从聊天里来的，把总开关关掉等于把回程路一起关掉。</p>
+         *
+         * Pause or resume alerts ({@code /alerts …}).
+         *
+         * <p>A pause leaves the master switch alone: commands arrive through the chat, and turning the
+         * master switch off would close the way back.</p>
+         */
+        ALERTS,
         /**
          * 不是命令，或者不认识。
          *
@@ -119,6 +145,45 @@ public final class TelegramCommand {
     }
 
     /**
+     * {@code /sens} 后面跟的那一个词。
+     *
+     * <p>光写 {@code sens} 是 {@link #REPORT}；{@link #SET} 要带一个数。认不出来的词、或者 1–10 之外
+     * 的数字，整句 {@link Verb#UNKNOWN} —— 灵敏度调到 11 和调到 0 都不是「最近的合法值」的意思。</p>
+     *
+     * The one word after {@code /sens}. A bare {@code sens} is {@link #REPORT}; {@link #SET} carries a
+     * number. An unrecognized word, or a number outside 1–10, makes the whole message
+     * {@link Verb#UNKNOWN}: "11" and "0" are not shorthand for the nearest legal value.
+     */
+    public enum SensitivityAction {
+        /** 光写一个 {@code sens}：报一句现在几档。 Bare {@code sens}: say which level it is on. */
+        REPORT,
+        /** {@code sens up}：灵敏一点。 One step more sensitive. */
+        UP,
+        /** {@code sens down}：钝一点。 One step less sensitive. */
+        DOWN,
+        /** {@code sens 7}：直接要第 7 档。 Ask for level 7 by number. */
+        SET
+    }
+
+    /**
+     * {@code /alerts} 后面跟的那一个词。
+     *
+     * <p>光写 {@code alerts} 是 {@link #REPORT}。认不出来的词整句 {@link Verb#UNKNOWN} ——
+     * 「alerts maybe」既不是开也不是关，猜一个方向比不回更糟。</p>
+     *
+     * The one word after {@code /alerts}. A bare {@code alerts} is {@link #REPORT}; an unrecognized word
+     * makes the whole message {@link Verb#UNKNOWN}, because guessing a direction is worse than silence.
+     */
+    public enum AlertsState {
+        /** 光写一个 {@code alerts}：报一句现在是开是停。 Bare {@code alerts}: say whether they run. */
+        REPORT,
+        /** {@code alerts on}：恢复。 Resume. */
+        ON,
+        /** {@code alerts off}：暂停。 Pause. */
+        OFF
+    }
+
+    /**
      * 不指定某一路。
      *
      * No specific lane.
@@ -155,6 +220,24 @@ public final class TelegramCommand {
      * Set only for {@link Verb#GUARD}; {@code null} for every other verb.
      */
     public final GuardAction guard;
+    /**
+     * 只有 {@link Verb#SENSITIVITY} 有值；别的命令全是 {@code null}。
+     *
+     * Set only for {@link Verb#SENSITIVITY}; {@code null} for every other verb.
+     */
+    public final SensitivityAction sensitivity;
+    /**
+     * 只有 {@link SensitivityAction#SET} 有值：要哪一档，已经确认在 1–10 之内。
+     *
+     * Set only for {@link SensitivityAction#SET}: which level, already checked to be inside 1–10.
+     */
+    public final int sensitivityLevel;
+    /**
+     * 只有 {@link Verb#ALERTS} 有值；别的命令全是 {@code null}。
+     *
+     * Set only for {@link Verb#ALERTS}; {@code null} for every other verb.
+     */
+    public final AlertsState alerts;
 
     private TelegramCommand(Verb verb, int lane) {
         this(verb, lane, null, "");
@@ -165,10 +248,23 @@ public final class TelegramCommand {
     }
 
     private TelegramCommand(Verb verb, int lane, GuardAction guard, String timeWord) {
+        this(verb, lane, guard, timeWord, null, 0);
+    }
+
+    private TelegramCommand(Verb verb, int lane, GuardAction guard, String timeWord,
+                            SensitivityAction sensitivity, int sensitivityLevel) {
+        this(verb, lane, guard, timeWord, sensitivity, sensitivityLevel, null);
+    }
+
+    private TelegramCommand(Verb verb, int lane, GuardAction guard, String timeWord,
+                            SensitivityAction sensitivity, int sensitivityLevel, AlertsState alerts) {
         this.verb = verb;
         this.lane = lane;
         this.guard = guard;
         this.timeWord = timeWord == null ? "" : timeWord;
+        this.sensitivity = sensitivity;
+        this.sensitivityLevel = sensitivityLevel;
+        this.alerts = alerts;
     }
 
     /**
@@ -223,6 +319,12 @@ public final class TelegramCommand {
         if ("status".equals(verb) || "state".equals(verb) || "s".equals(verb)) {
             return new TelegramCommand(Verb.STATUS, ANY_LANE);
         }
+        if ("sens".equals(verb) || "sensitivity".equals(verb)) {
+            return parseSensitivity(words);
+        }
+        if ("alerts".equals(verb) || "alarm".equals(verb)) {
+            return parseAlerts(words);
+        }
         if (!"pic".equals(verb) && !"photo".equals(verb) && !"picture".equals(verb)
                 && !"snap".equals(verb) && !"snapshot".equals(verb)) {
             return new TelegramCommand(Verb.UNKNOWN, ANY_LANE);
@@ -247,6 +349,87 @@ public final class TelegramCommand {
             }
         }
         return new TelegramCommand(Verb.PICTURE, lane, null, timeWord);
+    }
+
+    /**
+     * {@code alerts} 及后面的词：不写、{@code on} / {@code resume}、{@code off} / {@code pause}。
+     *
+     * <p>只收一个词。多写一个词（{@code alerts off now}）整句不认 —— 和 {@code guard} 同一条规矩。</p>
+     *
+     * {@code alerts} and the words after it: nothing, {@code on} / {@code resume}, or {@code off} /
+     * {@code pause}. Exactly one word is accepted; {@code alerts off now} is {@link Verb#UNKNOWN}, the
+     * same rule {@code guard} follows.
+     */
+    private static TelegramCommand parseAlerts(String[] words) {
+        if (words.length == 1) {
+            return new TelegramCommand(Verb.ALERTS, ANY_LANE, null, "", null, 0, AlertsState.REPORT);
+        }
+        if (words.length != 2) {
+            return new TelegramCommand(Verb.UNKNOWN, ANY_LANE);
+        }
+        String word = words[1].toLowerCase(java.util.Locale.US);
+        if ("on".equals(word) || "resume".equals(word) || "start".equals(word)) {
+            return new TelegramCommand(Verb.ALERTS, ANY_LANE, null, "", null, 0, AlertsState.ON);
+        }
+        if ("off".equals(word) || "pause".equals(word) || "stop".equals(word)) {
+            return new TelegramCommand(Verb.ALERTS, ANY_LANE, null, "", null, 0, AlertsState.OFF);
+        }
+        return new TelegramCommand(Verb.UNKNOWN, ANY_LANE);
+    }
+
+    /**
+     * {@code sens} 及后面的词。
+     *
+     * <p>{@code up} / {@code higher} / {@code more} / {@code +} 都是往上，{@code down} / {@code lower} /
+     * {@code less} / {@code -} 都是往下 —— 同一件事的说法不止一种，收下就是了。数字要在 1–10 之内，
+     * 之外的不猜。</p>
+     *
+     * {@code sens} and the words after it. {@code up} / {@code higher} / {@code more} / {@code +} all
+     * mean one step more sensitive, {@code down} / {@code lower} / {@code less} / {@code -} one step
+     * less; the same act said several ways is worth accepting. A number must be inside 1–10, and
+     * anything outside it is not guessed at.
+     */
+    private static TelegramCommand parseSensitivity(String[] words) {
+        if (words.length == 1) {
+            return new TelegramCommand(Verb.SENSITIVITY, ANY_LANE, null, "",
+                    SensitivityAction.REPORT, 0);
+        }
+        int value = -1;
+        String word = words[1].toLowerCase(java.util.Locale.US);
+        if (words.length == 3 && "set".equals(word)) {
+            value = numberOf(words[2]);
+        } else if (words.length == 2) {
+            if ("up".equals(word) || "higher".equals(word) || "more".equals(word)
+                    || "+".equals(word) || "+1".equals(word)) {
+                return new TelegramCommand(Verb.SENSITIVITY, ANY_LANE, null, "",
+                        SensitivityAction.UP, 0);
+            }
+            if ("down".equals(word) || "lower".equals(word) || "less".equals(word)
+                    || "-".equals(word) || "-1".equals(word)) {
+                return new TelegramCommand(Verb.SENSITIVITY, ANY_LANE, null, "",
+                        SensitivityAction.DOWN, 0);
+            }
+            value = numberOf(word);
+        }
+        if (value < MotionSensitivity.MIN || value > MotionSensitivity.MAX) {
+            return new TelegramCommand(Verb.UNKNOWN, ANY_LANE);
+        }
+        return new TelegramCommand(Verb.SENSITIVITY, ANY_LANE, null, "",
+                SensitivityAction.SET, value);
+    }
+
+    /** 整串都是数字才算；返回 -1 表示不是数字。「全是数字」：没有别的字符混进来。 */
+    /** Only an all-digit word counts; -1 means it is not a number. */
+    private static int numberOf(String word) {
+        if (word == null || word.isEmpty() || word.length() > 2) {
+            return -1;
+        }
+        for (int i = 0; i < word.length(); i++) {
+            if (word.charAt(i) < '0' || word.charAt(i) > '9') {
+                return -1;
+            }
+        }
+        return Integer.parseInt(word);
     }
 
     /**
@@ -318,6 +501,9 @@ public final class TelegramCommand {
     @Override
     public String toString() {
         return verb + (guard == null ? "" : ":" + guard)
+                + (alerts == null ? "" : ":" + alerts)
+                + (sensitivity == null ? "" : ":" + sensitivity
+                        + (sensitivity == SensitivityAction.SET ? "=" + sensitivityLevel : ""))
                 + (lane == ANY_LANE ? "" : "#" + lane);
     }
 }

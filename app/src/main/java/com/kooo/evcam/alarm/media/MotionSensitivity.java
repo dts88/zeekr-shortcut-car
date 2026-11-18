@@ -69,6 +69,21 @@ public final class MotionSensitivity {
     }
 
     /**
+     * 往上或往下挪一档，到两头就停在那里。
+     *
+     * <p>为什么夹住而不是绕回去：车主在聊天里连发五次 {@code sens down}，意思是「还嫌它太敏」，
+     * 不是「转一圈回到最敏」。到头了就如实说一声，停在 1 或 10。</p>
+     *
+     * Move one step up or down, stopping at either end.
+     *
+     * <p>Clamped rather than wrapping: five {@code sens down} in a row means "still too sensitive", not
+     * "go round to the most sensitive". At the end the reply says so, and the level stays at 1 or 10.</p>
+     */
+    public static int step(int level, boolean up) {
+        return clamp(clamp(level) + (up ? 1 : -1));
+    }
+
+    /**
      * 平均差阈值：档位越高越小（越灵敏）。
      *
      * Average-difference threshold: the higher the level, the smaller it is (more sensitive).
