@@ -74,19 +74,27 @@ public class MainScreenShotsTest {
      */
     @Test
     public void rightToLeftLeavesTheMainScreenAsItIs() {
-        int[] ltr = railAt(Shots.DAY, "main-day-ltr-check", View.LAYOUT_DIRECTION_LTR);
-        int[] rtl = railAt(Shots.DAY_RTL, "main-day-rtl", View.LAYOUT_DIRECTION_RTL);
+        int[] ltr = railAt(R.layout.activity_main_zeekr_7x, Shots.DAY, "main-day-ltr-check", View.LAYOUT_DIRECTION_LTR);
+        int[] rtl = railAt(R.layout.activity_main_zeekr_7x, Shots.DAY_RTL, "main-day-rtl", View.LAYOUT_DIRECTION_RTL);
         assertEquals("动作栏还在原来那一边", ltr[0], rtl[0]);
+        assertEquals(ltr[1], rtl[1]);
+
+        // 开了座舱那几路时用的另一套主界面，一样不镜像
+        ltr = railAt(R.layout.activity_main_zeekr_7x_multi, Shots.DAY, "main-multi-day-ltr-check",
+                View.LAYOUT_DIRECTION_LTR);
+        rtl = railAt(R.layout.activity_main_zeekr_7x_multi, Shots.DAY_RTL, "main-multi-day-rtl",
+                View.LAYOUT_DIRECTION_RTL);
+        assertEquals("多路的主界面：动作栏还在原来那一边", ltr[0], rtl[0]);
         assertEquals(ltr[1], rtl[1]);
     }
 
-    /** 主界面放进一个跟着语言方向的容器里，画一张；返回动作栏在窗口里的位置。 */
-    private static int[] railAt(String qualifiers, String shot, int outside) {
+    /** 主界面（{@code layout}）放进一个跟着语言方向的容器里，画一张；返回动作栏在窗口里的位置。 */
+    private static int[] railAt(int layout, String qualifiers, String shot, int outside) {
         RuntimeEnvironment.setQualifiers(qualifiers);
         ShotActivity activity = Robolectric.buildActivity(ShotActivity.class).setup().get();
         Shots.stillFrames(activity);
         ViewGroup frame = activity.findViewById(activity.container);
-        activity.getLayoutInflater().inflate(R.layout.activity_main_zeekr_7x, frame, true);
+        activity.getLayoutInflater().inflate(layout, frame, true);
         Shots.settle();
         assertEquals("外面的容器跟着语言方向", outside, frame.getLayoutDirection());
         assertEquals("主界面不镜像", View.LAYOUT_DIRECTION_LTR,

@@ -350,6 +350,8 @@ public class SetupFragment extends Fragment implements StorageState.Listener {
     private void side() {
         LinearLayout pair = new LinearLayout(requireContext());
         pair.setOrientation(LinearLayout.HORIZONTAL);
+        // 左侧那块在左、右侧那块在右：照实际方位摆，从右往左的语言里也不镜像（ui-spec §十七）
+        pair.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
         String[] sides = {"left", "right"};
         int[] names = {R.string.opt_rail_left, R.string.opt_rail_right};
         int[] notes = {R.string.setup_side_lhd, R.string.setup_side_rhd};

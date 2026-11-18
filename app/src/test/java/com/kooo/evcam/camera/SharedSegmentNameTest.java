@@ -53,10 +53,16 @@ public class SharedSegmentNameTest {
         Locale before = Locale.getDefault();
         try {
             Locale.setDefault(Locale.forLanguageTag("ar-EG"));
+            String local = new SimpleDateFormat(SharedSegmentName.PATTERN, Locale.getDefault()).format(new Date(WALL0));
+            assertFalse("前提：这个语言默认不写 0–9，不然这一条测不出东西：" + local, local.matches("[0-9]{8}_[0-9]{6}"));
+
             String text = new SharedSegmentName().next(T0, WALL0).text;
             assertTrue(text, text.matches("[0-9]{8}_[0-9]{6}"));
-            assertEquals("读回来是同一刻（到秒）", WALL0 / 1000 * 1000,
-                    SharedSegmentName.fileTime().parse(text).getTime());
+            assertEquals("读回来是同一刻（到秒）", WALL0 / 1000 * 1000, SharedSegmentName.parseTime(text).getTime());
+
+            // 以前的版本在这个语言下起的名字：数字换成 0–9 就是同一个名字、同一刻
+            assertEquals(text, SharedSegmentName.asciiDigits(local));
+            assertEquals(WALL0 / 1000 * 1000, SharedSegmentName.parseTime(local).getTime());
         } finally {
             Locale.setDefault(before);
         }

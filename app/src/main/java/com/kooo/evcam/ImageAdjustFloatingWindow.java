@@ -121,8 +121,7 @@ public class ImageAdjustFloatingWindow {
                 PixelFormat.TRANSLUCENT
         );
         
-        // 设置初始位置（屏幕右侧中间）
-        // 窗口照屏幕上的实际位置摆（里面的文字跟着语言方向）
+        // 初始位置：左上角附近。窗口照屏幕上的实际位置摆（里面的文字跟着语言方向）
         layoutParams.gravity = Gravity.TOP | Gravity.LEFT;
         layoutParams.x = 50;
         layoutParams.y = 100;

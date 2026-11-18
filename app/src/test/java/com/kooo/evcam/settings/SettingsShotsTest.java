@@ -50,10 +50,15 @@ public class SettingsShotsTest {
         shoot(Shots.DAY_EN, "day-en");
     }
 
-    /** 从右往左的语言：设置这类文字界面跟着镜像（左栏到右边、行尾的 › 翻过来；ui-spec §十七）。 */
+    /** 从右往左的语言：设置这类文字界面跟着镜像 —— 左栏到了右边（行尾的 › 翻过来看图；ui-spec §十七）。 */
     @Test
     public void everySectionRightToLeft() {
-        shoot(Shots.DAY_RTL, "day-rtl");
+        ShotActivity activity = shoot(Shots.DAY_RTL, "day-rtl");
+        int[] headers = new int[2];
+        int[] detail = new int[2];
+        activity.findViewById(R.id.settings_headers).getLocationInWindow(headers);
+        activity.findViewById(R.id.settings_detail).getLocationInWindow(detail);
+        assertTrue("左栏到了右边：" + headers[0] + " / " + detail[0], headers[0] > detail[0]);
     }
 
     @Test
@@ -377,7 +382,7 @@ public class SettingsShotsTest {
         assertEquals("screen_recording", shell.currentSection());
     }
 
-    private void shoot(String qualifiers, String tag) {
+    private ShotActivity shoot(String qualifiers, String tag) {
         RuntimeEnvironment.setQualifiers(qualifiers);
         ShotActivity activity = Robolectric.buildActivity(ShotActivity.class).setup().get();
         Shots.stillFrames(activity);
@@ -389,5 +394,6 @@ public class SettingsShotsTest {
             File file = Shots.save(activity, "settings-" + section.substring("screen_".length()) + "-" + tag);
             assertTrue(file + " 是空的", file.length() > 10_000);
         }
+        return activity;
     }
 }

@@ -7,6 +7,7 @@
 
 package com.kooo.evcam.camera;
 
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
@@ -54,15 +55,44 @@ public final class SharedSegmentName {
     public static final String PATTERN = "yyyyMMdd_HHmmss";
 
     /**
-     * 文件名里的时刻按 {@link #PATTERN} 写、读：数字固定是 0–9，不跟界面语言、系统语言走 —— 阿拉伯语等默认写成别的数字
-     * （٠–٩），那样回放、清理都认不出来（项目所有者 2026-11-18：文件名固定用 0–9）。录像、照片起名和读名都用它；时区每次现取。
+     * 文件名里的时刻按 {@link #PATTERN} 写：数字固定是 0–9，不跟界面语言、系统语言走（项目所有者 2026-11-18：文件名固定用 0–9）。
+     * 阿拉伯语等语言默认写别的数字（٠–٩），名字就会跟着当时的语言变。录像、照片起名都用它；时区每次现取。
      *
-     * The time in file names, written and read with {@link #PATTERN}: always the digits 0-9, whatever the UI or
-     * system language. Arabic and some other languages would otherwise write digits that playback and cleanup
-     * cannot read. Every recording and photo name is made and read with this.
+     * The time in file names, written with {@link #PATTERN}: always the digits 0-9, whatever the UI or system
+     * language. Arabic and some other languages default to other digits, so names would depend on the language
+     * of the moment. Every recording and photo name is made with this.
      */
     public static SimpleDateFormat fileTime() {
         return new SimpleDateFormat(PATTERN, Locale.US);
+    }
+
+    /**
+     * 名字里的数字换成 0–9。以前的版本在阿拉伯语等语言下起过 ٠–٩ 的名字，还在用户的盘上：
+     * 按名字比先后、分组之前先换一遍，新旧名字才按时间排在一起。只有 0–9 的名字原样返回。
+     *
+     * Digits in a name as 0-9. Earlier versions wrote other digits under Arabic and some other languages; names
+     * are compared and grouped through this, so old and new names sort by time.
+     */
+    public static String asciiDigits(String name) {
+        if (name == null) {
+            return null;
+        }
+        StringBuilder out = null;
+        for (int i = 0; i < name.length(); i++) {
+            char c = name.charAt(i);
+            if ((c < '0' || c > '9') && Character.isDigit(c)) {
+                if (out == null) {
+                    out = new StringBuilder(name);
+                }
+                out.setCharAt(i, (char) ('0' + Character.digit(c, 10)));
+            }
+        }
+        return out == null ? name : out.toString();
+    }
+
+    /** 读名字开头的时刻（{@link #PATTERN}）：数字是哪种写法都认（{@link #asciiDigits}）。 */
+    public static Date parseTime(String stamp) throws ParseException {
+        return fileTime().parse(asciiDigits(stamp));
     }
 
     /** 一次要名字的结果。 */

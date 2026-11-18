@@ -55,6 +55,44 @@ public class SetupShotsTest {
         shoot(Shots.NIGHT, "night");
     }
 
+    /** 从右往左的语言：「驾驶座位置」左侧那块还在左边、右侧在右边（照实际方位摆，ui-spec §十七）。 */
+    @Test
+    public void theDriverSideStepKeepsLeftOnTheLeftRightToLeft() {
+        RuntimeEnvironment.setQualifiers(Shots.DAY_RTL);
+        ShotActivity activity = Robolectric.buildActivity(ShotActivity.class).setup().get();
+        Shots.stillFrames(activity);
+        SetupFragment setup = show(activity);
+        setup.jumpTo(SetupFragment.SIDE);
+        File file = Shots.save(activity, "setup-3-side-day-rtl");
+        assertTrue(file + " 是空的", file.length() > 10_000);
+        assertEquals("外面跟着语言方向", View.LAYOUT_DIRECTION_RTL, setup.requireView().getLayoutDirection());
+        int[] left = locationOf(setup.requireView(), activity.getString(R.string.opt_rail_left));
+        int[] right = locationOf(setup.requireView(), activity.getString(R.string.opt_rail_right));
+        assertNotNull("找不到左侧那块", left);
+        assertNotNull("找不到右侧那块", right);
+        assertTrue("左侧那块在左边：" + left[0] + " / " + right[0], left[0] < right[0]);
+    }
+
+    /** 字正好是 {@code text} 的那个 TextView 在窗口里的位置；没有为 null。 */
+    private static int[] locationOf(View view, String text) {
+        if (view instanceof android.widget.TextView
+                && text.contentEquals(((android.widget.TextView) view).getText())) {
+            int[] at = new int[2];
+            view.getLocationInWindow(at);
+            return at;
+        }
+        if (view instanceof android.view.ViewGroup) {
+            android.view.ViewGroup group = (android.view.ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                int[] at = locationOf(group.getChildAt(i), text);
+                if (at != null) {
+                    return at;
+                }
+            }
+        }
+        return null;
+    }
+
     @Test
     public void stepsFiveAndSixShowTheSettingsRows() {
         RuntimeEnvironment.setQualifiers(Shots.DAY);
