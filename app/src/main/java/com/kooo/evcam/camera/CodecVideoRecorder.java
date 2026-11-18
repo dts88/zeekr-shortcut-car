@@ -2450,7 +2450,7 @@ public class CodecVideoRecorder {
             AppLog.d(TAG, "Camera " + cameraId + " using provider timestamp: " + timestamp);
         } else {
             // 回退到独立生成时间戳（兼容旧逻辑）
-            timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
+            timestamp = SharedSegmentName.fileTime().format(new Date());
             AppLog.d(TAG, "Camera " + cameraId + " using local timestamp: " + timestamp);
         }
         return timestamp + "_" + cameraPosition + ".mp4";
@@ -2679,7 +2679,7 @@ public class CodecVideoRecorder {
      * @param dir 这一次开录写到哪个目录（开录时给的）
      */
     private void openFirstFileNow(String dir) {
-        queuedFileName = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date())
+        queuedFileName = SharedSegmentName.fileTime().format(new Date())
                 + "_" + cameraPosition + ".mp4";
         offCycleName = true;
         fileQueued = true;
@@ -3854,7 +3854,7 @@ public class CodecVideoRecorder {
 
     /** 以这一刻命名的文件路径；撞名就往后挪一秒 —— 不能覆盖已有的文件。 */
     private String pathNamedAt(File dir, long wallMs) {
-        SimpleDateFormat format = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault());
+        SimpleDateFormat format = SharedSegmentName.fileTime();
         String suffix = "_" + cameraPosition + ".mp4";
         for (int i = 0; ; i++) {
             File file = new File(dir, format.format(new Date(wallMs + i * 1000L)) + suffix);

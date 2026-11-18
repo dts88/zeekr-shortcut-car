@@ -266,7 +266,9 @@ public class SideViewWindow extends ViewGroup implements SideViewOutputWindow {
                             : WindowManager.LayoutParams.TYPE_PHONE,
                     WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
                     PixelFormat.TRANSLUCENT);
-            params.gravity = Gravity.TOP | Gravity.START;
+            // 照屏幕上的实际位置摆：从右往左的语言里也不镜像（ui-spec §十七）
+            params.gravity = Gravity.TOP | Gravity.LEFT;
+            setLayoutDirection(LAYOUT_DIRECTION_LTR);
             place();
             applyWindowState();
             try {

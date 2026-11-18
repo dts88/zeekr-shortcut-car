@@ -110,8 +110,7 @@ public class PhotoGroup {
 
     private Date parseTimestamp(String timestamp) {
         try {
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault());
-            return sdf.parse(timestamp);
+            return com.kooo.evcam.camera.SharedSegmentName.parseTime(timestamp);
         } catch (ParseException e) {
             return new Date(0);
         }

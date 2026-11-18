@@ -444,7 +444,8 @@ public class RecordingFloatingService extends Service {
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
                 PixelFormat.TRANSLUCENT);
 
-        layoutParams.gravity = Gravity.TOP | Gravity.START;
+        // 照屏幕上的实际位置摆：从右往左的语言里也不镜像（ui-spec §十七）
+        layoutParams.gravity = Gravity.TOP | Gravity.LEFT;
         // 出现和收起：淡入淡出（ui-spec §十四），不放装饰动效时不放
         layoutParams.windowAnimations = com.kooo.evcam.ui.MotionPolicy.overlayWindowAnimations(this);
 
@@ -524,6 +525,7 @@ public class RecordingFloatingService extends Service {
 
         // 添加到窗口
         try {
+            floatingContainer.setLayoutDirection(android.view.View.LAYOUT_DIRECTION_LTR);
             windowManager.addView(floatingContainer, layoutParams);
             // 在不在录、什么样子只问相机管家（和前台通知同一个答案），之后的变化它会广播过来。
             // 以前靠主界面隔 500 ms 推它自己记的状态：主界面刚重建、还没对上时推的是「没在录」，

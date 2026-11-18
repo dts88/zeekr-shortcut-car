@@ -770,7 +770,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         android.widget.TextView unit = new android.widget.TextView(context);
         unit.setTextAppearance(R.style.TextAppearance_Cam_Row);
         unit.setText("GB");
-        unit.setPadding(Math.round(12 * density), 0, 0, 0);
+        unit.setPaddingRelative(Math.round(12 * density), 0, 0, 0);
         row.addView(unit);
         return row;
     }

@@ -34,7 +34,7 @@ public class SharedSegmentNameTest {
     private static final long WALL0 = 1_791_700_000_000L;
 
     private static String format(long wallMs) {
-        return new SimpleDateFormat(SharedSegmentName.PATTERN, Locale.getDefault()).format(new Date(wallMs));
+        return SharedSegmentName.fileTime().format(new Date(wallMs));
     }
 
     /** 一路在 T0 + afterMs 时来要名字（墙上时间跟着走）。 */
@@ -43,6 +43,30 @@ public class SharedSegmentNameTest {
     }
 
     // ------------------------------------------------------------------ 共用
+
+    /**
+     * 文件名里的数字固定 0–9：系统、界面是阿拉伯语这类默认写别的数字的语言时也一样，读回来也是同一刻
+     * （项目所有者 2026-11-18：文件名固定用 0–9）。
+     */
+    @Test
+    public void namesUseTheDigitsZeroToNineInEveryLanguage() throws Exception {
+        Locale before = Locale.getDefault();
+        try {
+            Locale.setDefault(Locale.forLanguageTag("ar-EG"));
+            String local = new SimpleDateFormat(SharedSegmentName.PATTERN, Locale.getDefault()).format(new Date(WALL0));
+            assertFalse("前提：这个语言默认不写 0–9，不然这一条测不出东西：" + local, local.matches("[0-9]{8}_[0-9]{6}"));
+
+            String text = new SharedSegmentName().next(T0, WALL0).text;
+            assertTrue(text, text.matches("[0-9]{8}_[0-9]{6}"));
+            assertEquals("读回来是同一刻（到秒）", WALL0 / 1000 * 1000, SharedSegmentName.parseTime(text).getTime());
+
+            // 以前的版本在这个语言下起的名字：数字换成 0–9 就是同一个名字、同一刻
+            assertEquals(text, SharedSegmentName.asciiDigits(local));
+            assertEquals(WALL0 / 1000 * 1000, SharedSegmentName.parseTime(local).getTime());
+        } finally {
+            Locale.setDefault(before);
+        }
+    }
 
     /** 开录之后、第一次分段之前，段号是 0（各路第一个文件按自己开录的时刻起名，不经这里）。 */
     @Test

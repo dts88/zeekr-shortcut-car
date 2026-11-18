@@ -239,7 +239,8 @@ public class EglSurfaceEncoder {
 
     /** 实际生成的角标贴图尺寸，画四边形时要用它，不能用常量。 */
     private int brandWidthPx;
-    private final SimpleDateFormat watermarkDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
+    /** 画进录像的时间：数字固定 0–9，不跟界面语言、系统语言走（项目所有者 2026-11-18）。 */
+    private final SimpleDateFormat watermarkDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US);
     
     // 性能优化：水印更新控制
     private long lastWatermarkUpdateMs = 0;

@@ -3646,8 +3646,7 @@ public class SingleCamera {
             // 文件名里的 yyyyMMdd_HHmmss 转成 EXIF 要的 yyyy:MM:dd HH:mm:ss
             String when;
             try {
-                java.util.Date date = new SimpleDateFormat("yyyyMMdd_HHmmss",
-                        Locale.getDefault()).parse(timestamp);
+                java.util.Date date = SharedSegmentName.parseTime(timestamp);
                 when = new SimpleDateFormat("yyyy:MM:dd HH:mm:ss", Locale.US).format(date);
             } catch (Exception e) {
                 when = new SimpleDateFormat("yyyy:MM:dd HH:mm:ss", Locale.US)
@@ -3774,14 +3773,13 @@ public class SingleCamera {
     /** yyyyMMdd_HHmmss -> yyyy-MM-dd HH:mm:ss；解析不了就用当前时间。 */
     private static String readableTime(String timestamp) {
         try {
-            java.text.SimpleDateFormat in =
-                    new java.text.SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault());
+            // 画进照片的时间：数字固定 0–9，和录像水印一样不跟语言（项目所有者 2026-11-18）
             java.text.SimpleDateFormat out =
-                    new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
-            return out.format(in.parse(timestamp));
+                    new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US);
+            return out.format(SharedSegmentName.parseTime(timestamp));
         } catch (Exception e) {
             return new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss",
-                    Locale.getDefault()).format(new java.util.Date());
+                    Locale.US).format(new java.util.Date());
         }
     }
 

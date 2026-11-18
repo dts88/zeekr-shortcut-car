@@ -68,6 +68,43 @@ public class MainScreenShotsTest {
         shoot(Shots.DAY_EN, "day-on-en", true);
     }
 
+    /**
+     * 从右往左的语言（阿拉伯语等）：主界面照车上的方位摆，不镜像 —— 动作栏还在原来那一边、画面不左右对调
+     * （ui-spec §十七）。设置这类文字界面跟着镜像，见 {@code SettingsShotsTest#everySectionRightToLeft}。
+     */
+    @Test
+    public void rightToLeftLeavesTheMainScreenAsItIs() {
+        int[] ltr = railAt(R.layout.activity_main_zeekr_7x, Shots.DAY, "main-day-ltr-check", View.LAYOUT_DIRECTION_LTR);
+        int[] rtl = railAt(R.layout.activity_main_zeekr_7x, Shots.DAY_RTL, "main-day-rtl", View.LAYOUT_DIRECTION_RTL);
+        assertEquals("动作栏还在原来那一边", ltr[0], rtl[0]);
+        assertEquals(ltr[1], rtl[1]);
+
+        // 开了座舱那几路时用的另一套主界面，一样不镜像
+        ltr = railAt(R.layout.activity_main_zeekr_7x_multi, Shots.DAY, "main-multi-day-ltr-check",
+                View.LAYOUT_DIRECTION_LTR);
+        rtl = railAt(R.layout.activity_main_zeekr_7x_multi, Shots.DAY_RTL, "main-multi-day-rtl",
+                View.LAYOUT_DIRECTION_RTL);
+        assertEquals("多路的主界面：动作栏还在原来那一边", ltr[0], rtl[0]);
+        assertEquals(ltr[1], rtl[1]);
+    }
+
+    /** 主界面（{@code layout}）放进一个跟着语言方向的容器里，画一张；返回动作栏在窗口里的位置。 */
+    private static int[] railAt(int layout, String qualifiers, String shot, int outside) {
+        RuntimeEnvironment.setQualifiers(qualifiers);
+        ShotActivity activity = Robolectric.buildActivity(ShotActivity.class).setup().get();
+        Shots.stillFrames(activity);
+        ViewGroup frame = activity.findViewById(activity.container);
+        activity.getLayoutInflater().inflate(layout, frame, true);
+        Shots.settle();
+        assertEquals("外面的容器跟着语言方向", outside, frame.getLayoutDirection());
+        assertEquals("主界面不镜像", View.LAYOUT_DIRECTION_LTR,
+                frame.findViewById(R.id.main).getLayoutDirection());
+        Shots.save(activity, shot);
+        int[] at = new int[2];
+        frame.findViewById(R.id.action_rail).getLocationInWindow(at);
+        return at;
+    }
+
     private static void everythingOn() {
         AppConfig config = new AppConfig(RuntimeEnvironment.getApplication());
         config.setRearViewEnabled(true);
