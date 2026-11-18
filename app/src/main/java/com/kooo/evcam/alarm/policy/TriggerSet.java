@@ -1,0 +1,165 @@
+/*
+ * Zeekr Shortcut - https://github.com/dts88/zeekr-shortcut-car
+ * Copyright (C) 2026 dts88
+ * Portions Copyright (C) 2026 Fab (Fabbbrrr) - https://github.com/Fabbbrrr
+ * SPDX-License-Identifier: GPL-3.0-only
+ * Additional terms under GPL-3.0 section 7 apply to dts88's code; see NOTICE.md.
+ */
+
+package com.kooo.evcam.alarm.policy;
+
+import java.util.LinkedHashSet;
+import java.util.Set;
+
+/**
+ * 哪些事情算「有事」。存成一串逗号分开的名字，纯逻辑（{@code TriggerSetTest}）。
+ *
+ * <p>车主可以自己选：每台车上能看到的信号不一样，不能看到的那一项开着只会让人以为它在工作。<\/p>
+ *
+ * Which things count as "something happened". Stored as a comma-separated list of names, pure
+ * logic ({@code TriggerSetTest}).
+ *
+ * <p>The owner can choose: the signals visible on each car differ, and an item that is on but
+ * cannot be seen only makes people think it is working.</p>
+ */
+public final class TriggerSet {
+
+    /** 画面里有东西在动（编码器读回的小图相差）。
+     *
+     * Something in the frame is moving (difference between the small frames read back from the
+     * encoder).
+     */
+    public static final String MOTION = "motion";
+    /** 双闪亮起。
+     *
+     * Hazard lights come on.
+     */
+    public static final String HAZARD = "hazard";
+    /** 远光闪一下。
+     *
+     * High beam flashes once.
+     */
+    public static final String FLASH = "flash";
+    /** 车门 / 前备箱 / 后备箱被打开。
+     *
+     * A door / frunk / trunk is opened.
+     */
+    public static final String DOORS = "doors";
+    /** 车灯自己亮起（日行灯 / 位置灯 / 近光）。
+     *
+     * Lamps come on by themselves (daytime running light / position lamp / low beam).
+     */
+    public static final String LAMPS = "lamps";
+    /** 中控屏亮起。
+     *
+     * Center screen comes on.
+     */
+    public static final String SCREEN = "screen";
+
+    /** 设置里列出来的顺序。
+     *
+     * The order listed in settings.
+     */
+    public static final String[] ALL = {MOTION, HAZARD, FLASH, DOORS, LAMPS, SCREEN};
+
+    /**
+     * 默认只开车自己会做的那几项：它觉得有事时间亮灯、闪双闪、亮屏。
+     *
+     * <p>其余三项（画面移动、远光闪、车门）默认关：它们可能比车自己的判断更敏敏或更钝，
+     * 留给车主自己决定 —— 一个默认值不该替他们挑。</p>
+     *
+     * By default only the things the car itself does are on: when it thinks something happened, it
+     * lights the lamps, flashes the hazard lights, and lights the screen.
+     *
+     * <p>The other three (motion, high-beam flash, doors) are off by default: they may be more or
+     * less sensitive than the car's own judgment, so they are left to the owner; a default value
+     * should not choose for them.</p>
+     */
+    public static final String DEFAULT = HAZARD + "," + LAMPS + "," + SCREEN;
+
+    /** “全开”：设置界面上一键勾全部时用的就是它自己。
+     *
+     * "All on": the settings screen uses this when one tap checks everything.
+     */
+    public static final String ALL_ON = MOTION + "," + HAZARD + "," + FLASH + ","
+            + DOORS + "," + LAMPS + "," + SCREEN;
+
+    /**
+     * 车主一项都没选时存的记号。
+     *
+     * <p>不能存空串：空串留给「存坏了」那道安全网（{@link #parse}），会被读回全开。
+     * 没有这个记号，「什么都不要报」这个选择就写不进去。</p>
+     *
+     * The marker stored when the owner picked nothing.
+     *
+     * <p>It cannot be an empty string: the empty string is kept for the "stored broken" safety
+     * net ({@link #parse}) and reads back as all on. Without this marker the choice "report
+     * nothing" cannot be written down.</p>
+     */
+    public static final String NONE = "none";
+
+    private final Set<String> enabled;
+
+    private TriggerSet(Set<String> enabled) {
+        this.enabled = enabled;
+    }
+
+    /** 读一串逗号分开的名字；{@link #NONE} 是按车主选的「都不报」；空串或全是认不出的名字时当默认全开。
+     *
+     * Parse a comma-separated list of names; {@link #NONE} is the owner's chosen "report none";
+     * treat an empty string or all-unrecognized names as defaulting to all on.
+     */
+    public static TriggerSet parse(String csv) {
+        Set<String> kept = new LinkedHashSet<>();
+        if (csv != null) {
+            for (String part : csv.split(",")) {
+                String name = part.trim().toLowerCase(java.util.Locale.US);
+                if (NONE.equals(name)) {
+                    return new TriggerSet(new LinkedHashSet<>());
+                }
+                for (String known : ALL) {
+                    if (known.equals(name)) {
+                        kept.add(known);
+                    }
+                }
+            }
+        }
+        if (kept.isEmpty()) {
+            for (String known : ALL) {
+                kept.add(known);
+            }
+        }
+        return new TriggerSet(kept);
+    }
+
+    /** 把选中的名字写回字符串（按 {@link #ALL} 的顺序）。一个都没选时返回 {@link #NONE}。
+     *
+     * Write the selected names back to a string (in {@link #ALL} order). Returns {@link #NONE}
+     * when nothing is selected.
+     */
+    public static String value(Set<String> names) {
+        StringBuilder out = new StringBuilder();
+        for (String known : ALL) {
+            if (names == null || !names.contains(known)) {
+                continue;
+            }
+            if (out.length() > 0) {
+                out.append(',');
+            }
+            out.append(known);
+        }
+        return out.length() == 0 ? NONE : out.toString();
+    }
+
+    public boolean has(String name) {
+        return enabled.contains(name);
+    }
+
+    /** 开着几项。
+     *
+     * How many are enabled.
+     */
+    public int size() {
+        return enabled.size();
+    }
+}
