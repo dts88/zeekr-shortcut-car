@@ -41,6 +41,8 @@ the diagnostics report in public; send it to dts88 by private message in the own
 
 ## Recommended
 
+**[Zeekr 7X Shortcut Dashcam App Installation & Usage Guide](https://youtu.be/m2o2HcqdsOY)** is brotatochip's complete, detailed getting-started video, from how to sideload to how to use the app. Highly recommended if you're new to sideloading or to Zeekr Shortcut.
+
 **[Zeekr Companion](https://github.com/wysie/zeekr-shortcut-car)** is wysie's version of Zeekr Shortcut, optimised for the ZEEKR 009 head unit. Wysie has also shared a great deal of basic information about Zeekr cars, and it's a pleasure to explore what the Zeekr head unit can do together.
 
 **[CAMCORDER](https://github.com/FerixzTanz/CAMCORDER)** is FerixzTanz's version of Zeekr Shortcut, with a series of features ahead of Zeekr Shortcut. This project's blind spot view started from FerixzTanz's code and on-car research, and showing it on the HUD comes from CAMCORDER: the approach, the HUD settings and his careful on-car calibration. Thanks to FerixzTanz for the support and contributions to this project.
