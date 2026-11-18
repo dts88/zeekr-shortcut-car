@@ -12,17 +12,18 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 
+import com.kooo.evcam.alarm.telegram.TelegramRequest;
 
 /**
  * 发往 ntfy 的那一次请求 —— 拼地址、算话题名、擦掉令牌。纯字符串，便于单测。
  *
- * <p>同一套规矩：
+ * <p>和 {@link TelegramRequest} 同一个位置、同一套规矩，但 ntfy 的形状不一样：
  * 令牌放在 {@code Authorization} 头里而不是路径里，文字走请求体，图片走 PUT 本体
  * —— 所以配图的说明只能放在查询串里（HTTP 头装不下真换行）。这些形都是量过的，
  * 出处是 {@code docs/ntfy/FINDINGS.md}。</p>
  *
  * <p>The request side of ntfy: build URLs, mint topic names, redact the token. Pure strings, so it can
- * be unit-tested. One role: the token rides in an
+ * be unit-tested. Same role as {@link TelegramRequest}, but the shape differs: the token rides in an
  * {@code Authorization} header instead of the path, text goes in the request body, and a picture goes
  * in the PUT body — which leaves the query string as the only place a caption can live (an HTTP header
  * cannot carry a real newline). Every shape here was measured; see {@code docs/ntfy/FINDINGS.md}.</p>

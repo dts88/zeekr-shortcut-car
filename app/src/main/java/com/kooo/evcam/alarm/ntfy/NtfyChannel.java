@@ -77,6 +77,14 @@ public final class NtfyChannel implements AlertChannel {
     }
 
     @Override
+    public boolean supportsClips() {
+        // 片段是 mp4，免费档 2 MiB 装不下，付费档也不该悄悄把「图 + 视频」变成两个上限。
+        // Clips are mp4: 2 MiB on the free tier will not hold one, and a paid tier should not silently
+        // turn "a picture" into two different limits either. Telegram keeps this feature.
+        return false;
+    }
+
+    @Override
     public Result sendPhoto(byte[] jpeg, String caption) {
         Kind blocked = blockedReason();
         if (blocked != Kind.OK) {

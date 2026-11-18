@@ -1,7 +1,7 @@
 /*
  * Zeekr Shortcut - https://github.com/dts88/zeekr-shortcut-car
- * Portions Copyright (C) 2026 Fab (Fabbbrrr) - https://github.com/Fabbbrrr
  * Copyright (C) 2026 dts88
+ * Portions Copyright (C) 2026 Fab (Fabbbrrr) - https://github.com/Fabbbrrr
  * SPDX-License-Identifier: GPL-3.0-only
  * Additional terms under GPL-3.0 section 7 apply to dts88's code; see NOTICE.md.
  */
@@ -24,76 +24,81 @@ import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.RuntimeEnvironment;
 
+import java.util.Iterator;
+
 /**
- * 话题名是钥匙：知道名字的人就能看。
+ * 令牌不能跟着设置一起出门（{@link AppConfig}，停车警报）：导出的设置、诊断报告、黑匣子都不该有它。
  *
- * <p>它和 ntfy 的令牌一样是凭据，所以和以前令牌的规矩相同：
- * {@link SettingsBackup#snapshot(Context)} 会把 {@code app_config} 里的每一个键写进导出文件，
- * 没见过的键也算「导出」。凭据存在单独的文件里（{@link AppConfig#SECRETS_PREF_NAME}），
- * 这个测试把这件事钉住：话题配好之后，导出的整份设置里一个字符都不出现。</p>
+ * <p>{@link SettingsBackup#snapshot(Context)} 把 {@code app_config} 里的每一个键都写进备份文件，
+ * 未知的键按“要导出”算。所以凭据另存一份（{@link AppConfig#SECRETS_PREF_NAME}），
+ * 这条测试就是钉住这件事：填了令牌之后，整份导出的设置里一个字都找不到它。</p>
  *
- * The topic is the key: whoever knows the name can read.
+ * The token must not leave with the settings ({@link AppConfig}, parked-car
+ * alerts): the exported settings, the diagnostics report, and the black box must
+ * never contain it.
  *
- * <p>Like the token before it, it is a credential, so it follows the same rule:
  * {@link SettingsBackup#snapshot(Context)} writes every key in {@code app_config}
- * into the backup file, and unknown keys count as "export". The credential is
+ * into the backup file, and unknown keys count as "export". So the credential is
  * stored separately ({@link AppConfig#SECRETS_PREF_NAME}), and this test pins
- * that down: after the topic is set, not one character of it appears
+ * that down: after the token is filled in, not one character of it appears
  * anywhere in the whole exported settings.
  */
 @RunWith(RobolectricTestRunner.class)
 public class AlertSecretsTest {
 
-    private static final String TOPIC = "zeekrsc_kymoy9m40cuQYXmHabcdefghijklmnopqrstu";
+    private static final String TOKEN = "123456789:AAH_exampleTOKENvalue_0123456789";
 
     @Test
-    public void theTopicIsNotInTheSettingsExportOrTheDiagnostics() throws Exception {
+    public void theTokenIsNotInTheSettingsExportOrTheDiagnostics() throws Exception {
         Context context = RuntimeEnvironment.getApplication();
         AppConfig config = new AppConfig(context);
-        config.setAlertsNtfyTopic(TOPIC);
-        config.setAlertsNtfyToken("tk_AAH_exampleTOKENvalue_0123456789");
+        config.setAlertsTelegramToken(TOKEN);
+        config.setAlertsTelegramChatId("123456789");
         config.setAlertsEnabled(true);
-        assertEquals(TOPIC, config.getAlertsNtfyTopic());
+        assertEquals(TOKEN, config.getAlertsTelegramToken());
 
         JSONObject snapshot = new JSONObject(SettingsBackup.snapshot(context).toString());
-        assertFalse("导出的设置里不能有话题名", holds(snapshot, TOPIC));
-        // ntfy 的令牌也是凭据：和话题一起放在单独的文件里，同样不进导出
-        // The ntfy token is also a credential: it lives in the same separate file as
-        // the topic, and also stays out of the export.
-        assertFalse("导出的设置里不能有 ntfy 令牌", holds(snapshot, "tk_AAH_exampleTOKENvalue_0123456789"));
+        assertFalse("导出的设置里不能有令牌", holds(snapshot, TOKEN));
+        // 会话号也是身份：跟着令牌一起放在单独的文件里，同样不进导出
+        // The chat id is also an identity: it lives in the same separate file as
+        // the token, and also stays out of the export.
+        assertFalse("导出的设置里不能有会话号", holds(snapshot, "123456789"));
     }
 
     @Test
-    public void theTopicLivesInItsOwnPreferencesFile() {
+    public void theTokenLivesInItsOwnPreferencesFile() {
         assertNotEquals(AppConfig.PREF_NAME, AppConfig.SECRETS_PREF_NAME);
         Context context = RuntimeEnvironment.getApplication();
         AppConfig config = new AppConfig(context);
-        config.setAlertsNtfyTopic(TOPIC);
-        assertFalse("话题名不许落进普通设置那个文件",
+        config.setAlertsTelegramToken(TOKEN);
+        assertFalse("令牌不许落进普通设置那个文件",
                 context.getSharedPreferences(AppConfig.PREF_NAME, Context.MODE_PRIVATE)
-                        .contains("alerts_ntfy_topic"));
+                        .contains("alerts_telegram_token"));
         assertTrue(context.getSharedPreferences(AppConfig.SECRETS_PREF_NAME, Context.MODE_PRIVATE)
-                .contains("alerts_ntfy_topic"));
+                .contains("alerts_telegram_token"));
+        assertFalse("会话号也不许落进普通设置那个文件",
+                context.getSharedPreferences(AppConfig.PREF_NAME, Context.MODE_PRIVATE)
+                        .contains("alerts_telegram_chat"));
     }
 
     @Test
-    public void clearingTheTopicClearsItForGood() {
+    public void clearingTheTokenClearsItForGood() {
         Context context = RuntimeEnvironment.getApplication();
         AppConfig config = new AppConfig(context);
-        config.setAlertsNtfyTopic(TOPIC);
-        config.setAlertsNtfyTopic("");
-        assertEquals("", config.getAlertsNtfyTopic());
-        assertFalse(config.hasAlertsNtfyConfig());
+        config.setAlertsTelegramToken(TOKEN);
+        config.setAlertsTelegramToken("");
+        assertEquals("", config.getAlertsTelegramToken());
+        assertFalse(config.hasAlertsTelegramConfig());
     }
 
     @Test
     public void alertsStayOffUntilSomebodyTurnsThemOn() {
         Context context = RuntimeEnvironment.getApplication();
         AppConfig config = new AppConfig(context);
-        config.setAlertsNtfyTopic("");
+        config.setAlertsTelegramToken("");
         config.setAlertsEnabled(false);
         assertFalse("默认关：没答应它的车上不该开始发警报", config.isAlertsEnabled());
-        assertFalse(config.hasAlertsNtfyConfig());
+        assertFalse(config.hasAlertsTelegramConfig());
     }
 
     /**
@@ -103,23 +108,23 @@ public class AlertSecretsTest {
      */
     private static boolean holds(Object node, String wanted) throws org.json.JSONException {
         if (node instanceof JSONObject) {
-            org.json.JSONObject object = (org.json.JSONObject) node;
-            java.util.Iterator<String> keys = object.keys();
-            while (keys.hasNext()) {
+            JSONObject object = (JSONObject) node;
+            for (Iterator<String> keys = object.keys(); keys.hasNext(); ) {
                 if (holds(object.get(keys.next()), wanted)) {
                     return true;
                 }
             }
-        } else if (node instanceof org.json.JSONArray) {
+            return false;
+        }
+        if (node instanceof org.json.JSONArray) {
             org.json.JSONArray array = (org.json.JSONArray) node;
             for (int i = 0; i < array.length(); i++) {
                 if (holds(array.get(i), wanted)) {
                     return true;
                 }
             }
-        } else if (node instanceof String) {
-            return node.equals(wanted);
+            return false;
         }
-        return false;
+        return node instanceof String && wanted.equals(node);
     }
 }

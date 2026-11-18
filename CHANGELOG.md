@@ -9,24 +9,36 @@ commit message, not here.
 
 ## [Unreleased]
 
-- Alerts (new section in Settings, off by default): with the car parked and Sentry Mode armed, the app
-  publishes one picture of all four cameras, one way, to a private ntfy topic when something happens to
-  the car — hazards, high beams, a door, the lights, the screen, or movement in view. The topic is
-  generated on the car, subscribed by the phone's ntfy app from a QR code, and proven with four digits
-  the car sends to it.
-- The ntfy setup wizard runs the whole path: it states the free-topic risk first (a free topic is
-  public — the name is the address) and refuses to send until that is accepted, then shows the QR code,
-  then asks for the digits. The topic name lives in the car's credential store — never in the settings
-  export, a diagnostic report, or the log — and one row rotates it if it ever leaked.
-- Alerts: every trigger is a switch under Settings → Alerts → What counts; movement in view is read
-  from the encoder's own frames and has its own 1–10 sensitivity.
+- Alerts: **Forgot Sentry**. Park away from home with Sentry Mode off and the car says so in the chat,
+  with a button to switch it on — and switches it on 60 s later by itself unless you say no. Four
+  modes under Settings → Alerts, off by default; "Also at home" lifts the away-from-home rule.
+- Alerts: the reminder only exists while the car can still be written to (about five minutes after
+  the door shuts), so a button never looks alive after the car has gone to sleep: it answers "too
+  late" instead.
+
+- Alerts: ntfy.sh as a second place for them — a free topic (no account, no token), or a paid
+  account's protected one. **Off by default**: the switch is in Developer options, so with
+  Developer options closed alerts go to Telegram and nothing on the ntfy side is touched; the
+  free-plan warning has to be accepted before a single alert is sent. Developer only until it
+  has been tested on a car.
+- Alerts: movement in view is now a trigger of its own, read from the encoder's own frames; and every
+  trigger can be switched on or off under Settings → Alerts → What counts.
 - Alerts: nothing is sent when you come back to the car. Unlocking drops Sentry Mode out of its armed
   value before the screen and the lamps come on, and an alert needs the armed value.
-- Alerts: arm delay (right away, 1 or 3 minutes after locking) and quiet hours between two times.
-- Alerts: a picture or just the line — on by default; one 2×2 or one picture per camera; the same
-  fisheye correction playback uses; every picture squeezed under 100 kB on the car.
-- Alerts: a diagnostics screen under Developer options shows the switch, the topic, the motion
-  detector and the car's state as one JSON plus the recent log.
+- Alerts: answer commands from Telegram while Sentry Mode is on — `pic` sends a picture now,
+  `pic front|rear|left|right` just that camera, `status` one line. Off by default, and only the
+  chat you configured is answered.
+- Alerts: one 2×2 picture, or one picture per camera so each is bigger on the phone; pick which
+  cameras, and straighten the picture with the same fisheye correction playback uses.
+- Alerts: the video now covers the moment itself (half of it before the trigger, half after) and
+  quiet hours silence everything between two times.
+- Alerts: by default only the three triggers the car itself reacts with are on (hazards, lamps, screen);
+  movement, high beams and doors are opt-in.
+- Alerts: README section with the step-by-step Telegram bot setup.
+- Alerts (new section in Settings, off by default): with the car parked and Sentry Mode on, the app
+  sends one picture of all four cameras to a Telegram chat when the hazards come on, the high beams
+  flash, or a door opens. The bot token is typed on the car screen and can be found together with the
+  chat id under Alerts; it stays on the car and out of the settings export.
 
 ## [4.11.0-alpha] - 2026-11-17
 

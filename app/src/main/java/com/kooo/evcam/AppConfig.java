@@ -13,6 +13,7 @@ package com.kooo.evcam;
 import android.content.Context;
 import android.content.SharedPreferences;
 
+import com.kooo.evcam.alarm.ntfy.NtfyGate;
 import com.kooo.evcam.camera.CameraNames;
 import com.kooo.evcam.settings.LicensePlate;
 import com.kooo.evcam.settings.SettingSpec;
@@ -135,17 +136,25 @@ public class AppConfig {
     private static final String KEY_ALERTS_ENABLED = "alerts_enabled";
     private static final String KEY_ALERTS_TRIGGERS = "alerts_triggers";
     private static final String KEY_ALERTS_MOTION_SENSITIVITY = "alerts_motion_sensitivity";
+    private static final String KEY_ALERTS_CLIP_SECONDS = "alerts_clip_seconds";  // 0 关 / 5 / 10
+    private static final String KEY_ALERTS_CLIP_AUDIO = "alerts_clip_audio";
     private static final String KEY_ALERTS_ARM_DELAY = "alerts_arm_delay_minutes";  // 0 / 1 / 3
     private static final String KEY_ALERTS_QUIET_ENABLED = "alerts_quiet_enabled";
     private static final String KEY_ALERTS_QUIET_START = "alerts_quiet_start";
     private static final String KEY_ALERTS_QUIET_END = "alerts_quiet_end";  // 哪些事情算「有事」
+    private static final String KEY_ALERTS_TELEGRAM_TOKEN = "alerts_telegram_token";
+    private static final String KEY_ALERTS_TELEGRAM_CHAT = "alerts_telegram_chat";
+    private static final String KEY_ALERTS_OWNER_ID = "alerts_owner_id";  // 谁能发命令（私聊里就是会话号）
     private static final String KEY_ALERTS_LAYOUT = "alerts_layout";       // 一张四宫格 / 每路一张
     private static final String KEY_ALERTS_CAMERAS = "alerts_cameras";     // 分开发时要哪几路（"0,1,2,3"）
     private static final String KEY_ALERTS_STRAIGHTEN = "alerts_straighten";  // 发之前掰直
     private static final String KEY_ALERTS_SEND_PICTURE = "alerts_send_picture";  // 发警报时附一张压缩图
-    // ntfy（规格见 docs/ntfy/）：服务器、档位、话题、令牌、风险提示的接受记录。
-    // ntfy (see docs/ntfy/): server, tier, topic, token,
+    private static final String KEY_ALERTS_COMMANDS = "alerts_commands";   // 回应 Telegram 里的命令
+    private static final String KEY_ALERTS_COMMAND_OFFSET = "alerts_command_offset";  // 轮询到哪一条（运行状态）
+    // ntfy（开发者选项里才选得了；规格见 docs/ntfy/）：走哪条路、服务器、档位、话题、令牌、风险提示的接受记录。
+    // ntfy (selectable only under developer options; see docs/ntfy/): route, server, tier, topic, token,
     // and the record of the accepted free-topic warning.
+    private static final String KEY_ALERTS_TRANSPORT = "alerts_transport";  // "telegram" / "ntfy"（DEVELOPER_KEYS）
     private static final String KEY_ALERTS_NTFY_SERVER = "alerts_ntfy_server";  // 空 = https://ntfy.sh
     private static final String KEY_ALERTS_NTFY_TIER = "alerts_ntfy_tier";  // "free" / "paid"
     private static final String KEY_ALERTS_NTFY_RISK_ACK = "alerts_ntfy_risk_ack";  // 版本|话题末八位
@@ -792,6 +801,7 @@ public class AppConfig {
                 KEY_LAST_DETECTED_SD_PATH,
                 KEY_REARVIEW_GUIDE_SEEN,
                 KEY_PHOTO_VIA_JPEG_RESET,
+                KEY_ALERTS_COMMAND_OFFSET,
                 // 话题轮换的两个记号（2026-11-16）：安装时刻和换到第几次。不是设置，不进导出 ——
                 // 备份恢复到另一台车上不该带着别人的时刻和计数，那正是「两台车撞名」的来路。
                 // The two rotation marks: when this install first rotated and how many times. Not
@@ -2090,9 +2100,114 @@ public class AppConfig {
         AppLog.i(TAG, "停车警报设为 " + (enabled ? "开" : "关"));
     }
 
-    // ==================== ntfy 警报 ====================
+    /**
+     * Telegram 机器人令牌。
+     *
+     * <p><b>这个值不进日志、不进故障报告。</b>写进来的第一个动作就是夹掉首尾空白；
+     * 外形不像令牌（{@code 数字:一串字符}）时原样存着，让设置界面去说“填得不对”，
+     * 而不是偷偷把用户敲的东西改掉。</p>
+     */
+    public String getAlertsTelegramToken() {
+        String raw = secrets().getString(KEY_ALERTS_TELEGRAM_TOKEN, "");
+        return raw == null ? "" : raw.trim();
+    }
 
+    public void setAlertsTelegramToken(String value) {
+        // 粘贴最容易带进来的东西：前后的空白、不断行空格、零宽字符、弯引号、从网页复制来的换行。
+        // 真令牌只有数字、冒号、字母、下划线、横线，所以别的字符一律丢掉 —— 存进去的必须就是能用的那一串。
+        StringBuilder kept = new StringBuilder();
+        if (value != null) {
+            for (int i = 0; i < value.length(); i++) {
+                char c = value.charAt(i);
+                boolean ok = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+                        || c == ':' || c == '_' || c == '-';
+                if (ok) {
+                    kept.append(c);
+                }
+            }
+        }
+        String clean = kept.toString();
+        secrets().edit().putString(KEY_ALERTS_TELEGRAM_TOKEN, clean).apply();
+        // 只记“填了还是清空了”：令牌本身绝不落进日志。
+        AppLog.i(TAG, "Telegram 令牌" + (clean.isEmpty() ? "已清空" : "已填写"));
+    }
 
+    /** 消息发到哪个会话。群组是负数，所以这里只去空白，不要求是正数。 */
+    public String getAlertsTelegramChatId() {
+        String raw = secrets().getString(KEY_ALERTS_TELEGRAM_CHAT, "");
+        if (raw == null || raw.trim().isEmpty()) {
+            // 会话号一度存在普通设置里，后来挪到了凭据文件。升级上来的那一份还在老地方，
+            // 不搬过来就是“令牌填了、会话号没了” —— 警报与命令都不会开始。
+            String legacy = prefs.getString(KEY_ALERTS_TELEGRAM_CHAT, "");
+            if (legacy != null && !legacy.trim().isEmpty()) {
+                String clean = legacy.trim();
+                secrets().edit().putString(KEY_ALERTS_TELEGRAM_CHAT, clean).apply();
+                prefs.edit().remove(KEY_ALERTS_TELEGRAM_CHAT).apply();
+                AppLog.i(TAG, "Telegram 会话号已从设置挪到凭据文件");
+                return clean;
+            }
+        }
+        return raw == null ? "" : raw.trim();
+    }
+
+    public void setAlertsTelegramChatId(String value) {
+        String clean = value == null ? "" : value.trim();
+        secrets().edit().putString(KEY_ALERTS_TELEGRAM_CHAT, clean).apply();
+        // 会话号也是身份：只记末四位，完整的不落日志
+        AppLog.i(TAG, "Telegram 会话号" + (clean.isEmpty() ? "已清空"
+                : "已填写（末四位 " + clean.substring(Math.max(0, clean.length() - 4)) + "）"));
+    }
+
+    // ==================== ntfy 警报（开发者选项里才选得了） ====================
+
+    /**
+     * 存着的「走哪条路」：{@code telegram} 或 {@code ntfy}。
+     *
+     * <p>设置里那个开关显示的是这个值，不是生效的值 —— 开发者选项关着时两者不同，
+     * 开关要如实显示「存着什么」，否则重新打开开发者选项就看不见自己上次选的那一条了。</p>
+     *
+     * The stored route. The developer switch shows this, not the effective value: with developer
+     * options closed the two differ, and the switch must show what is stored or the previous choice
+     * becomes invisible when developer options are reopened.
+     */
+    public String getAlertsTransportStored() {
+        return com.kooo.evcam.alarm.ntfy.NtfyGate.stored(
+                prefs.getString(KEY_ALERTS_TRANSPORT, com.kooo.evcam.alarm.ntfy.NtfyGate.TELEGRAM));
+    }
+
+    /**
+     * 真正在用的那条路。开发者选项关着时一律 telegram（{@link com.kooo.evcam.alarm.ntfy.NtfyGate#effective}）。
+     *
+     * <p>发送、界面上的状态行都读这一个值 —— 两处读同一个函数，说法就不会打架。</p>
+     *
+     * The route actually in use: telegram whenever developer options are closed. The sender and the
+     * status row both read this one function, so they cannot disagree.
+     */
+    public String getAlertsTransport() {
+        // 2026-11-15：这一项从开发者选项搬到「停车警报」里，成了车主的普通选择，
+        // 所以不再跟着开发者选项开关走；存坏的值仍然按 telegram 算（NtfyGate.stored）。
+        // 2026-11-15: the choice moved out of Developer options into the alerts section, so it no longer
+        // follows that switch; a stored value that makes no sense still reads as telegram.
+        return com.kooo.evcam.alarm.ntfy.NtfyGate.stored(getAlertsTransportStored());
+    }
+
+    /**
+     * 换一条路。只写这一个键，另一边的设置一个字都不动（{@code docs/ntfy/DECISIONS.md} D14）。
+     *
+     * Switch routes. Writes this one key and touches nothing on the other side.
+     */
+    public void setAlertsTransport(String value) {
+        String clean = com.kooo.evcam.alarm.ntfy.NtfyGate.stored(value);
+        prefs.edit().putString(KEY_ALERTS_TRANSPORT, clean).apply();
+        AppLog.i(TAG, "警报出口设为 " + clean);
+    }
+
+    /** 现在是不是走 ntfy。Whether the effective route is ntfy. */
+    public boolean isAlertsNtfy() {
+        return com.kooo.evcam.alarm.ntfy.NtfyGate.NTFY.equals(getAlertsTransport());
+    }
+
+    /** ntfy 服务器地址；空表示用默认的 ntfy.sh。The ntfy server; empty means the default. */
     public String getAlertsNtfyServer() {
         String raw = readString(KEY_ALERTS_NTFY_SERVER, "");
         return raw == null ? "" : raw.trim();
@@ -2297,6 +2412,59 @@ public class AppConfig {
         AppLog.i(TAG, "警报附图设为 " + (enabled ? "开" : "关（只发文字）"));
     }
 
+    /**
+     * 回应 Telegram 里发来的命令（{@code pic}、{@code status}）。默认关。
+     *
+     * <p>开着的时候车会定期去问一次「有人找我吗」—— 长轮询，25 秒一次，车一直是客户端。
+     * 车机睡着时不问（进程本来就没了），所以那条命令要等车醒过来才有回音。</p>
+     */
+    public boolean isAlertsCommands() {
+        return prefs.getBoolean(KEY_ALERTS_COMMANDS, false);
+    }
+
+    public void setAlertsCommands(boolean enabled) {
+        prefs.edit().putBoolean(KEY_ALERTS_COMMANDS, enabled).apply();
+        AppLog.i(TAG, "停车警报命令回应设为 " + (enabled ? "开" : "关"));
+    }
+
+    /** 已经处理到哪一条更新：重启之后不能把上一条命令再执行一次。 */
+    public long getAlertsCommandOffset() {
+        return prefs.getLong(KEY_ALERTS_COMMAND_OFFSET, 0L);
+    }
+
+    /**
+     * 处理到哪一条。用 {@code commit()} 而不是 {@code apply()}：
+     * 这条命令接下来就要拍照发图，进程半路被杀时磁盘上必须已经写着「这条处理过了」，
+     * 否则重启会把同一张照片再发一遍。
+     */
+    public void setAlertsCommandOffset(long offset) {
+        prefs.edit().putLong(KEY_ALERTS_COMMAND_OFFSET, Math.max(0L, offset)).commit();
+    }
+
+    /**
+     * 谁能发命令 —— 车主自己的 Telegram 用户号。
+     *
+     * <p>为什么不只看会话号：会话可以是一个群，群里不只有车主。
+     * 配了这个号，群聊里只有车主自己能要照片，别人按一下那排按钮不算数。</p>
+     *
+     * <p>私聊里它和会话号是同一个数；「找会话号」会顺手把它一起记下来。</p>
+     */
+    public String getAlertsOwnerId() {
+        String raw = secrets().getString(KEY_ALERTS_OWNER_ID, "");
+        return raw == null ? "" : raw.trim();
+    }
+
+    public void setAlertsOwnerId(String value) {
+        String clean = value == null ? "" : value.trim();
+        secrets().edit().putString(KEY_ALERTS_OWNER_ID, clean).apply();
+        AppLog.i(TAG, "Telegram 车主号" + (clean.isEmpty() ? "已清空"
+                : "已填写（末四位 " + clean.substring(Math.max(0, clean.length() - 4)) + "）"));
+    }
+
+    /** 会话号与车主号都有；群聊里要靠后者才能分出是谁。 */
+    public boolean hasAlertsOwner() {
+        return !getAlertsOwnerId().isEmpty();
+    }
 
     /**
      * 哪些事情算「有事」（{@link com.kooo.evcam.alarm.policy.TriggerSet}）。
@@ -2335,7 +2503,27 @@ public class AppConfig {
                 com.kooo.evcam.alarm.media.MotionSensitivity.clamp(level)).apply();
     }
 
+    /** 警报时发一段短视频吗：0 关，5 或 10 秒。 */
+    public int getAlertsClipSeconds() {
+        int value = prefs.getInt(KEY_ALERTS_CLIP_SECONDS, 0);
+        return value == 5 || value == 10 ? value : 0;
+    }
 
+    public void setAlertsClipSeconds(int seconds) {
+        int clean = seconds == 5 || seconds == 10 ? seconds : 0;
+        prefs.edit().putInt(KEY_ALERTS_CLIP_SECONDS, clean).apply();
+    }
+
+    /** 短视频带不带声音（车上录着声音时才有）。 */
+    public boolean isAlertsClipAudio() {
+        return prefs.getBoolean(KEY_ALERTS_CLIP_AUDIO, true);
+    }
+
+    public void setAlertsClipAudio(boolean enabled) {
+        prefs.edit().putBoolean(KEY_ALERTS_CLIP_AUDIO, enabled).apply();
+    }
+
+    /** 安静时段开不开。默认关。 */
     public boolean isAlertsQuietEnabled() {
         return prefs.getBoolean(KEY_ALERTS_QUIET_ENABLED, false);
     }
@@ -2373,6 +2561,11 @@ public class AppConfig {
     public void setAlertsArmDelayMinutes(int minutes) {
         prefs.edit().putInt(KEY_ALERTS_ARM_DELAY,
                 com.kooo.evcam.alarm.policy.ArmDelay.clamp(minutes)).apply();
+    }
+
+    /** 令牌和会话号都填了：可以试着发一条。 */
+    public boolean hasAlertsTelegramConfig() {
+        return !getAlertsTelegramToken().isEmpty() && !getAlertsTelegramChatId().isEmpty();
     }
 
     /**

@@ -9,18 +9,21 @@
 package com.kooo.evcam.alarm;
 
 import com.kooo.evcam.alarm.ntfy.NtfyChannel;
+import com.kooo.evcam.alarm.ntfy.NtfyGate;
 import com.kooo.evcam.alarm.ntfy.NtfyRisk;
 import com.kooo.evcam.alarm.policy.AlertPolicy;
 
 /**
  * 一条警报的出口：一个话题、一个机器人，都长这个样子。
  *
- * <p>{@link SentryAlerts} 决定「该不该发」；发到哪儿由这里决定。实现是 {@link NtfyChannel}，
- * 很薄：拼参数、翻译失败原因，判断一条都不许写进来 —— 判断在 {@link AlertPolicy}、{@link NtfyRisk}。</p>
+ * <p>{@link SentryAlerts} 决定「该不该发」；发到哪儿由这里决定。两个实现各管一条路
+ * （{@link TelegramChannel}、{@link NtfyChannel}），都薄：拼参数、翻译失败原因，
+ * 判断一条都不许写进来 —— 判断在 {@link AlertPolicy}、{@link NtfyGate}、{@link NtfyRisk}。</p>
  *
- * <p>The exit for one alert. {@link SentryAlerts} decides whether to send; this decides where. The one
- * implementation is {@link NtfyChannel}, thin: it builds the call and translates failures. No policy
- * lives here — that is {@link AlertPolicy} and {@link NtfyRisk}.</p>
+ * <p>The exit for one alert. {@link SentryAlerts} decides whether to send; this decides where. Two
+ * implementations, one per route ({@link TelegramChannel}, {@link NtfyChannel}), both thin: they build
+ * the call and translate failures. No policy lives here — that is {@link AlertPolicy},
+ * {@link NtfyGate} and {@link NtfyRisk}.</p>
  */
 public interface AlertChannel {
 
@@ -80,6 +83,9 @@ public interface AlertChannel {
 
     /** 没配好的时候，缺的是什么。Why it is not ready. */
     Kind blockedReason();
+
+    /** 这条路能不能发视频片段（只有 Telegram 能）。Whether this route can carry a video clip (Telegram only). */
+    boolean supportsClips();
 
     /** 发一张图，附一句说明。Send one picture with a caption. */
     Result sendPhoto(byte[] jpeg, String caption);

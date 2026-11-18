@@ -1,6 +1,7 @@
 /*
  * Zeekr Shortcut - https://github.com/dts88/zeekr-shortcut-car
  * Copyright (C) 2026 dts88
+ * Portions Copyright (C) 2026 Fab (Fabbbrrr) - https://github.com/Fabbbrrr
  * Portions Copyright (C) suyunkai and the EVCam contributors - https://github.com/suyunkai/EVCam
  * SPDX-License-Identifier: GPL-3.0-only
  * Additional terms under GPL-3.0 section 7 apply to dts88's code; see NOTICE.md.
@@ -5435,6 +5436,70 @@ public class MultiCameraManager {
      *
      * @return false：上一张还在拍，这一次不接
      */
+    /**
+     * 把环视那一路最后几秒写成一个 MP4（停车警报的短视频）。
+     *
+     * <p>先回到主线程拿到那一路的录制器（slot 表只在主线程上动），写文件放在后台线程。
+     * 取不到录制器、或者正在拍照那一刻没有用的样本，回 false。</p>
+     */
+    void writeClip(java.io.File out, int seconds, boolean includeAudio,
+                   java.util.function.Consumer<Boolean> done) {
+        writeClip(out, seconds, includeAudio, com.kooo.evcam.camera.CameraSlots.KEY_SURROUND, done);
+    }
+
+    /**
+     * 同上，但那一路由调用方点名（停车警报里「要 front 的片段」）。
+     *
+     * <p>每一路有自己的录制器，片段就从那一路的样本环里切；没有那一槽、没在录、环里不够长，回 false。</p>
+     *
+     * The same, for the camera the caller names (the alert's "give me the front clip"). Each lane has its
+     * own recorder, so the clip is cut from that lane's sample ring; a missing slot, no recording, or a
+     * ring that is too short answers false.
+     */
+    void writeClip(java.io.File out, int seconds, boolean includeAudio, String cameraKey,
+                   java.util.function.Consumer<Boolean> done) {
+        mainHandler.post(() -> {
+            Slot slot = slots.get(cameraKey);
+            CodecVideoRecorder recorder = slot == null ? null : slot.recorder;
+            if (recorder == null) {
+                done.accept(false);
+                return;
+            }
+            new Thread(() -> {
+                boolean ok = recorder.writeClipSeconds(out, seconds, includeAudio);
+                done.accept(ok);
+            }, "alert-clip").start();
+        });
+    }
+
+    /**
+     * 同上，但结尾不是最新一帧，是现在往前 {@code endAgoMs} 那一刻（停车警报里那一条所指的时刻）。
+     *
+     * <p>车主十分钟后才点「片段」，要的还是那一刻的画面：从那一槽的样本环里切出「那一刻之前几秒」，
+     * 绝不重新录一段、也不拿此刻的画面顶。环里没留到那么早，回 false —— 那一刻没有。</p>
+     *
+     * The same, except the clip ends at the moment {@code endAgoMs} before now instead of at the
+     * newest frame (the moment the alert names). The owner taps "clip" ten minutes later and still
+     * gets that moment: the last few seconds before it, cut from that lane's sample ring. Nothing is
+     * recorded afresh and this instant's picture never stands in. A ring that did not hold that
+     * stretch answers false — the moment is not available.
+     */
+    void writeClipEndingMsAgo(java.io.File out, int seconds, boolean includeAudio, String cameraKey,
+                              long endAgoMs, java.util.function.Consumer<Boolean> done) {
+        mainHandler.post(() -> {
+            Slot slot = slots.get(cameraKey);
+            CodecVideoRecorder recorder = slot == null ? null : slot.recorder;
+            if (recorder == null) {
+                done.accept(false);
+                return;
+            }
+            new Thread(() -> {
+                boolean ok = recorder.writeClipSecondsEndingMsAgo(out, seconds, includeAudio, endAgoMs);
+                done.accept(ok);
+            }, "alert-clip").start();
+        });
+    }
+
     public boolean takePhoto(PhotoCallback callback) {
         if (android.os.Looper.myLooper() != android.os.Looper.getMainLooper()) {
             mainHandler.post(() -> takePhoto(callback));

@@ -56,6 +56,7 @@ public class NtfyTopicRotationTest {
         DeveloperMode.lock(context);
         DeveloperMode.init(context);
         config = new AppConfig(context);
+        config.setAlertsTransport(NtfyGate.NTFY);
         config.setAlertsNtfyPaid(false);
         config.setAlertsNtfyTopic(OLD_TOPIC);
         config.setAlertsNtfyRiskAck(NtfyRisk.ackFor(OLD_TOPIC));

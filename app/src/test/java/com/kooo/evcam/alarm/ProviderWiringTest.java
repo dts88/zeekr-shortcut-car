@@ -108,12 +108,12 @@ public class ProviderWiringTest {
     }
 
     /**
-     * 第三条出口就是一个类：把 {@link AlertChannel} 的方法写出来，不碰现有那个。
+     * 第三条出口就是一个类：把 {@link AlertChannel} 的六个方法写出来，不碰现有的两个。
      *
      * <p>这里用一个假的实现把接口走一遍，证明它自足 —— 不需要 Telegram 或 ntfy 的任何东西，
      * 也不需要 {@code SentryAlerts} 知道它是谁。</p>
      *
-     * A third exit is one class: the methods of {@link AlertChannel}, touching the existing exit not at all.
+     * A third exit is one class: six methods of {@link AlertChannel}, touching neither existing exit.
      * A fake implementation walks the interface here to show it is self-contained — it needs nothing
      * from Telegram or ntfy, and {@code SentryAlerts} never learns who it is.
      */
@@ -123,6 +123,7 @@ public class ProviderWiringTest {
         assertEquals("黑匣子写这个名字", "signal", signal.name());
         assertTrue(signal.ready());
         assertEquals(AlertChannel.Kind.OK, signal.blockedReason());
+        assertFalse("能力差异由出口自己回答，不由编排去问名字", signal.supportsClips());
 
         AlertChannel.Result sent = signal.sendText("车回来了");
         assertTrue(sent.ok);
@@ -150,6 +151,11 @@ public class ProviderWiringTest {
         @Override
         public Kind blockedReason() {
             return Kind.OK;
+        }
+
+        @Override
+        public boolean supportsClips() {
+            return false;
         }
 
         @Override
