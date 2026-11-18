@@ -1,6 +1,7 @@
 /*
  * Zeekr Shortcut - https://github.com/dts88/zeekr-shortcut-car
  * Copyright (C) 2026 dts88
+ * Portions Copyright (C) 2026 Fab (Fabbbrrr) - https://github.com/Fabbbrrr
  * Portions Copyright (C) suyunkai and the EVCam contributors - https://github.com/suyunkai/EVCam
  * SPDX-License-Identifier: GPL-3.0-only
  * Additional terms under GPL-3.0 section 7 apply to dts88's code; see NOTICE.md.
@@ -3258,6 +3259,196 @@ public class CodecVideoRecorder {
      * 写不进就换盘：写过多留的那段先补写进新文件，这一个接着写进去；换不了，这个文件就算写不了
      * （{@link #failFile}），以前那样走编码器不健康 → 重建 → 写不进文件的裁判。</p>
      */
+    /**
+     * 把最后几秒写成一个单独的 MP4（停车警报的短视频）。
+     *
+     * <p>用的是环里已经编码好的样本：不重开相机、不重新编码，也不碰正在录的那个文件。
+     * 自己开一个 MediaMuxer、写到另一个文件里去，所以能在任何线程上调。</p>
+     *
+     * @param seconds      要多长（5、10）
+     * @param includeAudio 车上录着声音时，把声音也带上
+     * @return 写成了没有；没有可用的样本、参数不对、没地方写，都是 false
+     */
+    public boolean writeClipSeconds(java.io.File out, int seconds, boolean includeAudio) {
+        MediaFormat video = fileFormat;
+        if (out == null || seconds <= 0 || video == null) {
+            return false;
+        }
+        java.util.List<SampleRing.Sample> kept = ring.keptSnapshot();
+        if (kept.isEmpty()) {
+            return false;
+        }
+        long[] pts = new long[kept.size()];
+        boolean[] keyframe = new boolean[kept.size()];
+        boolean[] audio = new boolean[kept.size()];
+        long endUs = 0;
+        int videoCount = 0;
+        for (int i = 0; i < kept.size(); i++) {
+            SampleRing.Sample sample = kept.get(i);
+            pts[i] = sample.ptsUs;
+            keyframe[i] = sample.keyframe;
+            audio[i] = sample.audio;
+            if (!sample.audio) {
+                videoCount++;
+                endUs = Math.max(endUs, sample.ptsUs);
+            }
+        }
+        if (videoCount == 0) {
+            return false;
+        }
+        com.kooo.evcam.alarm.ClipWindow.Cut cut = com.kooo.evcam.alarm.ClipWindow.choose(
+                pts, keyframe, audio, endUs, seconds * 1_000_000L);
+        if (cut.isEmpty()) {
+            return false;
+        }
+        return writeCut(out, kept, cut, includeAudio);
+    }
+
+    /**
+     * 把「现在往前 {@code endAgoMs} 那一刻」结束的几秒写成一个单独的 MP4（停车警报里那一刻的短视频）。
+     *
+     * <p>和 {@link #writeClipSeconds} 同一套：环里已经编码好的样本、自己开一个 MediaMuxer，不重开相机、
+     * 不重新编码、不碰正在录的那个文件。只差一处：结尾不是最新一帧，而是「现在往前 {@code endAgoMs}」
+     * 那个时刻 —— 车主要的是警报那一刻的画面，不是此刻的画面。</p>
+     *
+     * <p>环没留到那么早，就回 false：留着的最近 {@link SampleRing#KEEP_MS} 一定在（等 fsync 确认落盘才丢，
+     * 最多留到 {@link SampleRing#MAX_MS}），再往前的已经补写进文件、从内存里扔了。回 false 就是「那一刻没有」，
+     * 绝不拿此刻的画面凑数。</p>
+     *
+     * Write the few seconds <b>ending at the moment {@code endAgoMs} before now</b> into a standalone MP4
+     * (the alert's short clip of that moment).
+     *
+     * <p>Same machinery as {@link #writeClipSeconds}: the samples already encoded in the ring, its own
+     * MediaMuxer, no camera reopen, no re-encode, no touching the file being recorded. One difference
+     * only: the end is not the newest frame but the moment {@code endAgoMs} before now — the owner wants
+     * the alert's moment, not this instant.</p>
+     *
+     * <p>When the ring does not reach back that far it answers false: the last
+     * {@link SampleRing#KEEP_MS} is always held (dropped only once fsync confirms it landed, never more
+     * than {@link SampleRing#MAX_MS}), anything older was rewritten into a file and dropped from memory.
+     * False here means "that moment is not available"; this instant's picture is never offered instead.</p>
+     *
+     * @param seconds      要多长（5、10）
+     * @param includeAudio 车上录着声音时，把声音也带上
+     * @param endAgoMs     结尾离现在多久（毫秒）；0 就是最新一帧
+     * @return 写成了没有；环没留到那么早、没有可用的画面、参数不对、没地方写，都是 false
+     */
+    public boolean writeClipSecondsEndingMsAgo(java.io.File out, int seconds, boolean includeAudio, long endAgoMs) {
+        MediaFormat video = fileFormat;
+        if (out == null || seconds <= 0 || video == null || endAgoMs < 0) {
+            return false;
+        }
+        java.util.List<SampleRing.Sample> kept = ring.keptSnapshot();
+        if (kept.isEmpty()) {
+            return false;
+        }
+        SampleRing.Sample newest = SampleRing.newestPicture(kept);
+        if (newest == null) {
+            return false;
+        }
+        long endUs = SampleRing.endPtsAtAgo(newest.ptsUs, newest.queuedAtMs,
+                SystemClock.elapsedRealtime(), endAgoMs);
+        if (endUs <= 0L) {
+            return false;
+        }
+        // 环得盖住整个窗口：最老的一帧晚于窗口起点，就是要的那几秒根本没留住
+        // The ring must cover the whole window: an oldest frame after the window start means those seconds were never held
+        long windowUs = seconds * 1_000_000L;
+        if (SampleRing.oldestPicturePtsUs(kept) > endUs - windowUs) {
+            return false;
+        }
+        int last = SampleRing.lastAtOrBefore(kept, endUs);
+        if (last < 0) {
+            return false;
+        }
+        int count = last + 1;
+        long[] pts = new long[count];
+        boolean[] keyframe = new boolean[count];
+        boolean[] audio = new boolean[count];
+        long cutEndUs = 0;
+        for (int i = 0; i < count; i++) {
+            SampleRing.Sample sample = kept.get(i);
+            pts[i] = sample.ptsUs;
+            keyframe[i] = sample.keyframe;
+            audio[i] = sample.audio;
+            if (!sample.audio) {
+                cutEndUs = Math.max(cutEndUs, sample.ptsUs);
+            }
+        }
+        if (cutEndUs <= 0L) {
+            return false;
+        }
+        com.kooo.evcam.alarm.ClipWindow.Cut cut = com.kooo.evcam.alarm.ClipWindow.choose(
+                pts, keyframe, audio, cutEndUs, windowUs);
+        if (cut.isEmpty()) {
+            return false;
+        }
+        return writeCut(out, kept, cut, includeAudio);
+    }
+
+    /**
+     * 把选好的那一段写成 MP4（两个切片段的方法共用，muxer 只写一遍）。
+     *
+     * <p>参数集已经在开轨的 format 里带上了，样本里的那种跳过；时间戳从 0 起算。</p>
+     *
+     * Write the selected range into an MP4 (shared by both clip methods, so the muxer code exists once).
+     * The parameter sets already travel in the track format, so config samples are skipped; timestamps
+     * start at zero.
+     */
+    private boolean writeCut(java.io.File out, java.util.List<SampleRing.Sample> kept,
+                             com.kooo.evcam.alarm.ClipWindow.Cut cut, boolean includeAudio) {
+        MediaFormat video = fileFormat;
+        if (out == null || video == null) {
+            return false;
+        }
+        boolean withAudio = includeAudio && fileAudioFormat != null;
+        MediaMuxer clip = null;
+        try {
+            clip = new MediaMuxer(out.getAbsolutePath(), MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
+            int videoTrack = clip.addTrack(video);
+            int audioTrack = -1;
+            if (withAudio) {
+                audioTrack = clip.addTrack(fileAudioFormat);
+            }
+            clip.start();
+            MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
+            for (int i = cut.from; i < cut.to; i++) {
+                SampleRing.Sample sample = kept.get(i);
+                if (sample.audio && !withAudio) {
+                    continue;
+                }
+                if (sample.config) {
+                    // 参数集在 addTrack 的 format 里已经带上了；再写一遍会把时间轴搞乱
+                    continue;
+                }
+                long ptsUs = com.kooo.evcam.alarm.ClipWindow.relativeMs(sample.ptsUs, cut.baseUs) * 1000L;
+                info.set(0, sample.data.length, ptsUs, sample.flags);
+                clip.writeSampleData(sample.audio ? audioTrack : videoTrack,
+                        java.nio.ByteBuffer.wrap(sample.data), info);
+            }
+            return true;
+        } catch (java.io.IOException | RuntimeException e) {
+            AppLog.w(TAG, "clip write failed: " + e);
+            if (out.exists() && !out.delete()) {
+                AppLog.w(TAG, "clip file could not be deleted");
+            }
+            return false;
+        } finally {
+            if (clip != null) {
+                try {
+                    clip.stop();
+                } catch (RuntimeException ignored) {
+                    // 没 start 过或没写过任何东西：stop 会抛，不影响结论
+                }
+                try {
+                    clip.release();
+                } catch (RuntimeException ignored) {
+                    // 同上
+                }
+            }
+        }
+    }
+
     private void writeQueued(SampleRing.Sample sample) {
         if (fileFailed || muxer == null || !muxerStarted) {
             // 没有能写的文件：这个文件没开成、开轨失败、换盘也没换成。写不了的只能丢

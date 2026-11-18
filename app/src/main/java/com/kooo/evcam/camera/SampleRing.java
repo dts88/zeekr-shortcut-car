@@ -508,6 +508,92 @@ final class SampleRing {
         return first == null ? 0L : Math.max(0L, last.ptsUs - first.ptsUs) / 1000L;
     }
 
+    /**
+     * 这些样本里最新的一个画面；没有画面样本是 null。
+     *
+     * <p>「环里的现在」就是它：警报那一刻要往回数多少，从它的时刻和它进队的时刻算。</p>
+     *
+     * The newest picture sample held by these samples, or null when they hold none. This sample
+     * is "now" as far as the ring is concerned: how far back a moment lies is counted from its
+     * timestamp and the time it was queued.
+     */
+    static Sample newestPicture(List<Sample> samples) {
+        Sample newest = null;
+        for (Sample sample : samples) {
+            if (sample.audio) {
+                continue;
+            }
+            if (newest == null || sample.ptsUs >= newest.ptsUs) {
+                newest = sample;
+            }
+        }
+        return newest;
+    }
+
+    /** 这些样本里最老的一个画面的时间戳；没有画面样本是 0。 / The oldest picture timestamp, 0 when there is none. */
+    static long oldestPicturePtsUs(List<Sample> samples) {
+        long oldest = 0L;
+        boolean seen = false;
+        for (Sample sample : samples) {
+            if (sample.audio) {
+                continue;
+            }
+            if (!seen || sample.ptsUs < oldest) {
+                oldest = sample.ptsUs;
+                seen = true;
+            }
+        }
+        return oldest;
+    }
+
+    /**
+     * 最后一个时间戳不晚于 {@code endUs} 的样本下标；一个都没有是 -1。
+     *
+     * <p>从后往前找：样本按先后排着，找的是「那一刻之前录到的最后一帧」。</p>
+     *
+     * The index of the last sample whose timestamp is not after {@code endUs}, or -1 when there is
+     * none. Searched from the back, because the samples run in order and what we want is the last
+     * frame recorded at or before that moment.
+     */
+    static int lastAtOrBefore(List<Sample> samples, long endUs) {
+        if (samples == null || endUs <= 0L) {
+            return -1;
+        }
+        for (int i = samples.size() - 1; i >= 0; i--) {
+            if (samples.get(i).ptsUs <= endUs) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * 把「现在往前 {@code endAgoMs} 毫秒那一刻」换算成环里的时间戳。
+     *
+     * <p>环里最新一帧不是此刻，它比此刻老了 {@code nowElapsedMs - newestQueuedAtMs}；所以那个时刻
+     * 在最新一帧之前 {@code endAgoMs} 减去这段年龄。年龄按开机时长算，不看墙上时间（车机睡醒后会跳）。</p>
+     *
+     * <p>那个时刻比最新一帧还新（环还没录到那儿，或者时钟读数不老实），回 -1：环回答不了那一刻。</p>
+     *
+     * Convert "the moment {@code endAgoMs} before now" into a ring timestamp. The newest frame is
+     * not this instant: it is already {@code nowElapsedMs - newestQueuedAtMs} old, so that moment
+     * lies {@code endAgoMs} minus that age before it. The age comes from elapsed realtime, never
+     * from wall clock (the head unit jumps it after sleep). A moment newer than the newest frame
+     * (the ring has not reached it, or the clock reading is not honest) answers -1: the ring cannot
+     * speak for that moment.
+     */
+    static long endPtsAtAgo(long newestPtsUs, long newestQueuedAtMs, long nowElapsedMs, long endAgoMs) {
+        if (newestPtsUs <= 0L || endAgoMs < 0L) {
+            return -1L;
+        }
+        long newestAgeMs = Math.max(0L, nowElapsedMs - newestQueuedAtMs);
+        long backUs = (endAgoMs - newestAgeMs) * 1000L;
+        if (backUs < 0L) {
+            return -1L;
+        }
+        return newestPtsUs - backUs;
+    }
+
     /** 留存规则；只在关键帧处截断，最后一整段（关键帧到最新）永远留着。 */
     private void trimKept() {
         if (kept.isEmpty()) {

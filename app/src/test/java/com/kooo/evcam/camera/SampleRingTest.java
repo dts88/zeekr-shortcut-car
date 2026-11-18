@@ -20,6 +20,8 @@ import org.junit.Test;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.kooo.evcam.alarm.guard.AlertMoment;
+
 /**
  * {@link SampleRing} 的单元测试。
  *
@@ -760,5 +762,65 @@ public class SampleRingTest {
         // 新的一次录像：第一段照样马上记
         bp.dropped(30, 3_000, 1);
         assertNotNull(bp.admitted(40, true));
+    }
+
+    // ================================================================= 警报那一刻往回切（AlertMoment 的片段）
+
+    @Test
+    public void newestAndOldestPictureSkipAudio() {
+        SampleRing ring = new SampleRing();
+        write(ring, 1_000, true, 10);
+        write(ring, 2_000, false, 10);
+        // 声音比最后一帧画面晚一点：算环里新旧都不看它
+        offerAudio(ring, 2_500, 20);
+        writeHead(ring, 2_500);
+        List<SampleRing.Sample> kept = ring.keptSnapshot();
+        assertEquals(2_000 * 1000L, SampleRing.newestPicture(kept).ptsUs);
+        assertEquals(1_000 * 1000L, SampleRing.oldestPicturePtsUs(kept));
+        // 只有声音时没有画面：新旧都是「没有」
+        SampleRing onlyAudio = new SampleRing();
+        offerAudio(onlyAudio, 500, 20);
+        writeHead(onlyAudio, 500);
+        assertNull(SampleRing.newestPicture(onlyAudio.keptSnapshot()));
+        assertEquals(0L, SampleRing.oldestPicturePtsUs(onlyAudio.keptSnapshot()));
+    }
+
+    @Test
+    public void lastAtOrBeforeFindsTheFrameRecordedAtThatMoment() {
+        SampleRing ring = new SampleRing();
+        for (long t = 0; t <= 10 * SEC; t += SEC) {
+            write(ring, t, t % (3 * SEC) == 0, 10);
+        }
+        List<SampleRing.Sample> kept = ring.keptSnapshot();
+        // 正好落在某一帧上
+        assertEquals(4, SampleRing.lastAtOrBefore(kept, 4 * SEC * 1000L));
+        // 两帧之间：取那一刻之前录到的最后一帧，不是之后那一帧
+        assertEquals(4, SampleRing.lastAtOrBefore(kept, 4 * SEC * 1000L + 400_000L));
+        // 第一帧还早：环里没有那一刻
+        assertEquals(-1, SampleRing.lastAtOrBefore(kept, -1));
+        assertEquals(-1, SampleRing.lastAtOrBefore(kept, 0L));
+    }
+
+    @Test
+    public void endPtsAtAgoCountsBackFromTheNewestFrameNotFromThisInstant() {
+        // 最新一帧是 60 秒、它比此刻老了 1 秒；要 10 秒前的那一刻
+        long endUs = SampleRing.endPtsAtAgo(60 * SEC * 1000L, 1_000, 2_000, 10 * SEC);
+        assertEquals(51 * SEC * 1000L, endUs);
+        // 最新一帧就是此刻（年龄 0）：直接往回 10 秒
+        assertEquals(50 * SEC * 1000L,
+                SampleRing.endPtsAtAgo(60 * SEC * 1000L, 1_000, 1_000, 10 * SEC));
+        // 要的时刻比最新一帧还新（环还没录到那儿）：环回答不了
+        assertEquals(-1L, SampleRing.endPtsAtAgo(60 * SEC * 1000L, 5_000, 6_000, 500));
+        // 没有画面、或者负数年龄：也是没有
+        assertEquals(-1L, SampleRing.endPtsAtAgo(0L, 1_000, 2_000, 0));
+        assertEquals(-1L, SampleRing.endPtsAtAgo(60 * SEC * 1000L, 1_000, 2_000, -1));
+    }
+
+    @Test
+    public void ringReachBackIsMeasuredFromTheConstant() {
+        // 警报那一刻能往回切多远，就是留着的上限：MAX_MS 一分钟，其中 KEEP_MS 十五秒一定在
+        assertEquals(60_000L, SampleRing.MAX_MS);
+        assertEquals(15_000L, SampleRing.KEEP_MS);
+        assertTrue(SampleRing.MAX_MS > SampleRing.KEEP_MS);
     }
 }
