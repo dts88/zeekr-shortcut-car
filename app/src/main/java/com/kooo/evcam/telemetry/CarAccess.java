@@ -42,4 +42,10 @@ public interface CarAccess {
 
     /** 一个传感器现在的值；读不到（含占位值）是 null。 */
     Float sensor(int type);
+
+    /**
+     * 一个传感器事件现在的原值（挡位这一类，{@link Signal.Kind#SENSOR_EVENT}），当场问车机；读不到是 null。
+     * 上车时切驾驶模式临写之前用它读挡位：发布出来的读数是合并发布的，会晚几十毫秒。
+     */
+    Integer sensorEvent(int type);
 }

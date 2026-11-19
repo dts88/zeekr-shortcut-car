@@ -516,7 +516,7 @@ final class EcarxSource {
             Method queryConfig = carInfo == null ? null : findMethod(carInfo, "queryCarConfig", int.class);
             access = new Access(function, getFunctionValue, getFunctionValueZoned, setFunctionValue, setFunctionValueZoned,
                     isFunctionSupportedZoned, getCustomizeZoned, setCustomizeZoned, sensor, getSensorLatestValue,
-                    carInfo, queryConfig);
+                    getSensorEvent, carInfo, queryConfig);
             status = String.format(Locale.US,
                     "connected in %d ms; function=%s zoned=%s sensorEvent=%s sensorValue=%s; driver %s; %s",
                     SystemClock.elapsedRealtime() - start, getFunctionValue != null, getFunctionValueZoned != null,
@@ -1455,12 +1455,13 @@ final class EcarxSource {
         private final Method setFloatZoned;
         private final Object sensor;
         private final Method sensorValue;
+        private final Method sensorEvent;
         private final Object carInfo;
         private final Method queryConfig;
 
         Access(Object function, Method get, Method getZoned, Method set, Method setZoned, Method supportedZoned,
-               Method getFloatZoned, Method setFloatZoned, Object sensor, Method sensorValue, Object carInfo,
-               Method queryConfig) {
+               Method getFloatZoned, Method setFloatZoned, Object sensor, Method sensorValue, Method sensorEvent,
+               Object carInfo, Method queryConfig) {
             this.function = function;
             this.get = get;
             this.getZoned = getZoned;
@@ -1471,6 +1472,7 @@ final class EcarxSource {
             this.setFloatZoned = setFloatZoned;
             this.sensor = sensor;
             this.sensorValue = sensorValue;
+            this.sensorEvent = sensorEvent;
             this.carInfo = carInfo;
             this.queryConfig = queryConfig;
         }
@@ -1544,6 +1546,11 @@ final class EcarxSource {
             } catch (Throwable t) {
                 return null;
             }
+        }
+
+        @Override
+        public Integer sensorEvent(int type) {
+            return number(sensorEvent, sensor, type);
         }
 
         private static Integer number(Method m, Object target, Object... args) {

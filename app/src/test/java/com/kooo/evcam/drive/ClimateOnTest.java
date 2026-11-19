@@ -390,6 +390,46 @@ public class ClimateOnTest {
         assertFalse(world.awaiting());
     }
 
+    /** 同上，写车的结果是熄屏之后才回来的：循环模式做成了照样记下，亮屏后只写二排空调。 */
+    @Test
+    public void aResultDeliveredAfterTheScreenWentDarkStillCounts() {
+        world.holdAnswers = true;
+        world.rearResults.add(CarMoves.Result.NO_CHANGE);
+        start();
+        world.read(0, 2);
+        world.read(1, 2);
+        assertEquals(1, world.restores.size());
+        climate.stop();
+        world.answer();
+        assertFalse(world.circulationPending);
+        assertTrue(world.rearPending);
+
+        world.holdAnswers = false;
+        climate.start();
+        world.read(1, 2);
+        assertEquals(2, world.restores.size());
+        assertEquals("0,true", world.restores.get(1));
+    }
+
+    /** 结果回来之前空调又确认关过一回：那是上一回的结果，不算数，这一回两样都写。 */
+    @Test
+    public void aResultFromBeforeTheClimateWentOffAgainIsNotCounted() {
+        world.holdAnswers = true;
+        start();
+        world.read(0, 2);
+        world.read(1, 2);
+        assertEquals(1, world.restores.size());
+        climate.stop();
+        climate.start();
+        world.read(0, 2);
+        world.answer();
+        assertTrue(world.circulationPending);
+        assertTrue(world.rearPending);
+        world.holdAnswers = false;
+        world.read(1, 2);
+        assertEquals(CarMoves.CIRCULATION_INNER + ",true", world.restores.get(1));
+    }
+
     /** 同上，换成进程重启。 */
     @Test
     public void aPartialFailureIsRememberedByANewProcess() {

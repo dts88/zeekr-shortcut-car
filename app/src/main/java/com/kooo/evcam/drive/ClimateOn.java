@@ -104,6 +104,11 @@ public final class ClimateOn {
     /** 确认关过之后还没恢复的那几样（照存着的，{@link World#circulationPending}、{@link World#rearPending}）。 */
     private boolean circulationPending;
     private boolean rearPending;
+    /**
+     * 空调确认关了几回（这个进程里）。写车的结果记在要写的那一回上，不看屏幕：熄屏时还在写的那一件，做成了哪一样照样记下
+     * （{@link #restored}）—— 不然亮屏后两样又都写一遍。
+     */
+    private int cycle;
 
     ClimateOn(World world) {
         this.world = world;
@@ -187,6 +192,7 @@ public final class ClimateOn {
         track = track.next(power);
         if (track.off == OffOn.CONFIRM) {
             // 确认关了（只读到一次关着不算）：两样都等它重新打开后恢复，写了几次从头算
+            cycle++;
             writes = 0;
             pending(true, true);
             world.turnedOff();
@@ -202,7 +208,8 @@ public final class ClimateOn {
                 }
                 busy = true;
                 writes++;
-                world.restore(circulation, rear, (first, second) -> restored(gen, first, second));
+                int asked = cycle;
+                world.restore(circulation, rear, (first, second) -> restored(gen, asked, first, second));
                 break;
             case FAILED:
                 giveUp();
@@ -212,14 +219,20 @@ public final class ClimateOn {
         }
     }
 
-    private void restored(int gen, CarMoves.Result circulation, CarMoves.Result rear) {
+    private void restored(int gen, int asked, CarMoves.Result circulation, CarMoves.Result rear) {
+        if (asked == cycle) {
+            // 做成的那一样不再等：再写时只写没成的，做成的之后手动改了的不动。空调没再关过就记，这中间熄过屏也记
+            boolean circulationLeft = circulationPending && circulation != CarMoves.Result.DONE;
+            boolean rearLeft = rearPending && rear != CarMoves.Result.DONE;
+            if (circulationLeft != circulationPending || rearLeft != rearPending) {
+                pending(circulationLeft, rearLeft, gen == generation);
+            }
+        }
         if (gen != generation) {
             return;
         }
         busy = false;
         lastWriteAt = world.now();
-        // 做成的那一样不再等：再写时只写没成的，做成的之后手动改了的不动
-        pending(circulationPending && circulation != CarMoves.Result.DONE, rearPending && rear != CarMoves.Result.DONE);
         if ((circulationPending || rearPending) && writes >= ClimateOnRules.MAX_WRITES) {
             giveUp();
         }
@@ -232,12 +245,19 @@ public final class ClimateOn {
         world.gaveUp(tried);
     }
 
-    /** 还没恢复的是哪几样：记下、存下（进程没了、熄屏再亮屏也还在）。都恢复了，写了几次清零。 */
     private void pending(boolean circulation, boolean rear) {
+        pending(circulation, rear, true);
+    }
+
+    /**
+     * 还没恢复的是哪几样：记下、存下（进程没了、熄屏再亮屏也还在）。都恢复了，写了几次清零 —— {@code current} 是 false
+     * （熄屏之前要的那一件晚到的结果）时不动写了几次：那是现在这一轮读的账。
+     */
+    private void pending(boolean circulation, boolean rear, boolean current) {
         circulationPending = circulation;
         rearPending = rear;
         world.setPending(circulation, rear);
-        if (!circulation && !rear) {
+        if (current && !circulation && !rear) {
             writes = 0;
         }
     }

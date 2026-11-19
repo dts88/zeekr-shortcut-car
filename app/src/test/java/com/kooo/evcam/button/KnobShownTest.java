@@ -82,6 +82,11 @@ public class KnobShownTest {
             public Float sensor(int type) {
                 return null;
             }
+
+            @Override
+            public Integer sensorEvent(int type) {
+                return null;
+            }
         };
         CarMoves.Names names = new CarMoves.Names() {
             @Override

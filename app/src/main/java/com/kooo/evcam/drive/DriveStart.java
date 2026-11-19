@@ -24,8 +24,8 @@ import com.kooo.evcam.telemetry.Signal;
 import com.kooo.evcam.telemetry.Telemetry;
 
 import java.util.Locale;
-import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 /**
  * 上车时切到设置的驾驶模式（issue 138；{@code AppConfig.getDriveModeAtStart}，设置页里还没有这一行）：车每次通电后驾驶模式
@@ -82,10 +82,10 @@ public final class DriveStart {
         boolean userExited();
 
         /**
-         * 写车、读回，结果在主线程上交回来。写车排在别的线程上，轮到时可能已经过了几秒：{@code stillWanted} 在那条线程上、
-         * 临写之前再问一次，说不要了就不写，结果是 {@link CarMoves.Result#MOVING}。
+         * 写车、读回，结果在主线程上交回来。写车排在别的线程上，轮到时可能已经过了几秒：临写之前在那条线程上现读一次挡位，
+         * 把挡位字母（读不到 null）交给 {@code stillWanted} 再问一次，说不要了就不写，结果是 {@link CarMoves.Result#MOVING}。
          */
-        void write(int mode, BooleanSupplier stillWanted, Consumer<CarMoves.Result> done);
+        void write(int mode, Predicate<String> stillWanted, Consumer<CarMoves.Result> done);
 
         /** 这一次上车没切成（{@code why} 不是 WAIT、WRITE）：记一行。{@code sinceStartMs} 是算上车起过了多久。 */
         void gaveUp(DriveStartRules.Decision why, int writes, boolean connected, Integer ignition, String gear,
@@ -217,7 +217,7 @@ public final class DriveStart {
                 break;
             case WRITE:
                 writes++;
-                world.write(mode, () -> stillWanted(gen), result -> written(gen, mode, result));
+                world.write(mode, liveGear -> stillWanted(gen, liveGear), result -> written(gen, mode, result));
                 break;
             default:
                 generation++;
@@ -236,19 +236,23 @@ public final class DriveStart {
             return;
         }
         if (result == CarMoves.Result.MOVING) {
-            // 轮到写的时候已经不要了（stillWanted），没写：不算写过一次，照此刻的样子再判
+            // 轮到写的时候已经不要了（stillWanted），没写：不算写过一次。隔一会儿再判 —— 发布出来的挡位这时多半还没跟上
+            // （现读的已经不是 P 挡），马上再判又会去写
             writes--;
+            world.later(DriveStartRules.RETRY_MS, () -> step(gen));
+            return;
         }
         step(gen);
     }
 
     /**
      * 写车的线程上、临写之前问：这一遍还作数、用户没退出、车还通着电、还挂着 P 挡。排队的那几秒里挂出了 P 挡的不写
-     * （{@link World#write}）。只读不改，哪个线程都能叫。
+     * （{@link World#write}）。挡位看的是 {@code liveGear}：写车的线程刚从车上现读的（读不到 null，不写），不是发布出来的
+     * 那一份 —— 那一份合并发布，会晚几十毫秒。只读不改，哪个线程都能叫。
      */
-    private boolean stillWanted(int gen) {
+    private boolean stillWanted(int gen, String liveGear) {
         return gen == generation && !world.userExited() && DriveStartRules.powered(world.ignition())
-                && "P".equals(world.gear());
+                && "P".equals(liveGear);
     }
 
     /** 切成之后再看一眼，只记一行：车自己的初始化要是晚到、又改回去了，从这里看得出来。 */
@@ -318,7 +322,7 @@ public final class DriveStart {
         }
 
         @Override
-        public void write(int mode, BooleanSupplier stillWanted, Consumer<CarMoves.Result> done) {
+        public void write(int mode, Predicate<String> stillWanted, Consumer<CarMoves.Result> done) {
             CarMoves.driveModeAtStart(app, mode, stillWanted, done);
         }
 

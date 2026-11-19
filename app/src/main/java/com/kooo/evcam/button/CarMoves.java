@@ -30,6 +30,7 @@ import java.util.Locale;
 import java.util.function.BiConsumer;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 /**
  * 灵动贴写车的那些动作：驾驶模式（项目所有者 2026-10-30）和 2026-11-04 车主定的那一套。
@@ -227,10 +228,11 @@ public final class CarMoves {
      * （{@link #driveModeUnlessAlready}）。什么时候算上车、挂着什么挡才写由 {@code drive.DriveStartRules} 定，这里只管写和读回；
      * 黑匣子记「上车设置 drive_mode：…」。结果在主线程上交给 {@code done}。
      *
-     * <p>这一件排在写车的线程上，前面的一件（比如关门）可能要等好几秒，轮到时车可能已经挂出 P 挡了：{@code stillWanted}
-     * 在写车的线程上、临写之前再问一次，说不要了就不写，结果是 {@link Result#MOVING}。它得是哪个线程都能叫的。</p>
+     * <p>这一件排在写车的线程上，前面的一件（比如关门）可能要等好几秒，轮到时车可能已经挂出 P 挡了：临写之前在写车的线程上
+     * 现读一次挡位（不用发布出来的读数：它合并发布，会晚几十毫秒），把挡位字母（读不到 null）交给 {@code stillWanted} 再问一次，
+     * 说不要了就不写，结果是 {@link Result#MOVING}。{@code stillWanted} 得是哪个线程都能叫的、不读车的。</p>
      */
-    public static void driveModeAtStart(Context app, int mode, BooleanSupplier stillWanted, Consumer<Result> done) {
+    public static void driveModeAtStart(Context app, int mode, Predicate<String> stillWanted, Consumer<Result> done) {
         run(app, By.DRIVE_START, "drive_mode", driveModeUnlessAlready(mode, stillWanted), done);
     }
 
@@ -582,6 +584,10 @@ public final class CarMoves {
             }
             boolean accepted = access.write(id, zone, value);
             if (!accepted && zone == all()) {
+                // 带区域的那一笔等车机回话的时候也可能退出了：不带区域的这一笔之前再看一次
+                if (blocked()) {
+                    return false;
+                }
                 accepted = access.write(id, value);
             }
             note(String.format(Locale.US, "write %s@%s=%s %s", hex(id), hex(zone), hex(value), accepted ? "ok" : "refused"));
@@ -1142,17 +1148,20 @@ public final class CarMoves {
     /**
      * 上车时切到设置的驾驶模式（{@link #driveModeAtStart}）：读到已经是它就不写、算做成；临写之前 {@code stillWanted} 说不要了
      * （挂出 P 挡了、车没通电了、这一次上车已经作废）不写，是 {@link Result#MOVING}；别的同 {@link #driveMode}。
-     * 问完 {@code stillWanted} 到写之间不再读车（读车要等车机回话，等的时候可能就挂出 P 挡了）：读回用前面读到的那个值比。
+     * 写之前最后问车的一件是现读挡位，读到的字母（读不到 null）交给 {@code stillWanted}；问完它到写之间不再读车
+     * （读车要等车机回话，等的时候可能就挂出 P 挡了）：读回用前面读到的那个值比。
      */
-    static Job driveModeUnlessAlready(int mode, BooleanSupplier stillWanted) {
+    static Job driveModeUnlessAlready(int mode, Predicate<String> stillWanted) {
         return c -> {
             Integer cur = c.access.read(Signal.DRIVE_MODE.id);
             if (cur != null && cur == mode) {
                 c.note("already " + hex(cur));
                 return Result.DONE;
             }
-            if (!stillWanted.getAsBoolean()) {
-                c.note("no longer wanted, not written");
+            Object gear = Signal.GEAR.decode(c.access.sensorEvent(Signal.GEAR.id));
+            String letter = gear instanceof String ? (String) gear : null;
+            if (!stillWanted.test(letter)) {
+                c.note("no longer wanted (gear " + (letter == null ? "?" : letter) + "), not written");
                 return Result.MOVING;
             }
             return c.writePlain(Signal.DRIVE_MODE.id, mode, cur);

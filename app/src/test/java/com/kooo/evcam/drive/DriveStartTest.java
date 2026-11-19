@@ -21,13 +21,15 @@ import org.junit.Test;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 /**
  * 上车时切驾驶模式的一遍怎么走（{@link DriveStart}）：钟、车辆信号、写车都是假的，只看什么时候写、写几次、什么时候算了。
  */
 public class DriveStartTest {
+
+    private static final String SAME = "same as published";
 
     /** 假的外面：钟要 {@link #advance} 才走；写车照 {@link #results} 里排好的结果回话（排完了的都算成）。 */
     private static final class FakeWorld implements DriveStart.World {
@@ -37,7 +39,10 @@ public class DriveStartTest {
         String setting = AppConfig.DRIVE_MODE_AT_START_COMFORT;
         boolean connected = true;
         Integer ignition = Signal.IGNITION_ON;
+        /** 发布出来的挡位（主线程上判的时候看的）。 */
         String gear = "P";
+        /** 写车的线程临写之前从车上现读的挡位；{@link #SAME} 是和发布出来的一样，null 是读不到。 */
+        String liveGear = SAME;
         Integer driveMode = Signal.DRIVE_MODE_STANDARD;
         boolean exited;
         /** 交给写车的线程几次。 */
@@ -114,12 +119,12 @@ public class DriveStartTest {
             return exited;
         }
 
-        /** 轮到写的时候（{@link #answer}，没拿在手里的就是当场）先问还要不要：不要了不写，是 MOVING。 */
+        /** 轮到写的时候（{@link #answer}，没拿在手里的就是当场）先拿现读的挡位问还要不要：不要了不写，是 MOVING。 */
         @Override
-        public void write(int mode, BooleanSupplier stillWanted, Consumer<CarMoves.Result> done) {
+        public void write(int mode, Predicate<String> stillWanted, Consumer<CarMoves.Result> done) {
             requests++;
             Runnable answer = () -> {
-                if (!stillWanted.getAsBoolean()) {
+                if (!stillWanted.test(SAME.equals(liveGear) ? gear : liveGear)) {
                     done.accept(CarMoves.Result.MOVING);
                     return;
                 }
@@ -351,11 +356,51 @@ public class DriveStartTest {
         world.gear = "D";
         world.answer();
         assertTrue(world.writes.isEmpty());
+        world.advance(DriveStartRules.RETRY_MS);
         assertEquals(Collections.singletonList(DriveStartRules.Decision.LEFT_PARK), world.gaveUp);
         world.gear = "P";
         world.advance(PLENTY);
         assertTrue(world.writes.isEmpty());
         assertEquals(1, world.requests);
+    }
+
+    /**
+     * 发布出来的挡位还是 P、车上现读的已经是 D（刚挂出去，发布晚几十毫秒）：不写。之后发布出来的跟上了，这一次上车就不切了。
+     */
+    @Test
+    public void aStalePublishedGearDoesNotLetTheWriteThrough() {
+        world.liveGear = "D";
+        start.screenWentLit();
+        world.advance(DriveStartRules.SETTLE_MS);
+        assertEquals(1, world.requests);
+        assertTrue(world.writes.isEmpty());
+        world.gear = "D";
+        world.advance(PLENTY);
+        assertTrue(world.writes.isEmpty());
+        assertEquals(Collections.singletonList(DriveStartRules.Decision.LEFT_PARK), world.gaveUp);
+    }
+
+    /** 临写之前现读不到挡位：不写；一直读不到，隔一会儿再试、到头算了，一笔都没写。 */
+    @Test
+    public void anUnreadableLiveGearWritesNothing() {
+        world.liveGear = null;
+        start.screenWentLit();
+        world.advance(PLENTY);
+        assertTrue(world.writes.isEmpty());
+        assertTrue("隔一会儿才再试，不是连着试", world.requests <= DriveStartRules.WINDOW_MS / DriveStartRules.RETRY_MS + 1);
+        assertEquals(Collections.singletonList(DriveStartRules.Decision.TIMED_OUT), world.gaveUp);
+    }
+
+    /** 现读不到挡位的那一下过去了：下一次试就写。 */
+    @Test
+    public void writesOnceTheLiveGearReadsParkAgain() {
+        world.liveGear = null;
+        start.screenWentLit();
+        world.advance(DriveStartRules.SETTLE_MS);
+        assertTrue(world.writes.isEmpty());
+        world.liveGear = SAME;
+        world.advance(DriveStartRules.RETRY_MS);
+        assertEquals(1, world.writes.size());
     }
 
     /** 排队时车断电了：轮到时不写，也不算写过一次；通电了照常写。 */

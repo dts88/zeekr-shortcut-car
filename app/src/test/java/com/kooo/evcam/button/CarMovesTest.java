@@ -20,6 +20,7 @@ import com.kooo.evcam.telemetry.Signal;
 import org.junit.Test;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -72,6 +73,9 @@ public class CarMovesTest {
     private static final int WINDOW_POS = 0xCD00;
     private static final int DEFROST_FRONT = 0xCE00;
     private static final int HILL_DESCENT = 0xCF00;
+    /** 挡位传感器事件的原值（{@link Signal#GEAR}）。 */
+    private static final int GEAR_P = 0x00200230;
+    private static final int GEAR_D = 0x00200220;
     private static final int AMBIENT_MAIN = 0xD100;
     private static final int AMBIENT_TOP = 0xD200;
 
@@ -163,6 +167,14 @@ public class CarMovesTest {
         @Override
         public Float sensor(int type) {
             return type == Signal.SPEED.id ? speed : null;
+        }
+
+        /** 现读的挡位（传感器事件的原值）：默认 P；null 是读不到。 */
+        Integer gearEvent = GEAR_P;
+
+        @Override
+        public Integer sensorEvent(int type) {
+            return type == Signal.GEAR.id ? gearEvent : null;
         }
     }
 
@@ -799,27 +811,27 @@ public class CarMovesTest {
     public void driveModeUnlessAlreadyWritesOnlyWhenTheCarIsInAnotherMode() {
         FakeCar car = new FakeCar();
         car.values.put(String.valueOf(Signal.DRIVE_MODE.id), Signal.DRIVE_MODE_COMFORT);
-        assertEquals(CarMoves.Result.DONE, run(car, CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_COMFORT, () -> true)));
+        assertEquals(CarMoves.Result.DONE, run(car, CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_COMFORT, gear -> true)));
         assertTrue(car.writes.isEmpty());
 
         car.values.put(String.valueOf(Signal.DRIVE_MODE.id), Signal.DRIVE_MODE_STANDARD);
-        assertEquals(CarMoves.Result.DONE, run(car, CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_COMFORT, () -> true)));
+        assertEquals(CarMoves.Result.DONE, run(car, CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_COMFORT, gear -> true)));
         assertEquals(Signal.DRIVE_MODE.id + "=" + Signal.DRIVE_MODE_COMFORT, car.writes.get(0));
         assertEquals(Signal.DRIVE_MODE_COMFORT, (int) car.read(Signal.DRIVE_MODE.id));
 
         FakeCar unread = new FakeCar();
         assertEquals(CarMoves.Result.DONE,
-                run(unread, CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_SPORT, () -> true)));
+                run(unread, CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_SPORT, gear -> true)));
         assertEquals(1, unread.writes.size());
 
         FakeCar refusing = new FakeCar();
         refusing.acceptPlain = false;
         assertEquals(CarMoves.Result.UNAVAILABLE,
-                run(refusing, CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_SPORT, () -> true)));
+                run(refusing, CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_SPORT, gear -> true)));
         FakeCar ignoring = new FakeCar();
         ignoring.applies = false;
         assertEquals(CarMoves.Result.NO_CHANGE,
-                run(ignoring, CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_SPORT, () -> true)));
+                run(ignoring, CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_SPORT, gear -> true)));
     }
 
     /** 轮到写的时候说不要了（排队时挂出了 P 挡）：不写，是 MOVING；已经是设置的那个模式照样算做成。 */
@@ -828,13 +840,13 @@ public class CarMovesTest {
         FakeCar car = new FakeCar();
         car.values.put(String.valueOf(Signal.DRIVE_MODE.id), Signal.DRIVE_MODE_STANDARD);
         assertEquals(CarMoves.Result.MOVING,
-                run(car, CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_COMFORT, () -> false)));
+                run(car, CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_COMFORT, gear -> false)));
         assertTrue(car.writes.isEmpty());
         assertEquals(Signal.DRIVE_MODE_STANDARD, (int) car.read(Signal.DRIVE_MODE.id));
 
         car.values.put(String.valueOf(Signal.DRIVE_MODE.id), Signal.DRIVE_MODE_COMFORT);
         assertEquals(CarMoves.Result.DONE,
-                run(car, CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_COMFORT, () -> false)));
+                run(car, CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_COMFORT, gear -> false)));
         assertTrue(car.writes.isEmpty());
     }
 
@@ -854,18 +866,23 @@ public class CarMovesTest {
             }
 
             @Override
+            public Integer sensorEvent(int type) {
+                order.add("gear");
+                return super.sensorEvent(type);
+            }
+
+            @Override
             public boolean write(int id, int value) {
                 order.add("write");
                 return super.write(id, value);
             }
         };
         car.values.put(String.valueOf(Signal.DRIVE_MODE.id), Signal.DRIVE_MODE_STANDARD);
-        assertEquals(CarMoves.Result.DONE, run(car, CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_COMFORT, () -> {
+        assertEquals(CarMoves.Result.DONE, run(car, CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_COMFORT, gear -> {
             order.add("ask");
-            return inPark[0];
+            return inPark[0] && "P".equals(gear);
         })));
-        assertEquals("问完紧接着就是写", order.indexOf("ask") + 1, order.indexOf("write"));
-        assertEquals("写之前只读一次", 1, order.indexOf("ask"));
+        assertEquals("写之前：读驾驶模式、现读挡位、问、写", Arrays.asList("read", "gear", "ask", "write"), order.subList(0, 4));
 
         // 写之前的那一次读车时挂出了 P 挡：读完再问，问到的是不在 P 挡，不写
         FakeCar shifting = new FakeCar() {
@@ -877,8 +894,31 @@ public class CarMovesTest {
         };
         shifting.values.put(String.valueOf(Signal.DRIVE_MODE.id), Signal.DRIVE_MODE_STANDARD);
         assertEquals(CarMoves.Result.MOVING,
-                run(shifting, CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_COMFORT, () -> inPark[0])));
+                run(shifting, CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_COMFORT, gear -> inPark[0])));
         assertTrue(shifting.writes.isEmpty());
+    }
+
+    /** 临写之前现读的挡位交给问的那一下：车上已经是 D 挡、读不到，都不写（发布出来的读数这里根本不看）。 */
+    @Test
+    public void driveModeUnlessAlreadyAsksWithTheGearReadFromTheCar() {
+        List<String> asked = new ArrayList<>();
+        FakeCar car = new FakeCar();
+        car.values.put(String.valueOf(Signal.DRIVE_MODE.id), Signal.DRIVE_MODE_STANDARD);
+        CarMoves.Job job = CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_COMFORT, gear -> {
+            asked.add(String.valueOf(gear));
+            return "P".equals(gear);
+        });
+        car.gearEvent = GEAR_D;
+        assertEquals(CarMoves.Result.MOVING, run(car, job));
+        car.gearEvent = null;
+        assertEquals(CarMoves.Result.MOVING, run(car, job));
+        car.gearEvent = 255;
+        assertEquals(CarMoves.Result.MOVING, run(car, job));
+        assertTrue(car.writes.isEmpty());
+        car.gearEvent = GEAR_P;
+        assertEquals(CarMoves.Result.DONE, run(car, job));
+        assertEquals(1, car.writes.size());
+        assertEquals(Arrays.asList("D", "null", "null", "P"), asked);
     }
 
     // ---- 空调重新打开后恢复循环模式、二排空调（issue 138）
@@ -1007,8 +1047,37 @@ public class CarMovesTest {
         assertEquals(CarMoves.Result.UNAVAILABLE, CarMoves.climateSettings(CarMoves.CIRCULATION_OUTER, true).run(blocked));
         assertEquals(CarMoves.Result.UNAVAILABLE, CarMoves.hillDescentOn().run(blocked));
         assertEquals(CarMoves.Result.UNAVAILABLE,
-                CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_SPORT, () -> true).run(blocked));
+                CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_SPORT, gear -> true).run(blocked));
         assertTrue(none.writes.isEmpty());
+    }
+
+    /** 带「全车」区域的那一笔车机不受理、等它回话的时候用户退出了：不带区域的那一笔不再写。 */
+    @Test
+    public void exitingDuringARefusedZonedWriteStopsTheUnzonedFallback() {
+        boolean[] exited = {false};
+        FakeCar fake = new FakeCar() {
+            @Override
+            public boolean write(int id, int zone, int value) {
+                writes.add(id + "@" + zone + "=" + value);
+                exited[0] = true;
+                return false;
+            }
+        };
+        fake.set(CIRCULATION, ALL, CIRCULATION + 3);
+        fake.set(DEFROST_FRONT, ALL, 0);
+        CarMoves.Car car = new CarMoves.Car(fake, NAMES, ms -> { }, null, null);
+        car.blocked = () -> exited[0];
+        assertEquals(CarMoves.Result.UNAVAILABLE, CarMoves.climateSettings(CarMoves.CIRCULATION_INNER, false).run(car));
+        assertEquals("只有带区域的那一笔", 1, fake.writes.size());
+        assertEquals(CIRCULATION + "@" + ALL + "=" + (CIRCULATION + 1), fake.writes.get(0));
+
+        // 没退出时照旧：带区域的不受理，再不带区域写
+        exited[0] = false;
+        car.blocked = () -> false;
+        fake.writes.clear();
+        CarMoves.climateSettings(CarMoves.CIRCULATION_INNER, false).run(car);
+        assertEquals(Arrays.asList(CIRCULATION + "@" + ALL + "=" + (CIRCULATION + 1), CIRCULATION + "=" + (CIRCULATION + 1)),
+                fake.writes);
     }
 
     /** 前排空调的电源按排读；读不到是 null。 */
