@@ -56,8 +56,9 @@ public class DriveStartTest {
         /** 写车的结果先不回，拿在手里（{@link #answer}）。 */
         boolean holdAnswers;
         final List<Runnable> pending = new ArrayList<>();
-        /** 没切成的每一次是为什么。 */
+        /** 没切成的每一次是为什么、记下的挡位是什么。 */
         final List<DriveStartRules.Decision> gaveUp = new ArrayList<>();
+        final List<String> gaveUpGear = new ArrayList<>();
         /** 切成之后再看的每一次：还是不是写的那个。 */
         final List<Boolean> checks = new ArrayList<>();
         boolean awaitingNextDrive;
@@ -154,6 +155,7 @@ public class DriveStartTest {
         public void gaveUp(DriveStartRules.Decision why, int writes, boolean connected, Integer ignition, String gear,
                            long sinceStartMs) {
             gaveUp.add(why);
+            gaveUpGear.add(gear);
         }
 
         @Override
@@ -392,6 +394,7 @@ public class DriveStartTest {
         world.advance(DriveStartRules.SETTLE_MS);
         assertEquals(1, world.requests);
         assertEquals(Collections.singletonList(DriveStartRules.Decision.LEFT_PARK), world.gaveUp);
+        assertEquals("记的是车上现读的挡位，不是发布出来的 P", Collections.singletonList("D"), world.gaveUpGear);
         world.liveGear = SAME;
         world.advance(PLENTY);
         assertTrue(world.writes.isEmpty());

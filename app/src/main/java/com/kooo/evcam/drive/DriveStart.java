@@ -107,8 +107,13 @@ public final class DriveStart {
     private volatile int generation;
     /** 屏幕此刻亮着（{@link #resumeAfterExit} 看）。 */
     private boolean lit;
-    /** 哪一遍在临写之前从车上读到了不是 P 的挡位（{@link #stillWanted} 在写车的线程上记）；没有是 -1。 */
+    /**
+     * 哪一遍在临写之前从车上读到了不是 P 的挡位（{@link #stillWanted} 在写车的线程上记）；没有是 -1。那一下现读的挡位、点火
+     * 一起记着：黑匣子那一行写的是它们，不是发布出来的（那时多半还是 P）。
+     */
     private volatile int leftParkGen = -1;
+    private volatile String leftParkGear;
+    private volatile Integer leftParkIgnition;
     private long startedAt;
     private int writes;
     private long lastWriteAt;
@@ -246,8 +251,8 @@ public final class DriveStart {
             if (leftParkGen == gen) {
                 // 从车上读到挂出 P 挡了：这一次上车不切了，之后挂回 P 挡也不切（不等发布出来的挡位跟上）
                 generation++;
-                world.gaveUp(DriveStartRules.Decision.LEFT_PARK, writes, world.linkConnected(), world.ignition(),
-                        world.gear(), lastWriteAt - startedAt);
+                world.gaveUp(DriveStartRules.Decision.LEFT_PARK, writes, world.linkConnected(), leftParkIgnition,
+                        leftParkGear, lastWriteAt - startedAt);
                 return;
             }
             // 别的原因（挡位、点火一时读不到，车刚断电）：隔一会儿再判，不马上再去写
@@ -265,6 +270,8 @@ public final class DriveStart {
      */
     private boolean stillWanted(int gen, int mode, long started, Integer liveIgnition, String liveGear) {
         if (liveGear != null && !"P".equals(liveGear)) {
+            leftParkGear = liveGear;
+            leftParkIgnition = liveIgnition;
             leftParkGen = gen;
         }
         return gen == generation && !world.userExited() && DriveStartRules.target(world.setting()) == mode
