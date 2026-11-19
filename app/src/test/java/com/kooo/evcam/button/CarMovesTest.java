@@ -305,7 +305,7 @@ public class CarMovesTest {
         assertEquals(CarMoves.Result.DONE, KnobTurn.DRIVER_SWEEP.dial.turn(car(f), 1));
         assertEquals(Integer.valueOf(1), f.get(SWEEPING, DRIVER));
         assertEquals(Integer.valueOf(1), f.get(CLIMATE_POWER, ROW_1));
-        assertEquals(Integer.valueOf(1), f.get(CLIMATE_POWER, DRIVER));
+        assertEquals(Integer.valueOf(0), f.get(CLIMATE_POWER, DRIVER));
         assertEquals(Integer.valueOf(BLOWING + 3), f.get(BLOWING, DRIVER));
         assertEquals(Integer.valueOf(1), f.get(AIRVENT, DRIVER));
     }
@@ -396,6 +396,7 @@ public class CarMovesTest {
         assertEquals(CarMoves.Result.DONE, KnobTurn.DRIVER_TEMP.dial.turn(car(f), 2));
         assertEquals(Float.valueOf(23f), f.floats.get(TEMP + "@" + DRIVER));
         assertEquals(Integer.valueOf(0), f.get(CLIMATE_POWER, DRIVER));
+        assertNull(f.get(CLIMATE_POWER, ROW_1));
         assertNull(f.floats.get(TEMP + "@" + PASSENGER));
     }
 
@@ -472,13 +473,23 @@ public class CarMovesTest {
     public void temperatureWritesBothFrontZonesAndOpensTheClimateFirst() {
         FakeCar car = new FakeCar();
         car.floats.put(TEMP + "@" + DRIVER, 22f);
-        car.set(CLIMATE_POWER, DRIVER, 1);
+        car.set(CLIMATE_POWER, ROW_1, 0);
+        car.set(CLIMATE_POWER, DRIVER, 0);
         car.set(CLIMATE_POWER, PASSENGER, 0);
         assertEquals(CarMoves.Result.DONE, run(car, CarMoves.temperature(2)));
         assertEquals(Float.valueOf(23f), car.floats.get(TEMP + "@" + DRIVER));
         assertEquals(Float.valueOf(23f), car.floats.get(TEMP + "@" + PASSENGER));
-        assertEquals(Integer.valueOf(1), car.get(CLIMATE_POWER, PASSENGER));
-        assertTrue(car.writes.indexOf(CLIMATE_POWER + "@" + PASSENGER + "=1") < car.writes.indexOf(TEMP + "@" + DRIVER + "=23.0"));
+        assertEquals(Integer.valueOf(1), car.get(CLIMATE_POWER, ROW_1));
+        assertEquals(Integer.valueOf(0), car.get(CLIMATE_POWER, DRIVER));
+        assertEquals(Integer.valueOf(0), car.get(CLIMATE_POWER, PASSENGER));
+        int power = car.writes.indexOf(CLIMATE_POWER + "@" + ROW_1 + "=1");
+        assertTrue(power >= 0 && power < car.writes.indexOf(TEMP + "@" + DRIVER + "=23.0"));
+
+        FakeCar on = new FakeCar();
+        on.floats.put(TEMP + "@" + DRIVER, 22f);
+        on.set(CLIMATE_POWER, ROW_1, 1);
+        assertEquals(CarMoves.Result.DONE, run(on, CarMoves.temperature(1)));
+        assertFalse(on.writes.contains(CLIMATE_POWER + "@" + ROW_1 + "=1"));
     }
 
     @Test
