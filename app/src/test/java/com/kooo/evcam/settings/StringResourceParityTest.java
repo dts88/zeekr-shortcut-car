@@ -56,7 +56,17 @@ public class StringResourceParityTest {
     private static final Pattern PLURAL_PLACEHOLDER = Pattern.compile("%(\\d\\$)?[sd]");
 
     /** 翻译目录。新增一种语言时，这里和 xml/locales_config.xml 一起改。 */
-    private static final String[] TRANSLATIONS = {"values-en", "values-ms"};
+    private static final String[] TRANSLATIONS = {"values-en", "values-ms", "values-ar"};
+
+    /**
+     * 复数要写全的那几种说法（Android 照 CLDR 的复数规则挑）。阿拉伯语六种都有：0、1、2、3–10、11–99、其余；
+     * 少写一种，那个数量就落到 other 上，读起来是错的语法。没列的语言只要求有 other。
+     */
+    private static final Map<String, String[]> QUANTITIES = new LinkedHashMap<>();
+
+    static {
+        QUANTITIES.put("values-ar", new String[]{"zero", "one", "two", "few", "many", "other"});
+    }
 
     /** 只有中文（values-zh）和英文（values，默认）两份的文件。 */
     private static final String[] ZH_EN_ONLY = {"strings_about.xml"};
@@ -99,7 +109,7 @@ public class StringResourceParityTest {
     /**
      * 复数（{@code <plurals>}）同样要每种语言都有、占位符对得上。
      *
-     * <p>中文和马来文只有 {@code other} 一条，英文另有 {@code one}。每种语言都必须有 {@code other}
+     * <p>中文和马来文只有 {@code other} 一条，英文另有 {@code one}，阿拉伯文六种都写（{@link #QUANTITIES}）。每种语言都必须有 {@code other}
      * （任何数量都能落到它）；{@code other} 的占位符要和中文的一致，其他条目不能多出中文没有的占位符
      * （{@code one} 可以不写数字，但不能多要参数）。</p>
      */
@@ -131,6 +141,11 @@ public class StringResourceParityTest {
             for (Map.Entry<String, Map<String, String>> entry : zh.entrySet()) {
                 TreeSet<String> expected = pluralPlaceholders(entry.getValue().get("other"));
                 Map<String, String> items = other.get(entry.getKey());
+                for (String quantity : QUANTITIES.getOrDefault(dir, new String[0])) {
+                    if (!items.containsKey(quantity)) {
+                        mismatched.add(entry.getKey() + "/" + quantity + "（缺）");
+                    }
+                }
                 if (!items.containsKey("other")
                         || !pluralPlaceholders(items.get("other")).equals(expected)) {
                     mismatched.add(entry.getKey() + "/other");
@@ -141,7 +156,7 @@ public class StringResourceParityTest {
                     }
                 }
             }
-            assertTrue("这些复数条目和 " + dir + " 的占位符不一致，运行期格式化会出错: "
+            assertTrue("这些复数条目在 " + dir + " 里缺了说法，或者占位符不一致（运行期格式化会出错）: "
                     + mismatched, mismatched.isEmpty());
         }
     }
@@ -162,12 +177,68 @@ public class StringResourceParityTest {
                 assertTrue(name + " 里 " + entry.getKey() + " 的中英占位符不一致",
                         placeholders(entry.getValue()).equals(placeholders(en.get(entry.getKey()))));
             }
-            for (String dir : new String[]{"values", "values-en", "values-ms"}) {
+            for (String dir : stringDirs(false)) {
                 TreeSet<String> twice = new TreeSet<>(en.keySet());
                 twice.retainAll(parse(new File(module, "src/main/res/" + dir + "/strings.xml")).keySet());
                 assertTrue(dir + "/strings.xml 里又出现了只做中英两份的条目: " + twice, twice.isEmpty());
             }
         }
+    }
+
+    /** 中文（values）和每一份翻译；{@code withZhOnly} 时再加上只放中文长文字的 values-zh。 */
+    private static List<String> stringDirs(boolean withZhOnly) {
+        List<String> dirs = new ArrayList<>();
+        dirs.add("values");
+        dirs.addAll(java.util.Arrays.asList(TRANSLATIONS));
+        if (withZhOnly) {
+            dirs.add("values-zh");
+        }
+        return dirs;
+    }
+
+    /**
+     * 界面上的数字一律 0–9（项目所有者 2026-11-18，ui-text-style §4）：阿拉伯文翻译里不写 ٠–٩，
+     * 任何一份都不写全角数字这类别的数字。
+     */
+    @Test
+    public void everyLanguageWritesDigits0to9() throws IOException {
+        File module = findModuleRoot();
+        assumeTrue("定位不到模块根目录，跳过", module != null);
+        List<String> offenders = new ArrayList<>();
+        for (String dir : stringDirs(true)) {
+            File[] files = new File(module, "src/main/res/" + dir).listFiles(
+                    (d, n) -> n.startsWith("strings") && n.endsWith(".xml"));
+            if (files == null) {
+                continue;
+            }
+            for (File file : files) {
+                String text = new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8);
+                for (Map.Entry<String, String> entry : parse(file).entrySet()) {
+                    if (otherDigits(entry.getValue())) {
+                        offenders.add(dir + ":" + entry.getKey());
+                    }
+                }
+                for (Map.Entry<String, Map<String, String>> plural : parsePlurals(file).entrySet()) {
+                    for (Map.Entry<String, String> item : plural.getValue().entrySet()) {
+                        if (otherDigits(item.getValue())) {
+                            offenders.add(dir + ":" + plural.getKey() + "/" + item.getKey());
+                        }
+                    }
+                }
+                assertTrue(file + " 是空的", !text.isEmpty());
+            }
+        }
+        assertTrue("这些字符串里有 0–9 以外的数字: " + offenders, offenders.isEmpty());
+    }
+
+    private static boolean otherDigits(String text) {
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (Character.isDigit(c) && (c < '0' || c > '9')) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static TreeSet<String> placeholders(String text) {
@@ -249,7 +320,7 @@ public class StringResourceParityTest {
 
         List<String> offenders = new ArrayList<>();
         List<File> files = new ArrayList<>();
-        for (String dir : new String[]{"values", "values-en", "values-ms", "values-zh"}) {
+        for (String dir : stringDirs(true)) {
             File[] inDir = new File(module, "src/main/res/" + dir).listFiles(
                     (d, n) -> n.startsWith("strings") && n.endsWith(".xml"));
             if (inDir != null) {

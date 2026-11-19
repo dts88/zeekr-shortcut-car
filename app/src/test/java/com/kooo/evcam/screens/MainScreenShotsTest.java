@@ -88,6 +88,33 @@ public class MainScreenShotsTest {
         assertEquals(ltr[1], rtl[1]);
     }
 
+    /**
+     * 抽屉永远从左边滑出（菜单键在左上），从右往左的语言里也一样（项目所有者 2026-11-19；ui-spec §十七）。
+     * 里面的条目跟着语言。阿拉伯语那张给人看。
+     */
+    @Test
+    public void theDrawerOpensFromTheLeftRightToLeft() {
+        for (String[] run : new String[][]{{Shots.DAY_RTL, "main-drawer-day-rtl"}, {Shots.DAY_AR, "main-drawer-day-ar"}}) {
+            RuntimeEnvironment.setQualifiers(run[0]);
+            ShotActivity activity = Robolectric.buildActivity(ShotActivity.class).setup().get();
+            Shots.stillFrames(activity);
+            ViewGroup frame = activity.findViewById(activity.container);
+            activity.getLayoutInflater().inflate(R.layout.activity_main_zeekr_7x, frame, true);
+            assertEquals(View.LAYOUT_DIRECTION_RTL, frame.getLayoutDirection());
+            com.kooo.evcam.ui.NavDrawer.attach(activity, R.id.nav_recording, itemId -> { }).open();
+            Shots.settle();
+            Shots.save(activity, run[1]);
+            int[] at = new int[2];
+            frame.findViewById(R.id.nav_view).getLocationInWindow(at);
+            assertEquals("抽屉从左边出", 0, at[0]);
+        }
+    }
+
+    @Test
+    public void mainScreenRecordingInArabic() {
+        shoot(Shots.DAY_AR, "day-ar", true);
+    }
+
     /** 主界面（{@code layout}）放进一个跟着语言方向的容器里，画一张；返回动作栏在窗口里的位置。 */
     private static int[] railAt(int layout, String qualifiers, String shot, int outside) {
         RuntimeEnvironment.setQualifiers(qualifiers);

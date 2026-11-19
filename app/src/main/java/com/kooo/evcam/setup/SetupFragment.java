@@ -319,7 +319,7 @@ public class SetupFragment extends Fragment implements StorageState.Listener {
 
     // ------------------------------------------------------------------ 每一步的内容
 
-    /** 语言：四样一列，选了马上生效（语言真变了，系统重建界面，回到这一步）。 */
+    /** 语言：一样一行，选了马上生效（语言真变了，系统重建界面，回到这一步）。 */
     private void language() {
         SettingSpec spec = SettingsRegistry.LANGUAGE;
         String current = spec.sanitize(config.getLanguageMode());
@@ -330,6 +330,8 @@ public class SetupFragment extends Fragment implements StorageState.Listener {
         for (int i = 0; i < values.length; i++) {
             String value = values[i];
             View card = choice(list, spec.label(requireContext(), value), null, null);
+            // 语言名各用各的文字写：对齐跟着界面方向，不跟着名字本身（从右往左时 English 也靠右）
+            ((TextView) card.findViewById(R.id.setup_choice_title)).setTextAlignment(View.TEXT_ALIGNMENT_VIEW_START);
             card.setActivated(value.equals(current));
             card.setOnClickListener(v -> {
                 for (View other : cards) {

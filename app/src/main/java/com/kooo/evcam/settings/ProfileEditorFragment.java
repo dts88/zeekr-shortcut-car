@@ -411,9 +411,17 @@ public class ProfileEditorFragment extends Fragment {
                 + " · " + TargetBitrate.format(bitrate);
     }
 
+    /**
+     * 尺寸「宽×高」。最前面加一个从左往右的标记（U+200E）：从右往左的语言里，「×」两边的数字不然会对调，
+     * 显示成「高×宽」（ui-spec §十七）。别的语言里看不见。
+     */
+    static String sizeText(int width, int height) {
+        return "\u200E" + width + "×" + height;
+    }
+
     private String landingSize(CameraProfile camera, int[] source) {
         EncodeSize landing = landingFor(camera, source);
-        return landing.width + "×" + landing.height;
+        return sizeText(landing.width, landing.height);
     }
 
     private EncodeSize landingFor(CameraProfile camera, int[] source) {
@@ -668,13 +676,13 @@ public class ProfileEditorFragment extends Fragment {
             return sb.toString();
         }
         sb.append(" · ").append(getString(R.string.editor_per_cell,
-                source[0] + "×" + (source[1] / 4)));
+                sizeText(source[0], source[1] / 4)));
         // 落盘尺寸要走拆分几何，而几何认的是相机 id：相机还没起来时算不出来，
         // 那就不写 —— 编一个数比不写更糟
         if (StreamLayoutTable.compositeCameraId() != null) {
             EncodeSize landing = landingFor(camera, source);
             sb.append(" · ").append(getString(R.string.editor_landing,
-                    landing.width + "×" + landing.height));
+                    sizeText(landing.width, landing.height)));
         }
         return sb.toString();
     }
@@ -691,7 +699,7 @@ public class ProfileEditorFragment extends Fragment {
                 ? camera.photo : camera.preview;
         int[] size = resolvedSource(camera.role, used);
         return size == null ? getString(R.string.editor_resolved_by_camera)
-                : size[0] + "×" + size[1];
+                : sizeText(size[0], size[1]);
     }
 
     /** 「自动 → 1280x5140」这种写法：意图在前，解出来的数在后。 */
@@ -772,11 +780,11 @@ public class ProfileEditorFragment extends Fragment {
                 continue;
             }
             String text = size[0] + "x" + size[1] + "   "
-                    + getString(R.string.editor_per_cell, size[0] + "×" + (size[1] / 4));
+                    + getString(R.string.editor_per_cell, sizeText(size[0], size[1] / 4));
             if (compositeId != null) {
                 EncodeSize landing = EncodeSize.forSource(compositeId, size[0], size[1], grid);
                 text += " · " + getString(R.string.editor_landing,
-                        landing.width + "×" + landing.height);
+                        sizeText(landing.width, landing.height));
             }
             labels.add(text);
         }
