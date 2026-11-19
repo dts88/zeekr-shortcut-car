@@ -15,7 +15,6 @@ import static org.junit.Assert.assertTrue;
 import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.button.CarMoves;
 import com.kooo.evcam.drive.ClimateOnRules.Decision;
-import com.kooo.evcam.drive.ClimateOnRules.Track;
 import com.kooo.evcam.settings.SettingsRegistry;
 
 import org.junit.Test;
@@ -23,15 +22,15 @@ import org.junit.Test;
 /** 前排空调重新打开后恢复循环模式、二排空调的规矩（{@link ClimateOnRules}）。 */
 public class ClimateOnRulesTest {
 
-    private static Track after(boolean awaiting, Integer... powers) {
-        Track track = Track.start(awaiting);
+    private static OffOn after(boolean awaiting, Integer... powers) {
+        OffOn track = OffOn.start(awaiting);
         for (Integer power : powers) {
             track = track.next(power);
         }
         return track;
     }
 
-    private static Decision decide(Track track) {
+    private static Decision decide(OffOn track) {
         return ClimateOnRules.decide(track, 0, 0);
     }
 
@@ -76,7 +75,7 @@ public class ClimateOnRulesTest {
         assertEquals(Decision.WAIT, decide(after(true, 1, 0, 1)));
         assertEquals(Decision.WRITE, decide(after(true, 1, 1)));
         // 车没通电的那一会儿：连着的次数从头数，在等照旧
-        Track resumed = after(true, 1).unknown().next(1);
+        OffOn resumed = after(true, 1).unknown().next(1);
         assertTrue(resumed.awaiting);
         assertEquals(Decision.WAIT, decide(resumed));
         assertEquals(Decision.WRITE, decide(resumed.next(1)));
@@ -84,7 +83,7 @@ public class ClimateOnRulesTest {
 
     @Test
     public void staysDoneUntilTheClimateGoesOffAgain() {
-        Track done = after(false, 0, 0, 1, 1).done();
+        OffOn done = after(false, 0, 0, 1, 1).done();
         assertFalse(done.awaiting);
         assertEquals(Decision.WAIT, decide(done.next(1).next(1)));
         assertEquals(Decision.WRITE, decide(done.next(0).next(0).next(1).next(1)));
@@ -92,7 +91,7 @@ public class ClimateOnRulesTest {
 
     @Test
     public void retriesAFailedWriteAfterAGapUpToTheLimit() {
-        Track on = after(true, 1, 1);
+        OffOn on = after(true, 1, 1);
         assertEquals(Decision.WAIT, ClimateOnRules.decide(on, 1, ClimateOnRules.RETRY_MS - 1));
         assertEquals(Decision.WRITE, ClimateOnRules.decide(on, 1, ClimateOnRules.RETRY_MS));
         assertEquals(Decision.WRITE, ClimateOnRules.decide(on, ClimateOnRules.MAX_WRITES - 1, ClimateOnRules.RETRY_MS));

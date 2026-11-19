@@ -77,6 +77,7 @@ public class AppConfig {
     private static final String KEY_DRIVE_SOUND = "drive_sound";                   // 模拟声浪（设置 → 系统，试验性）
     private static final String KEY_DRIVE_SOUND_STANDARD = "drive_sound_standard"; // 模拟声浪：标准模式下播放（默认关）
     private static final String KEY_REAR_CLIMATE_AT_CLIMATE_ON = "rear_climate_at_climate_on";  // 空调重新打开后打开二排空调（默认关）
+    private static final String KEY_HILL_DESCENT_AT_START = "hill_descent_at_start";  // 每次上车能用时打开陡坡缓降（默认关）
     private static final String KEY_GPU_FISHEYE_PREVIEW = "gpu_fisheye_preview";  // 预览鱼眼校正走 GPU 逐像素（开发者选项）
     private static final String KEY_GPU_FISHEYE_VIDEO = "gpu_fisheye_video";      // 视频回看鱼眼校正走 GPU 逐像素（开发者选项）
     private static final String KEY_PLAYBACK_READ_DURATIONS = "playback_read_durations";  // 录像回放逐个读取片段时长（开发者选项）
@@ -1291,6 +1292,18 @@ public class AppConfig {
 
     public void setRearClimateAtClimateOn(boolean on) {
         prefs.edit().putBoolean(KEY_REAR_CLIMATE_AT_CLIMATE_ON, on).apply();
+    }
+
+    /**
+     * 每次上车、陡坡缓降能用了就把它打开（issue 138，默认关）：上电后它用不了，挂过 D 挡才能用（澳洲 7X 车主实测，PR 145）；
+     * 打开一次之后手动关掉的不动（{@code drive.HillDescent}）。设置页里还没有这一行：放在哪、叫什么等项目所有者定。
+     */
+    public boolean isHillDescentAtStart() {
+        return readBoolean(KEY_HILL_DESCENT_AT_START, false);
+    }
+
+    public void setHillDescentAtStart(boolean on) {
+        prefs.edit().putBoolean(KEY_HILL_DESCENT_AT_START, on).apply();
     }
 
     /**

@@ -84,7 +84,7 @@ public final class ClimateOn {
     private final World world;
     /** 每开始读、停一次加一：排着的那一下、晚到的读车写车结果对不上就不算。 */
     private int generation;
-    private ClimateOnRules.Track track = ClimateOnRules.Track.start(false);
+    private OffOn track = OffOn.start(false);
     /** 读车、写车还没回话。 */
     private boolean busy;
     private int writes;
@@ -129,7 +129,7 @@ public final class ClimateOn {
         int gen = ++generation;
         busy = false;
         writes = 0;
-        track = ClimateOnRules.Track.start(world.awaitingClimateOn());
+        track = OffOn.start(world.awaitingClimateOn());
         tick(gen);
     }
 
@@ -217,7 +217,7 @@ public final class ClimateOn {
 
     /** 两项设置都关着：什么都不记着，再打开设置时从头看。 */
     private void forget() {
-        track = ClimateOnRules.Track.start(false);
+        track = OffOn.start(false);
         writes = 0;
         world.setAwaitingClimateOn(false);
     }

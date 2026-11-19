@@ -71,6 +71,7 @@ public class CarMovesTest {
     private static final int REGEN = 0xCC00;
     private static final int WINDOW_POS = 0xCD00;
     private static final int DEFROST_FRONT = 0xCE00;
+    private static final int HILL_DESCENT = 0xCF00;
     private static final int AMBIENT_MAIN = 0xD100;
     private static final int AMBIENT_TOP = 0xD200;
 
@@ -202,6 +203,7 @@ public class CarMovesTest {
             functions.put("IVehicle.SETTING_FUNC_ENERGY_REGENERATION", REGEN);
             functions.put("IBcm.BCM_FUNC_WINDOW_POS", WINDOW_POS);
             functions.put("IHvac.HVAC_FUNC_DEFROST_FRONT_MAX", DEFROST_FRONT);
+            functions.put("IADAS.SETTING_FUNC_HDC_SWITCH", HILL_DESCENT);
             functions.put("IAmbienceLight.SETTING_FUNC_AMBIENCE_LIGHT_MAINZONES_COLOR_SET", AMBIENT_MAIN);
             functions.put("IAmbienceLight.SETTING_FUNC_AMBIENCE_LIGHT_TOPZONES_COLOR_SET", AMBIENT_TOP);
         }
@@ -901,6 +903,53 @@ public class CarMovesTest {
         assertEquals(1, (int) CarMoves.frontClimatePower(car(car)));
         car.set(CLIMATE_POWER, ROW_1, 0);
         assertEquals(0, (int) CarMoves.frontClimatePower(car(car)));
+    }
+
+    // ---- 陡坡缓降能用时打开它（issue 138）
+
+    /** 能不能用照车机说的：active 是能，notactive 是不能，别的、问不了是 null。 */
+    @Test
+    public void hillDescentAvailabilityFollowsTheHeadUnit() {
+        FakeCar car = new FakeCar();
+        String key = HILL_DESCENT + "@" + ALL;
+        assertEquals(1, (int) CarMoves.hillDescentAvailable(car(car)));
+        car.statuses.put(key, "FunctionStatus.active");
+        assertEquals(1, (int) CarMoves.hillDescentAvailable(car(car)));
+        car.statuses.put(key, "notactive");
+        assertEquals(0, (int) CarMoves.hillDescentAvailable(car(car)));
+        car.statuses.put(key, "FunctionStatus.notactive");
+        assertEquals(0, (int) CarMoves.hillDescentAvailable(car(car)));
+        car.statuses.put(key, "notavailable");
+        assertNull(CarMoves.hillDescentAvailable(car(car)));
+        car.statuses.put(key, "error");
+        assertNull(CarMoves.hillDescentAvailable(car(car)));
+        car.statuses.put(key, null);
+        assertNull(CarMoves.hillDescentAvailable(car(car)));
+    }
+
+    /** 能用、关着才写开（不带区域）；已经开着不写；车机说用不了不写、是做不了。 */
+    @Test
+    public void hillDescentIsSwitchedOnOnlyWhenTheHeadUnitSaysItCan() {
+        FakeCar car = new FakeCar();
+        car.values.put(String.valueOf(HILL_DESCENT), 0);
+        assertEquals(CarMoves.Result.DONE, run(car, CarMoves.hillDescentOn()));
+        assertEquals(HILL_DESCENT + "=1", car.writes.get(0));
+        assertEquals(1, (int) car.read(HILL_DESCENT));
+
+        car.writes.clear();
+        assertEquals(CarMoves.Result.DONE, run(car, CarMoves.hillDescentOn()));
+        assertTrue(car.writes.isEmpty());
+
+        FakeCar notYet = new FakeCar();
+        notYet.values.put(String.valueOf(HILL_DESCENT), 0);
+        notYet.statuses.put(HILL_DESCENT + "@" + ALL, "notactive");
+        assertEquals(CarMoves.Result.UNAVAILABLE, run(notYet, CarMoves.hillDescentOn()));
+        assertTrue(notYet.writes.isEmpty());
+
+        FakeCar ignoring = new FakeCar();
+        ignoring.values.put(String.valueOf(HILL_DESCENT), 0);
+        ignoring.applies = false;
+        assertEquals(CarMoves.Result.NO_CHANGE, run(ignoring, CarMoves.hillDescentOn()));
     }
 
     // ---- 后雾灯闪烁（jlunnn 的 PR #160，从 7X-U 搬来）

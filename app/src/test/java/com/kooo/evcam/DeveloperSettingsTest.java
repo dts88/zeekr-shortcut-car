@@ -94,7 +94,7 @@ public class DeveloperSettingsTest {
             "drive_sound_style", "drive_sound_output",
             "drive_sound_view", "drive_sound_rpm", "drive_sound_gearbox",
             "drive_sound_exterior_volume", "drive_sound_standard", "drive_mode_at_start",
-            "circulation_at_climate_on", "rear_climate_at_climate_on",
+            "circulation_at_climate_on", "rear_climate_at_climate_on", "hill_descent_at_start",
             "video_storage_limit_gb", "photo_storage_limit_gb", "custom_sd_card_path",
             "exposure_compensation", "awb_mode", "car_model", "side_view_enabled", "side_view_min_speed",
             "side_view_mode", "side_view_place_height", "side_view_place_edge",

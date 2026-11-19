@@ -49,8 +49,9 @@ import java.util.function.Consumer;
  *
  * <p>判断和换值都在 {@link Car} 和下面的纯函数里，测试换上假的车辆接口（{@code CarMovesTest}）。</p>
  *
- * <p>上车时切驾驶模式（{@code drive.DriveStart}）、空调重新打开后恢复循环模式和二排空调（{@code drive.ClimateOn}）不是按键按的
- * （issue 138），写车也走这里（{@link #driveModeAtStart}、{@link #restoreClimate}）：排在同一条线程上，和按键的动作一件一件做。</p>
+ * <p>上车时切驾驶模式（{@code drive.DriveStart}）、空调重新打开后恢复循环模式和二排空调（{@code drive.ClimateOn}）、陡坡缓降能用时
+ * 打开它（{@code drive.HillDescent}）不是按键按的（issue 138），读写车也走这里（{@link #driveModeAtStart}、{@link #restoreClimate}、
+ * {@link #restoreHillDescent}）：排在同一条线程上，和按键的动作一件一件做。</p>
  */
 public final class CarMoves {
 
@@ -180,7 +181,7 @@ public final class CarMoves {
 
     /** 这一件是谁要做的：黑匣子那一行开头照它写。 */
     private enum By {
-        BUTTON, FLOATING, DRIVE_START, CLIMATE_ON
+        BUTTON, FLOATING, DRIVE_START, CLIMATE_ON, HILL_DESCENT
     }
 
     private static void run(Context app, By by, String key, Job job, Consumer<Result> done) {
@@ -203,7 +204,7 @@ public final class CarMoves {
                 }
                 detail = car.detail();
             }
-            BlackBox.note((by == By.DRIVE_START ? "上车设置 " : by == By.CLIMATE_ON ? "空调设置 "
+            BlackBox.note((by == By.DRIVE_START || by == By.HILL_DESCENT ? "上车设置 " : by == By.CLIMATE_ON ? "空调设置 "
                     : by == By.FLOATING ? "悬浮按钮动作 " : "灵动贴动作 ") + key + "：" + result + "（" + detail + "）");
             Result r = result;
             back.post(() -> done.accept(r));
@@ -248,6 +249,82 @@ public final class CarMoves {
             Integer p = power;
             back.post(() -> seen.accept(p));
         });
+    }
+
+    /**
+     * 陡坡缓降能用时打开它（{@code drive.HillDescent}，主线程上叫）：车机说能用（active）、读到关着才写开；已经开着算做成。
+     * 什么时候写由 {@code drive.HillDescentRules} 定；黑匣子记「上车设置 hill_descent：…」。结果在主线程上交给 {@code done}。
+     */
+    public static void restoreHillDescent(Context app, Consumer<Result> done) {
+        run(app, By.HILL_DESCENT, "hill_descent", hillDescentOn(), done);
+    }
+
+    /**
+     * 陡坡缓降此刻能不能用（{@code drive.HillDescent} 每秒问一次，主线程上叫）：在写车的线程上问车机，答案在主线程上交给
+     * {@code seen}（1 能用、0 用不了、问不了 null，{@link #hillDescentAvailable(Car)}）。只读，不记黑匣子。
+     */
+    public static void hillDescentAvailable(Consumer<Integer> seen) {
+        Handler h = handler();
+        Handler back = main;
+        h.post(() -> {
+            CarAccess access = Telemetry.get().carAccess();
+            Integer available = null;
+            if (access != null) {
+                try {
+                    available = hillDescentAvailable(new Car(access, SYSTEM_NAMES, SystemClock::sleep, null, null));
+                } catch (RuntimeException e) {
+                    available = null;
+                }
+            }
+            Integer a = available;
+            back.post(() -> seen.accept(a));
+        });
+    }
+
+    /**
+     * 陡坡缓降的开关车机说能不能用：active 是 1；notactive 是 0（ACC 时、上电后还没挂过 D 挡时是它，澳洲 7X 车主实测，PR 145；
+     * 车机把出错也报成它）；别的（notavailable：这台车没有；问不了；这台车机没有这个号）是 null。
+     */
+    static Integer hillDescentAvailable(Car c) {
+        Integer id = c.function("SETTING_FUNC_HDC_SWITCH", "IADAS");
+        if (id == null) {
+            return null;
+        }
+        String status = c.access.status(id, c.all());
+        if (active(status)) {
+            return 1;
+        }
+        if (status != null) {
+            String s = status.trim().toLowerCase(Locale.US);
+            if (s.equals("notactive") || s.endsWith(".notactive")) {
+                return 0;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 打开陡坡缓降（{@link #restoreHillDescent}）：照车主实测过的写法，不带区域读写，0 关 1 开。车机说不能用（不是 active）不写、
+     * 是做不了；读到已经开着不写、算做成。写了读回第一下可能还是 0，{@link Car#setPlain} 等得到。
+     */
+    static Job hillDescentOn() {
+        return c -> {
+            Integer id = c.function("SETTING_FUNC_HDC_SWITCH", "IADAS");
+            if (id == null) {
+                return Result.UNAVAILABLE;
+            }
+            String status = c.access.status(id, c.all());
+            if (!active(status)) {
+                c.note("hill descent " + status);
+                return Result.UNAVAILABLE;
+            }
+            Integer cur = c.access.read(id);
+            if (cur != null && cur == 1) {
+                c.note("hill descent already on");
+                return Result.DONE;
+            }
+            return c.setPlain(id, 1);
+        };
     }
 
     /** 前排空调的电源：按排读（{@link CarNames#ROW_1}），同 {@link #openClimate}。 */
