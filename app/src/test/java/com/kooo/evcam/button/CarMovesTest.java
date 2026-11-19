@@ -811,27 +811,29 @@ public class CarMovesTest {
     public void driveModeUnlessAlreadyWritesOnlyWhenTheCarIsInAnotherMode() {
         FakeCar car = new FakeCar();
         car.values.put(String.valueOf(Signal.DRIVE_MODE.id), Signal.DRIVE_MODE_COMFORT);
-        assertEquals(CarMoves.Result.DONE, run(car, CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_COMFORT, gear -> true)));
+        assertEquals(CarMoves.Result.DONE,
+                run(car, CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_COMFORT, (ignition, gear) -> true)));
         assertTrue(car.writes.isEmpty());
 
         car.values.put(String.valueOf(Signal.DRIVE_MODE.id), Signal.DRIVE_MODE_STANDARD);
-        assertEquals(CarMoves.Result.DONE, run(car, CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_COMFORT, gear -> true)));
+        assertEquals(CarMoves.Result.DONE,
+                run(car, CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_COMFORT, (ignition, gear) -> true)));
         assertEquals(Signal.DRIVE_MODE.id + "=" + Signal.DRIVE_MODE_COMFORT, car.writes.get(0));
         assertEquals(Signal.DRIVE_MODE_COMFORT, (int) car.read(Signal.DRIVE_MODE.id));
 
         FakeCar unread = new FakeCar();
         assertEquals(CarMoves.Result.DONE,
-                run(unread, CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_SPORT, gear -> true)));
+                run(unread, CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_SPORT, (ignition, gear) -> true)));
         assertEquals(1, unread.writes.size());
 
         FakeCar refusing = new FakeCar();
         refusing.acceptPlain = false;
         assertEquals(CarMoves.Result.UNAVAILABLE,
-                run(refusing, CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_SPORT, gear -> true)));
+                run(refusing, CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_SPORT, (ignition, gear) -> true)));
         FakeCar ignoring = new FakeCar();
         ignoring.applies = false;
         assertEquals(CarMoves.Result.NO_CHANGE,
-                run(ignoring, CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_SPORT, gear -> true)));
+                run(ignoring, CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_SPORT, (ignition, gear) -> true)));
     }
 
     /** 轮到写的时候说不要了（排队时挂出了 P 挡）：不写，是 MOVING；已经是设置的那个模式照样算做成。 */
@@ -840,13 +842,13 @@ public class CarMovesTest {
         FakeCar car = new FakeCar();
         car.values.put(String.valueOf(Signal.DRIVE_MODE.id), Signal.DRIVE_MODE_STANDARD);
         assertEquals(CarMoves.Result.MOVING,
-                run(car, CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_COMFORT, gear -> false)));
+                run(car, CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_COMFORT, (ignition, gear) -> false)));
         assertTrue(car.writes.isEmpty());
         assertEquals(Signal.DRIVE_MODE_STANDARD, (int) car.read(Signal.DRIVE_MODE.id));
 
         car.values.put(String.valueOf(Signal.DRIVE_MODE.id), Signal.DRIVE_MODE_COMFORT);
         assertEquals(CarMoves.Result.DONE,
-                run(car, CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_COMFORT, gear -> false)));
+                run(car, CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_COMFORT, (ignition, gear) -> false)));
         assertTrue(car.writes.isEmpty());
     }
 
@@ -878,11 +880,13 @@ public class CarMovesTest {
             }
         };
         car.values.put(String.valueOf(Signal.DRIVE_MODE.id), Signal.DRIVE_MODE_STANDARD);
-        assertEquals(CarMoves.Result.DONE, run(car, CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_COMFORT, gear -> {
-            order.add("ask");
-            return inPark[0] && "P".equals(gear);
-        })));
-        assertEquals("写之前：读驾驶模式、现读挡位、问、写", Arrays.asList("read", "gear", "ask", "write"), order.subList(0, 4));
+        assertEquals(CarMoves.Result.DONE, run(car, CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_COMFORT,
+                (ignition, gear) -> {
+                    order.add("ask");
+                    return inPark[0] && "P".equals(gear);
+                })));
+        assertEquals("写之前：读驾驶模式、现读点火、现读挡位、问、写",
+                Arrays.asList("read", "read", "gear", "ask", "write"), order.subList(0, 5));
 
         // 写之前的那一次读车时挂出了 P 挡：读完再问，问到的是不在 P 挡，不写
         FakeCar shifting = new FakeCar() {
@@ -894,7 +898,7 @@ public class CarMovesTest {
         };
         shifting.values.put(String.valueOf(Signal.DRIVE_MODE.id), Signal.DRIVE_MODE_STANDARD);
         assertEquals(CarMoves.Result.MOVING,
-                run(shifting, CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_COMFORT, gear -> inPark[0])));
+                run(shifting, CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_COMFORT, (ignition, gear) -> inPark[0])));
         assertTrue(shifting.writes.isEmpty());
     }
 
@@ -904,8 +908,10 @@ public class CarMovesTest {
         List<String> asked = new ArrayList<>();
         FakeCar car = new FakeCar();
         car.values.put(String.valueOf(Signal.DRIVE_MODE.id), Signal.DRIVE_MODE_STANDARD);
-        CarMoves.Job job = CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_COMFORT, gear -> {
+        car.values.put(String.valueOf(Signal.IGNITION.id), Signal.IGNITION_ON);
+        CarMoves.Job job = CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_COMFORT, (ignition, gear) -> {
             asked.add(String.valueOf(gear));
+            assertEquals("现读的点火也交过来", Signal.IGNITION_ON, (int) ignition);
             return "P".equals(gear);
         });
         car.gearEvent = GEAR_D;
@@ -1047,7 +1053,7 @@ public class CarMovesTest {
         assertEquals(CarMoves.Result.UNAVAILABLE, CarMoves.climateSettings(CarMoves.CIRCULATION_OUTER, true).run(blocked));
         assertEquals(CarMoves.Result.UNAVAILABLE, CarMoves.hillDescentOn().run(blocked));
         assertEquals(CarMoves.Result.UNAVAILABLE,
-                CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_SPORT, gear -> true).run(blocked));
+                CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_SPORT, (ignition, gear) -> true).run(blocked));
         assertTrue(none.writes.isEmpty());
     }
 

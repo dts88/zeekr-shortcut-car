@@ -21,8 +21,8 @@ import org.junit.Test;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.function.BiPredicate;
 import java.util.function.Consumer;
-import java.util.function.Predicate;
 
 /**
  * 上车时切驾驶模式的一遍怎么走（{@link DriveStart}）：钟、车辆信号、写车都是假的，只看什么时候写、写几次、什么时候算了。
@@ -30,6 +30,7 @@ import java.util.function.Predicate;
 public class DriveStartTest {
 
     private static final String SAME = "same as published";
+    private static final Integer SAME_IGNITION = Integer.MIN_VALUE;
 
     /** 假的外面：钟要 {@link #advance} 才走；写车照 {@link #results} 里排好的结果回话（排完了的都算成）。 */
     private static final class FakeWorld implements DriveStart.World {
@@ -43,6 +44,8 @@ public class DriveStartTest {
         String gear = "P";
         /** 写车的线程临写之前从车上现读的挡位；{@link #SAME} 是和发布出来的一样，null 是读不到。 */
         String liveGear = SAME;
+        /** 同上，现读的点火；{@link #SAME_IGNITION} 是和发布出来的一样。 */
+        Integer liveIgnition = SAME_IGNITION;
         Integer driveMode = Signal.DRIVE_MODE_STANDARD;
         boolean exited;
         /** 交给写车的线程几次。 */
@@ -119,12 +122,13 @@ public class DriveStartTest {
             return exited;
         }
 
-        /** 轮到写的时候（{@link #answer}，没拿在手里的就是当场）先拿现读的挡位问还要不要：不要了不写，是 MOVING。 */
+        /** 轮到写的时候（{@link #answer}，没拿在手里的就是当场）先拿现读的点火、挡位问还要不要：不要了不写，是 MOVING。 */
         @Override
-        public void write(int mode, Predicate<String> stillWanted, Consumer<CarMoves.Result> done) {
+        public void write(int mode, BiPredicate<Integer, String> stillWanted, Consumer<CarMoves.Result> done) {
             requests++;
             Runnable answer = () -> {
-                if (!stillWanted.test(SAME.equals(liveGear) ? gear : liveGear)) {
+                if (!stillWanted.test(SAME_IGNITION.equals(liveIgnition) ? ignition : liveIgnition,
+                        SAME.equals(liveGear) ? gear : liveGear)) {
                     done.accept(CarMoves.Result.MOVING);
                     return;
                 }
@@ -378,6 +382,77 @@ public class DriveStartTest {
         world.advance(PLENTY);
         assertTrue(world.writes.isEmpty());
         assertEquals(Collections.singletonList(DriveStartRules.Decision.LEFT_PARK), world.gaveUp);
+    }
+
+    /** 临写之前从车上读到 D 挡，隔一会儿再试之前又挂回了 P 挡：读到过挂出 P 挡，这一次上车就不切了。 */
+    @Test
+    public void aKnownShiftOutOfParkEndsTheDriveEvenIfParkComesBack() {
+        world.liveGear = "D";
+        start.screenWentLit();
+        world.advance(DriveStartRules.SETTLE_MS);
+        assertEquals(1, world.requests);
+        assertEquals(Collections.singletonList(DriveStartRules.Decision.LEFT_PARK), world.gaveUp);
+        world.liveGear = SAME;
+        world.advance(PLENTY);
+        assertTrue(world.writes.isEmpty());
+        assertEquals("不再试", 1, world.requests);
+    }
+
+    /** 发布出来的点火还是 ON、车上现读的已经是 ACC（刚断电），挡位 P：不写。 */
+    @Test
+    public void aStalePublishedIgnitionDoesNotLetTheWriteThrough() {
+        world.liveIgnition = Signal.IGNITION_ACC;
+        start.screenWentLit();
+        world.advance(DriveStartRules.SETTLE_MS);
+        assertEquals(1, world.requests);
+        assertTrue(world.writes.isEmpty());
+        world.liveIgnition = null;
+        world.advance(DriveStartRules.RETRY_MS);
+        assertTrue("读不到点火也不写", world.writes.isEmpty());
+        assertTrue(world.gaveUp.isEmpty());
+    }
+
+    /** 等到快到时限才排上的那一件，轮到时已经过了时限：不写。 */
+    @Test
+    public void aWriteQueuedBeforeTheDeadlineIsDroppedAfterIt() {
+        world.holdAnswers = true;
+        world.connected = false;
+        start.screenWentLit();
+        world.advance(DriveStartRules.WINDOW_MS - DriveStart.POLL_MS);
+        world.connected = true;
+        world.advance(DriveStart.POLL_MS);
+        assertEquals(1, world.requests);
+        world.advance(DriveStartRules.RETRY_MS);
+        world.answer();
+        assertTrue(world.writes.isEmpty());
+        world.advance(PLENTY);
+        assertTrue(world.writes.isEmpty());
+        assertEquals(Collections.singletonList(DriveStartRules.Decision.TIMED_OUT), world.gaveUp);
+    }
+
+    /** 排着的时候设置关掉了、改成了别的模式：排着的那一件不写；改成别的模式的，再判时照新的写。 */
+    @Test
+    public void aQueuedWriteIsDroppedWhenTheSettingChanges() {
+        world.holdAnswers = true;
+        start.screenWentLit();
+        world.advance(DriveStartRules.SETTLE_MS);
+        assertEquals(1, world.requests);
+        world.setting = AppConfig.DRIVE_MODE_AT_START_OFF;
+        world.answer();
+        world.advance(PLENTY);
+        assertTrue(world.writes.isEmpty());
+        assertTrue(world.gaveUp.isEmpty());
+
+        world.setting = AppConfig.DRIVE_MODE_AT_START_COMFORT;
+        start.screenWentDark();
+        start.screenWentLit();
+        world.advance(DriveStartRules.SETTLE_MS);
+        world.setting = AppConfig.DRIVE_MODE_AT_START_SPORT;
+        world.answer();
+        assertTrue("排着的是舒适，不写", world.writes.isEmpty());
+        world.holdAnswers = false;
+        world.advance(DriveStartRules.RETRY_MS);
+        assertEquals(Collections.singletonList(Signal.DRIVE_MODE_SPORT), world.writes);
     }
 
     /** 临写之前现读不到挡位：不写；一直读不到，隔一会儿再试、到头算了，一笔都没写。 */

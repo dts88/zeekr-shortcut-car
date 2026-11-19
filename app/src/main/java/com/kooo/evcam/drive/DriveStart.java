@@ -24,8 +24,8 @@ import com.kooo.evcam.telemetry.Signal;
 import com.kooo.evcam.telemetry.Telemetry;
 
 import java.util.Locale;
+import java.util.function.BiPredicate;
 import java.util.function.Consumer;
-import java.util.function.Predicate;
 
 /**
  * 上车时切到设置的驾驶模式（issue 138；{@code AppConfig.getDriveModeAtStart}，设置页里还没有这一行）：车每次通电后驾驶模式
@@ -82,10 +82,11 @@ public final class DriveStart {
         boolean userExited();
 
         /**
-         * 写车、读回，结果在主线程上交回来。写车排在别的线程上，轮到时可能已经过了几秒：临写之前在那条线程上现读一次挡位，
-         * 把挡位字母（读不到 null）交给 {@code stillWanted} 再问一次，说不要了就不写，结果是 {@link CarMoves.Result#MOVING}。
+         * 写车、读回，结果在主线程上交回来。写车排在别的线程上，轮到时可能已经过了几秒：临写之前在那条线程上现读一次点火、
+         * 一次挡位，把点火的原值、挡位字母（读不到 null）交给 {@code stillWanted} 再问一次，说不要了就不写，结果是
+         * {@link CarMoves.Result#MOVING}。
          */
-        void write(int mode, Predicate<String> stillWanted, Consumer<CarMoves.Result> done);
+        void write(int mode, BiPredicate<Integer, String> stillWanted, Consumer<CarMoves.Result> done);
 
         /** 这一次上车没切成（{@code why} 不是 WAIT、WRITE）：记一行。{@code sinceStartMs} 是算上车起过了多久。 */
         void gaveUp(DriveStartRules.Decision why, int writes, boolean connected, Integer ignition, String gear,
@@ -106,6 +107,8 @@ public final class DriveStart {
     private volatile int generation;
     /** 屏幕此刻亮着（{@link #resumeAfterExit} 看）。 */
     private boolean lit;
+    /** 哪一遍在临写之前从车上读到了不是 P 的挡位（{@link #stillWanted} 在写车的线程上记）；没有是 -1。 */
+    private volatile int leftParkGen = -1;
     private long startedAt;
     private int writes;
     private long lastWriteAt;
@@ -217,7 +220,9 @@ public final class DriveStart {
                 break;
             case WRITE:
                 writes++;
-                world.write(mode, liveGear -> stillWanted(gen, liveGear), result -> written(gen, mode, result));
+                long started = startedAt;
+                world.write(mode, (liveIgnition, liveGear) -> stillWanted(gen, mode, started, liveIgnition, liveGear),
+                        result -> written(gen, mode, result));
                 break;
             default:
                 generation++;
@@ -236,9 +241,16 @@ public final class DriveStart {
             return;
         }
         if (result == CarMoves.Result.MOVING) {
-            // 轮到写的时候已经不要了（stillWanted），没写：不算写过一次。隔一会儿再判 —— 发布出来的挡位这时多半还没跟上
-            // （现读的已经不是 P 挡），马上再判又会去写
+            // 轮到写的时候已经不要了（stillWanted），没写：不算写过一次
             writes--;
+            if (leftParkGen == gen) {
+                // 从车上读到挂出 P 挡了：这一次上车不切了，之后挂回 P 挡也不切（不等发布出来的挡位跟上）
+                generation++;
+                world.gaveUp(DriveStartRules.Decision.LEFT_PARK, writes, world.linkConnected(), world.ignition(),
+                        world.gear(), lastWriteAt - startedAt);
+                return;
+            }
+            // 别的原因（挡位、点火一时读不到，车刚断电）：隔一会儿再判，不马上再去写
             world.later(DriveStartRules.RETRY_MS, () -> step(gen));
             return;
         }
@@ -246,12 +258,17 @@ public final class DriveStart {
     }
 
     /**
-     * 写车的线程上、临写之前问：这一遍还作数、用户没退出、车还通着电、还挂着 P 挡。排队的那几秒里挂出了 P 挡的不写
-     * （{@link World#write}）。挡位看的是 {@code liveGear}：写车的线程刚从车上现读的（读不到 null，不写），不是发布出来的
-     * 那一份 —— 那一份合并发布，会晚几十毫秒。只读不改，哪个线程都能叫。
+     * 写车的线程上、临写之前问：这一遍还作数、用户没退出、设置里要的还是这个模式、没过等的时限、车还通着电、还挂着 P 挡。
+     * 排队的那几秒里挂出了 P 挡、断了电、改了设置、过了时限的不写（{@link World#write}）。点火、挡位看的是写车的线程刚从车上
+     * 现读的（{@code liveIgnition}、{@code liveGear}，读不到 null，不写），不是发布出来的那一份 —— 那一份合并发布，会晚几十毫秒。
+     * 读到了不是 P 的挡位记下来（{@link #leftParkGen}）：这一次上车就此不切。哪个线程都能叫。
      */
-    private boolean stillWanted(int gen, String liveGear) {
-        return gen == generation && !world.userExited() && DriveStartRules.powered(world.ignition())
+    private boolean stillWanted(int gen, int mode, long started, Integer liveIgnition, String liveGear) {
+        if (liveGear != null && !"P".equals(liveGear)) {
+            leftParkGen = gen;
+        }
+        return gen == generation && !world.userExited() && DriveStartRules.target(world.setting()) == mode
+                && world.now() - started <= DriveStartRules.WINDOW_MS && DriveStartRules.powered(liveIgnition)
                 && "P".equals(liveGear);
     }
 
@@ -322,7 +339,7 @@ public final class DriveStart {
         }
 
         @Override
-        public void write(int mode, Predicate<String> stillWanted, Consumer<CarMoves.Result> done) {
+        public void write(int mode, BiPredicate<Integer, String> stillWanted, Consumer<CarMoves.Result> done) {
             CarMoves.driveModeAtStart(app, mode, stillWanted, done);
         }
 
