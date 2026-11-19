@@ -37,6 +37,11 @@ import java.util.Locale;
  * <p>车机本来是什么语言，这个应用就该是什么语言 —— 这是不需要任何人做决定的默认。
  * 其余几档留给「系统语言和使用者的偏好不一致」的情况。</p>
  *
+ * <h3>系统语言没有翻译时用英文</h3>
+ *
+ * <p>跟随系统而系统语言不是中文、英文、马来文、阿拉伯文时，交给系统的是英文（项目所有者 2026-11-19）：
+ * 不指定的话，系统会落到默认资源（{@code values/}，中文）。系统语言一变就重新算，同下面的数字。</p>
+ *
  * <h3>界面数字一律 0–9</h3>
  *
  * <p>阿拉伯语默认写 ٠–٩，界面数字一律 0–9（项目所有者 2026-11-18，ui-text-style §4）。只在这里管：
@@ -88,13 +93,37 @@ public final class Languages {
     }
 
     /**
-     * 实际交给系统的语言标签：选了某种语言就是 {@link #tagsFor(String)}；跟随系统时，系统语言写 0–9 的是空
-     * （真正跟随），不写 0–9 的是系统语言加 {@code nu-latn}。纯函数，可以单独测。
+     * 实际交给系统的语言标签：选了某种语言就是 {@link #tagsFor(String)}；跟随系统时，系统语言没有翻译的是英文，
+     * 有翻译的见 {@link #digits0to9(Locale)}。纯函数，可以单独测。
      */
     public static String tagsFor(String mode, Locale system) {
         String tags = tagsFor(mode);
-        if (!tags.isEmpty() || system == null || writesDigits0to9(system)) {
+        if (!tags.isEmpty() || system == null) {
             return tags;
+        }
+        return translated(system) ? digits0to9(system) : tagsFor(ENGLISH);
+    }
+
+    /** 有没有这个语言的翻译：{@code values/} 是中文，另有 {@code values-en}、{@code values-ms}、{@code values-ar}（同 locales_config）。 */
+    static boolean translated(Locale locale) {
+        switch (locale.getLanguage()) {
+            case CHINESE:
+            case ENGLISH:
+            case MALAY:
+            case ARABIC:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * 照系统语言、数字写 0–9 的标签：系统语言本来写 0–9 的是空（真正跟随），不写的是系统语言加 {@code nu-latn}。
+     * 截图测试的空壳也照它套（{@code ShotActivity}）。
+     */
+    public static String digits0to9(Locale system) {
+        if (writesDigits0to9(system)) {
+            return "";
         }
         try {
             return new Locale.Builder().setLocale(system)
