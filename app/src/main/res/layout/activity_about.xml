@@ -20,9 +20,11 @@
     android:background="@color/bg"
     android:orientation="vertical">
 
+    <!-- ① 标题区不镜像：菜单 / 返回键永远在左上，标题紧跟着（ui-spec §十七） -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="@dimen/title_bar_height"
+        android:layoutDirection="ltr"
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingStart="10dp"

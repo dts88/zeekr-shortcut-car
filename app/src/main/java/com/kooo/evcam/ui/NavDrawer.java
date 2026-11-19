@@ -9,6 +9,7 @@ package com.kooo.evcam.ui;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.view.Gravity;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.SubMenu;
@@ -17,7 +18,6 @@ import android.widget.CompoundButton;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.core.view.GravityCompat;
 import androidx.drawerlayout.widget.DrawerLayout;
 
 import com.google.android.material.navigation.NavigationView;
@@ -35,6 +35,9 @@ import com.kooo.evcam.overlay.OverlayCoordinator;
  * 这里管行为：去别处的几项交给所在的界面（{@link Host}）。抽屉只管去哪 —— 原来的两行开关 4.0 起在主界面动作栏上
  * （{@link QuickSwitches}，项目所有者 2026-11-12）。
  * 亮着的一项是当前这个界面，由所在的界面定（{@link #select}）。</p>
+ *
+ * <p>永远从左边滑出：菜单键永远在左上，从右往左的语言里也一样（项目所有者 2026-11-19，ui-spec §十七），
+ * 所以用 {@link Gravity#LEFT}，不用 START。抽屉里的条目照旧跟着语言。</p>
  */
 public final class NavDrawer {
 
@@ -103,21 +106,21 @@ public final class NavDrawer {
         menu.setNavigationItemSelectedListener(item -> {
             int itemId = item.getItemId();
             host.onNavigate(itemId);
-            layout.closeDrawer(GravityCompat.START);
+            layout.closeDrawer(Gravity.LEFT);
             return false;   // 亮哪一项由所在的界面定（select）
         });
     }
 
     public void toggle() {
-        if (layout.isDrawerOpen(GravityCompat.START)) {
-            layout.closeDrawer(GravityCompat.START);
+        if (layout.isDrawerOpen(Gravity.LEFT)) {
+            layout.closeDrawer(Gravity.LEFT);
         } else {
-            layout.openDrawer(GravityCompat.START);
+            layout.openDrawer(Gravity.LEFT);
         }
     }
 
     public void open() {
-        layout.openDrawer(GravityCompat.START);
+        layout.openDrawer(Gravity.LEFT);
     }
 
     /** 锁住：从屏幕边上拉不开（初始设置在屏幕上时，那几步还没走完）；开着的先收起。 */
@@ -127,10 +130,10 @@ public final class NavDrawer {
 
     /** 开着就收起来，返回 true —— 返回键先收抽屉。 */
     public boolean closeIfOpen() {
-        if (!layout.isDrawerOpen(GravityCompat.START)) {
+        if (!layout.isDrawerOpen(Gravity.LEFT)) {
             return false;
         }
-        layout.closeDrawer(GravityCompat.START);
+        layout.closeDrawer(Gravity.LEFT);
         return true;
     }
 

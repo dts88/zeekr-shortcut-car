@@ -81,6 +81,10 @@ public class ZeekrShortcutApp extends Application {
         if (old != null) {
             com.kooo.evcam.blackbox.BlackBox.noteImportant("配置变化：" + describeChange(old, newConfig));
         }
+        // 系统语言变了：跟随系统时要跟上，数字照旧 0–9（Languages）
+        if (old == null || !old.getLocales().equals(newConfig.getLocales())) {
+            Languages.apply(new AppConfig(this).getLanguageMode());
+        }
     }
 
     /** 变了哪几项、从什么变成什么。只给维护者看，写英文字段名。 */

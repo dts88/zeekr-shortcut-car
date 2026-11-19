@@ -50,15 +50,33 @@ public class SettingsShotsTest {
         shoot(Shots.DAY_EN, "day-en");
     }
 
-    /** 从右往左的语言：设置这类文字界面跟着镜像 —— 左栏到了右边（行尾的 › 翻过来看图；ui-spec §十七）。 */
+    /**
+     * 从右往左的语言：设置这类文字界面跟着镜像 —— 左栏到了右边（行尾的 › 翻过来看图）；
+     * ① 标题区不镜像，菜单键还在左上、标题紧跟着（项目所有者 2026-11-19；ui-spec §十七）。
+     */
     @Test
     public void everySectionRightToLeft() {
-        ShotActivity activity = shoot(Shots.DAY_RTL, "day-rtl");
+        rightToLeft(shoot(Shots.DAY_RTL, "day-rtl"));
+    }
+
+    /** 阿拉伯语：同上，文字是阿拉伯文、数字 0–9。 */
+    @Test
+    public void everySectionInArabic() {
+        rightToLeft(shoot(Shots.DAY_AR, "day-ar"));
+    }
+
+    private static void rightToLeft(ShotActivity activity) {
         int[] headers = new int[2];
         int[] detail = new int[2];
         activity.findViewById(R.id.settings_headers).getLocationInWindow(headers);
         activity.findViewById(R.id.settings_detail).getLocationInWindow(detail);
         assertTrue("左栏到了右边：" + headers[0] + " / " + detail[0], headers[0] > detail[0]);
+        int[] nav = new int[2];
+        int[] title = new int[2];
+        activity.findViewById(R.id.settings_nav).getLocationInWindow(nav);
+        activity.findViewById(R.id.settings_title).getLocationInWindow(title);
+        assertTrue("菜单键在左上：" + nav[0], nav[0] < headers[0] / 4);
+        assertTrue("标题紧跟在菜单键右边：" + nav[0] + " / " + title[0], nav[0] < title[0]);
     }
 
     @Test

@@ -46,6 +46,12 @@ public class AboutShotsTest {
         shoot(Shots.DAY.replace("zh-rCN-", "en-"), "about-credits-en", "lelelolo", "Media3 ExoPlayer");
     }
 
+    /** 关于页没有阿拉伯文：阿拉伯语界面显示英文那份（同马来文；ui-text-style §5）。 */
+    @Test
+    public void creditsInArabicShowTheEnglishPage() {
+        shoot(Shots.DAY_AR, "about-credits-ar", "lelelolo", "Media3 ExoPlayer");
+    }
+
     private void shoot(String qualifiers, String name, String... mustContain) {
         RuntimeEnvironment.setQualifiers(qualifiers);
         AboutActivity activity = Robolectric.buildActivity(AboutActivity.class).setup().get();

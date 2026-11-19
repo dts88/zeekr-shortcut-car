@@ -1,6 +1,6 @@
 # 界面文字规范
 
-适用于界面上的全部文字：`values/`、`values-en/`、`values-ms/` 的 strings.xml，以及关于页（strings_about.xml）。
+适用于界面上的全部文字：`values/`、`values-en/`、`values-ms/`、`values-ar/` 的 strings.xml，以及关于页（strings_about.xml）。
 新写或修改任何界面文字之前，先查 §10 术语表；表里没有的概念，按本规范的语体和句式写，再补进表里。
 
 ---
@@ -72,6 +72,7 @@
 
 **英文**：单句片段不加句号，多句时每句都加；「，请重试」对应「. Try again」，整条按一句处理，末尾不加句号（Can't start recording. Try again）。不用 em dash，改用句号或冒号；界面名称不加引号；单引号在资源里写 `\'`。
 **马来文**：同英文（「. Cuba lagi」同上）。
+**阿拉伯文**：同英文（「. يُرجى إعادة المحاولة」同上）；逗号、分号、问号用 ، ؛ ؟（§7）。
 
 ---
 
@@ -94,27 +95,28 @@
 - 不写「在设置里」而不给路径。
 - 改名时必须搜一遍引用它的文字，包括其他字符串、代码注释和文档，一起改。
 - 英文、马来文不加引号，名称与界面一致：Settings → Storage → Storage location；Tap Start recording；Tetapan → Storan → Lokasi storan。
-- 关于页没有马来文，马来文界面显示英文；马来文文字引用关于页里的条目时写英文名（如 Safety notice）。
+- 阿拉伯文同样不加引号，层级之间用「 ← 」（指向阅读方向）：الإعدادات ← التخزين ← موقع التخزين。
+- 关于页没有马来文、阿拉伯文，这两种界面显示英文；它们的文字引用关于页里的条目时写英文名（如 Safety notice）。
 
 ---
 
 ## 6. 固定说法
 
-| 中文 | English | Bahasa Melayu |
-|---|---|---|
-| 重启应用后生效 | Takes effect after restarting the app | Berkuat kuasa selepas apl dimulakan semula |
-| 请重试 | Try again | Cuba lagi |
-| 无法（动作） | Can't (action) | Tidak dapat (…) |
-| （X）失败：（原因） | (X) failed: (reason) | (X) gagal: (sebab) |
-| 正在（动作）… | (Action)ing… | (kata kerja me- / ber-)…，如 Mengimbas… |
-| 已开启 / 已关闭 | On / Off | Dihidupkan / Dimatikan |
-| 需开启「X」 | Requires X | Memerlukan X |
-| 关闭后，…… | When off, … | Jika dimatikan, … |
-| 需开启开发者选项 | Requires developer options | Memerlukan pilihan pembangun |
-| 未检测到 U 盘 | No USB drive found | Tiada pemacu USB ditemui |
-| 暂无（对象） | No (objects) yet | Belum ada (…) |
-| 删除后无法恢复。 | This can't be undone. | Tindakan ini tidak boleh dibatalkan. |
-| 原因：无网络连接 / 连接超时 / 存储空间不足 / 文件不存在 | no network connection / connection timed out / not enough storage space / file not found | tiada sambungan rangkaian / sambungan tamat masa / ruang storan tidak cukup / fail tidak ditemui |
+| 中文 | English | Bahasa Melayu | العربية |
+|---|---|---|---|
+| 重启应用后生效 | Takes effect after restarting the app | Berkuat kuasa selepas apl dimulakan semula | يسري بعد إعادة تشغيل التطبيق |
+| 请重试 | Try again | Cuba lagi | يُرجى إعادة المحاولة |
+| 无法（动作） | Can't (action) | Tidak dapat (…) | تعذّر (…)，如 تعذّر بدء التسجيل |
+| （X）失败：（原因） | (X) failed: (reason) | (X) gagal: (sebab) | فشل (X): (السبب) |
+| 正在（动作）… | (Action)ing… | (kata kerja me- / ber-)…，如 Mengimbas… | جارٍ (…)…，如 جارٍ الفحص… |
+| 已开启 / 已关闭 | On / Off | Dihidupkan / Dimatikan | تشغيل / إيقاف |
+| 需开启「X」 | Requires X | Memerlukan X | يتطلب تشغيل X |
+| 关闭后，…… | When off, … | Jika dimatikan, … | عند الإيقاف، … |
+| 需开启开发者选项 | Requires developer options | Memerlukan pilihan pembangun | يتطلب تشغيل خيارات المطوّرين |
+| 未检测到 U 盘 | No USB drive found | Tiada pemacu USB ditemui | لم يتم اكتشاف محرك أقراص USB |
+| 暂无（对象） | No (objects) yet | Belum ada (…) | لا توجد (…) بعد |
+| 删除后无法恢复。 | This can't be undone. | Tindakan ini tidak boleh dibatalkan. | لا يمكن التراجع عن هذا الإجراء. |
+| 原因：无网络连接 / 连接超时 / 存储空间不足 / 文件不存在 | no network connection / connection timed out / not enough storage space / file not found | tiada sambungan rangkaian / sambungan tamat masa / ruang storan tidak cukup / fail tidak ditemui | لا يوجد اتصال بالشبكة / انتهت مهلة الاتصال / مساحة التخزين غير كافية / الملف غير موجود |
 
 失败提示不显示异常的原文（英文类名、`null`）：能归到上面几种原因的就写原因，归不进去的只写「无法……」，异常本身只进日志。
 
@@ -122,7 +124,7 @@
 
 ---
 
-## 7. 英文与马来文
+## 7. 英文、马来文与阿拉伯文
 
 **英文**
 - 平实、简短的界面英文；句首大写，其余小写（sentence case）。
@@ -133,7 +135,23 @@
 
 **马来文**
 - 与中文同一张术语表；开关用 hidupkan / matikan，窗口和页面用 buka / tutup；回放用 main semula；环视用 sekeliling；车机用 unit kepala。
-- 不留未翻译的英文词；例外：贴边标签 Super mirror（三种语言都用英文，有意为之）、Auto hold 这类车上本来就印着英文的标识。
+- 不留未翻译的英文词；例外：贴边标签 Super mirror（各种语言都用英文，有意为之）、Auto hold 这类车上本来就印着英文的标识。
+
+**阿拉伯文**
+- 现代标准阿拉伯语，车机、手机系统设置的口吻：简短、中性；不用埃及口语（مش、عشان、فلاشة、الفلاشر），也不用公文腔（قام بـ、من قِبل；写 تلقائيًا，不写 بشكل تلقائي）。
+- 与中文同一张术语表：开关用 تشغيل / إيقاف，值也写 تشغيل / إيقاف（动名词，不随名称变阴阳性）；窗口、页面、文件用 فتح / إغلاق；车机用 نظام المعلومات والترفيه；环视用 الرؤية المحيطة；U 盘用 محرك أقراص USB；主界面用 الواجهة الرئيسية（الشاشة الرئيسية 是安卓桌面）；回放没有对应的一个词，写页名 الفيديوهات / الصور，播放写 تشغيل。
+- 说明用第三人称、阳性现在时动词开头（يعرض…、يضيف…），不称呼用户；「你」的从句改成动名词（离车后 → بعد مغادرة السيارة）。要用户做事：Toast、对话框正文用「يُرجى + 动名词」（يُرجى إعادة المحاولة）；操作提示、步骤、通知正文用阳性单数命令式（انقر للعودة إلى التطبيق）。
+- 按钮用动名词，不用命令式：حفظ、حذف、إلغاء；破坏性操作的确认按钮复述动作（حذف、إيقاف）；纯告知 حسنًا，确定 موافق。确认类对话框标题：动名词 + ؟（حذف الصور المحددة؟），不写 هل تريد…؟。
+- Toast：成功 تم + 动名词（تم قفل 3 ملفات）；失败 تعذّر + 动名词，或 فشل X: السبب；进行中 جارٍ + 动名词…（جارٍ فحص التسجيلات…）。
+- 标点：逗号 ،、分号 ؛、问号 ؟，句号、冒号用 . 和 :（冒号后空一格）。句末规则同英文：单句片段不加句号，多句每句都加；「تعذّر بدء التسجيل. يُرجى إعادة المحاولة」整条按一句，末尾不加。省略号只用 …；不用破折号、感叹号。界面名称不加引号；英文用 “ ” 括起的占位符值写成 « »。
+- 数字一律 0–9（不写 ٠–٩），小数点「.」，百分号 %（不用 ٪）。数字与单位之间空一格：10 ثوانٍ、1.5 GB、20 fps；GB / MB / Mbps / fps / px / dp 照写；紧凑标签里的 s / min / h 写 ث / د / س。
+- 写死的数字照语法配名词：3–10 用复数（3 دقائق），11–99 用单数宾格（15 ثانية），1、2 写单数 / 双数（دقيقتان）。非复数条目里的变量数字，改成名词不用变格的写法：先名词后数字（الكاميرات: %1$d）、「%1$d من + 复数」，或不变的单位（%1$d د）。
+- 复数六种都写：zero / one / two 可以不写数字（ملف واحد、ملفان），few（3–10）%d ملفات，many（11–99）%d ملفًا，other %d ملف；other 的占位符与中文一致，其他条不能多出占位符。
+- 路径从 الإعدادات 写起，层级之间用「 ← 」（指向阅读方向），不加引号：الإعدادات ← التخزين ← موقع التخزين；英文里别的 →（步骤、映射）也写 ←。名称照标题原样，带 ال；介词 ل 不连写在名称前（会吞掉 alif），改用 إلى / في / من。
+- 关于页不翻译，阿拉伯文界面显示英文关于页；引用关于页里的条目写英文名：انقر على Safety notice。
+- 照写拉丁字母：Zeekr、Zeekr 7X、Zeekr Shortcut、HUD、USB、Type-C、NVMe、GitHub、JPEG、H.264/H.265、ntfy、Telegram、Wi‑Fi；贴边标签 Super mirror；车上印着英文的标识（Auto hold）。语言列表里写 العربية。
+- 文字方向：按逻辑顺序写。字符串尽量不以拉丁字母或占位符开头，非这样不可时最前面加 U+200F（RLM）；以数字开头的尺寸、范围（1280×800、%1$d×%2$d、0–1）前加 U+200E（LRM），否则显示成 800×1280。
+- 拼写用标准书面语（ى / ي、ة / ه 分清）；不标全部元音，只保留术语表写定的叠音符号和鼻音符号（تعذّر、جارٍ、المطوّرين、أولًا）。
 
 ---
 
@@ -687,7 +705,7 @@
 下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
 可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
 
-- （现在没有。）
+- 阿拉伯文全部（values-ar，2026-11-19 草稿：先定术语表和写法，再分块翻译、统一核对）。等母语使用者审校（issue 250 的 mina5500）；改的时候照本规范改，词改了连同 §10 的阿拉伯文一列一起改。
 
 ---
 
@@ -695,59 +713,59 @@
 
 每个概念只用一个叫法。「例外」列之外，不用其他说法。
 
-| 概念 | 中文 | English | Bahasa Melayu | 例外与说明 |
-|---|---|---|---|---|
-| 录制（动作） | 录制：开始录制、停止录制、录制中、录制中断 | record / recording | rakam / merakam / rakaman | 「录像」不作动词；不用单字「录」 |
-| 录像（保存的文件） | 录像；「存储上限」里的「录像」 | recording(s)；与照片并列时 video(s)；Storage caps → Videos | rakaman；与照片并列时 video；Had storan → Video | 「视频」只用于「视频流」「视频流配置」，以及转述手机浏览器的叫法（「图片或视频」） |
-| 片段与一次录像 | 片段（量词「段」：每段 3 分钟、第 2 段）；一次从开始到停止的录制 = 录像；回放里切换用「上一条 / 下一条」 | clip；recording；Previous / Next | klip；rakaman；Sebelumnya / Seterusnya | — |
-| 丢帧 | 丢帧（录像里少了画面）；U 盘写入速度跟不上 | dropped frames、drop frames；writes too slowly | bingkai tercicir；menulis terlalu perlahan | 不用「掉帧」「卡帧」 |
-| 影像 | 影像（录像和照片的合称） | footage | rakaman | 单指一种时写录像或照片；「倒车影像」「泊车影像」是原厂功能名 |
-| 照片 | 照片（量词「张」「组」）；「存储上限」里的「照片」 | photo(s)；Storage caps → Photos | foto；Had storan → Foto | 「图片」只指非照片的图像（使用指南插图） |
-| 回放 | 回放；页面名：录像回放、照片回放 | playback；页面名 Videos、Photos | main semula；页面名 Video、Foto | 不用「回看」 |
-| U 盘 | U 盘；需区分类型时写「U 盘或固态硬盘」 | USB drive | pemacu USB | 不用「录像盘」「固态盘」 |
-| 存储位置 / 录像保存在 | 存储位置（设置中选定的 U 盘）；「录像保存在 …」（实际写入的目录，写在选存储位置的框里） | Storage location；Videos are saved in … | Lokasi storan；Video disimpan di … | — |
-| 内置存储 | 内置存储 | internal storage | storan dalaman | 解释寿命时写「内置存储的写入寿命有限」；不用「闪存」「车机存储」「内部存储」作名称 |
-| 环视 | 环视；技术处：环视合成流；版式：四格显示 / 整幅显示 | surround view（标签 Surround）；composite stream；2×2 grid / full frame | paparan sekeliling（标签 Sekeliling）；strim komposit；grid 2×2 / bingkai penuh | 马来文用 sekeliling，不用 keliling |
-| 座舱 | 座舱；前座舱、后座舱 | cabin；front cabin、rear cabin | kabin；kabin depan、kabin belakang | 不用「车厢」；「前排 / 后排」只指座位排 |
-| 摄像头 | 摄像头；摄像头映射 | camera；Camera mapping | kamera；Pemetaan kamera | Android 权限名照系统写「相机权限」；关于页致谢原文不动 |
-| 路 / 画面 | 量词「路」（4 路、录制 3 路）；指某一路用「该路」「此路画面」；看到的内容叫「画面」 | camera；view | kamera；paparan | 不用「那一路」「换一路」；英文、马来文不用 lane / lorong（lorong 只指车道） |
-| 视频流配置 | 视频流配置；入口「编辑视频流配置」；预设：极氪7X（环视）、极氪7X（环视 + 后座舱） | Stream profile；Edit stream profile；Zeekr 7X (surround)、Zeekr 7X (surround + rear cabin) | Profil strim；Edit profil strim；Zeekr 7X (sekeliling)、Zeekr 7X (sekeliling + kabin belakang) | 同一预设在设置列表和状态条上同名；2.20 之前叫「极氪7X（环视 + 前后座舱）」 |
-| 超级镜子 | 超级镜子（2.12 起，原「超级后视镜」）；其窗口在本分区内称「窗口」 | Super mirror（句中也大写 S） | Cermin super | 「电子后视镜」只作解释；贴边标签三种语言都写 Super mirror |
-| 盲区画面 | 盲区画面（按情境在中控屏或 HUD 上该侧显示侧方摄像头画面的窗口，设置在「超级镜子」分区里；显示位置：中控屏 / HUD / 中控屏和 HUD） | Blind spot view（句中也大写 B） | Paparan titik buta | 2026-10-17 项目所有者批准；不用「盲区辅助」（原厂功能的名字）、「侧视弹窗」 |
-| 转向灯 | 转向灯；打转向灯 | turn signal | lampu isyarat | 双闪见「闪远光 / 双闪」 |
-| 盲区指示灯 / 开门预警 | 盲区指示灯（后视镜上那盏灯，开车时旁边有车亮）；开门预警（停车后亮，后视镜上同一盏灯） | blind spot light；door open warning | lampu titik buta；amaran buka pintu | 2026-11-03 加，项目所有者批准；2026-11-04 加的附加项名「盲区提醒」2026-11-09 随附加项去掉；「后视镜」指车外两侧的，英文 side mirror / 马来文 cermin sisi |
-| 情境（盲区画面） | 情境：丰富、标准、简洁（盲区画面那一行除「关闭」外的三档：什么情形显示画面，一档包含下一档） | mode：Full、Standard、Minimal | mod：Penuh、Piawai、Minimum | 2026-11-09 加，中文名字是项目所有者定的，2026-11-09 项目所有者批准 |
-| 方向标签 | 方向标签（超级镜子窗口左上角那块写着前、后、左、右的标签） | Direction label | Label arah | 2.12 加；标签上的字用「前 / 后 / 左 / 右」（zeekr_lane_*），后座舱写「后座舱」（slot_cabin_rear） |
-| 切换范围 | 切换范围（超级镜子在哪几路之间切）：四向、前后、后视 + 后座舱；设置里是「超级镜子」那一行除「关闭」外的三档，不单独成行（2026-11-11） | Views：All four、Front and rear、Rear + rear cabin | Paparan：Empat arah、Depan dan belakang、Belakang + kabin belakang | 2026-10-19 加，取代「只显示前后视」 |
-| 悬浮按钮 | 悬浮按钮；按钮大小、按钮透明度、时长文字大小 | floating button；Button opacity | butang terapung；Kelegapan butang | 「悬浮窗」只用于系统权限名「悬浮窗权限」（Overlay / Paparan di atas apl lain） |
-| 行驶信息条 | 行驶信息条；仅车辆信号页每行下方的小字可简称「信息条」 | Driving info bar（行下小字 Info bar） | Bar maklumat pemanduan | — |
-| 车辆信号（那一页） | 车辆信号（试验性） | Vehicle signals (experimental) | Isyarat kenderaan (percubaan) | 2026-10-23 前叫「系统信息」；说的是车机读得到的那些信号 |
-| 车辆状态 / 车辆信号 | 车辆状态（试验性）只作主界面面板的功能名；泛指读到的数据用「车辆信号」 | Vehicle status (experimental)；vehicle signals | Status kenderaan (percubaan)；isyarat kenderaan | — |
-| 车机 / 车辆 / 车 | 车机 = 运行本应用的中控主机；车辆 = 整车；单字「车」只在固定词里（下车、锁车、车门、车速、车牌、左舵车） | head unit；vehicle | unit kepala；kenderaan | 休眠、重启、占用摄像头的是车机；日常短语可用 car / kereta（leave the car） |
-| 熄屏 / 休眠 | 熄屏、亮屏（屏幕）；休眠、唤醒（车机）；保持唤醒状态（车机，哨兵模式）；熄屏录制（阻止休眠）（开发者选项）；熄屏持续录制（录制）；熄屏后的帧率（熄屏持续录制的下一层） | screen off / on；sleep / wake；keep the head unit awake；Screen-off recording (keep awake)；Keep recording when the screen goes off；Screen-off frame rate | skrin padam / hidup；tidur / bangun；unit kepala kekal berjaga；Rakaman skrin padam (kekal berjaga)；Terus merakam apabila skrin padam；Kadar bingkai skrin padam | 不用「睡」「不让车机睡」；马来文不用 skrin mati |
-| 中控屏 | 中控屏（车机的那块屏幕；系统信息页屏幕电源事件那一行就叫它，值写熄屏 / 亮屏） | Center screen | Skrin tengah | 2.11.2 加；只在要指那块屏幕本身时用，说状态仍用熄屏 / 亮屏 |
-| HUD | HUD（抬头显示，投在前挡风玻璃上的那块屏；盲区画面可以投到上面） | HUD | HUD | 2026-10-21 加；三种语言都写 HUD，界面上不写「抬头显示」「平视显示」 |
-| 主界面 | 主界面；返回主界面 | Main screen；Back to main screen | Skrin utama；Kembali ke skrin utama | 不用「录制界面」 |
-| 应用 | 应用；需区分时「本应用」「其他应用」 | app；this app | apl；apl ini | 不用「软件」「程序」（关于页致谢原文除外） |
-| 开发者选项 | 开发者选项；条件写「需开启开发者选项」 | developer options | pilihan pembangun | 不用「开发者模式」 |
-| 锁定 / 解锁 | 锁定、解锁、已锁定；「受保护」只描述锁定的效果 | lock、unlock、locked；protected | kunci、buka kunci、dikunci；dilindungi | 悬浮按钮的「锁定位置」是另一个概念 |
-| 开关与窗口 | 开关：开启 / 关闭（已开启、未开启、需开启「X」）；窗口、页面、文件、应用：打开 / 关闭；紧凑值标签：开 / 关 | turn on / off、On / Off；open / close | hidupkan / matikan、Hidup / Mati；buka / tutup | 马来文开关不用 buka / tutup |
-| 手势 | 点击、长按、拖动、滑动（上下滑动 / 左右滑动） | tap、long press、drag、swipe | ketik、tekan lama、seret、leret | 不用「点一下」「划」「单击」 |
-| 诊断信息 / 诊断报告 | 诊断信息（设置项与页面）；诊断报告（导出的文件） | Diagnostics；Diagnostics report | Maklumat diagnostik；Laporan diagnostik | — |
-| 引用写法 | 「设置 → 通用 → 诊断信息」 | Settings → General → Diagnostics | Tetapan → Umum → Maklumat diagnostik | 见 §5 |
-| 开机自启动 | 开机自启动（2.10.4 起含保活，不再有「保持后台运行」） | Start on boot | Mula semasa but | 不用「保活」 |
-| 水印 | 时间水印、应用水印、车牌号水印、水印显示录制规格 | stamp：Timestamp、App stamp、Plate number stamp、Include recording specs | tera：Tera masa、Tera nama apl、Tera nombor plat、Sertakan spesifikasi rakaman | 不用「角标」；英文不用 overlay、badge |
-| 试验性 | 名称旁的标签「试验性」（4.0 起；以前是功能名后缀「（试验性）」） | Experimental | Percubaan | 不用「实验性」「试验功能」 |
-| 鱼眼校正 | 鱼眼校正（按钮与设置项同名）；鱼眼校正方式：直线、宽视野（地平线弯曲）、全圆（直线略弯）；视野角度（超级镜子）、校正视野（界面） | 按钮 Straighten；Fisheye correction、Fisheye projection；Straight lines、Wide (curved horizon)、Full circle (lines slightly curved) | 按钮 Luruskan；Pembetulan mata ikan、Unjuran mata ikan | 英文引用按钮时写 Straighten |
-| 闪远光 / 双闪 | 闪远光；双闪（说明文字里可写全称「双闪警示灯」，项目所有者 2026-10-23） | flash-to-pass；hazard lights（值标签 Hazard；设置里的按钮 Hazard lights） | kelip lampu tinggi；lampu kecemasan | — |
-| 原厂 | 原厂（原厂 360、原厂界面、原厂行车记录仪） | factory | kilang | 英文不用 stock |
-| 挡位 | 挡位 | gear | gear | 不写「档位」；「码率档」的「档」指等级，用字正确 |
-| 驾驶座 / 操作按钮 | 驾驶座（一侧）；操作按钮、操作按钮位置 | driver's side；action buttons、Action button side | sebelah pemandu；butang tindakan、Sebelah butang tindakan | 不用「驾驶位」 |
-| 自动清理 / 删除 | 自动清理（超出上限或空间不足时应用删除最旧的文件）；删除（用户手动） | automatic cleanup；delete | pembersihan automatik；padam | — |
-| 开机 / 启动 | 开机 = 车机开机（开机自启动）；启动 = 应用启动（启动自动录制） | boot（Start on boot）；launch / open（Record on launch） | but（Mula semasa but）；buka（Rakam semasa dibuka） | — |
-| 需重启生效 | 重启应用后生效（放在句末） | Takes effect after restarting the app | Berkuat kuasa selepas apl dimulakan semula | — |
-| 确认按钮 | 知道了 | Got it | Faham | 不用「我知道了」 |
-| 画面调节 | 画面调节；画面调节窗口 | Image adjustment | Pelarasan imej | 不用「亮度 / 降噪调节」 |
-| 设置分区与页面 | 4.0 起：录制、存储、超级镜子、盲区画面、按键、通用、更新与关于、开发者选项；页：详细参数、车辆信号、关于与致谢、初始设置（4.0 以前的「悬浮键与灵动贴」「界面」「系统」「检查更新」不再是页名） | Recording、Storage、Super mirror、Blind spot view、Buttons、General、Updates & about、Developer options（草稿） | Rakaman、Storan、Cermin super、Paparan titik buta、Butang、Umum、Kemas kini & perihal、Pilihan pembangun（草稿） | 英文、马来文 4.0 全部做完后统一整理 |
-| 灵动贴 | 灵动贴（只有页名里和「悬浮键」连着写，别处的悬浮按钮照旧） | smart button | butang pintar | — |
-| 绑定（灵动贴） | 绑定：绑定灵动贴、已绑定 | pair：Pair smart button、paired | pasangkan：Pasangkan butang pintar、dipasangkan | 「连接」只指连上蓝牙的那一下（长按时）；不用「搜索」「登记」「配对」（2026-11-04 加，2026-11-05 项目所有者批准） |
+| 概念 | 中文 | English | Bahasa Melayu | العربية | 例外与说明 |
+|---|---|---|---|---|---|
+| 录制（动作） | 录制：开始录制、停止录制、录制中、录制中断 | record / recording | rakam / merakam / rakaman | التسجيل (يسجّل)؛ بدء التسجيل، إيقاف التسجيل، جارٍ التسجيل، انقطاع التسجيل | 「录像」不作动词；不用单字「录」 |
+| 录像（保存的文件） | 录像；「存储上限」里的「录像」 | recording(s)；与照片并列时 video(s)；Storage caps → Videos | rakaman；与照片并列时 video；Had storan → Video | التسجيل (ج. التسجيلات)؛ مع الصور: الفيديو (ج. الفيديوهات)؛ حدود التخزين ← الفيديوهات | 「视频」只用于「视频流」「视频流配置」，以及转述手机浏览器的叫法（「图片或视频」） |
+| 片段与一次录像 | 片段（量词「段」：每段 3 分钟、第 2 段）；一次从开始到停止的录制 = 录像；回放里切换用「上一条 / 下一条」 | clip；recording；Previous / Next | klip；rakaman；Sebelumnya / Seterusnya | المقطع (ج. المقاطع؛ مدة كل مقطع 3 دقائق، المقطع 2)؛ التسجيل (من البدء حتى الإيقاف)؛ السابق / التالي | — |
+| 丢帧 | 丢帧（录像里少了画面）；U 盘写入速度跟不上 | dropped frames、drop frames；writes too slowly | bingkai tercicir；menulis terlalu perlahan | فقدان الإطارات (قد تُفقد إطارات من التسجيل)؛ الكتابة على محرك أقراص USB بطيئة جدًا | 不用「掉帧」「卡帧」 |
+| 影像 | 影像（录像和照片的合称） | footage | rakaman | اللقطات (التسجيلات والصور معًا) | 单指一种时写录像或照片；「倒车影像」「泊车影像」是原厂功能名 |
+| 照片 | 照片（量词「张」「组」）；「存储上限」里的「照片」 | photo(s)；Storage caps → Photos | foto；Had storan → Foto | الصورة (ج. الصور)؛ حدود التخزين ← الصور | 「图片」只指非照片的图像（使用指南插图） |
+| 回放 | 回放；页面名：录像回放、照片回放 | playback；页面名 Videos、Photos | main semula；页面名 Video、Foto | صفحتا الفيديوهات والصور؛ اسما الصفحتين: الفيديوهات، الصور؛ تشغيل المقطع | 不用「回看」 |
+| U 盘 | U 盘；需区分类型时写「U 盘或固态硬盘」 | USB drive | pemacu USB | محرك أقراص USB (ج. محركات أقراص USB)؛ عند التمييز: محرك أقراص USB أو قرص SSD | 不用「录像盘」「固态盘」 |
+| 存储位置 / 录像保存在 | 存储位置（设置中选定的 U 盘）；「录像保存在 …」（实际写入的目录，写在选存储位置的框里） | Storage location；Videos are saved in … | Lokasi storan；Video disimpan di … | موقع التخزين؛ تُحفظ الفيديوهات في … | — |
+| 内置存储 | 内置存储 | internal storage | storan dalaman | وحدة التخزين الداخلية | 解释寿命时写「内置存储的写入寿命有限」；不用「闪存」「车机存储」「内部存储」作名称 |
+| 环视 | 环视；技术处：环视合成流；版式：四格显示 / 整幅显示 | surround view（标签 Surround）；composite stream；2×2 grid / full frame | paparan sekeliling（标签 Sekeliling）；strim komposit；grid 2×2 / bingkai penuh | الرؤية المحيطة (والتسمية المختصرة كذلك)؛ تقنيًا: التدفق المُركّب؛ التخطيط: شبكة 2×2 / إطار كامل | 马来文用 sekeliling，不用 keliling |
+| 座舱 | 座舱；前座舱、后座舱 | cabin；front cabin、rear cabin | kabin；kabin depan、kabin belakang | المقصورة؛ المقصورة الأمامية، المقصورة الخلفية | 不用「车厢」；「前排 / 后排」只指座位排 |
+| 摄像头 | 摄像头；摄像头映射 | camera；Camera mapping | kamera；Pemetaan kamera | الكاميرا (ج. الكاميرات)؛ تعيين الكاميرات | Android 权限名照系统写「相机权限」；关于页致谢原文不动 |
+| 路 / 画面 | 量词「路」（4 路、录制 3 路）；指某一路用「该路」「此路画面」；看到的内容叫「画面」 | camera；view | kamera；paparan | كاميرا (4 كاميرات، تسجيل 3 كاميرات)؛ هذه الكاميرا، صورة هذه الكاميرا؛ الاتجاه: الرؤية الأمامية / الخلفية / اليسرى / اليمنى؛ ما يظهر: الصورة | 不用「那一路」「换一路」；英文、马来文不用 lane / lorong（lorong 只指车道） |
+| 视频流配置 | 视频流配置；入口「编辑视频流配置」；预设：极氪7X（环视）、极氪7X（环视 + 后座舱） | Stream profile；Edit stream profile；Zeekr 7X (surround)、Zeekr 7X (surround + rear cabin) | Profil strim；Edit profil strim；Zeekr 7X (sekeliling)、Zeekr 7X (sekeliling + kabin belakang) | ملف تعريف التدفق؛ تعديل ملف تعريف التدفق؛ Zeekr 7X (الرؤية المحيطة)، Zeekr 7X (الرؤية المحيطة + المقصورة الخلفية) | 同一预设在设置列表和状态条上同名；2.20 之前叫「极氪7X（环视 + 前后座舱）」 |
+| 超级镜子 | 超级镜子（2.12 起，原「超级后视镜」）；其窗口在本分区内称「窗口」 | Super mirror（句中也大写 S） | Cermin super | المرآة الفائقة؛ نافذتها في هذا القسم: النافذة | 「电子后视镜」只作解释；贴边标签三种语言都写 Super mirror |
+| 盲区画面 | 盲区画面（按情境在中控屏或 HUD 上该侧显示侧方摄像头画面的窗口，设置在「超级镜子」分区里；显示位置：中控屏 / HUD / 中控屏和 HUD） | Blind spot view（句中也大写 B） | Paparan titik buta | رؤية النقطة العمياء؛ مكان العرض: الشاشة المركزية / HUD / الشاشة المركزية وHUD | 2026-10-17 项目所有者批准；不用「盲区辅助」（原厂功能的名字）、「侧视弹窗」 |
+| 转向灯 | 转向灯；打转向灯 | turn signal | lampu isyarat | إشارة الانعطاف؛ تشغيل إشارة الانعطاف | 双闪见「闪远光 / 双闪」 |
+| 盲区指示灯 / 开门预警 | 盲区指示灯（后视镜上那盏灯，开车时旁边有车亮）；开门预警（停车后亮，后视镜上同一盏灯） | blind spot light；door open warning | lampu titik buta；amaran buka pintu | مؤشر النقطة العمياء؛ تحذير فتح الباب | 2026-11-03 加，项目所有者批准；2026-11-04 加的附加项名「盲区提醒」2026-11-09 随附加项去掉；「后视镜」指车外两侧的，英文 side mirror / 马来文 cermin sisi |
+| 情境（盲区画面） | 情境：丰富、标准、简洁（盲区画面那一行除「关闭」外的三档：什么情形显示画面，一档包含下一档） | mode：Full、Standard、Minimal | mod：Penuh、Piawai、Minimum | الوضع: كامل، قياسي، مبسّط | 2026-11-09 加，中文名字是项目所有者定的，2026-11-09 项目所有者批准 |
+| 方向标签 | 方向标签（超级镜子窗口左上角那块写着前、后、左、右的标签） | Direction label | Label arah | تسمية الاتجاه؛ النص عليها: الأمام / الخلف / اليسار / اليمين؛ المقصورة الخلفية | 2.12 加；标签上的字用「前 / 后 / 左 / 右」（zeekr_lane_*），后座舱写「后座舱」（slot_cabin_rear） |
+| 切换范围 | 切换范围（超级镜子在哪几路之间切）：四向、前后、后视 + 后座舱；设置里是「超级镜子」那一行除「关闭」外的三档，不单独成行（2026-11-11） | Views：All four、Front and rear、Rear + rear cabin | Paparan：Empat arah、Depan dan belakang、Belakang + kabin belakang | نطاق التبديل: الاتجاهات الأربعة، الأمام والخلف، الخلف + المقصورة الخلفية | 2026-10-19 加，取代「只显示前后视」 |
+| 悬浮按钮 | 悬浮按钮；按钮大小、按钮透明度、时长文字大小 | floating button；Button opacity | butang terapung；Kelegapan butang | الزر العائم؛ حجم الزر، عتامة الزر، حجم نص المدة | 「悬浮窗」只用于系统权限名「悬浮窗权限」（Overlay / Paparan di atas apl lain） |
+| 行驶信息条 | 行驶信息条；仅车辆信号页每行下方的小字可简称「信息条」 | Driving info bar（行下小字 Info bar） | Bar maklumat pemanduan | شريط معلومات القيادة؛ تحت كل صف في صفحة إشارات السيارة فقط: شريط المعلومات | — |
+| 车辆信号（那一页） | 车辆信号（试验性） | Vehicle signals (experimental) | Isyarat kenderaan (percubaan) | إشارات السيارة (تجريبي) | 2026-10-23 前叫「系统信息」；说的是车机读得到的那些信号 |
+| 车辆状态 / 车辆信号 | 车辆状态（试验性）只作主界面面板的功能名；泛指读到的数据用「车辆信号」 | Vehicle status (experimental)；vehicle signals | Status kenderaan (percubaan)；isyarat kenderaan | حالة السيارة (تجريبي)، اسم لوحة الواجهة الرئيسية فقط؛ إشارات السيارة للبيانات المقروءة عمومًا | — |
+| 车机 / 车辆 / 车 | 车机 = 运行本应用的中控主机；车辆 = 整车；单字「车」只在固定词里（下车、锁车、车门、车速、车牌、左舵车） | head unit；vehicle | unit kepala；kenderaan | نظام المعلومات والترفيه (الجهاز الذي يعمل عليه التطبيق)؛ السيارة (المركبة كلها، وفي العبارات الثابتة: مغادرة السيارة، باب السيارة، سرعة السيارة، رقم اللوحة) | 休眠、重启、占用摄像头的是车机；日常短语可用 car / kereta（leave the car） |
+| 熄屏 / 休眠 | 熄屏、亮屏（屏幕）；休眠、唤醒（车机）；保持唤醒状态（车机，哨兵模式）；熄屏录制（阻止休眠）（开发者选项）；熄屏持续录制（录制）；熄屏后的帧率（熄屏持续录制的下一层） | screen off / on；sleep / wake；keep the head unit awake；Screen-off recording (keep awake)；Keep recording when the screen goes off；Screen-off frame rate | skrin padam / hidup；tidur / bangun；unit kepala kekal berjaga；Rakaman skrin padam (kekal berjaga)；Terus merakam apabila skrin padam；Kadar bingkai skrin padam | انطفاء الشاشة / إضاءة الشاشة (القيمتان: مطفأة / مضاءة)؛ السكون / الاستيقاظ (نظام المعلومات والترفيه)؛ إبقاء نظام المعلومات والترفيه نشطًا (وضع الحراسة)؛ التسجيل عند انطفاء الشاشة (منع السكون) (خيارات المطوّرين)؛ متابعة التسجيل عند انطفاء الشاشة؛ معدل الإطارات عند انطفاء الشاشة | 不用「睡」「不让车机睡」；马来文不用 skrin mati |
+| 中控屏 | 中控屏（车机的那块屏幕；系统信息页屏幕电源事件那一行就叫它，值写熄屏 / 亮屏） | Center screen | Skrin tengah | الشاشة المركزية | 2.11.2 加；只在要指那块屏幕本身时用，说状态仍用熄屏 / 亮屏 |
+| HUD | HUD（抬头显示，投在前挡风玻璃上的那块屏；盲区画面可以投到上面） | HUD | HUD | HUD | 2026-10-21 加；三种语言都写 HUD，界面上不写「抬头显示」「平视显示」 |
+| 主界面 | 主界面；返回主界面 | Main screen；Back to main screen | Skrin utama；Kembali ke skrin utama | الواجهة الرئيسية؛ العودة إلى الواجهة الرئيسية | 不用「录制界面」 |
+| 应用 | 应用；需区分时「本应用」「其他应用」 | app；this app | apl；apl ini | التطبيق؛ هذا التطبيق، التطبيقات الأخرى | 不用「软件」「程序」（关于页致谢原文除外） |
+| 开发者选项 | 开发者选项；条件写「需开启开发者选项」 | developer options | pilihan pembangun | خيارات المطوّرين؛ يتطلب تشغيل خيارات المطوّرين | 不用「开发者模式」 |
+| 锁定 / 解锁 | 锁定、解锁、已锁定；「受保护」只描述锁定的效果 | lock、unlock、locked；protected | kunci、buka kunci、dikunci；dilindungi | قفل، إلغاء القفل، مقفل؛ محمي (لوصف أثر القفل فقط) | 悬浮按钮的「锁定位置」是另一个概念 |
+| 开关与窗口 | 开关：开启 / 关闭（已开启、未开启、需开启「X」）；窗口、页面、文件、应用：打开 / 关闭；紧凑值标签：开 / 关 | turn on / off、On / Off；open / close | hidupkan / matikan、Hidup / Mati；buka / tutup | المفاتيح: تشغيل / إيقاف (القيم: تشغيل / إيقاف؛ يتطلب تشغيل X)؛ النوافذ والصفحات والملفات والتطبيق: فتح / إغلاق؛ القيم المختصرة: تشغيل / إيقاف | 马来文开关不用 buka / tutup |
+| 手势 | 点击、长按、拖动、滑动（上下滑动 / 左右滑动） | tap、long press、drag、swipe | ketik、tekan lama、seret、leret | النقر (انقر على)، النقر مع الاستمرار، السحب (اسحب)، التمرير (مرّر لأعلى أو لأسفل، مرّر لليمين أو لليسار) | 不用「点一下」「划」「单击」 |
+| 诊断信息 / 诊断报告 | 诊断信息（设置项与页面）；诊断报告（导出的文件） | Diagnostics；Diagnostics report | Maklumat diagnostik；Laporan diagnostik | معلومات التشخيص (الإعداد والصفحة)؛ تقرير التشخيص (الملف المُصدَّر) | — |
+| 引用写法 | 「设置 → 通用 → 诊断信息」 | Settings → General → Diagnostics | Tetapan → Umum → Maklumat diagnostik | الإعدادات ← عام ← معلومات التشخيص | 见 §5 |
+| 开机自启动 | 开机自启动（2.10.4 起含保活，不再有「保持后台运行」） | Start on boot | Mula semasa but | التشغيل التلقائي | 不用「保活」 |
+| 水印 | 时间水印、应用水印、车牌号水印、水印显示录制规格 | stamp：Timestamp、App stamp、Plate number stamp、Include recording specs | tera：Tera masa、Tera nama apl、Tera nombor plat、Sertakan spesifikasi rakaman | الختم: الختم الزمني، ختم التطبيق، ختم رقم اللوحة، تضمين مواصفات التسجيل | 不用「角标」；英文不用 overlay、badge |
+| 试验性 | 名称旁的标签「试验性」（4.0 起；以前是功能名后缀「（试验性）」） | Experimental | Percubaan | تجريبي | 不用「实验性」「试验功能」 |
+| 鱼眼校正 | 鱼眼校正（按钮与设置项同名）；鱼眼校正方式：直线、宽视野（地平线弯曲）、全圆（直线略弯）；视野角度（超级镜子）、校正视野（界面） | 按钮 Straighten；Fisheye correction、Fisheye projection；Straight lines、Wide (curved horizon)、Full circle (lines slightly curved) | 按钮 Luruskan；Pembetulan mata ikan、Unjuran mata ikan | تصحيح عين السمكة (الإعداد؛ نص الزر: تصحيح)؛ طريقة تصحيح عين السمكة: خطوط مستقيمة، واسع (أفق منحنٍ)، دائرة كاملة (خطوط منحنية قليلًا)؛ مجال الرؤية (المرآة الفائقة)، مجال الرؤية بعد التصحيح | 英文引用按钮时写 Straighten |
+| 闪远光 / 双闪 | 闪远光；双闪（说明文字里可写全称「双闪警示灯」，项目所有者 2026-10-23） | flash-to-pass；hazard lights（值标签 Hazard；设置里的按钮 Hazard lights） | kelip lampu tinggi；lampu kecemasan | وميض الضوء العالي؛ أضواء الطوارئ (القيمة المختصرة: الطوارئ؛ الخيار في الإعدادات: أضواء الطوارئ) | — |
+| 原厂 | 原厂（原厂 360、原厂界面、原厂行车记录仪） | factory | kilang | الأصلي / الأصلية: رؤية 360 الأصلية، الشاشات الأصلية، كاميرا لوحة القيادة الأصلية | 英文不用 stock |
+| 挡位 | 挡位 | gear | gear | ناقل الحركة (وضعه: P / R / N / D)؛ تبديل التروس: ترس أعلى / ترس أدنى | 不写「档位」；「码率档」的「档」指等级，用字正确 |
+| 驾驶座 / 操作按钮 | 驾驶座（一侧）；操作按钮、操作按钮位置 | driver's side；action buttons、Action button side | sebelah pemandu；butang tindakan、Sebelah butang tindakan | جهة السائق؛ أزرار الإجراءات، جهة أزرار الإجراءات | 不用「驾驶位」 |
+| 自动清理 / 删除 | 自动清理（超出上限或空间不足时应用删除最旧的文件）；删除（用户手动） | automatic cleanup；delete | pembersihan automatik；padam | التنظيف التلقائي (يحذف التطبيق أقدم الملفات عند تجاوز الحد أو نفاد المساحة)؛ الحذف (يدويًا) | — |
+| 开机 / 启动 | 开机 = 车机开机（开机自启动）；启动 = 应用启动（启动自动录制） | boot（Start on boot）；launch / open（Record on launch） | but（Mula semasa but）；buka（Rakam semasa dibuka） | بدء التشغيل = تشغيل نظام المعلومات والترفيه (التشغيل التلقائي)؛ فتح التطبيق (التسجيل عند فتح التطبيق) | — |
+| 需重启生效 | 重启应用后生效（放在句末） | Takes effect after restarting the app | Berkuat kuasa selepas apl dimulakan semula | يسري بعد إعادة تشغيل التطبيق (في آخر الجملة) | — |
+| 确认按钮 | 知道了 | Got it | Faham | حسنًا | 不用「我知道了」 |
+| 画面调节 | 画面调节；画面调节窗口 | Image adjustment | Pelarasan imej | ضبط الصورة؛ نافذة ضبط الصورة | 不用「亮度 / 降噪调节」 |
+| 设置分区与页面 | 4.0 起：录制、存储、超级镜子、盲区画面、按键、通用、更新与关于、开发者选项；页：详细参数、车辆信号、关于与致谢、初始设置（4.0 以前的「悬浮键与灵动贴」「界面」「系统」「检查更新」不再是页名） | Recording、Storage、Super mirror、Blind spot view、Buttons、General、Updates & about、Developer options（草稿） | Rakaman、Storan、Cermin super、Paparan titik buta、Butang、Umum、Kemas kini & perihal、Pilihan pembangun（草稿） | التسجيل، التخزين، المرآة الفائقة، رؤية النقطة العمياء، الأزرار، عام، التحديثات وحول التطبيق، خيارات المطوّرين؛ الصفحات: الإعدادات التفصيلية، إشارات السيارة، حول التطبيق وشكر وتقدير، الإعداد الأولي | 英文、马来文 4.0 全部做完后统一整理 |
+| 灵动贴 | 灵动贴（只有页名里和「悬浮键」连着写，别处的悬浮按钮照旧） | smart button | butang pintar | الزر الذكي (ج. الأزرار الذكية) | — |
+| 绑定（灵动贴） | 绑定：绑定灵动贴、已绑定 | pair：Pair smart button、paired | pasangkan：Pasangkan butang pintar、dipasangkan | الإقران: إقران زر ذكي، مقترن | 「连接」只指连上蓝牙的那一下（长按时）；不用「搜索」「登记」「配对」（2026-11-04 加，2026-11-05 项目所有者批准） |

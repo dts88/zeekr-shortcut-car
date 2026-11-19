@@ -65,7 +65,8 @@ public final class SettingsRegistry {
             entry("auto", "跟随系统", R.string.lang_auto),
             entry("zh", "中文", R.string.lang_zh),
             entry("en", "English", R.string.lang_en),
-            entry("ms", "Bahasa Melayu", R.string.lang_ms));
+            entry("ms", "Bahasa Melayu", R.string.lang_ms),
+            entry("ar", "العربية", R.string.lang_ar));
 
     /**
      * 鱼眼校正用哪种投影。
