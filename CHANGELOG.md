@@ -11,6 +11,13 @@ commit message, not here.
 
 Nothing yet.
 
+## [4.12.0-alpha] - 2026-11-19
+
+- Arabic (العربية) in Settings → General → Language and in first-run setup; numbers stay 0–9.
+- Right to left: menu and back keys stay top left and the drawer opens from the left; the main screen, playback, Super mirror, Blind spot view and the floating button keep their layout.
+- Recordings and photos: file names and the time drawn into them always use 0–9; names an earlier version wrote with other digits still sort by time.
+- About: Fabbbrrr added to the contributors.
+
 ## [4.11.0-alpha] - 2026-11-17
 
 - Super mirror: fisheye correction uses the method chosen in Settings → General → Fisheye correction; up to 180° with Wide or Full circle.
