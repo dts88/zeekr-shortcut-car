@@ -62,6 +62,21 @@ public class LanguagesTest {
         assertEquals("ar-u-nu-latn", Languages.tagsFor(Languages.ARABIC, Locale.US));
     }
 
+    /**
+     * 跟随系统而系统语言没有翻译：用英文，不落到默认资源的中文（项目所有者 2026-11-19）。
+     * 有翻译的照旧（中文、马来文写 0–9，是空）；选了语言的不看系统。截图空壳只套数字那一条。
+     */
+    @Test
+    public void followingAnUntranslatedSystemUsesEnglish() {
+        assertEquals("en", Languages.tagsFor(Languages.AUTO, Locale.FRANCE));
+        assertEquals("en", Languages.tagsFor(Languages.AUTO, Locale.forLanguageTag("fa-IR")));
+        assertEquals("en", Languages.tagsFor(Languages.AUTO, Locale.forLanguageTag("he-IL")));
+        assertEquals("", Languages.tagsFor(Languages.AUTO, Locale.forLanguageTag("ms-MY")));
+        assertEquals("", Languages.tagsFor(Languages.AUTO, Locale.forLanguageTag("zh-TW")));
+        assertEquals("zh-CN", Languages.tagsFor(Languages.CHINESE, Locale.FRANCE));
+        assertEquals("", Languages.digits0to9(Locale.forLanguageTag("he-IL")));
+    }
+
     /** 存坏了的值不该锁到某个语言上，回到跟随系统才是安全的落点。 */
     @Test
     public void unknownValuesFallBackToFollowingTheSystem() {
