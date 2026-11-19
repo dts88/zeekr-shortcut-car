@@ -11,6 +11,10 @@ commit message, not here.
 
 Nothing yet.
 
+## [4.12.1-alpha] - 2026-11-19
+
+- Temperature up / down, and the X knob's temperature and air direction: the climate is switched on first only when the car reports it off.
+
 ## [4.12.0-alpha] - 2026-11-19
 
 - Arabic (العربية) in Settings → General → Language and in first-run setup; numbers stay 0–9.
