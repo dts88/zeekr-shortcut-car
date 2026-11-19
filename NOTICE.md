@@ -75,8 +75,7 @@ dts88 写的部分另有两条 GPL-3.0 第 7 条允许的附加条款（署名�
   从他的 7X-U 搬来，他在 7X 上实测过）；比较盘的路径时统一用 / 分隔，单元测试在 Windows 上也能通过（`FallbackVolumes`）。
   都是 PR #160，2026-11-06 收录，项目所有者照界面文字规范改了动作的名字。
 - **calvinbui**（Calvin Bui，<https://github.com/calvinbui>）：在他的澳洲 7X（固件 2.1.1c）上实测 6 项设置的记录：
-  内外循环、二排空调、自动远光、低速紧急制动、陡坡缓降、舒适加速（`docs/australian-7x-*.md`，PR #145，2026-11-06 收录）。
-  他没核实、本项目实测过的休眠、下电、重启，补在舒适加速那一篇的第 8 节。
+  内外循环、二排空调、自动远光、低速紧急制动、陡坡缓降、舒适加速（[PR #145](https://github.com/dts88/zeekr-shortcut-car/pull/145)，2026-11-06 收录）。
 - **lelelolo**（<https://github.com/lelelolo>）：盲区画面的两处改进，2026-11-08 随 PR 合并：
   - 环视被车机占用、在恢复或恢复不了时不显示黑框，提示一次（`SideViewDecision.surroundCanShow`，PR #173）；
   - 后视镜上的灯亮着时画面描边（`SideViewAlert`、`SideViewEdge`，PR #174）。
