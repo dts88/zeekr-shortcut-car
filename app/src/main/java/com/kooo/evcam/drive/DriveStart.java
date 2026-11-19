@@ -36,7 +36,7 @@ import java.util.function.Consumer;
  *   <li>亮屏那条边（{@link ScreenState} 的 E3：黑着时车通电了）。车上实测过的就是它：点火 ACC → ON、屏幕电源事件 1 → 0
  *       之后一秒多写，切成了（澳洲 7X，PR 145）。车没通电时屏幕亮了（远程开空调那一类）不是亮屏，不算。</li>
  *   <li>进程起来时屏幕已经亮着的：上一个进程最后看到的是熄屏、或者车机真正开过机才算（{@link DriveStartRules#startsAtProcessStart}）；
- *       进程在行驶中重启的不算。「最后看到的是熄屏」存在 {@link #STATE} 里，不是设置，不进设置备份。</li>
+ *       进程在行驶中重启的不算。「在等下一次上车」（熄屏时记下、算上车时清掉）存在 {@link #STATE} 里，不是设置，不进设置备份。</li>
  * </ul>
  *
  * <p>一次上车只做一遍：熄屏（人下车了）时还没做完的那一遍作废；设置关着的那一次上车什么都不做，半路打开也要等下一次上车。
@@ -48,9 +48,9 @@ import java.util.function.Consumer;
  */
 public final class DriveStart {
 
-    /** 存「上一个进程最后看到的是熄屏」的那一份（运行状态）。 */
+    /** 存「在等下一次上车」的那一份（运行状态）：熄屏时记下，算上一次上车时清掉；进程没了也还在。 */
     static final String STATE = "drive_start_state";
-    static final String KEY_LEFT_WHILE_DARK = "left_while_dark";
+    static final String KEY_AWAITING_NEXT_DRIVE = "awaiting_next_drive";
     /** 等的时候多久再看一次。 */
     static final long POLL_MS = 500L;
 
@@ -82,9 +82,9 @@ public final class DriveStart {
         /** 切成 {@link DriveStartRules#VERIFY_MS} 之后读到的驾驶模式（{@code seen}，读不到 null）：记一行。 */
         void verified(int mode, Integer seen);
 
-        boolean leftWhileDark();
+        boolean awaitingNextDrive();
 
-        void setLeftWhileDark(boolean left);
+        void setAwaitingNextDrive(boolean awaiting);
     }
 
     private static DriveStart instance;
@@ -126,10 +126,10 @@ public final class DriveStart {
 
     // ================================================================= 输入（主线程）
 
-    /** 熄屏：人下车了。没做完的那一遍作废，记下「最后看到的是熄屏」。 */
+    /** 熄屏：人下车了。没做完的那一遍作废，记下在等下一次上车。 */
     void screenWentDark() {
         generation++;
-        world.setLeftWhileDark(true);
+        world.setAwaitingNextDrive(true);
     }
 
     /** 亮屏（车通电了）：一次上车。 */
@@ -139,7 +139,7 @@ public final class DriveStart {
 
     /** 进程起来、屏幕知道了：亮着、又算得上一次上车的就开始。 */
     void processStarted(boolean dark, boolean rebooted) {
-        if (!dark && DriveStartRules.startsAtProcessStart(world.leftWhileDark(), rebooted)) {
+        if (!dark && DriveStartRules.startsAtProcessStart(world.awaitingNextDrive(), rebooted)) {
             begin();
         }
     }
@@ -147,7 +147,7 @@ public final class DriveStart {
     // ================================================================= 一遍
 
     private void begin() {
-        world.setLeftWhileDark(false);
+        world.setAwaitingNextDrive(false);
         int gen = ++generation;
         if (DriveStartRules.target(world.setting()) == 0) {
             return;
@@ -286,14 +286,14 @@ public final class DriveStart {
         }
 
         @Override
-        public boolean leftWhileDark() {
-            return state.getBoolean(KEY_LEFT_WHILE_DARK, false);
+        public boolean awaitingNextDrive() {
+            return state.getBoolean(KEY_AWAITING_NEXT_DRIVE, false);
         }
 
         @Override
-        public void setLeftWhileDark(boolean left) {
-            if (leftWhileDark() != left) {
-                state.edit().putBoolean(KEY_LEFT_WHILE_DARK, left).apply();
+        public void setAwaitingNextDrive(boolean awaiting) {
+            if (awaitingNextDrive() != awaiting) {
+                state.edit().putBoolean(KEY_AWAITING_NEXT_DRIVE, awaiting).apply();
             }
         }
     }

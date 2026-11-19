@@ -101,10 +101,10 @@ final class DriveStartRules {
     }
 
     /**
-     * 进程起来、屏幕亮着时，算不算一次上车：上一个进程最后看到的是熄屏（人下车了，进程后来没了），或者车机真正开过机
-     * （和「这一趟」同一个判法，规格 §2.5）。进程在行驶中重启的不算：上一次上车已经切过，之后手动切换的不动。
+     * 进程起来、屏幕亮着时，算不算一次上车：在等下一次上车（上一个进程最后看到的是熄屏，人下车了，进程后来没了），或者车机
+     * 真正开过机（和「这一趟」同一个判法，规格 §2.5）。进程在行驶中重启的不算：上一次上车已经切过，之后手动切换的不动。
      */
-    static boolean startsAtProcessStart(boolean leftWhileDark, boolean rebooted) {
-        return leftWhileDark || rebooted;
+    static boolean startsAtProcessStart(boolean awaitingNextDrive, boolean rebooted) {
+        return awaitingNextDrive || rebooted;
     }
 }

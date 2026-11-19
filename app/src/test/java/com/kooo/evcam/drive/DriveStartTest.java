@@ -47,7 +47,7 @@ public class DriveStartTest {
         final List<DriveStartRules.Step> gaveUp = new ArrayList<>();
         /** 切成之后再看的每一次：还是不是写的那个。 */
         final List<Boolean> checks = new ArrayList<>();
-        boolean leftWhileDark;
+        boolean awaitingNextDrive;
 
         @Override
         public long now() {
@@ -137,13 +137,13 @@ public class DriveStartTest {
         }
 
         @Override
-        public boolean leftWhileDark() {
-            return leftWhileDark;
+        public boolean awaitingNextDrive() {
+            return awaitingNextDrive;
         }
 
         @Override
-        public void setLeftWhileDark(boolean left) {
-            leftWhileDark = left;
+        public void setAwaitingNextDrive(boolean left) {
+            awaitingNextDrive = left;
         }
     }
 
@@ -347,11 +347,11 @@ public class DriveStartTest {
     @Test
     public void aProcessStartedAfterTheCarWasLeftCountsOnce() {
         start.screenWentDark();
-        assertTrue("熄屏记下来，进程没了也还在", world.leftWhileDark);
+        assertTrue("熄屏记下来，进程没了也还在", world.awaitingNextDrive);
 
         DriveStart next = new DriveStart(world);
         next.processStarted(false, false);
-        assertFalse(world.leftWhileDark);
+        assertFalse(world.awaitingNextDrive);
         world.advance(LONG);
         assertEquals(1, world.writes.size());
 
@@ -370,11 +370,11 @@ public class DriveStartTest {
 
     @Test
     public void aProcessStartedWhileDarkWaitsForTheScreen() {
-        world.leftWhileDark = true;
+        world.awaitingNextDrive = true;
         start.processStarted(true, true);
         world.advance(LONG);
         assertTrue(world.writes.isEmpty());
-        assertTrue("留给亮屏那条边", world.leftWhileDark);
+        assertTrue("留给亮屏那条边", world.awaitingNextDrive);
         start.screenWentLit();
         world.advance(LONG);
         assertEquals(1, world.writes.size());
