@@ -944,9 +944,7 @@ final class CarMoves {
                 return Result.DONE;
             }
             if (open) {
-                for (String name : zoneNames) {
-                    openClimate(c, c.zone(name));
-                }
+                openClimate(c, c.zone(CarNames.ROW_1));
             }
             boolean accepted = true;
             for (String name : zoneNames) {
@@ -969,14 +967,18 @@ final class CarMoves {
         };
     }
 
-    private static void openClimate(Car c, int zone) {
+    /**
+     * 先开空调：电源按排读写（前排 {@link CarNames#ROW_1}、二排 {@link CarNames#ROW_2}），读到的不是开着（1）就写开。
+     * 车上开、关空调变的是排的区域；按主驾、副驾的座位读一直是 0，看不出开没开（澳洲 7X 车主实测，PR #145）。
+     */
+    static void openClimate(Car c, int row) {
         Integer power = c.function("HVAC_FUNC_POWER", "IHvac");
         if (power == null) {
             return;
         }
-        Integer on = c.read(power, zone);
-        if (on != null && on == 0) {
-            c.write(power, zone, 1);
+        Integer on = c.read(power, row);
+        if (on == null || on != 1) {
+            c.write(power, row, 1);
         }
     }
 
