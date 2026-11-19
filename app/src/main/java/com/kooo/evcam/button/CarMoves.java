@@ -48,8 +48,11 @@ import java.util.function.Consumer;
  * </ul>
  *
  * <p>判断和换值都在 {@link Car} 和下面的纯函数里，测试换上假的车辆接口（{@code CarMovesTest}）。</p>
+ *
+ * <p>上车时切驾驶模式（{@code drive.DriveStart}，issue 138）不是按键按的，写车也走这里（{@link #driveModeAtStart}）：
+ * 排在同一条线程上，和按键的动作一件一件做。</p>
  */
-final class CarMoves {
+public final class CarMoves {
 
     /** 读回最多等多久（Lab 3.5.4：座椅通风这些车上慢的要 600 毫秒）。 */
     static final long BACK_MS = 1000;
@@ -84,7 +87,7 @@ final class CarMoves {
     static final long FOG_OFF_MS = 350;
 
     /** 一件的结果。 */
-    enum Result {
+    public enum Result {
         /** 读回变成写的值了。 */
         DONE,
         /** 车机受理了，车上没变。 */
@@ -168,6 +171,15 @@ final class CarMoves {
      * {@code why} 是谁按的：悬浮按钮按的记「悬浮按钮动作」，别的照旧记「灵动贴动作」。
      */
     static void run(Context app, CameraKeeper.Why why, String key, Job job, Consumer<Result> done) {
+        run(app, why == CameraKeeper.Why.FLOATING ? By.FLOATING : By.BUTTON, key, job, done);
+    }
+
+    /** 这一件是谁要做的：黑匣子那一行开头照它写。 */
+    private enum By {
+        BUTTON, FLOATING, DRIVE_START
+    }
+
+    private static void run(Context app, By by, String key, Job job, Consumer<Result> done) {
         Handler h = handler();
         Handler back = main;
         h.post(() -> {
@@ -187,10 +199,20 @@ final class CarMoves {
                 }
                 detail = car.detail();
             }
-            BlackBox.note((why == CameraKeeper.Why.FLOATING ? "悬浮按钮动作 " : "灵动贴动作 ") + key + "：" + result + "（" + detail + "）");
+            BlackBox.note((by == By.DRIVE_START ? "上车设置 " : by == By.FLOATING ? "悬浮按钮动作 " : "灵动贴动作 ")
+                    + key + "：" + result + "（" + detail + "）");
             Result r = result;
             back.post(() -> done.accept(r));
         });
+    }
+
+    /**
+     * 上车时切到设置的驾驶模式（{@code drive.DriveStart}，主线程上叫）：已经是它就不写，不然同 {@link #driveMode}
+     * （{@link #startDriveMode}）。什么时候算上车、挂着什么挡才写由 {@code drive.DriveStartRules} 定，这里只管写和读回；
+     * 黑匣子记「上车设置 drive_mode：…」。结果在主线程上交给 {@code done}。
+     */
+    public static void driveModeAtStart(Context app, int mode, Consumer<Result> done) {
+        run(app, By.DRIVE_START, "drive_mode", startDriveMode(mode), done);
     }
 
     private static final java.util.Map<String, Turning> turning = new java.util.HashMap<>();
@@ -882,6 +904,18 @@ final class CarMoves {
     /** 切到一种驾驶模式（不带区域，本项目车上验证过的写法）。 */
     static Job driveMode(int mode) {
         return c -> c.setPlain(Signal.DRIVE_MODE.id, mode);
+    }
+
+    /** 上车时切到设置的驾驶模式（{@link #driveModeAtStart}）：读到已经是它就不写、算做成；别的同 {@link #driveMode}。 */
+    static Job startDriveMode(int mode) {
+        return c -> {
+            Integer cur = c.access.read(Signal.DRIVE_MODE.id);
+            if (cur != null && cur == mode) {
+                c.note("already " + hex(cur));
+                return Result.DONE;
+            }
+            return c.setPlain(Signal.DRIVE_MODE.id, mode);
+        };
     }
 
     /** 一键运动：不在运动就记下现在的模式、切运动；已经是运动就回到记下的（没记过是标准）。 */
