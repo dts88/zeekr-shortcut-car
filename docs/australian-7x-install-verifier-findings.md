@@ -116,21 +116,33 @@ on this car:
 ```
 ro.boot.verifiedbootstate = green
 ro.boot.veritymode        = enforcing
+ro.boot.flash.locked      = 1
+ro.secure                 = 1
+ro.debuggable             = 1
 ```
 
-`green` means the bootloader is locked and the boot chain verified against the
-manufacturer keys; `enforcing` means dm-verity is active, so the system and
-vendor partitions are hash-checked at runtime and any modification fails the read
-(on a locked device, typically a boot failure).
+`green` and `flash.locked = 1` mean the bootloader is locked and the boot chain
+verified against the manufacturer keys; `enforcing` means dm-verity is active, so
+the system and vendor partitions are hash-checked at runtime and any modification
+fails the read (on a locked device, typically a boot failure). `ro.secure = 1`
+means a secure adb/shell. `ro.debuggable = 1` is the `userdebug` flag: debuggable
+but still locked, not unlocked.
 
 **Inference.** Disabling or removing the verifier means altering `/system` or
 `/vendor`, which enforcing dm-verity blocks, and flashing a patched image is
 refused by the locked bootloader unless signed with the manufacturer keys. There
-is no user-reachable bootloader unlock on these units. The build is `userdebug`
-(see [platform notes](zeekr-platform-notes.md)), which leaves some debug surface
-but does not defeat verified boot or dm-verity. Removing the install verifier is
+is no user-reachable bootloader unlock on these units. The `userdebug` build
+would permit a root shell over adb in principle, but adb is not exposed on these
+units, and even a root shell on a locked, verity-enforcing device cannot
+persistently modify the system partitions. Removing the install verifier is
 therefore not feasible without defeating verified boot, with real bricking risk
 and no known public method for this unit.
+
+Note the verifier sits **above** the App Lab container, at the Android system
+level: it fires for any real install on the device, so installing outside the
+sandbox would still be checked (and rejected the same way). The only bypass is a
+privileged/root install that skips verification, which the points above put out
+of reach.
 
 ## 7. Evidence and open items
 
