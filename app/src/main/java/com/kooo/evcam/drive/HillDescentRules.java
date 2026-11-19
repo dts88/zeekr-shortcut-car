@@ -52,11 +52,14 @@ final class HillDescentRules {
      * @param sinceLastWriteMs 上一次写完过了多久；没写过随便
      */
     static Decision decide(boolean awaiting, int availableInARow, int writes, long sinceLastWriteMs) {
-        if (!awaiting || availableInARow < OffOn.CONFIRM) {
+        if (!awaiting) {
             return Decision.WAIT;
         }
         if (writes >= MAX_WRITES) {
             return Decision.FAILED;
+        }
+        if (availableInARow < OffOn.CONFIRM) {
+            return Decision.WAIT;
         }
         if (writes > 0 && sinceLastWriteMs < RETRY_MS) {
             return Decision.WAIT;

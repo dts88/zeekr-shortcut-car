@@ -838,6 +838,49 @@ public class CarMovesTest {
         assertTrue(car.writes.isEmpty());
     }
 
+    /**
+     * 问完还要不要，到写为止不再读车：读车要等车机回话，等的那一下挂出 P 挡的话，回来就写了。
+     * 这里每读一次驾驶模式就算挂出了 P 挡 —— 问的时候还在 P 挡的只有「最后一次读之后才问」这一种次序。
+     */
+    @Test
+    public void driveModeUnlessAlreadyDoesNotReadTheCarBetweenAskingAndWriting() {
+        boolean[] inPark = {true};
+        List<String> order = new ArrayList<>();
+        FakeCar car = new FakeCar() {
+            @Override
+            public Integer read(int id) {
+                order.add("read");
+                return super.read(id);
+            }
+
+            @Override
+            public boolean write(int id, int value) {
+                order.add("write");
+                return super.write(id, value);
+            }
+        };
+        car.values.put(String.valueOf(Signal.DRIVE_MODE.id), Signal.DRIVE_MODE_STANDARD);
+        assertEquals(CarMoves.Result.DONE, run(car, CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_COMFORT, () -> {
+            order.add("ask");
+            return inPark[0];
+        })));
+        assertEquals("问完紧接着就是写", order.indexOf("ask") + 1, order.indexOf("write"));
+        assertEquals("写之前只读一次", 1, order.indexOf("ask"));
+
+        // 写之前的那一次读车时挂出了 P 挡：读完再问，问到的是不在 P 挡，不写
+        FakeCar shifting = new FakeCar() {
+            @Override
+            public Integer read(int id) {
+                inPark[0] = false;
+                return super.read(id);
+            }
+        };
+        shifting.values.put(String.valueOf(Signal.DRIVE_MODE.id), Signal.DRIVE_MODE_STANDARD);
+        assertEquals(CarMoves.Result.MOVING,
+                run(shifting, CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_COMFORT, () -> inPark[0])));
+        assertTrue(shifting.writes.isEmpty());
+    }
+
     // ---- 空调重新打开后恢复循环模式、二排空调（issue 138）
 
     /** 空调刚重新打开的样子：循环模式自动、二排空调关着、前挡除雾关着。 */
@@ -938,6 +981,34 @@ public class CarMovesTest {
         assertEquals(CarMoves.Result.DONE, run(climateJustOn(), CarMoves.climateSettings(0, true, rearOnly)));
         assertNull(rearOnly[0]);
         assertEquals(CarMoves.Result.DONE, rearOnly[1]);
+    }
+
+    /** 一件里的每一笔写之前都看用户退出了没有：循环模式读回的时候退出了，二排空调不再写。 */
+    @Test
+    public void exitingDuringTheCirculationReadbackStopsTheRearWrite() {
+        boolean[] exited = {false};
+        FakeCar fake = climateJustOn();
+        // 写了要等几次读回才变：等的时候（sleeper）用户退出了
+        fake.applies = false;
+        CarMoves.Car car = new CarMoves.Car(fake, NAMES, ms -> exited[0] = true, null, null);
+        car.blocked = () -> exited[0];
+        CarMoves.Result[] parts = new CarMoves.Result[2];
+        CarMoves.climateSettings(CarMoves.CIRCULATION_INNER, true, parts).run(car);
+        assertEquals("只有循环模式那一笔", 1, fake.writes.size());
+        assertEquals(CIRCULATION + "@" + ALL + "=" + (CIRCULATION + 1), fake.writes.get(0));
+        assertEquals(0, (int) fake.get(CLIMATE_POWER, ROW_2));
+        assertEquals(CarMoves.Result.UNAVAILABLE, parts[1]);
+
+        // 一开始就退出了：一笔都不写（驾驶模式、陡坡缓降不带区域的写法也一样）
+        FakeCar none = climateJustOn();
+        none.values.put(String.valueOf(HILL_DESCENT), 0);
+        CarMoves.Car blocked = new CarMoves.Car(none, NAMES, ms -> { }, null, null);
+        blocked.blocked = () -> true;
+        assertEquals(CarMoves.Result.UNAVAILABLE, CarMoves.climateSettings(CarMoves.CIRCULATION_OUTER, true).run(blocked));
+        assertEquals(CarMoves.Result.UNAVAILABLE, CarMoves.hillDescentOn().run(blocked));
+        assertEquals(CarMoves.Result.UNAVAILABLE,
+                CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_SPORT, () -> true).run(blocked));
+        assertTrue(none.writes.isEmpty());
     }
 
     /** 前排空调的电源按排读；读不到是 null。 */

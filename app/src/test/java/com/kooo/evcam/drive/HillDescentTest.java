@@ -191,6 +191,23 @@ public class HillDescentTest {
         assertEquals(reads, world.reads);
     }
 
+    /** 第三次没成之后它又用不了：当场算了、不再问，不等它再能用。 */
+    @Test
+    public void givesUpAtTheLastFailedWriteEvenIfItIsNoLongerAvailable() {
+        for (int i = 0; i < HillDescentRules.MAX_WRITES; i++) {
+            world.results.add(CarMoves.Result.NO_CHANGE);
+        }
+        getIn();
+        while (world.writes < HillDescentRules.MAX_WRITES) {
+            world.read(1, 1);
+        }
+        assertEquals(1, world.gaveUp.size());
+        assertFalse(world.awaiting);
+        int reads = world.reads;
+        world.read(0, 600);
+        assertEquals("不再问", reads, world.reads);
+    }
+
     @Test
     public void doesNotAskWhileTheUserHasExited() {
         world.exited = true;

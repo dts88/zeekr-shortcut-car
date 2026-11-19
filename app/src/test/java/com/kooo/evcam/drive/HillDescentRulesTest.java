@@ -39,7 +39,9 @@ public class HillDescentRulesTest {
                 HillDescentRules.decide(true, 5, HillDescentRules.MAX_WRITES - 1, HillDescentRules.RETRY_MS));
         assertEquals(Decision.FAILED,
                 HillDescentRules.decide(true, 5, HillDescentRules.MAX_WRITES, HillDescentRules.RETRY_MS));
-        // 这一会儿又用不了：不写，等它能用
-        assertEquals(Decision.WAIT, HillDescentRules.decide(true, 0, HillDescentRules.MAX_WRITES, HillDescentRules.RETRY_MS));
+        // 写满了次数就算了，不等它再能用
+        assertEquals(Decision.FAILED, HillDescentRules.decide(true, 0, HillDescentRules.MAX_WRITES, 0));
+        // 还没写满、这一会儿又用不了：不写，等它能用
+        assertEquals(Decision.WAIT, HillDescentRules.decide(true, 0, 1, HillDescentRules.RETRY_MS));
     }
 }

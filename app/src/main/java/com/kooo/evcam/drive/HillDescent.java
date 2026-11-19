@@ -86,7 +86,7 @@ public final class HillDescent {
     /** 这一次上车还没打开过（照存着的，{@link World#awaitingAvailable}）。 */
     private boolean awaiting;
     /** 只用它数连着几次能用。 */
-    private OffOn track = OffOn.start(false);
+    private OffOn track = OffOn.NONE;
     /** 读车、写车还没回话。 */
     private boolean busy;
     private int writes;
@@ -138,7 +138,7 @@ public final class HillDescent {
         busy = false;
         writes = 0;
         awaiting = world.awaitingAvailable();
-        track = OffOn.start(false);
+        track = OffOn.NONE;
         tick(gen);
     }
 
@@ -165,7 +165,7 @@ public final class HillDescent {
         }
         world.later(HillDescentRules.POLL_MS, () -> tick(gen));
         if (world.userExited() || !world.linkConnected() || !DriveStartRules.powered(world.ignition())) {
-            track = track.unknown();
+            track = OffOn.NONE;
             return;
         }
         if (busy) {
@@ -205,6 +205,11 @@ public final class HillDescent {
         lastWriteAt = world.now();
         if (result == CarMoves.Result.DONE) {
             finish();
+        } else if (writes >= HillDescentRules.MAX_WRITES) {
+            // 写满了次数：当场算了，不等下一次读到能用（它这时可能已经用不了，一直等下去就一直问）
+            int tried = writes;
+            finish();
+            world.gaveUp(tried);
         }
     }
 
@@ -218,7 +223,7 @@ public final class HillDescent {
     /** 设置关着：什么都不记着，再打开设置时从下一次上车起。 */
     private void forget() {
         awaiting = false;
-        track = OffOn.start(false);
+        track = OffOn.NONE;
         writes = 0;
         world.setAwaitingAvailable(false);
     }
@@ -269,7 +274,7 @@ public final class HillDescent {
 
         @Override
         public void readAvailable(Consumer<Integer> seen) {
-            CarMoves.hillDescentAvailable(seen);
+            CarMoves.hillDescentAvailable(app, seen);
         }
 
         @Override

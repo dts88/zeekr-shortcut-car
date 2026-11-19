@@ -53,7 +53,13 @@ public class ClimateOnTest {
         int turnedOff;
         /** 写满次数都没成的每一次写了几次。 */
         final List<Integer> gaveUp = new ArrayList<>();
-        boolean awaiting;
+        boolean circulationPending;
+        boolean rearPending;
+
+        /** 确认关过，还有没恢复的。 */
+        boolean awaiting() {
+            return circulationPending || rearPending;
+        }
 
         @Override
         public long now() {
@@ -150,13 +156,19 @@ public class ClimateOnTest {
         }
 
         @Override
-        public boolean awaitingClimateOn() {
-            return awaiting;
+        public boolean circulationPending() {
+            return circulationPending;
         }
 
         @Override
-        public void setAwaitingClimateOn(boolean awaiting) {
-            this.awaiting = awaiting;
+        public boolean rearPending() {
+            return rearPending;
+        }
+
+        @Override
+        public void setPending(boolean circulation, boolean rear) {
+            circulationPending = circulation;
+            rearPending = rear;
         }
     }
 
@@ -176,7 +188,7 @@ public class ClimateOnTest {
 
         world.read(0, 2);
         assertEquals(1, world.turnedOff);
-        assertTrue(world.awaiting);
+        assertTrue(world.awaiting());
         assertTrue("关着不写", world.restores.isEmpty());
 
         world.read(1, 1);
@@ -184,7 +196,7 @@ public class ClimateOnTest {
         world.read(1, 1);
         assertEquals(1, world.restores.size());
         assertEquals(CarMoves.CIRCULATION_INNER + ",true", world.restores.get(0));
-        assertFalse(world.awaiting);
+        assertFalse(world.awaiting());
 
         // 之后手动改回去：空调没再关过，不再写
         world.read(1, 30);
@@ -233,13 +245,14 @@ public class ClimateOnTest {
     public void doesNotReadTheCarWhileBothSettingsAreOff() {
         world.circulation = AppConfig.CIRCULATION_AT_CLIMATE_ON_OFF;
         world.rear = false;
-        world.awaiting = true;
+        world.circulationPending = true;
+        world.rearPending = true;
         start();
         world.read(0, 5);
         world.read(1, 5);
         assertEquals(0, world.reads);
         assertTrue(world.restores.isEmpty());
-        assertFalse("关着时不记着在等", world.awaiting);
+        assertFalse("关着时不记着在等", world.awaiting());
 
         // 打开设置：从头看，空调此刻开着不写
         world.rear = true;
@@ -287,7 +300,7 @@ public class ClimateOnTest {
         world.advance(60_000);
         assertEquals(3, world.restores.size());
         assertTrue("第三次成了", world.gaveUp.isEmpty());
-        assertFalse(world.awaiting);
+        assertFalse(world.awaiting());
     }
 
     @Test
@@ -301,7 +314,7 @@ public class ClimateOnTest {
         assertEquals(ClimateOnRules.MAX_WRITES, world.restores.size());
         assertEquals(1, world.gaveUp.size());
         assertEquals(ClimateOnRules.MAX_WRITES, (int) world.gaveUp.get(0));
-        assertFalse(world.awaiting);
+        assertFalse(world.awaiting());
 
         world.read(0, 2);
         world.read(1, 2);
@@ -331,11 +344,11 @@ public class ClimateOnTest {
         world.read(0, 2);
         world.read(1, 2);
         assertEquals(CarMoves.CIRCULATION_INNER + ",true", world.restores.get(0));
-        assertTrue("还有一样没成", world.awaiting);
+        assertTrue("还有一样没成", world.awaiting());
         world.advance(ClimateOnRules.RETRY_MS);
         assertEquals(2, world.restores.size());
         assertEquals("0,true", world.restores.get(1));
-        assertFalse(world.awaiting);
+        assertFalse(world.awaiting());
 
         // 下一次关掉再打开：两样又都写
         world.read(0, 2);
@@ -361,6 +374,68 @@ public class ClimateOnTest {
         assertEquals(1, world.gaveUp.size());
     }
 
+    /** 一样恢复了、另一样没成，这时熄屏再亮屏：空调没再关过，只写没成的那一样。 */
+    @Test
+    public void aPartialFailureIsRememberedAcrossTheScreenGoingDark() {
+        world.rearResults.add(CarMoves.Result.NO_CHANGE);
+        start();
+        world.read(0, 2);
+        world.read(1, 2);
+        assertEquals(CarMoves.CIRCULATION_INNER + ",true", world.restores.get(0));
+        climate.stop();
+        climate.start();
+        world.read(1, 2);
+        assertEquals(2, world.restores.size());
+        assertEquals("循环模式已经恢复过，不再写", "0,true", world.restores.get(1));
+        assertFalse(world.awaiting());
+    }
+
+    /** 同上，换成进程重启。 */
+    @Test
+    public void aPartialFailureIsRememberedByANewProcess() {
+        world.rearResults.add(CarMoves.Result.NO_CHANGE);
+        start();
+        world.read(0, 2);
+        world.read(1, 2);
+        climate.stop();
+
+        ClimateOn next = new ClimateOn(world);
+        next.start();
+        world.advance(2 * ClimateOnRules.POLL_MS);
+        assertEquals(2, world.restores.size());
+        assertEquals("0,true", world.restores.get(1));
+    }
+
+    /** 二排空调没成、等着再写的时候把它的设置关掉了：不再写它（循环模式的设置还开着也一样）。 */
+    @Test
+    public void aPendingRetryDropsASettingThatWasSwitchedOff() {
+        world.rearResults.add(CarMoves.Result.NO_CHANGE);
+        start();
+        world.read(0, 2);
+        world.read(1, 2);
+        assertEquals(1, world.restores.size());
+        world.rear = false;
+        world.read(1, 60);
+        assertEquals(1, world.restores.size());
+        assertFalse(world.awaiting());
+        assertTrue(world.gaveUp.isEmpty());
+    }
+
+    /** 写满了次数当场算了，不用再读到一次开着。 */
+    @Test
+    public void givesUpAtTheLastFailedWriteWithoutAnotherReading() {
+        for (int i = 0; i < ClimateOnRules.MAX_WRITES; i++) {
+            world.results.add(CarMoves.Result.NO_CHANGE);
+        }
+        start();
+        world.read(0, 2);
+        while (world.restores.size() < ClimateOnRules.MAX_WRITES) {
+            world.read(1, 1);
+        }
+        assertEquals(1, world.gaveUp.size());
+        assertFalse(world.awaiting());
+    }
+
     @Test
     public void doesNotReadWhileTheUserHasExited() {
         world.exited = true;
@@ -380,7 +455,7 @@ public class ClimateOnTest {
     public void stopsReadingWhileTheScreenIsDarkAndRemembersItWasOff() {
         start();
         world.read(0, 2);
-        assertTrue(world.awaiting);
+        assertTrue(world.awaiting());
         climate.stop();
         int reads = world.reads;
         world.read(1, 30);
@@ -403,7 +478,7 @@ public class ClimateOnTest {
         next.start();
         world.advance(2 * ClimateOnRules.POLL_MS);
         assertEquals(1, world.restores.size());
-        assertFalse(world.awaiting);
+        assertFalse(world.awaiting());
     }
 
     @Test

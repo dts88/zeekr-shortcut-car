@@ -203,6 +203,10 @@ public final class CarMoves {
                 detail = "car interface not connected";
             } else {
                 Car car = new Car(access, SYSTEM_NAMES, SystemClock::sleep, memory(app), app);
+                if (by != By.BUTTON && by != By.FLOATING) {
+                    // 一件里的每一笔写之前再看一次（等读回的时候退出了的，后面的不写）
+                    car.blocked = () -> UserExit.isExited(app);
+                }
                 try {
                     result = job.run(car);
                 } catch (RuntimeException e) {
@@ -245,15 +249,15 @@ public final class CarMoves {
 
     /**
      * 前排空调此刻开没开（{@code drive.ClimateOn} 每秒问一次，主线程上叫）：在写车的线程上读，读到的在主线程上交给
-     * {@code seen}（1 开、0 关，读不到 null）。只读，不记黑匣子。
+     * {@code seen}（1 开、0 关，读不到 null）。只读，不记黑匣子。轮到时用户退出了的不读车，是 null。
      */
-    public static void frontClimatePower(Consumer<Integer> seen) {
+    public static void frontClimatePower(Context app, Consumer<Integer> seen) {
         Handler h = handler();
         Handler back = main;
         h.post(() -> {
             CarAccess access = Telemetry.get().carAccess();
             Integer power = null;
-            if (access != null) {
+            if (access != null && !UserExit.isExited(app)) {
                 try {
                     power = frontClimatePower(new Car(access, SYSTEM_NAMES, SystemClock::sleep, null, null));
                 } catch (RuntimeException e) {
@@ -276,14 +280,15 @@ public final class CarMoves {
     /**
      * 陡坡缓降此刻能不能用（{@code drive.HillDescent} 每秒问一次，主线程上叫）：在写车的线程上问车机，答案在主线程上交给
      * {@code seen}（1 能用、0 用不了、问不了 null，{@link #hillDescentAvailable(Car)}）。只读，不记黑匣子。
+     * 轮到时用户退出了的不读车，是 null。
      */
-    public static void hillDescentAvailable(Consumer<Integer> seen) {
+    public static void hillDescentAvailable(Context app, Consumer<Integer> seen) {
         Handler h = handler();
         Handler back = main;
         h.post(() -> {
             CarAccess access = Telemetry.get().carAccess();
             Integer available = null;
-            if (access != null) {
+            if (access != null && !UserExit.isExited(app)) {
                 try {
                     available = hillDescentAvailable(new Car(access, SYSTEM_NAMES, SystemClock::sleep, null, null));
                 } catch (RuntimeException e) {
@@ -515,6 +520,11 @@ public final class CarMoves {
         final Memory memory;
         /** 音量那两件要；测试里是 null。 */
         final Context app;
+        /**
+         * 这一件不该再写车了没有：每一笔写之前问一次，说是就不写。不是人按的那几件设它（用户退出了，{@link #run}）——
+         * 一件里有几笔写、中间等读回的，等的时候退出了，后面的不再写。按键的动作不设（null）。
+         */
+        BooleanSupplier blocked;
         private final StringBuilder detail = new StringBuilder();
 
         Car(CarAccess access, Names names, Sleeper sleeper, Memory memory, Context app) {
@@ -567,6 +577,9 @@ public final class CarMoves {
 
         /** 写（不读回）：全车先带「全车」区域，车机不受理再不带区域。车机受理了返回 true。 */
         boolean write(int id, int zone, int value) {
+            if (blocked()) {
+                return false;
+            }
             boolean accepted = access.write(id, zone, value);
             if (!accepted && zone == all()) {
                 accepted = access.write(id, value);
@@ -584,9 +597,25 @@ public final class CarMoves {
             return back(() -> read(id, zone), value, before);
         }
 
+        /** 不该再写了（{@link #blocked}）：记一笔。 */
+        private boolean blocked() {
+            if (blocked == null || !blocked.getAsBoolean()) {
+                return false;
+            }
+            note("user exited, not written");
+            return true;
+        }
+
         /** 不带区域写、读回（驾驶模式：本项目车上验证过的写法）。 */
         Result setPlain(int id, int value) {
-            Integer before = access.read(id);
+            return writePlain(id, value, access.read(id));
+        }
+
+        /** 同上，写之前的值（{@code before}）调用方已经读过了：到写为止不再读车。 */
+        Result writePlain(int id, int value, Integer before) {
+            if (blocked()) {
+                return Result.UNAVAILABLE;
+            }
             boolean accepted = access.write(id, value);
             note(String.format(Locale.US, "write %s=%s %s", hex(id), hex(value), accepted ? "ok" : "refused"));
             if (!accepted) {
@@ -1113,6 +1142,7 @@ public final class CarMoves {
     /**
      * 上车时切到设置的驾驶模式（{@link #driveModeAtStart}）：读到已经是它就不写、算做成；临写之前 {@code stillWanted} 说不要了
      * （挂出 P 挡了、车没通电了、这一次上车已经作废）不写，是 {@link Result#MOVING}；别的同 {@link #driveMode}。
+     * 问完 {@code stillWanted} 到写之间不再读车（读车要等车机回话，等的时候可能就挂出 P 挡了）：读回用前面读到的那个值比。
      */
     static Job driveModeUnlessAlready(int mode, BooleanSupplier stillWanted) {
         return c -> {
@@ -1125,7 +1155,7 @@ public final class CarMoves {
                 c.note("no longer wanted, not written");
                 return Result.MOVING;
             }
-            return c.setPlain(Signal.DRIVE_MODE.id, mode);
+            return c.writePlain(Signal.DRIVE_MODE.id, mode, cur);
         };
     }
 

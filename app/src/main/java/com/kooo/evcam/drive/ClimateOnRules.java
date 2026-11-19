@@ -59,16 +59,20 @@ final class ClimateOnRules {
     }
 
     /**
-     * @param track            前排空调的电源读到现在的样子（{@link OffOn}：0 关、1 开）
+     * @param pending          确认关过，还有没恢复的
+     * @param onInARow         连着读到几次开着
      * @param writes           这一次打开已经写过几次（都没成）
      * @param sinceLastWriteMs 上一次写完过了多久；没写过随便
      */
-    static Decision decide(OffOn track, int writes, long sinceLastWriteMs) {
-        if (!track.awaiting || track.on < OffOn.CONFIRM) {
+    static Decision decide(boolean pending, int onInARow, int writes, long sinceLastWriteMs) {
+        if (!pending) {
             return Decision.WAIT;
         }
         if (writes >= MAX_WRITES) {
             return Decision.FAILED;
+        }
+        if (onInARow < OffOn.CONFIRM) {
+            return Decision.WAIT;
         }
         if (writes > 0 && sinceLastWriteMs < RETRY_MS) {
             return Decision.WAIT;

@@ -9,8 +9,6 @@
 package com.kooo.evcam.drive;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
 
 import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.button.CarMoves;
@@ -19,20 +17,8 @@ import com.kooo.evcam.settings.SettingsRegistry;
 
 import org.junit.Test;
 
-/** 前排空调重新打开后恢复循环模式、二排空调的规矩（{@link ClimateOnRules}）。 */
+/** 前排空调重新打开后恢复循环模式、二排空调的规矩（{@link ClimateOnRules}）；关着、开着怎么数在 {@code OffOnTest}。 */
 public class ClimateOnRulesTest {
-
-    private static OffOn after(boolean awaiting, Integer... powers) {
-        OffOn track = OffOn.start(awaiting);
-        for (Integer power : powers) {
-            track = track.next(power);
-        }
-        return track;
-    }
-
-    private static Decision decide(OffOn track) {
-        return ClimateOnRules.decide(track, 0, 0);
-    }
 
     @Test
     public void everySettingValueMapsToItsCirculation() {
@@ -49,54 +35,26 @@ public class ClimateOnRulesTest {
     }
 
     @Test
-    public void writesAfterTheClimateWasSeenOffThenOn() {
-        assertEquals(Decision.WAIT, decide(after(false, 1, 1, 1)));
-        assertEquals(Decision.WAIT, decide(after(false, 1, 0, 0)));
-        assertEquals(Decision.WAIT, decide(after(false, 1, 0, 0, 1)));
-        assertEquals(Decision.WRITE, decide(after(false, 1, 0, 0, 1, 1)));
-        assertEquals(Decision.WRITE, decide(after(false, 0, 0, 0, 0, 1, 1, 1)));
+    public void writesOnceItHasBeenOnTwiceInARowAfterBeingOff() {
+        assertEquals(Decision.WAIT, ClimateOnRules.decide(true, 0, 0, 0));
+        assertEquals(Decision.WAIT, ClimateOnRules.decide(true, OffOn.CONFIRM - 1, 0, 0));
+        assertEquals(Decision.WRITE, ClimateOnRules.decide(true, OffOn.CONFIRM, 0, 0));
+        assertEquals(Decision.WRITE, ClimateOnRules.decide(true, 60, 0, 0));
     }
 
     @Test
-    public void oneOffReadingIsNotEnough() {
-        assertFalse(after(false, 1, 0).awaiting);
-        assertEquals(Decision.WAIT, decide(after(false, 1, 0, 1, 1)));
-        // 两次关着中间隔了一次开着、一次读不到：不算连着
-        assertFalse(after(false, 0, 1, 0).awaiting);
-        assertFalse(after(false, 0, null, 0).awaiting);
-        assertFalse(after(false, 0, 255, 0).awaiting);
-        assertTrue(after(false, 0, 0).awaiting);
-    }
-
-    @Test
-    public void onMustBeSeenTwiceInARow() {
-        assertEquals(Decision.WAIT, decide(after(true, 1)));
-        assertEquals(Decision.WAIT, decide(after(true, 1, null, 1)));
-        assertEquals(Decision.WAIT, decide(after(true, 1, 0, 1)));
-        assertEquals(Decision.WRITE, decide(after(true, 1, 1)));
-        // 车没通电的那一会儿：连着的次数从头数，在等照旧
-        OffOn resumed = after(true, 1).unknown().next(1);
-        assertTrue(resumed.awaiting);
-        assertEquals(Decision.WAIT, decide(resumed));
-        assertEquals(Decision.WRITE, decide(resumed.next(1)));
-    }
-
-    @Test
-    public void staysDoneUntilTheClimateGoesOffAgain() {
-        OffOn done = after(false, 0, 0, 1, 1).done();
-        assertFalse(done.awaiting);
-        assertEquals(Decision.WAIT, decide(done.next(1).next(1)));
-        assertEquals(Decision.WRITE, decide(done.next(0).next(0).next(1).next(1)));
+    public void doesNothingWhileNothingIsPending() {
+        assertEquals(Decision.WAIT, ClimateOnRules.decide(false, 60, 0, 0));
+        assertEquals(Decision.WAIT, ClimateOnRules.decide(false, 60, ClimateOnRules.MAX_WRITES, 0));
     }
 
     @Test
     public void retriesAFailedWriteAfterAGapUpToTheLimit() {
-        OffOn on = after(true, 1, 1);
-        assertEquals(Decision.WAIT, ClimateOnRules.decide(on, 1, ClimateOnRules.RETRY_MS - 1));
-        assertEquals(Decision.WRITE, ClimateOnRules.decide(on, 1, ClimateOnRules.RETRY_MS));
-        assertEquals(Decision.WRITE, ClimateOnRules.decide(on, ClimateOnRules.MAX_WRITES - 1, ClimateOnRules.RETRY_MS));
-        assertEquals(Decision.FAILED, ClimateOnRules.decide(on, ClimateOnRules.MAX_WRITES, ClimateOnRules.RETRY_MS));
-        // 空调又关了：不写，等它再开
-        assertEquals(Decision.WAIT, ClimateOnRules.decide(on.next(0), ClimateOnRules.MAX_WRITES, ClimateOnRules.RETRY_MS));
+        assertEquals(Decision.WAIT, ClimateOnRules.decide(true, 5, 1, ClimateOnRules.RETRY_MS - 1));
+        assertEquals(Decision.WRITE, ClimateOnRules.decide(true, 5, 1, ClimateOnRules.RETRY_MS));
+        assertEquals(Decision.WRITE, ClimateOnRules.decide(true, 5, ClimateOnRules.MAX_WRITES - 1, ClimateOnRules.RETRY_MS));
+        assertEquals(Decision.FAILED, ClimateOnRules.decide(true, 5, ClimateOnRules.MAX_WRITES, ClimateOnRules.RETRY_MS));
+        // 写满了次数就算了，不看这一会儿开没开着
+        assertEquals(Decision.FAILED, ClimateOnRules.decide(true, 0, ClimateOnRules.MAX_WRITES, 0));
     }
 }

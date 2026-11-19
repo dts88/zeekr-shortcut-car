@@ -34,9 +34,10 @@ import java.util.function.Consumer;
  *   <li>屏幕亮着（车通电了）时每 {@link ClimateOnRules#POLL_MS} 读一次前排空调的电源；熄屏就停，亮屏再接着读。
  *       两项设置都关着时不读车。车没通电、车辆接口没连着、用户退出了还没再打开应用（{@code UserExit}）的那一会儿不读，
  *       连着的次数从头数。</li>
- *   <li>两样各记各的：一样做成了、另一样没成，再写时只写没成的那一样 —— 做成的那一样之后手动改了的不动。</li>
- *   <li>「在等空调重新打开」（确认关过、还没恢复）存在 {@link #STATE} 里，不是设置，不进设置备份：空调关着时下车、进程后来没了，
- *       回来打开空调照样恢复。</li>
+ *   <li>两样各记各的：一样做成了、另一样没成，再写时只写没成的那一样 —— 做成的那一样之后手动改了的不动。每次写之前照此刻的
+ *       设置：没成的那一样设置里关掉了，就不再写它。</li>
+ *   <li>确认关过之后还没恢复的是哪几样，存在 {@link #STATE} 里，不是设置，不进设置备份：空调关着时下车、进程后来没了，
+ *       回来打开空调照样恢复；一样恢复了、另一样还没成时熄屏再亮屏、进程重启，也只写没成的那一样。</li>
  *   <li>界面上什么都不显示，只进黑匣子（要不要提示等项目所有者定）：确认关了记一行，写车的那一行是「空调设置 climate：…」
  *       （{@code CarMoves}），写满次数都没成再记一行。</li>
  * </ul>
@@ -45,9 +46,10 @@ import java.util.function.Consumer;
  */
 public final class ClimateOn {
 
-    /** 存「在等空调重新打开」的那一份（运行状态）：确认关了记下，恢复过了清掉；进程没了也还在。 */
+    /** 存「确认关过、还没恢复的是哪几样」的那一份（运行状态）：确认关了两样都记下，恢复一样清一样；进程没了也还在。 */
     static final String STATE = "climate_on_state";
-    static final String KEY_AWAITING_CLIMATE_ON = "awaiting_climate_on";
+    static final String KEY_CIRCULATION_PENDING = "circulation_pending";
+    static final String KEY_REAR_PENDING = "rear_pending";
 
     /** 外面的东西：钟、车辆信号、设置、读车写车、黑匣子。真的是 {@link SystemWorld}；测试里是假的。 */
     interface World {
@@ -81,9 +83,12 @@ public final class ClimateOn {
         /** 写满了次数都没成：记一行。 */
         void gaveUp(int writes);
 
-        boolean awaitingClimateOn();
+        /** 确认关过之后循环模式还没恢复、二排空调还没恢复（存着的）。 */
+        boolean circulationPending();
 
-        void setAwaitingClimateOn(boolean awaiting);
+        boolean rearPending();
+
+        void setPending(boolean circulation, boolean rear);
     }
 
     private static ClimateOn instance;
@@ -91,14 +96,14 @@ public final class ClimateOn {
     private final World world;
     /** 每开始读、停一次加一：排着的那一下、晚到的读车写车结果对不上就不算。 */
     private int generation;
-    private OffOn track = OffOn.start(false);
+    private OffOn track = OffOn.NONE;
     /** 读车、写车还没回话。 */
     private boolean busy;
     private int writes;
     private long lastWriteAt;
-    /** 空调这一次打开还没做成的：循环模式（0 是不用写了）、二排空调。第一次写之前照设置定。 */
-    private int circulationLeft;
-    private boolean rearLeft;
+    /** 确认关过之后还没恢复的那几样（照存着的，{@link World#circulationPending}、{@link World#rearPending}）。 */
+    private boolean circulationPending;
+    private boolean rearPending;
 
     ClimateOn(World world) {
         this.world = world;
@@ -134,12 +139,14 @@ public final class ClimateOn {
 
     // ================================================================= 输入（主线程）
 
-    /** 屏幕亮着：开始每隔一会儿读一次。在不在等空调重新打开照存着的。 */
+    /** 屏幕亮着：开始每隔一会儿读一次。还有哪几样没恢复照存着的。 */
     void start() {
         int gen = ++generation;
         busy = false;
         writes = 0;
-        track = OffOn.start(world.awaitingClimateOn());
+        track = OffOn.NONE;
+        circulationPending = world.circulationPending();
+        rearPending = world.rearPending();
         tick(gen);
     }
 
@@ -156,11 +163,13 @@ public final class ClimateOn {
         }
         world.later(ClimateOnRules.POLL_MS, () -> tick(gen));
         if (ClimateOnRules.circulation(world.circulationSetting()) == 0 && !world.rearSetting()) {
-            forget();
+            // 两项设置都关着：什么都不记着，再打开设置时从头看
+            track = OffOn.NONE;
+            pending(false, false);
             return;
         }
         if (world.userExited() || !world.linkConnected() || !DriveStartRules.powered(world.ignition())) {
-            track = track.unknown();
+            track = OffOn.NONE;
             return;
         }
         if (busy) {
@@ -175,34 +184,28 @@ public final class ClimateOn {
             return;
         }
         busy = false;
-        boolean wasAwaiting = track.awaiting;
         track = track.next(power);
-        if (track.off >= OffOn.CONFIRM) {
-            // 确认又关了：下一次打开从头算写了几次、要写哪几样。只读到一次关着不算（同确认关着，一次不作数）
+        if (track.off == OffOn.CONFIRM) {
+            // 确认关了（只读到一次关着不算）：两样都等它重新打开后恢复，写了几次从头算
             writes = 0;
-        }
-        if (!wasAwaiting && track.awaiting) {
-            world.setAwaitingClimateOn(true);
+            pending(true, true);
             world.turnedOff();
         }
-        switch (ClimateOnRules.decide(track, writes, world.now() - lastWriteAt)) {
+        switch (ClimateOnRules.decide(circulationPending || rearPending, track.on, writes, world.now() - lastWriteAt)) {
             case WRITE:
-                if (writes == 0) {
-                    circulationLeft = ClimateOnRules.circulation(world.circulationSetting());
-                    rearLeft = world.rearSetting();
-                }
-                if (circulationLeft == 0 && !rearLeft) {
-                    forget();
+                // 照此刻的设置：没恢复的那一样设置里关掉了的，不再写
+                int circulation = circulationPending ? ClimateOnRules.circulation(world.circulationSetting()) : 0;
+                boolean rear = rearPending && world.rearSetting();
+                pending(circulation != 0, rear);
+                if (circulation == 0 && !rear) {
                     break;
                 }
                 busy = true;
                 writes++;
-                world.restore(circulationLeft, rearLeft, (circulation, rear) -> restored(gen, circulation, rear));
+                world.restore(circulation, rear, (first, second) -> restored(gen, first, second));
                 break;
             case FAILED:
-                int tried = writes;
-                finish();
-                world.gaveUp(tried);
+                giveUp();
                 break;
             default:
                 break;
@@ -215,29 +218,28 @@ public final class ClimateOn {
         }
         busy = false;
         lastWriteAt = world.now();
-        if (circulation == CarMoves.Result.DONE) {
-            circulationLeft = 0;
-        }
-        if (rear == CarMoves.Result.DONE) {
-            rearLeft = false;
-        }
-        if (circulationLeft == 0 && !rearLeft) {
-            finish();
+        // 做成的那一样不再等：再写时只写没成的，做成的之后手动改了的不动
+        pending(circulationPending && circulation != CarMoves.Result.DONE, rearPending && rear != CarMoves.Result.DONE);
+        if ((circulationPending || rearPending) && writes >= ClimateOnRules.MAX_WRITES) {
+            giveUp();
         }
     }
 
-    /** 恢复过了、或者不再写了：不等了，到空调下一次关掉。 */
-    private void finish() {
-        track = track.done();
-        writes = 0;
-        world.setAwaitingClimateOn(false);
+    /** 写满了次数都没成：不等了，到空调下一次关掉。 */
+    private void giveUp() {
+        int tried = writes;
+        pending(false, false);
+        world.gaveUp(tried);
     }
 
-    /** 两项设置都关着：什么都不记着，再打开设置时从头看。 */
-    private void forget() {
-        track = OffOn.start(false);
-        writes = 0;
-        world.setAwaitingClimateOn(false);
+    /** 还没恢复的是哪几样：记下、存下（进程没了、熄屏再亮屏也还在）。都恢复了，写了几次清零。 */
+    private void pending(boolean circulation, boolean rear) {
+        circulationPending = circulation;
+        rearPending = rear;
+        world.setPending(circulation, rear);
+        if (!circulation && !rear) {
+            writes = 0;
+        }
     }
 
     // ================================================================= 真的
@@ -291,7 +293,7 @@ public final class ClimateOn {
 
         @Override
         public void readFrontPower(Consumer<Integer> seen) {
-            CarMoves.frontClimatePower(seen);
+            CarMoves.frontClimatePower(app, seen);
         }
 
         @Override
@@ -310,14 +312,19 @@ public final class ClimateOn {
         }
 
         @Override
-        public boolean awaitingClimateOn() {
-            return state.getBoolean(KEY_AWAITING_CLIMATE_ON, false);
+        public boolean circulationPending() {
+            return state.getBoolean(KEY_CIRCULATION_PENDING, false);
         }
 
         @Override
-        public void setAwaitingClimateOn(boolean awaiting) {
-            if (awaitingClimateOn() != awaiting) {
-                state.edit().putBoolean(KEY_AWAITING_CLIMATE_ON, awaiting).apply();
+        public boolean rearPending() {
+            return state.getBoolean(KEY_REAR_PENDING, false);
+        }
+
+        @Override
+        public void setPending(boolean circulation, boolean rear) {
+            if (circulationPending() != circulation || rearPending() != rear) {
+                state.edit().putBoolean(KEY_CIRCULATION_PENDING, circulation).putBoolean(KEY_REAR_PENDING, rear).apply();
             }
         }
     }
