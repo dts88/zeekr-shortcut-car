@@ -26,7 +26,7 @@ import java.util.Locale;
 import java.util.function.Consumer;
 
 /**
- * 上车时切到设置的驾驶模式（issue 138；{@code AppConfig.getDriveStartMode}，设置页里还没有这一行）：车每次通电后驾驶模式
+ * 上车时切到设置的驾驶模式（issue 138；{@code AppConfig.getDriveModeAtStart}，设置页里还没有这一行）：车每次通电后驾驶模式
  * 回到标准，选了舒适、标准或运动，就在每次上车时切过去一次。什么时候写、什么时候算了照 {@link DriveStartRules}（纯函数），写车和读回在 {@code button.CarMoves}
  * 的那条线程上（{@link CarMoves#driveModeAtStart}）。
  *
@@ -54,7 +54,7 @@ public final class DriveStart {
     /** 等的时候多久再看一次。 */
     static final long POLL_MS = 500L;
 
-    /** 外面的东西：钟、车辆信号、设置、写车、黑匣子。真的是 {@link Car}；测试里是假的。 */
+    /** 外面的东西：钟、车辆信号、设置、写车、黑匣子。真的是 {@link SystemWorld}；测试里是假的。 */
     interface World {
         /** 此刻（毫秒，只拿来算过了多久）。 */
         long now();
@@ -62,7 +62,7 @@ public final class DriveStart {
         /** 过这么久在主线程上做。 */
         void later(long delayMs, Runnable action);
 
-        /** 设置里存的值（{@code SettingsRegistry.DRIVE_START_MODE}）。 */
+        /** 设置里存的值（{@code SettingsRegistry.DRIVE_MODE_AT_START}）。 */
         String setting();
 
         boolean linkConnected();
@@ -77,7 +77,8 @@ public final class DriveStart {
         void write(int mode, Consumer<CarMoves.Result> done);
 
         /** 这一次上车没切成（{@code why} 不是 WAIT、WRITE）：记一行。{@code sinceStartMs} 是算上车起过了多久。 */
-        void gaveUp(DriveStartRules.Step why, int writes, boolean connected, Integer ignition, String gear, long sinceStartMs);
+        void gaveUp(DriveStartRules.Decision why, int writes, boolean connected, Integer ignition, String gear,
+                    long sinceStartMs);
 
         /** 切成 {@link DriveStartRules#VERIFY_MS} 之后读到的驾驶模式（{@code seen}，读不到 null）：记一行。 */
         void verified(int mode, Integer seen);
@@ -108,7 +109,7 @@ public final class DriveStart {
         if (instance != null) {
             return;
         }
-        DriveStart start = new DriveStart(new Car(context.getApplicationContext()));
+        DriveStart start = new DriveStart(new SystemWorld(context.getApplicationContext()));
         instance = start;
         ScreenState.addListener(new ScreenState.Listener() {
             @Override
@@ -172,9 +173,9 @@ public final class DriveStart {
         boolean connected = world.linkConnected();
         Integer ignition = world.ignition();
         String gear = world.gear();
-        DriveStartRules.Step step = DriveStartRules.decide(now - startedAt, connected, ignition, gear, writes,
+        DriveStartRules.Decision decision = DriveStartRules.decide(now - startedAt, connected, ignition, gear, writes,
                 now - lastWriteAt);
-        switch (step) {
+        switch (decision) {
             case WAIT:
                 world.later(POLL_MS, () -> step(gen));
                 break;
@@ -184,7 +185,7 @@ public final class DriveStart {
                 break;
             default:
                 generation++;
-                world.gaveUp(step, writes, connected, ignition, gear, now - startedAt);
+                world.gaveUp(decision, writes, connected, ignition, gear, now - startedAt);
                 break;
         }
     }
@@ -211,13 +212,13 @@ public final class DriveStart {
 
     // ================================================================= 真的
 
-    private static final class Car implements World {
+    private static final class SystemWorld implements World {
         private final Context app;
         private final AppConfig config;
         private final SharedPreferences state;
         private final Handler main = new Handler(Looper.getMainLooper());
 
-        Car(Context app) {
+        SystemWorld(Context app) {
             this.app = app;
             this.config = new AppConfig(app);
             this.state = app.getSharedPreferences(STATE, Context.MODE_PRIVATE);
@@ -235,7 +236,7 @@ public final class DriveStart {
 
         @Override
         public String setting() {
-            return config.getDriveStartMode();
+            return config.getDriveModeAtStart();
         }
 
         @Override
@@ -268,7 +269,7 @@ public final class DriveStart {
         }
 
         @Override
-        public void gaveUp(DriveStartRules.Step why, int writes, boolean connected, Integer ignition, String gear,
+        public void gaveUp(DriveStartRules.Decision why, int writes, boolean connected, Integer ignition, String gear,
                            long sinceStartMs) {
             BlackBox.note("上车设置 drive_mode：这一次上车不切（" + why + "：写过 " + writes + " 次，车辆接口"
                     + (connected ? "连着" : "没连着") + "、点火=" + hex(ignition) + "、挡位=" + (gear == null ? "?" : gear)

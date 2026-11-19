@@ -1244,22 +1244,22 @@ public class AppConfig {
         writeEnum(SettingsRegistry.DRIVE_SOUND_EXTERIOR_VOLUME, db);
     }
 
-    /** 上车时的驾驶模式（{@link SettingsRegistry#DRIVE_START_MODE}）：关闭（默认），上车时不切。 */
-    public static final String DRIVE_START_MODE_OFF = "off";
-    public static final String DRIVE_START_MODE_COMFORT = "comfort";
-    public static final String DRIVE_START_MODE_STANDARD = "standard";
-    public static final String DRIVE_START_MODE_SPORT = "sport";
+    /** 上车时的驾驶模式（{@link SettingsRegistry#DRIVE_MODE_AT_START}）：关闭（默认），上车时不切。 */
+    public static final String DRIVE_MODE_AT_START_OFF = "off";
+    public static final String DRIVE_MODE_AT_START_COMFORT = "comfort";
+    public static final String DRIVE_MODE_AT_START_STANDARD = "standard";
+    public static final String DRIVE_MODE_AT_START_SPORT = "sport";
 
     /**
      * 上车时切到哪个驾驶模式（issue 138）：每次上车、车通电后、挂着 P 挡时切一次，之后手动切换的不动
      * （{@code drive.DriveStart}）。改了从下一次上车起用。设置页里还没有这一行：放在哪、叫什么等项目所有者定。
      */
-    public String getDriveStartMode() {
-        return readEnum(SettingsRegistry.DRIVE_START_MODE);
+    public String getDriveModeAtStart() {
+        return readEnum(SettingsRegistry.DRIVE_MODE_AT_START);
     }
 
-    public void setDriveStartMode(String mode) {
-        writeEnum(SettingsRegistry.DRIVE_START_MODE, mode);
+    public void setDriveModeAtStart(String mode) {
+        writeEnum(SettingsRegistry.DRIVE_MODE_AT_START, mode);
     }
 
     /**

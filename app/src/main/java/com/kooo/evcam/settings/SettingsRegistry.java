@@ -239,12 +239,12 @@ public final class SettingsRegistry {
      * 选了一种就在每次上车时切过去一次。默认关闭。只有存取和后面的逻辑：设置页里还没有这一行，放在哪、叫什么等项目所有者定，
      * 所以选项不带界面上的名字，下面的中文只进日志。
      */
-    public static final SettingSpec DRIVE_START_MODE = SettingSpec.of(
-            "drive_start_mode", "上车时的驾驶模式", com.kooo.evcam.AppConfig.DRIVE_START_MODE_OFF,
-            entry(com.kooo.evcam.AppConfig.DRIVE_START_MODE_OFF, "关闭"),
-            entry(com.kooo.evcam.AppConfig.DRIVE_START_MODE_COMFORT, "舒适"),
-            entry(com.kooo.evcam.AppConfig.DRIVE_START_MODE_STANDARD, "标准"),
-            entry(com.kooo.evcam.AppConfig.DRIVE_START_MODE_SPORT, "运动"));
+    public static final SettingSpec DRIVE_MODE_AT_START = SettingSpec.of(
+            "drive_mode_at_start", "上车时的驾驶模式", com.kooo.evcam.AppConfig.DRIVE_MODE_AT_START_OFF,
+            entry(com.kooo.evcam.AppConfig.DRIVE_MODE_AT_START_OFF, "关闭"),
+            entry(com.kooo.evcam.AppConfig.DRIVE_MODE_AT_START_COMFORT, "舒适"),
+            entry(com.kooo.evcam.AppConfig.DRIVE_MODE_AT_START_STANDARD, "标准"),
+            entry(com.kooo.evcam.AppConfig.DRIVE_MODE_AT_START_SPORT, "运动"));
 
     /** 全部枚举型设置项，启动自检会逐个走一遍。 */
     public static final List<SettingSpec> ALL = Collections.unmodifiableList(Arrays.asList(
@@ -267,5 +267,5 @@ public final class SettingsRegistry {
             DRIVE_SOUND_OUTPUT,
             DRIVE_SOUND_EXTERIOR_ROUTE,
             DRIVE_SOUND_EXTERIOR_VOLUME,
-            DRIVE_START_MODE));
+            DRIVE_MODE_AT_START));
 }

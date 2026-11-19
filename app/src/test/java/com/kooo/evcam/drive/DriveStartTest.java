@@ -33,7 +33,7 @@ public class DriveStartTest {
         long now = 1_000_000L;
         final List<long[]> due = new ArrayList<>();
         final List<Runnable> actions = new ArrayList<>();
-        String setting = AppConfig.DRIVE_START_MODE_COMFORT;
+        String setting = AppConfig.DRIVE_MODE_AT_START_COMFORT;
         boolean connected = true;
         Integer ignition = Signal.IGNITION_ON;
         String gear = "P";
@@ -42,9 +42,9 @@ public class DriveStartTest {
         final List<CarMoves.Result> results = new ArrayList<>();
         /** 写车的结果先不回，拿在手里（{@link #answer}）。 */
         boolean holdAnswers;
-        final List<Runnable> held = new ArrayList<>();
+        final List<Runnable> pending = new ArrayList<>();
         /** 没切成的每一次是为什么。 */
-        final List<DriveStartRules.Step> gaveUp = new ArrayList<>();
+        final List<DriveStartRules.Decision> gaveUp = new ArrayList<>();
         /** 切成之后再看的每一次：还是不是写的那个。 */
         final List<Boolean> checks = new ArrayList<>();
         boolean awaitingNextDrive;
@@ -115,18 +115,18 @@ public class DriveStartTest {
                 done.accept(result);
             };
             if (holdAnswers) {
-                held.add(answer);
+                pending.add(answer);
             } else {
                 answer.run();
             }
         }
 
         void answer() {
-            held.remove(0).run();
+            pending.remove(0).run();
         }
 
         @Override
-        public void gaveUp(DriveStartRules.Step why, int writes, boolean connected, Integer ignition, String gear,
+        public void gaveUp(DriveStartRules.Decision why, int writes, boolean connected, Integer ignition, String gear,
                            long sinceStartMs) {
             gaveUp.add(why);
         }
@@ -150,7 +150,7 @@ public class DriveStartTest {
     private final FakeWorld world = new FakeWorld();
     private final DriveStart start = new DriveStart(world);
 
-    private static final long LONG = DriveStartRules.WINDOW_MS * 3;
+    private static final long PLENTY = DriveStartRules.WINDOW_MS * 3;
 
     @Test
     public void switchesOnceAfterTheScreenLights() {
@@ -163,34 +163,34 @@ public class DriveStartTest {
 
         // 之后手动切到运动：这一次上车不再写
         world.driveMode = Signal.DRIVE_MODE_SPORT;
-        world.advance(LONG);
+        world.advance(PLENTY);
         assertEquals(1, world.writes.size());
         assertTrue(world.gaveUp.isEmpty());
     }
 
     @Test
     public void eachSettingWritesItsOwnMode() {
-        world.setting = AppConfig.DRIVE_START_MODE_SPORT;
+        world.setting = AppConfig.DRIVE_MODE_AT_START_SPORT;
         start.screenWentLit();
-        world.advance(LONG);
+        world.advance(PLENTY);
         assertEquals(1, world.writes.size());
         assertEquals(Signal.DRIVE_MODE_SPORT, (int) world.writes.get(0));
     }
 
     @Test
     public void doesNothingWhenTheSettingIsOff() {
-        world.setting = AppConfig.DRIVE_START_MODE_OFF;
+        world.setting = AppConfig.DRIVE_MODE_AT_START_OFF;
         start.screenWentLit();
         // 半路打开：这一次上车已经过去了，等下一次
-        world.setting = AppConfig.DRIVE_START_MODE_COMFORT;
-        world.advance(LONG);
+        world.setting = AppConfig.DRIVE_MODE_AT_START_COMFORT;
+        world.advance(PLENTY);
         assertTrue(world.writes.isEmpty());
         assertTrue(world.gaveUp.isEmpty());
         assertTrue(world.checks.isEmpty());
 
         start.screenWentDark();
         start.screenWentLit();
-        world.advance(LONG);
+        world.advance(PLENTY);
         assertEquals(1, world.writes.size());
     }
 
@@ -199,9 +199,9 @@ public class DriveStartTest {
         world.connected = false;
         start.screenWentLit();
         world.advance(DriveStartRules.SETTLE_MS);
-        world.setting = AppConfig.DRIVE_START_MODE_OFF;
+        world.setting = AppConfig.DRIVE_MODE_AT_START_OFF;
         world.connected = true;
-        world.advance(LONG);
+        world.advance(PLENTY);
         assertTrue(world.writes.isEmpty());
         assertTrue(world.gaveUp.isEmpty());
     }
@@ -226,12 +226,12 @@ public class DriveStartTest {
     public void givesUpWithANoticeWhenTheCarNeverGetsReady() {
         world.ignition = Signal.IGNITION_ACC;
         start.screenWentLit();
-        world.advance(LONG);
+        world.advance(PLENTY);
         assertTrue(world.writes.isEmpty());
-        assertEquals(Collections.singletonList(DriveStartRules.Step.TIMED_OUT), world.gaveUp);
+        assertEquals(Collections.singletonList(DriveStartRules.Decision.TIMED_OUT), world.gaveUp);
         // 之后通电了也不写：这一次上车已经算了
         world.ignition = Signal.IGNITION_ON;
-        world.advance(LONG);
+        world.advance(PLENTY);
         assertTrue(world.writes.isEmpty());
     }
 
@@ -244,10 +244,10 @@ public class DriveStartTest {
         world.gear = "D";
         world.advance(DriveStart.POLL_MS);
         assertTrue(world.writes.isEmpty());
-        assertEquals(Collections.singletonList(DriveStartRules.Step.LEFT_PARK), world.gaveUp);
+        assertEquals(Collections.singletonList(DriveStartRules.Decision.LEFT_PARK), world.gaveUp);
         // 等红灯时挂回 P 挡也不写
         world.gear = "P";
-        world.advance(LONG);
+        world.advance(PLENTY);
         assertTrue(world.writes.isEmpty());
         assertEquals(1, world.gaveUp.size());
     }
@@ -261,7 +261,7 @@ public class DriveStartTest {
         assertEquals(1, world.writes.size());
         world.advance(DriveStartRules.RETRY_MS - 1);
         assertEquals("没隔够不再写", 1, world.writes.size());
-        world.advance(LONG);
+        world.advance(PLENTY);
         assertEquals(3, world.writes.size());
         assertTrue("第三次成了", world.gaveUp.isEmpty());
     }
@@ -272,9 +272,9 @@ public class DriveStartTest {
             world.results.add(CarMoves.Result.NO_CHANGE);
         }
         start.screenWentLit();
-        world.advance(LONG);
+        world.advance(PLENTY);
         assertEquals(DriveStartRules.MAX_WRITES, world.writes.size());
-        assertEquals(Collections.singletonList(DriveStartRules.Step.FAILED), world.gaveUp);
+        assertEquals(Collections.singletonList(DriveStartRules.Decision.FAILED), world.gaveUp);
     }
 
     @Test
@@ -292,7 +292,7 @@ public class DriveStartTest {
         start.screenWentLit();
         world.advance(DriveStartRules.SETTLE_MS);
         world.driveMode = Signal.DRIVE_MODE_STANDARD;
-        world.advance(LONG);
+        world.advance(PLENTY);
         assertEquals(Collections.singletonList(false), world.checks);
         assertEquals(1, world.writes.size());
         assertTrue(world.gaveUp.isEmpty());
@@ -305,7 +305,7 @@ public class DriveStartTest {
         world.advance(DriveStartRules.SETTLE_MS);
         start.screenWentDark();
         world.connected = true;
-        world.advance(LONG);
+        world.advance(PLENTY);
         assertTrue(world.writes.isEmpty());
         assertTrue(world.gaveUp.isEmpty());
     }
@@ -319,7 +319,7 @@ public class DriveStartTest {
         assertEquals(1, world.writes.size());
         start.screenWentDark();
         world.answer();
-        world.advance(LONG);
+        world.advance(PLENTY);
         assertEquals("下车之后不再写", 1, world.writes.size());
         assertTrue(world.gaveUp.isEmpty());
         assertTrue(world.checks.isEmpty());
@@ -328,18 +328,18 @@ public class DriveStartTest {
     @Test
     public void everyTimeTheScreenLightsIsANewStart() {
         start.screenWentLit();
-        world.advance(LONG);
+        world.advance(PLENTY);
         world.driveMode = Signal.DRIVE_MODE_STANDARD;
         start.screenWentDark();
         start.screenWentLit();
-        world.advance(LONG);
+        world.advance(PLENTY);
         assertEquals(2, world.writes.size());
     }
 
     @Test
     public void aProcessStartedMidDriveDoesNothing() {
         start.processStarted(false, false);
-        world.advance(LONG);
+        world.advance(PLENTY);
         assertTrue(world.writes.isEmpty());
         assertTrue(world.gaveUp.isEmpty());
     }
@@ -352,19 +352,19 @@ public class DriveStartTest {
         DriveStart next = new DriveStart(world);
         next.processStarted(false, false);
         assertFalse(world.awaitingNextDrive);
-        world.advance(LONG);
+        world.advance(PLENTY);
         assertEquals(1, world.writes.size());
 
         // 再起来一个进程（行驶中重启）：不再算
         new DriveStart(world).processStarted(false, false);
-        world.advance(LONG);
+        world.advance(PLENTY);
         assertEquals(1, world.writes.size());
     }
 
     @Test
     public void aProcessStartedAfterARebootCounts() {
         start.processStarted(false, true);
-        world.advance(LONG);
+        world.advance(PLENTY);
         assertEquals(1, world.writes.size());
     }
 
@@ -372,11 +372,11 @@ public class DriveStartTest {
     public void aProcessStartedWhileDarkWaitsForTheScreen() {
         world.awaitingNextDrive = true;
         start.processStarted(true, true);
-        world.advance(LONG);
+        world.advance(PLENTY);
         assertTrue(world.writes.isEmpty());
         assertTrue("留给亮屏那条边", world.awaitingNextDrive);
         start.screenWentLit();
-        world.advance(LONG);
+        world.advance(PLENTY);
         assertEquals(1, world.writes.size());
     }
 }

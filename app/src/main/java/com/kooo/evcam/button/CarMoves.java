@@ -208,11 +208,11 @@ public final class CarMoves {
 
     /**
      * 上车时切到设置的驾驶模式（{@code drive.DriveStart}，主线程上叫）：已经是它就不写，不然同 {@link #driveMode}
-     * （{@link #startDriveMode}）。什么时候算上车、挂着什么挡才写由 {@code drive.DriveStartRules} 定，这里只管写和读回；
+     * （{@link #driveModeUnlessAlready}）。什么时候算上车、挂着什么挡才写由 {@code drive.DriveStartRules} 定，这里只管写和读回；
      * 黑匣子记「上车设置 drive_mode：…」。结果在主线程上交给 {@code done}。
      */
     public static void driveModeAtStart(Context app, int mode, Consumer<Result> done) {
-        run(app, By.DRIVE_START, "drive_mode", startDriveMode(mode), done);
+        run(app, By.DRIVE_START, "drive_mode", driveModeUnlessAlready(mode), done);
     }
 
     private static final java.util.Map<String, Turning> turning = new java.util.HashMap<>();
@@ -907,7 +907,7 @@ public final class CarMoves {
     }
 
     /** 上车时切到设置的驾驶模式（{@link #driveModeAtStart}）：读到已经是它就不写、算做成；别的同 {@link #driveMode}。 */
-    static Job startDriveMode(int mode) {
+    static Job driveModeUnlessAlready(int mode) {
         return c -> {
             Integer cur = c.access.read(Signal.DRIVE_MODE.id);
             if (cur != null && cur == mode) {

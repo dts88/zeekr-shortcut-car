@@ -37,7 +37,7 @@ final class DriveStartRules {
     static final long VERIFY_MS = 5_000L;
 
     /** 这一刻该怎样。 */
-    enum Step {
+    enum Decision {
         /** 再等等（还没等够、车辆信号还没就绪、刚写过没成）。 */
         WAIT,
         /** 写。 */
@@ -53,15 +53,15 @@ final class DriveStartRules {
     private DriveStartRules() {
     }
 
-    /** 设置里存的值（{@code SettingsRegistry.DRIVE_START_MODE}）→ 要切到的驾驶模式；关闭、不认识的是 0。 */
+    /** 设置里存的值（{@code SettingsRegistry.DRIVE_MODE_AT_START}）→ 要切到的驾驶模式；关闭、不认识的是 0。 */
     static int target(String setting) {
-        if (AppConfig.DRIVE_START_MODE_COMFORT.equals(setting)) {
+        if (AppConfig.DRIVE_MODE_AT_START_COMFORT.equals(setting)) {
             return Signal.DRIVE_MODE_COMFORT;
         }
-        if (AppConfig.DRIVE_START_MODE_STANDARD.equals(setting)) {
+        if (AppConfig.DRIVE_MODE_AT_START_STANDARD.equals(setting)) {
             return Signal.DRIVE_MODE_STANDARD;
         }
-        if (AppConfig.DRIVE_START_MODE_SPORT.equals(setting)) {
+        if (AppConfig.DRIVE_MODE_AT_START_SPORT.equals(setting)) {
             return Signal.DRIVE_MODE_SPORT;
         }
         return 0;
@@ -75,24 +75,24 @@ final class DriveStartRules {
      * @param writes           这一次上车已经写过几次（都没成）
      * @param sinceLastWriteMs 上一次写完过了多久；没写过随便
      */
-    static Step decide(long sinceStartMs, boolean linkConnected, Integer ignition, String gear, int writes,
+    static Decision decide(long sinceStartMs, boolean linkConnected, Integer ignition, String gear, int writes,
                        long sinceLastWriteMs) {
         if (writes >= MAX_WRITES) {
-            return Step.FAILED;
+            return Decision.FAILED;
         }
         if (gear != null && !"P".equals(gear)) {
-            return Step.LEFT_PARK;
+            return Decision.LEFT_PARK;
         }
         if (sinceStartMs > WINDOW_MS) {
-            return Step.TIMED_OUT;
+            return Decision.TIMED_OUT;
         }
         if (sinceStartMs < SETTLE_MS || !linkConnected || !powered(ignition) || gear == null) {
-            return Step.WAIT;
+            return Decision.WAIT;
         }
         if (writes > 0 && sinceLastWriteMs < RETRY_MS) {
-            return Step.WAIT;
+            return Decision.WAIT;
         }
-        return Step.WRITE;
+        return Decision.WRITE;
     }
 
     /** 车通电了：点火 ON 或 DRIVING。ACC 或更低、没见过的码、读不到都不算。 */

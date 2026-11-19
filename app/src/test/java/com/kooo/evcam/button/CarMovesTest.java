@@ -789,27 +789,27 @@ public class CarMovesTest {
 
     /** 上车时切驾驶模式（issue 138）：已经是设置的那个就不写；不是就不带区域写、读回。车机不受理是做不了。 */
     @Test
-    public void startDriveModeWritesOnlyWhenTheCarIsInAnotherMode() {
+    public void driveModeUnlessAlreadyWritesOnlyWhenTheCarIsInAnotherMode() {
         FakeCar car = new FakeCar();
         car.values.put(String.valueOf(Signal.DRIVE_MODE.id), Signal.DRIVE_MODE_COMFORT);
-        assertEquals(CarMoves.Result.DONE, run(car, CarMoves.startDriveMode(Signal.DRIVE_MODE_COMFORT)));
+        assertEquals(CarMoves.Result.DONE, run(car, CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_COMFORT)));
         assertTrue(car.writes.isEmpty());
 
         car.values.put(String.valueOf(Signal.DRIVE_MODE.id), Signal.DRIVE_MODE_STANDARD);
-        assertEquals(CarMoves.Result.DONE, run(car, CarMoves.startDriveMode(Signal.DRIVE_MODE_COMFORT)));
+        assertEquals(CarMoves.Result.DONE, run(car, CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_COMFORT)));
         assertEquals(Signal.DRIVE_MODE.id + "=" + Signal.DRIVE_MODE_COMFORT, car.writes.get(0));
         assertEquals(Signal.DRIVE_MODE_COMFORT, (int) car.read(Signal.DRIVE_MODE.id));
 
         FakeCar unread = new FakeCar();
-        assertEquals(CarMoves.Result.DONE, run(unread, CarMoves.startDriveMode(Signal.DRIVE_MODE_SPORT)));
+        assertEquals(CarMoves.Result.DONE, run(unread, CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_SPORT)));
         assertEquals(1, unread.writes.size());
 
         FakeCar refusing = new FakeCar();
         refusing.acceptPlain = false;
-        assertEquals(CarMoves.Result.UNAVAILABLE, run(refusing, CarMoves.startDriveMode(Signal.DRIVE_MODE_SPORT)));
+        assertEquals(CarMoves.Result.UNAVAILABLE, run(refusing, CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_SPORT)));
         FakeCar ignoring = new FakeCar();
         ignoring.applies = false;
-        assertEquals(CarMoves.Result.NO_CHANGE, run(ignoring, CarMoves.startDriveMode(Signal.DRIVE_MODE_SPORT)));
+        assertEquals(CarMoves.Result.NO_CHANGE, run(ignoring, CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_SPORT)));
     }
 
     // ---- 后雾灯闪烁（jlunnn 的 PR #160，从 7X-U 搬来）
