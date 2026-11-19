@@ -15,6 +15,7 @@ import android.os.Looper;
 import android.os.SystemClock;
 
 import com.kooo.evcam.AppConfig;
+import com.kooo.evcam.UserExit;
 import com.kooo.evcam.blackbox.BlackBox;
 import com.kooo.evcam.button.CarMoves;
 import com.kooo.evcam.screen.ScreenState;
@@ -23,6 +24,7 @@ import com.kooo.evcam.telemetry.Signal;
 import com.kooo.evcam.telemetry.Telemetry;
 
 import java.util.Locale;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 
 /**
@@ -38,6 +40,9 @@ import java.util.function.Consumer;
  *   <li>进程起来时屏幕已经亮着的：上一个进程最后看到的是熄屏、或者车机真正开过机才算（{@link DriveStartRules#startsAtProcessStart}）；
  *       进程在行驶中重启的不算。「在等下一次上车」（熄屏时记下、算上车时清掉）存在 {@link #STATE} 里，不是设置，不进设置备份。</li>
  * </ul>
+ *
+ * <p>用户退出以后（{@code UserExit}，进程可能又被系统拉起来）不写车：退出期间的那一次上车先记着，人再打开应用时补上
+ * （{@link #resumeAfterExit}）。</p>
  *
  * <p>一次上车只做一遍：熄屏（人下车了）时还没做完的那一遍作废；设置关着的那一次上车什么都不做，半路打开也要等下一次上车。
  * 界面上什么都不显示，切成没切成只进黑匣子（要不要提示等项目所有者定）：写车的那一行是「上车设置 drive_mode：…」
@@ -59,7 +64,7 @@ public final class DriveStart {
         /** 此刻（毫秒，只拿来算过了多久）。 */
         long now();
 
-        /** 过这么久在主线程上做。 */
+        /** 过这么久在主线程上做。哪个线程都能叫。 */
         void later(long delayMs, Runnable action);
 
         /** 设置里存的值（{@code SettingsRegistry.DRIVE_MODE_AT_START}）。 */
@@ -73,8 +78,14 @@ public final class DriveStart {
 
         Integer driveMode();
 
-        /** 写车、读回，结果在主线程上交回来。 */
-        void write(int mode, Consumer<CarMoves.Result> done);
+        /** 用户退出了、还没再打开应用（{@code UserExit}）。 */
+        boolean userExited();
+
+        /**
+         * 写车、读回，结果在主线程上交回来。写车排在别的线程上，轮到时可能已经过了几秒：{@code stillWanted} 在那条线程上、
+         * 临写之前再问一次，说不要了就不写，结果是 {@link CarMoves.Result#MOVING}。
+         */
+        void write(int mode, BooleanSupplier stillWanted, Consumer<CarMoves.Result> done);
 
         /** 这一次上车没切成（{@code why} 不是 WAIT、WRITE）：记一行。{@code sinceStartMs} 是算上车起过了多久。 */
         void gaveUp(DriveStartRules.Decision why, int writes, boolean connected, Integer ignition, String gear,
@@ -88,11 +99,13 @@ public final class DriveStart {
         void setAwaitingNextDrive(boolean awaiting);
     }
 
-    private static DriveStart instance;
+    private static volatile DriveStart instance;
 
     private final World world;
-    /** 每开始一遍、作废一遍加一：排着的那一步、晚到的写车结果对不上就不算。 */
-    private int generation;
+    /** 每开始一遍、作废一遍加一：排着的那一步、晚到的写车结果对不上就不算。写车的线程临写之前也看它（{@link #stillWanted}）。 */
+    private volatile int generation;
+    /** 屏幕此刻亮着（{@link #resumeAfterExit} 看）。 */
+    private boolean lit;
     private long startedAt;
     private int writes;
     private long lastWriteAt;
@@ -129,18 +142,35 @@ public final class DriveStart {
 
     /** 熄屏：人下车了。没做完的那一遍作废，记下在等下一次上车。 */
     void screenWentDark() {
+        lit = false;
         generation++;
         world.setAwaitingNextDrive(true);
     }
 
     /** 亮屏（车通电了）：一次上车。 */
     void screenWentLit() {
+        lit = true;
         begin();
     }
 
     /** 进程起来、屏幕知道了：亮着、又算得上一次上车的就开始。 */
     void processStarted(boolean dark, boolean rebooted) {
+        lit = !dark;
         if (!dark && DriveStartRules.startsAtProcessStart(world.awaitingNextDrive(), rebooted)) {
+            begin();
+        }
+    }
+
+    /** 用户退出后又打开了应用（{@code UserExit.clear}，哪个线程都能叫）：退出期间记着的那一次上车补上。 */
+    public static void resumeAfterExit() {
+        DriveStart start = instance;
+        if (start != null) {
+            start.world.later(0, start::userReturned);
+        }
+    }
+
+    void userReturned() {
+        if (lit && world.awaitingNextDrive()) {
             begin();
         }
     }
@@ -148,6 +178,12 @@ public final class DriveStart {
     // ================================================================= 一遍
 
     private void begin() {
+        if (world.userExited()) {
+            // 退出以后不写车：这一次上车先记着，人再打开应用时补上
+            generation++;
+            world.setAwaitingNextDrive(true);
+            return;
+        }
         world.setAwaitingNextDrive(false);
         int gen = ++generation;
         if (DriveStartRules.target(world.setting()) == 0) {
@@ -164,8 +200,8 @@ public final class DriveStart {
             return;
         }
         int mode = DriveStartRules.target(world.setting());
-        if (mode == 0) {
-            // 等的时候在设置里关掉了
+        if (mode == 0 || world.userExited()) {
+            // 等的时候在设置里关掉了、用户退出了
             generation++;
             return;
         }
@@ -181,7 +217,7 @@ public final class DriveStart {
                 break;
             case WRITE:
                 writes++;
-                world.write(mode, result -> written(gen, mode, result));
+                world.write(mode, () -> stillWanted(gen), result -> written(gen, mode, result));
                 break;
             default:
                 generation++;
@@ -197,9 +233,22 @@ public final class DriveStart {
         lastWriteAt = world.now();
         if (result == CarMoves.Result.DONE) {
             world.later(DriveStartRules.VERIFY_MS, () -> verify(gen, mode));
-        } else {
-            step(gen);
+            return;
         }
+        if (result == CarMoves.Result.MOVING) {
+            // 轮到写的时候已经不要了（stillWanted），没写：不算写过一次，照此刻的样子再判
+            writes--;
+        }
+        step(gen);
+    }
+
+    /**
+     * 写车的线程上、临写之前问：这一遍还作数、用户没退出、车还通着电、还挂着 P 挡。排队的那几秒里挂出了 P 挡的不写
+     * （{@link World#write}）。只读不改，哪个线程都能叫。
+     */
+    private boolean stillWanted(int gen) {
+        return gen == generation && !world.userExited() && DriveStartRules.powered(world.ignition())
+                && "P".equals(world.gear());
     }
 
     /** 切成之后再看一眼，只记一行：车自己的初始化要是晚到、又改回去了，从这里看得出来。 */
@@ -264,8 +313,13 @@ public final class DriveStart {
         }
 
         @Override
-        public void write(int mode, Consumer<CarMoves.Result> done) {
-            CarMoves.driveModeAtStart(app, mode, done);
+        public boolean userExited() {
+            return UserExit.isExited(app);
+        }
+
+        @Override
+        public void write(int mode, BooleanSupplier stillWanted, Consumer<CarMoves.Result> done) {
+            CarMoves.driveModeAtStart(app, mode, stillWanted, done);
         }
 
         @Override

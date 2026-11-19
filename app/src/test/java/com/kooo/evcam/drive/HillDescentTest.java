@@ -37,6 +37,7 @@ public class HillDescentTest {
         Integer ignition = Signal.IGNITION_ON;
         /** 此刻问到能不能用。 */
         Integer available = 0;
+        boolean exited;
         int reads;
         int writes;
         final List<CarMoves.Result> results = new ArrayList<>();
@@ -96,6 +97,11 @@ public class HillDescentTest {
         @Override
         public Integer ignition() {
             return ignition;
+        }
+
+        @Override
+        public boolean userExited() {
+            return exited;
         }
 
         @Override
@@ -159,6 +165,41 @@ public class HillDescentTest {
         world.read(1, 30);
         world.read(0, 5);
         world.read(1, 30);
+        assertEquals(1, world.writes);
+    }
+
+    @Test
+    public void stopsAskingOnceItIsSwitchedOn() {
+        getIn();
+        world.read(1, 3);
+        assertEquals(1, world.writes);
+        int reads = world.reads;
+        world.read(1, 600);
+        assertEquals("打开过了不再问", reads, world.reads);
+    }
+
+    @Test
+    public void stopsAskingOnceEveryWriteFailed() {
+        for (int i = 0; i < HillDescentRules.MAX_WRITES; i++) {
+            world.results.add(CarMoves.Result.NO_CHANGE);
+        }
+        getIn();
+        world.read(1, 60);
+        assertEquals(1, world.gaveUp.size());
+        int reads = world.reads;
+        world.read(1, 600);
+        assertEquals(reads, world.reads);
+    }
+
+    @Test
+    public void doesNotAskWhileTheUserHasExited() {
+        world.exited = true;
+        getIn();
+        world.read(1, 10);
+        assertEquals(0, world.reads);
+        assertEquals(0, world.writes);
+        world.exited = false;
+        world.read(1, 3);
         assertEquals(1, world.writes);
     }
 

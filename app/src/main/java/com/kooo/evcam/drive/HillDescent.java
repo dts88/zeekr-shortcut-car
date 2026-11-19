@@ -15,6 +15,7 @@ import android.os.Looper;
 import android.os.SystemClock;
 
 import com.kooo.evcam.AppConfig;
+import com.kooo.evcam.UserExit;
 import com.kooo.evcam.blackbox.BlackBox;
 import com.kooo.evcam.button.CarMoves;
 import com.kooo.evcam.screen.ScreenState;
@@ -29,8 +30,9 @@ import java.util.function.Consumer;
  * （{@link CarMoves#hillDescentAvailable}、{@link CarMoves#restoreHillDescent}）。
  *
  * <ul>
- *   <li>屏幕亮着（车通电了）时每 {@link HillDescentRules#POLL_MS} 问一次能不能用；熄屏就停，亮屏再接着问。设置关着时不读车。
- *       车没通电、车辆接口没连着的那一会儿不问，连着的次数从头数。</li>
+ *   <li>屏幕亮着（车通电了）、这一次上车还没打开过时，每 {@link HillDescentRules#POLL_MS} 问一次能不能用；打开过了、写满次数了、
+ *       熄屏了就不问了，到下一次上车。设置关着时不读车。车没通电、车辆接口没连着、用户退出了还没再打开应用（{@code UserExit}）
+ *       的那一会儿不问，连着的次数从头数。</li>
  *   <li>熄屏（人下车了）、车机真正开过机，记下「在等下一次能用」；打开过了清掉。存在 {@link #STATE} 里，不是设置，不进设置备份：
  *       进程在行驶中重启的，打开过一次的不再打开。设置是半路打开的，从下一次上车起。</li>
  *   <li>界面上什么都不显示，只进黑匣子（要不要提示等项目所有者定）：写车的那一行是「上车设置 hill_descent：…」
@@ -58,6 +60,9 @@ public final class HillDescent {
         boolean linkConnected();
 
         Integer ignition();
+
+        /** 用户退出了、还没再打开应用（{@code UserExit}）。 */
+        boolean userExited();
 
         /** 问陡坡缓降能不能用（1 能、0 不能、问不了 null），答案在主线程上交回来。 */
         void readAvailable(Consumer<Integer> seen);
@@ -151,12 +156,15 @@ public final class HillDescent {
         if (gen != generation) {
             return;
         }
-        world.later(HillDescentRules.POLL_MS, () -> tick(gen));
         if (!world.setting()) {
             forget();
+        }
+        if (!awaiting) {
+            // 这一次上车不用再问了（打开过了、写满次数了、设置关着）：不排下一下，到下一次亮屏
             return;
         }
-        if (!world.linkConnected() || !DriveStartRules.powered(world.ignition())) {
+        world.later(HillDescentRules.POLL_MS, () -> tick(gen));
+        if (world.userExited() || !world.linkConnected() || !DriveStartRules.powered(world.ignition())) {
             track = track.unknown();
             return;
         }
@@ -252,6 +260,11 @@ public final class HillDescent {
         @Override
         public Integer ignition() {
             return Telemetry.get().readings().code(Signal.IGNITION);
+        }
+
+        @Override
+        public boolean userExited() {
+            return UserExit.isExited(app);
         }
 
         @Override

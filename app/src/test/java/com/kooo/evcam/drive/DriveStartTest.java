@@ -21,6 +21,7 @@ import org.junit.Test;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 
 /**
@@ -38,6 +39,10 @@ public class DriveStartTest {
         Integer ignition = Signal.IGNITION_ON;
         String gear = "P";
         Integer driveMode = Signal.DRIVE_MODE_STANDARD;
+        boolean exited;
+        /** 交给写车的线程几次。 */
+        int requests;
+        /** 真写到车上的（轮到时还要的）。 */
         final List<Integer> writes = new ArrayList<>();
         final List<CarMoves.Result> results = new ArrayList<>();
         /** 写车的结果先不回，拿在手里（{@link #answer}）。 */
@@ -105,10 +110,21 @@ public class DriveStartTest {
         }
 
         @Override
-        public void write(int mode, Consumer<CarMoves.Result> done) {
-            writes.add(mode);
-            CarMoves.Result result = results.isEmpty() ? CarMoves.Result.DONE : results.remove(0);
+        public boolean userExited() {
+            return exited;
+        }
+
+        /** 轮到写的时候（{@link #answer}，没拿在手里的就是当场）先问还要不要：不要了不写，是 MOVING。 */
+        @Override
+        public void write(int mode, BooleanSupplier stillWanted, Consumer<CarMoves.Result> done) {
+            requests++;
             Runnable answer = () -> {
+                if (!stillWanted.getAsBoolean()) {
+                    done.accept(CarMoves.Result.MOVING);
+                    return;
+                }
+                writes.add(mode);
+                CarMoves.Result result = results.isEmpty() ? CarMoves.Result.DONE : results.remove(0);
                 if (result == CarMoves.Result.DONE) {
                     driveMode = mode;
                 }
@@ -313,16 +329,112 @@ public class DriveStartTest {
     @Test
     public void aWriteAnsweredAfterLeavingIsIgnored() {
         world.holdAnswers = true;
-        world.results.add(CarMoves.Result.NO_CHANGE);
         start.screenWentLit();
         world.advance(DriveStartRules.SETTLE_MS);
-        assertEquals(1, world.writes.size());
+        assertEquals(1, world.requests);
         start.screenWentDark();
         world.answer();
         world.advance(PLENTY);
-        assertEquals("下车之后不再写", 1, world.writes.size());
+        assertTrue("排着的那一件轮到时已经下车了：不写", world.writes.isEmpty());
+        assertEquals(1, world.requests);
         assertTrue(world.gaveUp.isEmpty());
         assertTrue(world.checks.isEmpty());
+    }
+
+    /** 写车的线程被前面的一件占着（比如关门等十几秒），排队时挂出了 P 挡：轮到时不写。 */
+    @Test
+    public void shiftingOutOfParkWhileTheWriteIsQueuedWritesNothing() {
+        world.holdAnswers = true;
+        start.screenWentLit();
+        world.advance(DriveStartRules.SETTLE_MS);
+        assertEquals(1, world.requests);
+        world.gear = "D";
+        world.answer();
+        assertTrue(world.writes.isEmpty());
+        assertEquals(Collections.singletonList(DriveStartRules.Decision.LEFT_PARK), world.gaveUp);
+        world.gear = "P";
+        world.advance(PLENTY);
+        assertTrue(world.writes.isEmpty());
+        assertEquals(1, world.requests);
+    }
+
+    /** 排队时车断电了：轮到时不写，也不算写过一次；通电了照常写。 */
+    @Test
+    public void losingPowerWhileTheWriteIsQueuedWritesNothingAndCostsNoAttempt() {
+        world.holdAnswers = true;
+        start.screenWentLit();
+        world.advance(DriveStartRules.SETTLE_MS);
+        world.ignition = Signal.IGNITION_ACC;
+        world.answer();
+        assertTrue(world.writes.isEmpty());
+        assertTrue(world.gaveUp.isEmpty());
+
+        world.holdAnswers = false;
+        for (int i = 0; i < DriveStartRules.MAX_WRITES - 1; i++) {
+            world.results.add(CarMoves.Result.NO_CHANGE);
+        }
+        world.ignition = Signal.IGNITION_ON;
+        world.advance(DriveStartRules.WINDOW_MS - DriveStartRules.SETTLE_MS);
+        assertEquals("没写的那一次不占次数", DriveStartRules.MAX_WRITES, world.writes.size());
+        assertTrue(world.gaveUp.isEmpty());
+    }
+
+    @Test
+    public void writesNothingWhileTheUserHasExitedAndCatchesUpWhenTheyReturn() {
+        world.exited = true;
+        start.screenWentLit();
+        world.advance(PLENTY);
+        assertEquals(0, world.requests);
+        assertTrue("这一次上车先记着", world.awaitingNextDrive);
+        assertTrue(world.gaveUp.isEmpty());
+
+        world.exited = false;
+        start.userReturned();
+        world.advance(PLENTY);
+        assertEquals(1, world.writes.size());
+        assertFalse(world.awaitingNextDrive);
+
+        // 再叫一次（没有记着的上车）：不写
+        start.userReturned();
+        world.advance(PLENTY);
+        assertEquals(1, world.writes.size());
+    }
+
+    @Test
+    public void returningWhileTheScreenIsDarkWaitsForTheScreen() {
+        start.screenWentDark();
+        start.userReturned();
+        world.advance(PLENTY);
+        assertEquals(0, world.requests);
+        start.screenWentLit();
+        world.advance(PLENTY);
+        assertEquals(1, world.writes.size());
+    }
+
+    @Test
+    public void exitingWhileWaitingStopsQuietly() {
+        world.connected = false;
+        start.screenWentLit();
+        world.advance(DriveStartRules.SETTLE_MS);
+        world.exited = true;
+        world.connected = true;
+        world.advance(PLENTY);
+        assertEquals(0, world.requests);
+        assertTrue(world.gaveUp.isEmpty());
+    }
+
+    @Test
+    public void aProcessStartedWhileExitedCatchesUpWhenTheUserOpensTheApp() {
+        world.exited = true;
+        world.awaitingNextDrive = true;
+        DriveStart next = new DriveStart(world);
+        next.processStarted(false, false);
+        world.advance(PLENTY);
+        assertEquals(0, world.requests);
+        world.exited = false;
+        next.userReturned();
+        world.advance(PLENTY);
+        assertEquals(1, world.writes.size());
     }
 
     @Test

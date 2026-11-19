@@ -20,6 +20,7 @@ import org.junit.Test;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 /**
@@ -43,6 +44,9 @@ public class ClimateOnTest {
         /** 每一次写车要的是什么：「循环模式,二排」。 */
         final List<String> restores = new ArrayList<>();
         final List<CarMoves.Result> results = new ArrayList<>();
+        /** 只给二排空调排的结果（排了就不看 {@link #results} 里的）。 */
+        final List<CarMoves.Result> rearResults = new ArrayList<>();
+        boolean exited;
         /** 写车的结果先不回，拿在手里（{@link #answer}）。 */
         boolean holdAnswers;
         final List<Runnable> pending = new ArrayList<>();
@@ -114,13 +118,20 @@ public class ClimateOnTest {
         }
 
         @Override
-        public void restore(int circulation, boolean rear, Consumer<CarMoves.Result> done) {
+        public boolean userExited() {
+            return exited;
+        }
+
+        @Override
+        public void restore(int circulation, boolean rear, BiConsumer<CarMoves.Result, CarMoves.Result> done) {
             restores.add(circulation + "," + rear);
-            CarMoves.Result result = results.isEmpty() ? CarMoves.Result.DONE : results.remove(0);
+            CarMoves.Result both = results.isEmpty() ? CarMoves.Result.DONE : results.remove(0);
+            CarMoves.Result first = circulation != 0 ? both : null;
+            CarMoves.Result second = !rear ? null : rearResults.isEmpty() ? both : rearResults.remove(0);
             if (holdAnswers) {
-                pending.add(() -> done.accept(result));
+                pending.add(() -> done.accept(first, second));
             } else {
-                done.accept(result);
+                done.accept(first, second);
             }
         }
 
@@ -310,6 +321,59 @@ public class ClimateOnTest {
         world.read(0, 2);
         world.read(1, 60);
         assertEquals("关过之后又是最多这么多次", 2 + ClimateOnRules.MAX_WRITES, world.restores.size());
+    }
+
+    /** 循环模式做成了、二排空调没成：再写只写二排空调，循环模式之后手动改了的不动。 */
+    @Test
+    public void aPartialFailureRetriesOnlyWhatFailed() {
+        world.rearResults.add(CarMoves.Result.NO_CHANGE);
+        start();
+        world.read(0, 2);
+        world.read(1, 2);
+        assertEquals(CarMoves.CIRCULATION_INNER + ",true", world.restores.get(0));
+        assertTrue("还有一样没成", world.awaiting);
+        world.advance(ClimateOnRules.RETRY_MS);
+        assertEquals(2, world.restores.size());
+        assertEquals("0,true", world.restores.get(1));
+        assertFalse(world.awaiting);
+
+        // 下一次关掉再打开：两样又都写
+        world.read(0, 2);
+        world.read(1, 2);
+        assertEquals(CarMoves.CIRCULATION_INNER + ",true", world.restores.get(2));
+    }
+
+    /** 写了没成之后只读到一次关着：不算又关过，写的次数接着算，一共还是最多那么多次。 */
+    @Test
+    public void oneOffReadingDoesNotStartTheWriteCountAgain() {
+        for (int i = 0; i < 10; i++) {
+            world.results.add(CarMoves.Result.NO_CHANGE);
+        }
+        start();
+        world.read(0, 2);
+        world.read(1, 2);
+        assertEquals(1, world.restores.size());
+        for (int i = 0; i < 5; i++) {
+            world.read(0, 1);
+            world.read(1, 5);
+        }
+        assertEquals(ClimateOnRules.MAX_WRITES, world.restores.size());
+        assertEquals(1, world.gaveUp.size());
+    }
+
+    @Test
+    public void doesNotReadWhileTheUserHasExited() {
+        world.exited = true;
+        start();
+        world.read(0, 5);
+        world.read(1, 5);
+        assertEquals(0, world.reads);
+        assertTrue(world.restores.isEmpty());
+
+        world.exited = false;
+        world.read(0, 2);
+        world.read(1, 2);
+        assertEquals(1, world.restores.size());
     }
 
     @Test

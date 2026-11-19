@@ -15,12 +15,14 @@ import android.os.Looper;
 import android.os.SystemClock;
 
 import com.kooo.evcam.AppConfig;
+import com.kooo.evcam.UserExit;
 import com.kooo.evcam.blackbox.BlackBox;
 import com.kooo.evcam.button.CarMoves;
 import com.kooo.evcam.screen.ScreenState;
 import com.kooo.evcam.telemetry.Signal;
 import com.kooo.evcam.telemetry.Telemetry;
 
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 /**
@@ -30,7 +32,9 @@ import java.util.function.Consumer;
  *
  * <ul>
  *   <li>屏幕亮着（车通电了）时每 {@link ClimateOnRules#POLL_MS} 读一次前排空调的电源；熄屏就停，亮屏再接着读。
- *       两项设置都关着时不读车。车没通电、车辆接口没连着的那一会儿不读，连着的次数从头数。</li>
+ *       两项设置都关着时不读车。车没通电、车辆接口没连着、用户退出了还没再打开应用（{@code UserExit}）的那一会儿不读，
+ *       连着的次数从头数。</li>
+ *   <li>两样各记各的：一样做成了、另一样没成，再写时只写没成的那一样 —— 做成的那一样之后手动改了的不动。</li>
  *   <li>「在等空调重新打开」（确认关过、还没恢复）存在 {@link #STATE} 里，不是设置，不进设置备份：空调关着时下车、进程后来没了，
  *       回来打开空调照样恢复。</li>
  *   <li>界面上什么都不显示，只进黑匣子（要不要提示等项目所有者定）：确认关了记一行，写车的那一行是「空调设置 climate：…」
@@ -62,11 +66,14 @@ public final class ClimateOn {
 
         Integer ignition();
 
+        /** 用户退出了、还没再打开应用（{@code UserExit}）。 */
+        boolean userExited();
+
         /** 读前排空调的电源（1 开、0 关，读不到 null），读到的在主线程上交回来。 */
         void readFrontPower(Consumer<Integer> seen);
 
-        /** 写车、读回，结果在主线程上交回来。 */
-        void restore(int circulation, boolean rear, Consumer<CarMoves.Result> done);
+        /** 写车、读回，两样各自的结果在主线程上交回来（先循环模式、后二排空调；没要的那一样是 null）。 */
+        void restore(int circulation, boolean rear, BiConsumer<CarMoves.Result, CarMoves.Result> done);
 
         /** 确认前排空调关了：记一行。 */
         void turnedOff();
@@ -89,6 +96,9 @@ public final class ClimateOn {
     private boolean busy;
     private int writes;
     private long lastWriteAt;
+    /** 空调这一次打开还没做成的：循环模式（0 是不用写了）、二排空调。第一次写之前照设置定。 */
+    private int circulationLeft;
+    private boolean rearLeft;
 
     ClimateOn(World world) {
         this.world = world;
@@ -149,7 +159,7 @@ public final class ClimateOn {
             forget();
             return;
         }
-        if (!world.linkConnected() || !DriveStartRules.powered(world.ignition())) {
+        if (world.userExited() || !world.linkConnected() || !DriveStartRules.powered(world.ignition())) {
             track = track.unknown();
             return;
         }
@@ -167,8 +177,8 @@ public final class ClimateOn {
         busy = false;
         boolean wasAwaiting = track.awaiting;
         track = track.next(power);
-        if (track.off > 0) {
-            // 又关了：下一次打开从头算写了几次
+        if (track.off >= OffOn.CONFIRM) {
+            // 确认又关了：下一次打开从头算写了几次、要写哪几样。只读到一次关着不算（同确认关着，一次不作数）
             writes = 0;
         }
         if (!wasAwaiting && track.awaiting) {
@@ -177,15 +187,17 @@ public final class ClimateOn {
         }
         switch (ClimateOnRules.decide(track, writes, world.now() - lastWriteAt)) {
             case WRITE:
-                int circulation = ClimateOnRules.circulation(world.circulationSetting());
-                boolean rear = world.rearSetting();
-                if (circulation == 0 && !rear) {
+                if (writes == 0) {
+                    circulationLeft = ClimateOnRules.circulation(world.circulationSetting());
+                    rearLeft = world.rearSetting();
+                }
+                if (circulationLeft == 0 && !rearLeft) {
                     forget();
                     break;
                 }
                 busy = true;
                 writes++;
-                world.restore(circulation, rear, result -> restored(gen, result));
+                world.restore(circulationLeft, rearLeft, (circulation, rear) -> restored(gen, circulation, rear));
                 break;
             case FAILED:
                 int tried = writes;
@@ -197,13 +209,19 @@ public final class ClimateOn {
         }
     }
 
-    private void restored(int gen, CarMoves.Result result) {
+    private void restored(int gen, CarMoves.Result circulation, CarMoves.Result rear) {
         if (gen != generation) {
             return;
         }
         busy = false;
         lastWriteAt = world.now();
-        if (result == CarMoves.Result.DONE) {
+        if (circulation == CarMoves.Result.DONE) {
+            circulationLeft = 0;
+        }
+        if (rear == CarMoves.Result.DONE) {
+            rearLeft = false;
+        }
+        if (circulationLeft == 0 && !rearLeft) {
             finish();
         }
     }
@@ -267,12 +285,17 @@ public final class ClimateOn {
         }
 
         @Override
+        public boolean userExited() {
+            return UserExit.isExited(app);
+        }
+
+        @Override
         public void readFrontPower(Consumer<Integer> seen) {
             CarMoves.frontClimatePower(seen);
         }
 
         @Override
-        public void restore(int circulation, boolean rear, Consumer<CarMoves.Result> done) {
+        public void restore(int circulation, boolean rear, BiConsumer<CarMoves.Result, CarMoves.Result> done) {
             CarMoves.restoreClimate(app, circulation, rear, done);
         }
 

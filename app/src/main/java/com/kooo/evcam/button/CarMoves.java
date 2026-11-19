@@ -16,6 +16,7 @@ import android.os.HandlerThread;
 import android.os.Looper;
 import android.os.SystemClock;
 
+import com.kooo.evcam.UserExit;
 import com.kooo.evcam.blackbox.BlackBox;
 import com.kooo.evcam.camera.CameraKeeper;
 import com.kooo.evcam.telemetry.CarAccess;
@@ -26,6 +27,8 @@ import com.kooo.evcam.telemetry.Telemetry;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.function.BiConsumer;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 
 /**
@@ -191,7 +194,11 @@ public final class CarMoves {
             CarAccess access = Telemetry.get().carAccess();
             Result result;
             String detail;
-            if (access == null) {
+            if (by != By.BUTTON && by != By.FLOATING && UserExit.isExited(app)) {
+                // 不是人按的那几件：用户退出以后不写车，到人再打开应用
+                result = Result.UNAVAILABLE;
+                detail = "user exited";
+            } else if (access == null) {
                 result = Result.UNAVAILABLE;
                 detail = "car interface not connected";
             } else {
@@ -215,18 +222,25 @@ public final class CarMoves {
      * 上车时切到设置的驾驶模式（{@code drive.DriveStart}，主线程上叫）：已经是它就不写，不然同 {@link #driveMode}
      * （{@link #driveModeUnlessAlready}）。什么时候算上车、挂着什么挡才写由 {@code drive.DriveStartRules} 定，这里只管写和读回；
      * 黑匣子记「上车设置 drive_mode：…」。结果在主线程上交给 {@code done}。
+     *
+     * <p>这一件排在写车的线程上，前面的一件（比如关门）可能要等好几秒，轮到时车可能已经挂出 P 挡了：{@code stillWanted}
+     * 在写车的线程上、临写之前再问一次，说不要了就不写，结果是 {@link Result#MOVING}。它得是哪个线程都能叫的。</p>
      */
-    public static void driveModeAtStart(Context app, int mode, Consumer<Result> done) {
-        run(app, By.DRIVE_START, "drive_mode", driveModeUnlessAlready(mode), done);
+    public static void driveModeAtStart(Context app, int mode, BooleanSupplier stillWanted, Consumer<Result> done) {
+        run(app, By.DRIVE_START, "drive_mode", driveModeUnlessAlready(mode, stillWanted), done);
     }
 
     /**
      * 前排空调重新打开后恢复设置的那几样（{@code drive.ClimateOn}，主线程上叫）：循环模式（{@link #CIRCULATION_INNER}、
      * {@link #CIRCULATION_OUTER}，0 不动）、二排空调打开（{@link #climateSettings}）。什么时候算重新打开由
-     * {@code drive.ClimateOnRules} 定，这里只管写和读回；黑匣子记「空调设置 climate：…」。结果在主线程上交给 {@code done}。
+     * {@code drive.ClimateOnRules} 定，这里只管写和读回；黑匣子记「空调设置 climate：…」。两样各自的结果在主线程上交给
+     * {@code done}（先循环模式、后二排空调；没要的那一样是 null）：没做成的那一样再做时，做成了的不用再带上。
      */
-    public static void restoreClimate(Context app, int circulation, boolean rear, Consumer<Result> done) {
-        run(app, By.CLIMATE_ON, "climate", climateSettings(circulation, rear), done);
+    public static void restoreClimate(Context app, int circulation, boolean rear, BiConsumer<Result, Result> done) {
+        // 这一件没轮到做（车辆接口没连上、用户退出了）时，要了的那一样算做不了
+        Result[] parts = {circulation != 0 ? Result.UNAVAILABLE : null, rear ? Result.UNAVAILABLE : null};
+        run(app, By.CLIMATE_ON, "climate", climateSettings(circulation, rear, parts),
+                result -> done.accept(parts[0], parts[1]));
     }
 
     /**
@@ -305,7 +319,8 @@ public final class CarMoves {
 
     /**
      * 打开陡坡缓降（{@link #restoreHillDescent}）：照车主实测过的写法，不带区域读写，0 关 1 开。车机说不能用（不是 active）不写、
-     * 是做不了；读到已经开着不写、算做成。写了读回第一下可能还是 0，{@link Car#setPlain} 等得到。
+     * 是做不了；读到已经开着不写、算做成；读到关着（0）才写，读不到、读到别的值不写、是做不了。写了读回第一下可能还是 0，
+     * {@link Car#setPlain} 等得到。
      */
     static Job hillDescentOn() {
         return c -> {
@@ -322,6 +337,10 @@ public final class CarMoves {
             if (cur != null && cur == 1) {
                 c.note("hill descent already on");
                 return Result.DONE;
+            }
+            if (cur == null || cur != 0) {
+                c.note("hill descent read " + hex(cur) + ", not 0/1");
+                return Result.UNAVAILABLE;
             }
             return c.setPlain(id, 1);
         };
@@ -923,14 +942,20 @@ public final class CarMoves {
      * </ul>
      */
     static Job climateSettings(int circulation, boolean rear) {
+        return climateSettings(circulation, rear, new Result[2]);
+    }
+
+    /** 同上，另外把两样各自的结果放进 {@code parts}（先循环模式、后二排空调；没要的那一样不动它）。 */
+    static Job climateSettings(int circulation, boolean rear, Result[] parts) {
         return c -> {
             Result result = Result.DONE;
             if (circulation != 0) {
-                result = restoreCirculation(c, circulation);
+                parts[0] = restoreCirculation(c, circulation);
+                result = parts[0];
             }
             if (rear) {
-                Result r = restoreRearClimate(c);
-                result = result == Result.DONE ? r : result;
+                parts[1] = restoreRearClimate(c);
+                result = result == Result.DONE ? parts[1] : result;
             }
             return result;
         };
@@ -1085,13 +1110,20 @@ public final class CarMoves {
         return c -> c.setPlain(Signal.DRIVE_MODE.id, mode);
     }
 
-    /** 上车时切到设置的驾驶模式（{@link #driveModeAtStart}）：读到已经是它就不写、算做成；别的同 {@link #driveMode}。 */
-    static Job driveModeUnlessAlready(int mode) {
+    /**
+     * 上车时切到设置的驾驶模式（{@link #driveModeAtStart}）：读到已经是它就不写、算做成；临写之前 {@code stillWanted} 说不要了
+     * （挂出 P 挡了、车没通电了、这一次上车已经作废）不写，是 {@link Result#MOVING}；别的同 {@link #driveMode}。
+     */
+    static Job driveModeUnlessAlready(int mode, BooleanSupplier stillWanted) {
         return c -> {
             Integer cur = c.access.read(Signal.DRIVE_MODE.id);
             if (cur != null && cur == mode) {
                 c.note("already " + hex(cur));
                 return Result.DONE;
+            }
+            if (!stillWanted.getAsBoolean()) {
+                c.note("no longer wanted, not written");
+                return Result.MOVING;
             }
             return c.setPlain(Signal.DRIVE_MODE.id, mode);
         };
