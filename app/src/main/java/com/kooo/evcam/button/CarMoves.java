@@ -49,8 +49,8 @@ import java.util.function.Consumer;
  *
  * <p>判断和换值都在 {@link Car} 和下面的纯函数里，测试换上假的车辆接口（{@code CarMovesTest}）。</p>
  *
- * <p>上车时切驾驶模式（{@code drive.DriveStart}，issue 138）不是按键按的，写车也走这里（{@link #driveModeAtStart}）：
- * 排在同一条线程上，和按键的动作一件一件做。</p>
+ * <p>上车时切驾驶模式（{@code drive.DriveStart}）、空调重新打开后恢复循环模式和二排空调（{@code drive.ClimateOn}）不是按键按的
+ * （issue 138），写车也走这里（{@link #driveModeAtStart}、{@link #restoreClimate}）：排在同一条线程上，和按键的动作一件一件做。</p>
  */
 public final class CarMoves {
 
@@ -78,6 +78,10 @@ public final class CarMoves {
     static final float TEMP_MAX = 28.5f;
     /** 一键运动记下的原来的驾驶模式（运行状态，在 {@code smart_button_state} 里）。 */
     static final String SPORT_SAVED = "sport_saved_mode";
+
+    /** 循环模式的值是功能号加几（{@link #circulation}）：内循环、外循环。{@link #restoreClimate} 的参数用它，0 是不动。 */
+    public static final int CIRCULATION_INNER = 1;
+    public static final int CIRCULATION_OUTER = 2;
 
     /** 后雾灯闪烁：闪几下（照 jlunnn 的 7X-U，fog_count 默认 3）。 */
     static final int FOG_FLASHES = 3;
@@ -176,7 +180,7 @@ public final class CarMoves {
 
     /** 这一件是谁要做的：黑匣子那一行开头照它写。 */
     private enum By {
-        BUTTON, FLOATING, DRIVE_START
+        BUTTON, FLOATING, DRIVE_START, CLIMATE_ON
     }
 
     private static void run(Context app, By by, String key, Job job, Consumer<Result> done) {
@@ -199,8 +203,8 @@ public final class CarMoves {
                 }
                 detail = car.detail();
             }
-            BlackBox.note((by == By.DRIVE_START ? "上车设置 " : by == By.FLOATING ? "悬浮按钮动作 " : "灵动贴动作 ")
-                    + key + "：" + result + "（" + detail + "）");
+            BlackBox.note((by == By.DRIVE_START ? "上车设置 " : by == By.CLIMATE_ON ? "空调设置 "
+                    : by == By.FLOATING ? "悬浮按钮动作 " : "灵动贴动作 ") + key + "：" + result + "（" + detail + "）");
             Result r = result;
             back.post(() -> done.accept(r));
         });
@@ -213,6 +217,43 @@ public final class CarMoves {
      */
     public static void driveModeAtStart(Context app, int mode, Consumer<Result> done) {
         run(app, By.DRIVE_START, "drive_mode", driveModeUnlessAlready(mode), done);
+    }
+
+    /**
+     * 前排空调重新打开后恢复设置的那几样（{@code drive.ClimateOn}，主线程上叫）：循环模式（{@link #CIRCULATION_INNER}、
+     * {@link #CIRCULATION_OUTER}，0 不动）、二排空调打开（{@link #climateSettings}）。什么时候算重新打开由
+     * {@code drive.ClimateOnRules} 定，这里只管写和读回；黑匣子记「空调设置 climate：…」。结果在主线程上交给 {@code done}。
+     */
+    public static void restoreClimate(Context app, int circulation, boolean rear, Consumer<Result> done) {
+        run(app, By.CLIMATE_ON, "climate", climateSettings(circulation, rear), done);
+    }
+
+    /**
+     * 前排空调此刻开没开（{@code drive.ClimateOn} 每秒问一次，主线程上叫）：在写车的线程上读，读到的在主线程上交给
+     * {@code seen}（1 开、0 关，读不到 null）。只读，不记黑匣子。
+     */
+    public static void frontClimatePower(Consumer<Integer> seen) {
+        Handler h = handler();
+        Handler back = main;
+        h.post(() -> {
+            CarAccess access = Telemetry.get().carAccess();
+            Integer power = null;
+            if (access != null) {
+                try {
+                    power = frontClimatePower(new Car(access, SYSTEM_NAMES, SystemClock::sleep, null, null));
+                } catch (RuntimeException e) {
+                    power = null;
+                }
+            }
+            Integer p = power;
+            back.post(() -> seen.accept(p));
+        });
+    }
+
+    /** 前排空调的电源：按排读（{@link CarNames#ROW_1}），同 {@link #openClimate}。 */
+    static Integer frontClimatePower(Car c) {
+        Integer power = c.function("HVAC_FUNC_POWER", "IHvac");
+        return power == null ? null : c.read(power, c.zone(CarNames.ROW_1));
     }
 
     private static final java.util.Map<String, Turning> turning = new java.util.HashMap<>();
@@ -792,6 +833,67 @@ public final class CarMoves {
             int zone = c.all();
             return c.set(id, zone, next(c.read(id, zone), id + 2, id + 3, id + 2, id + 1));
         };
+    }
+
+    /**
+     * 前排空调重新打开后恢复的那几样（{@link #restoreClimate}）：整个空调关掉再打开，循环模式回到自动、二排空调关着
+     * （澳洲 7X 车主实测，PR 145）。每一样读到已经是要的就不写；有一样没做成，结果就是它的（再做一遍时做成了的不会再写）。
+     *
+     * <ul>
+     *   <li>循环模式（{@code circulation} 不是 0）：写成内循环或外循环。要写内循环时，前挡除雾读到的不是关着（开着、读不到）
+     *       就不写、也不算没做成：除雾时不往内循环切（车主实测时也是读到关着才写）。</li>
+     *   <li>二排空调（{@code rear}）：电源按排写开（{@link CarNames#ROW_2}）；读回比写晚一两百毫秒，{@link Car#set} 等得到。</li>
+     * </ul>
+     */
+    static Job climateSettings(int circulation, boolean rear) {
+        return c -> {
+            Result result = Result.DONE;
+            if (circulation != 0) {
+                result = restoreCirculation(c, circulation);
+            }
+            if (rear) {
+                Result r = restoreRearClimate(c);
+                result = result == Result.DONE ? r : result;
+            }
+            return result;
+        };
+    }
+
+    private static Result restoreCirculation(Car c, int circulation) {
+        Integer id = c.function("HVAC_FUNC_CIRCULATION", "IHvac");
+        if (id == null) {
+            return Result.UNAVAILABLE;
+        }
+        int zone = c.all();
+        int target = id + circulation;
+        Integer cur = c.read(id, zone);
+        if (cur != null && cur == target) {
+            c.note("circulation already " + hex(cur));
+            return Result.DONE;
+        }
+        if (circulation == CIRCULATION_INNER) {
+            Integer defrost = c.function("HVAC_FUNC_DEFROST_FRONT_MAX", "IHvac");
+            Integer on = defrost == null ? null : c.read(defrost, zone);
+            if (on == null || on != 0) {
+                c.note("front defrost " + hex(on) + ", circulation left at " + hex(cur));
+                return Result.DONE;
+            }
+        }
+        return c.set(id, zone, target);
+    }
+
+    private static Result restoreRearClimate(Car c) {
+        Integer power = c.function("HVAC_FUNC_POWER", "IHvac");
+        if (power == null) {
+            return Result.UNAVAILABLE;
+        }
+        int row = c.zone(CarNames.ROW_2);
+        Integer cur = c.read(power, row);
+        if (cur != null && cur == 1) {
+            c.note("rear climate already on");
+            return Result.DONE;
+        }
+        return c.set(power, row, 1);
     }
 
     /** 写一个固定的值（座椅恢复写 1）。 */

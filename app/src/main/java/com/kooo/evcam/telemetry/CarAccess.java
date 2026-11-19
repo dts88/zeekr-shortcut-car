@@ -9,7 +9,7 @@ package com.kooo.evcam.telemetry;
 
 /**
  * 车辆接口的读写（{@link Telemetry#carAccess}）：只有 {@code button.CarMoves} 用（灵动贴的动作，项目所有者 2026-10-30、11-04；
- * 上车时切驾驶模式，issue 138）。
+ * 上车时切驾驶模式、空调重新打开后恢复循环模式和二排空调，issue 138）。
  *
  * <p>都是同步的 binder 调用，可以在任何线程上叫，但会等车机回话：别在主线程上叫。读不到、写不进返回 null / false，不抛。
  * 车机说「受理」不等于做到了（Lab findings §2.48、§2.50）：要读回来看。</p>

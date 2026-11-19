@@ -70,6 +70,7 @@ public class CarMovesTest {
     private static final int SUSPENSION = 0xCA00;
     private static final int REGEN = 0xCC00;
     private static final int WINDOW_POS = 0xCD00;
+    private static final int DEFROST_FRONT = 0xCE00;
     private static final int AMBIENT_MAIN = 0xD100;
     private static final int AMBIENT_TOP = 0xD200;
 
@@ -200,6 +201,7 @@ public class CarMovesTest {
             functions.put("IVehicle.SETTING_FUNC_SUSPENSION_HEIGHT_ADJUST", SUSPENSION);
             functions.put("IVehicle.SETTING_FUNC_ENERGY_REGENERATION", REGEN);
             functions.put("IBcm.BCM_FUNC_WINDOW_POS", WINDOW_POS);
+            functions.put("IHvac.HVAC_FUNC_DEFROST_FRONT_MAX", DEFROST_FRONT);
             functions.put("IAmbienceLight.SETTING_FUNC_AMBIENCE_LIGHT_MAINZONES_COLOR_SET", AMBIENT_MAIN);
             functions.put("IAmbienceLight.SETTING_FUNC_AMBIENCE_LIGHT_TOPZONES_COLOR_SET", AMBIENT_TOP);
         }
@@ -810,6 +812,95 @@ public class CarMovesTest {
         FakeCar ignoring = new FakeCar();
         ignoring.applies = false;
         assertEquals(CarMoves.Result.NO_CHANGE, run(ignoring, CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_SPORT)));
+    }
+
+    // ---- 空调重新打开后恢复循环模式、二排空调（issue 138）
+
+    /** 空调刚重新打开的样子：循环模式自动、二排空调关着、前挡除雾关着。 */
+    private static FakeCar climateJustOn() {
+        FakeCar car = new FakeCar();
+        car.set(CIRCULATION, ALL, CIRCULATION + 3);
+        car.set(CLIMATE_POWER, ROW_1, 1);
+        car.set(CLIMATE_POWER, ROW_2, 0);
+        car.set(DEFROST_FRONT, ALL, 0);
+        return car;
+    }
+
+    @Test
+    public void climateSettingsRestoreCirculationAndRearPower() {
+        FakeCar car = climateJustOn();
+        assertEquals(CarMoves.Result.DONE, run(car, CarMoves.climateSettings(CarMoves.CIRCULATION_INNER, true)));
+        assertEquals(CIRCULATION + 1, (int) car.get(CIRCULATION, ALL));
+        assertEquals(1, (int) car.get(CLIMATE_POWER, ROW_2));
+        assertEquals(2, car.writes.size());
+
+        // 已经是要的：再做一遍一笔都不写
+        car.writes.clear();
+        assertEquals(CarMoves.Result.DONE, run(car, CarMoves.climateSettings(CarMoves.CIRCULATION_INNER, true)));
+        assertTrue(car.writes.isEmpty());
+    }
+
+    @Test
+    public void climateSettingsOnlyTouchWhatIsAskedFor() {
+        FakeCar car = climateJustOn();
+        assertEquals(CarMoves.Result.DONE, run(car, CarMoves.climateSettings(CarMoves.CIRCULATION_OUTER, false)));
+        assertEquals(CIRCULATION + 2, (int) car.get(CIRCULATION, ALL));
+        assertEquals(0, (int) car.get(CLIMATE_POWER, ROW_2));
+
+        FakeCar rearOnly = climateJustOn();
+        assertEquals(CarMoves.Result.DONE, run(rearOnly, CarMoves.climateSettings(0, true)));
+        assertEquals(CIRCULATION + 3, (int) rearOnly.get(CIRCULATION, ALL));
+        assertEquals(1, (int) rearOnly.get(CLIMATE_POWER, ROW_2));
+    }
+
+    /** 前挡除雾开着、读不到：不往内循环切，也不算没做成；二排空调照开。外循环不看除雾。 */
+    @Test
+    public void innerCirculationIsLeftAloneUnlessFrontDefrostReadsOff() {
+        FakeCar defrosting = climateJustOn();
+        defrosting.set(DEFROST_FRONT, ALL, 1);
+        assertEquals(CarMoves.Result.DONE, run(defrosting, CarMoves.climateSettings(CarMoves.CIRCULATION_INNER, true)));
+        assertEquals(CIRCULATION + 3, (int) defrosting.get(CIRCULATION, ALL));
+        assertEquals(1, (int) defrosting.get(CLIMATE_POWER, ROW_2));
+
+        FakeCar unreadable = climateJustOn();
+        unreadable.values.remove(DEFROST_FRONT + "@" + ALL);
+        assertEquals(CarMoves.Result.DONE, run(unreadable, CarMoves.climateSettings(CarMoves.CIRCULATION_INNER, false)));
+        assertTrue(unreadable.writes.isEmpty());
+
+        defrosting.set(CIRCULATION, ALL, CIRCULATION + 3);
+        assertEquals(CarMoves.Result.DONE, run(defrosting, CarMoves.climateSettings(CarMoves.CIRCULATION_OUTER, false)));
+        assertEquals(CIRCULATION + 2, (int) defrosting.get(CIRCULATION, ALL));
+    }
+
+    /** 有一样没做成，结果是它的；再做一遍时做成了的那一样不再写。 */
+    @Test
+    public void climateSettingsReportTheOneThatFailed() {
+        FakeCar car = climateJustOn();
+        car.applies = false;
+        assertEquals(CarMoves.Result.NO_CHANGE, run(car, CarMoves.climateSettings(CarMoves.CIRCULATION_INNER, true)));
+
+        FakeCar refusing = climateJustOn();
+        refusing.acceptZoned = false;
+        refusing.acceptPlain = false;
+        assertEquals(CarMoves.Result.UNAVAILABLE, run(refusing, CarMoves.climateSettings(0, true)));
+
+        FakeCar half = climateJustOn();
+        half.set(CIRCULATION, ALL, CIRCULATION + 1);
+        half.applies = false;
+        assertEquals(CarMoves.Result.NO_CHANGE, run(half, CarMoves.climateSettings(CarMoves.CIRCULATION_INNER, true)));
+        assertEquals("只写了二排空调", 1, half.writes.size());
+    }
+
+    /** 前排空调的电源按排读；读不到是 null。 */
+    @Test
+    public void frontClimatePowerReadsTheFrontRow() {
+        FakeCar car = new FakeCar();
+        assertNull(CarMoves.frontClimatePower(car(car)));
+        car.set(CLIMATE_POWER, ROW_1, 1);
+        car.set(CLIMATE_POWER, DRIVER, 0);
+        assertEquals(1, (int) CarMoves.frontClimatePower(car(car)));
+        car.set(CLIMATE_POWER, ROW_1, 0);
+        assertEquals(0, (int) CarMoves.frontClimatePower(car(car)));
     }
 
     // ---- 后雾灯闪烁（jlunnn 的 PR #160，从 7X-U 搬来）

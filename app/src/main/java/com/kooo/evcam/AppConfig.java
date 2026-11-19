@@ -76,6 +76,7 @@ public class AppConfig {
     private static final String KEY_FOOTAGE_AUDIO = "footage_audio";               // 环视录像带声音（设置 → 录制，默认开）
     private static final String KEY_DRIVE_SOUND = "drive_sound";                   // 模拟声浪（设置 → 系统，试验性）
     private static final String KEY_DRIVE_SOUND_STANDARD = "drive_sound_standard"; // 模拟声浪：标准模式下播放（默认关）
+    private static final String KEY_REAR_CLIMATE_AT_CLIMATE_ON = "rear_climate_at_climate_on";  // 空调重新打开后打开二排空调（默认关）
     private static final String KEY_GPU_FISHEYE_PREVIEW = "gpu_fisheye_preview";  // 预览鱼眼校正走 GPU 逐像素（开发者选项）
     private static final String KEY_GPU_FISHEYE_VIDEO = "gpu_fisheye_video";      // 视频回看鱼眼校正走 GPU 逐像素（开发者选项）
     private static final String KEY_PLAYBACK_READ_DURATIONS = "playback_read_durations";  // 录像回放逐个读取片段时长（开发者选项）
@@ -1260,6 +1261,36 @@ public class AppConfig {
 
     public void setDriveModeAtStart(String mode) {
         writeEnum(SettingsRegistry.DRIVE_MODE_AT_START, mode);
+    }
+
+    /** 空调重新打开后的循环模式（{@link SettingsRegistry#CIRCULATION_AT_CLIMATE_ON}）：关闭（默认），不动。 */
+    public static final String CIRCULATION_AT_CLIMATE_ON_OFF = "off";
+    public static final String CIRCULATION_AT_CLIMATE_ON_INNER = "inner";
+    public static final String CIRCULATION_AT_CLIMATE_ON_OUTER = "outer";
+
+    /**
+     * 前排空调关掉再打开后，循环模式切到哪个（issue 138）：整个空调关掉再打开，循环模式回到自动（澳洲 7X 车主实测，PR 145），
+     * 选了内循环或外循环就在它重新打开后切过去一次，之后手动切换的不动（{@code drive.ClimateOn}）。
+     * 设置页里还没有这一行：放在哪、叫什么等项目所有者定。
+     */
+    public String getCirculationAtClimateOn() {
+        return readEnum(SettingsRegistry.CIRCULATION_AT_CLIMATE_ON);
+    }
+
+    public void setCirculationAtClimateOn(String circulation) {
+        writeEnum(SettingsRegistry.CIRCULATION_AT_CLIMATE_ON, circulation);
+    }
+
+    /**
+     * 前排空调关掉再打开后，把二排空调也打开（issue 138，默认关）：整个空调关掉再打开，二排空调还关着（同上）。
+     * 设置页里还没有这一行，同上。
+     */
+    public boolean isRearClimateAtClimateOn() {
+        return readBoolean(KEY_REAR_CLIMATE_AT_CLIMATE_ON, false);
+    }
+
+    public void setRearClimateAtClimateOn(boolean on) {
+        prefs.edit().putBoolean(KEY_REAR_CLIMATE_AT_CLIMATE_ON, on).apply();
     }
 
     /**
