@@ -108,7 +108,31 @@ image.
   off or lax) is the practical answer. Updating to 1.0.0.26 is expected to block
   sideloading, including this project's APK.
 
-## 6. Evidence and open items
+## 6. Why the verifier cannot be removed from this device
+
+**On-car observation.** Boot and integrity state read at runtime via `getprop`
+on this car:
+
+```
+ro.boot.verifiedbootstate = green
+ro.boot.veritymode        = enforcing
+```
+
+`green` means the bootloader is locked and the boot chain verified against the
+manufacturer keys; `enforcing` means dm-verity is active, so the system and
+vendor partitions are hash-checked at runtime and any modification fails the read
+(on a locked device, typically a boot failure).
+
+**Inference.** Disabling or removing the verifier means altering `/system` or
+`/vendor`, which enforcing dm-verity blocks, and flashing a patched image is
+refused by the locked bootloader unless signed with the manufacturer keys. There
+is no user-reachable bootloader unlock on these units. The build is `userdebug`
+(see [platform notes](zeekr-platform-notes.md)), which leaves some debug surface
+but does not defeat verified boot or dm-verity. Removing the install verifier is
+therefore not feasible without defeating verified boot, with real bricking risk
+and no known public method for this unit.
+
+## 7. Evidence and open items
 
 - Source: the factory verifier extracted from a **1.0.0.25** image, read with a
   file manager from the real system partitions (`/vendor/app/...`). Behaviour is
