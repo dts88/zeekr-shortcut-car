@@ -566,7 +566,10 @@ public final class CameraKeeper {
         }
     }
 
-    /** 保活（开机广播、例行叫醒、无障碍、ContentProvider）要前台服务在：该开着、又没起的才起。 */
+    /**
+     * 恢复（{@code Recovery}，人回来的那一下）要前台服务在：该开着、又没起的才起。进程被周期任务带回来时没人起它
+     * （人不在车上不取资源），到这一下才起；起来以后它把系统刚才没让起的悬浮窗补上（{@code CameraForegroundService}）。
+     */
     public void ensureForegroundService(String why) {
         if (foregroundServiceNeeded() && !CameraForegroundService.isRunning()) {
             AppLog.d(TAG, "前台服务没在，起来（" + why + "）");

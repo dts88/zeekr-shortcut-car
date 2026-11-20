@@ -178,17 +178,15 @@ public final class BlackBox {
     }
 
     /**
-     * 「起因」永远是最先跑的 ContentProvider，分不出真正是谁把进程拉起来的（26 次全写它）。
-     * 所以 Provider 之后<b>第一个</b>跑到的广播 / 保活任务 / 主界面另记一行 —— 它才是拉起者。
+     * 「起因」永远是最先跑到的那一处（现在是 Application），分不出真正是谁把进程拉起来的。
+     * 所以它之后<b>第一个</b>跑到的周期任务 / 主界面另记一行 —— 它才是拉起者（保活只剩周期任务，2026-11-21）。
      * 服务不算：服务都是我们自己起的，不是拉起者。
      */
     private static void noteStarterIfInformative(String starter) {
         if (starterNoted || starter == null) {
             return;
         }
-        boolean informative = starter.startsWith("Receiver:") || starter.startsWith("BootReceiver:")
-                || starter.equals("WorkManager") || starter.equals("Accessibility")
-                || starter.startsWith("Activity:");
+        boolean informative = starter.equals("WorkManager") || starter.startsWith("Activity:");
         if (!informative) {
             return;
         }

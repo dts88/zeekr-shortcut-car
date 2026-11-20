@@ -6,7 +6,6 @@
 <resources>
     <string name="app_name">Zeekr Shortcut</string>
     <string name="app_name_full">Zeekr Shortcut</string>
-    <string name="accessibility_service_description">تُستخدم في التشغيل التلقائي للمساعدة على إبقاء التطبيق يعمل في الخلفية.\n\nلا تقرأ هذه الخدمة أي محتوى على الشاشة ولا تتحكم فيه، ولا تجمع أي بيانات.</string>
     <string name="zeekr_lane_front">الأمام</string>
     <string name="zeekr_lane_back">الخلف</string>
     <string name="zeekr_lane_left">اليسار</string>
@@ -1179,8 +1178,6 @@
     <string name="dev_perm_all_files_why">يُستخدم لقراءة الملفات وكتابتها على محركات أقراص USB</string>
     <string name="dev_perm_overlay">الظهور فوق التطبيقات الأخرى</string>
     <string name="dev_perm_overlay_why">يُستخدم في المرآة الفائقة ورؤية النقطة العمياء والزر العائم ونافذة ضبط الصورة</string>
-    <string name="dev_perm_accessibility">خدمة سهولة الاستخدام</string>
-    <string name="dev_perm_accessibility_why">يُستخدم في التشغيل التلقائي</string>
     <string name="dev_perm_usage_access">الوصول إلى بيانات الاستخدام</string>
     <string name="dev_perm_usage_access_why">يُستخدم لرصد التطبيقات التي قد تستخدم إحدى الكاميرات</string>
     <string name="dev_perm_battery">تجاهل تحسين البطارية</string>

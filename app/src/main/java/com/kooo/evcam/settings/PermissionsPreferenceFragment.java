@@ -103,8 +103,6 @@ public class PermissionsPreferenceFragment extends PreferenceFragmentCompat {
         }
         add(advanced, context, R.string.dev_perm_overlay, R.string.dev_perm_overlay_why,
                 WakeUpHelper.hasOverlayPermission(context), this::requestOverlay);
-        add(advanced, context, R.string.dev_perm_accessibility, R.string.dev_perm_accessibility_why,
-                isAccessibilityEnabled(context), this::openAccessibilitySettings);
         // 开发者选项「记录可能占用摄像头的应用」要它；查法和那边是同一个
         add(advanced, context, R.string.dev_perm_usage_access, R.string.dev_perm_usage_access_why,
                 com.kooo.evcam.camera.CameraHolderSuspects.hasUsageAccess(context),
@@ -159,16 +157,6 @@ public class PermissionsPreferenceFragment extends PreferenceFragmentCompat {
         return hasPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE);
     }
 
-    private boolean isAccessibilityEnabled(Context context) {
-        try {
-            String enabled = Settings.Secure.getString(context.getContentResolver(),
-                    Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
-            return enabled != null && enabled.contains(context.getPackageName());
-        } catch (Throwable t) {
-            return false;
-        }
-    }
-
     private boolean isIgnoringBatteryOptimizations(Context context) {
         try {
             PowerManager power = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
@@ -196,10 +184,6 @@ public class PermissionsPreferenceFragment extends PreferenceFragmentCompat {
         if (getContext() != null) {
             WakeUpHelper.requestOverlayPermission(getContext());
         }
-    }
-
-    private void openAccessibilitySettings() {
-        launch(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
     }
 
     /** 车机上未必有「使用情况访问」那一页：打不开就退到本应用的详情页。 */

@@ -24,13 +24,13 @@ import com.kooo.evcam.blackbox.BlackBox;
  * <p>{@code exitApp()} 停了前台服务、然后 {@code System.exit(0)}，但从没取消 WorkManager
  * 那个十五分钟的保活任务。任务登记在系统那边，进程死了照样到点把进程拉起来 ——
  * 2026-09-23 21:10:32 退出，21:14:43 进程起来，第一行就是「保活任务执行」。
- * 另外，停前台服务时它的 {@code onDestroy} 会发 {@code ACTION_KEEP_ALIVE}，
- * 清单里的保活广播接收器收到又去启动它；系统也会重启 START_STICKY 的服务。</p>
+ * 另外，那时停前台服务它的 {@code onDestroy} 会发保活广播，清单里的保活广播接收器收到又去启动它；系统也会重启
+ * START_STICKY 的服务（这几条路 2026-11-21 都删了，保活只剩周期任务）。</p>
  *
  * <h3>做法</h3>
  *
  * <p>退出时<b>先</b>写一个持久的标记、取消保活任务，再停服务。之后凡是会把我们拉起来的入口
- * （前台服务的启动口、保活广播、最早启动的 ContentProvider、保活任务、各服务被系统重启）
+ * （前台服务的启动口、保活任务、各服务的启动口）
  * 都先问这里；标记在就什么也不做。主界面被创建时清掉 —— 我们自己拉主界面的那几条路
  * 都在这些入口后面，被拦住了，所以标记还在时主界面被创建，只能是人点开的。
  * 真正开机时也清掉（虽然实测这个容器不把开机广播送给我们，见平台笔记 §3.6）。</p>
@@ -57,6 +57,17 @@ public final class UserExit {
         BlackBox.noteImportant("用户退出：暂停自启动，已取消保活任务，直到真正开机或手动打开");
     }
 
+    /**
+     * 连着崩溃够了（{@code recovery.CrashHold}，进程刚起来时叫）：和用户退出一样处理 —— 暂停自启动、取消周期任务，
+     * 直到人自己点开主界面或者车机真正开机。
+     */
+    public static void markHeldAfterCrashes(Context context, int crashes) {
+        prefs(context).edit().putLong(KEY_EXITED_AT, System.currentTimeMillis())
+                .putLong(KEY_EXITED_BOOT_AT, bootAt()).commit();
+        KeepAliveManager.stopKeepAliveWork(context);
+        BlackBox.noteImportant("连着崩溃 " + crashes + " 次：不再自动回来，已取消周期任务，直到人自己点开或者真正开机");
+    }
+
     public static boolean isExited(Context context) {
         return context != null && prefs(context).getLong(KEY_EXITED_AT, 0L) != 0L;
     }
@@ -74,6 +85,8 @@ public final class UserExit {
         }
         prefs(context).edit().remove(KEY_EXITED_AT).apply();
         BlackBox.noteImportant("恢复自启动：" + why);
+        // 是连着崩溃按住的话，次数从头数
+        com.kooo.evcam.recovery.CrashHold.reset(context);
         com.kooo.evcam.camera.CameraKeeper.exitCleared();
         // 灵动贴退出以后不听（进程起来时看的这个记号），清掉就接着听
         com.kooo.evcam.button.SmartButtons buttons = com.kooo.evcam.button.SmartButtons.get();

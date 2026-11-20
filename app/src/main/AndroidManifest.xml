@@ -39,7 +39,7 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- 悬浮窗权限（绕过后台启动Activity限制，需要用户手动授权） -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
-    <!-- 开机自启动权限 -->
+    <!-- 周期任务（WorkManager）在车机重启后重新登记要它；我们自己不收开机广播 -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- 请求电池优化白名单（阻止休眠的关键） -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
@@ -77,14 +77,6 @@
         android:supportsRtl="true"
         android:usesCleartextTraffic="true"
         android:theme="@style/Theme.Cam">
-
-        <!-- 高优先级保活 Provider：在应用启动的最早阶段初始化服务 -->
-        <!-- initOrder="2147483647" 确保最先执行（参考保活效果好的应用） -->
-        <provider
-            android:name=".KeepAliveProvider"
-            android:authorities="${applicationId}.keepalive"
-            android:exported="false"
-            android:initOrder="2147483647" />
 
         <!-- FileProvider for sharing video files -->
         <provider
@@ -189,70 +181,10 @@
             android:excludeFromRecents="true"
             android:exported="false" />
 
-        <!-- 无障碍服务：保活手段之一。系统肯不肯让它跑还没在车上试过，它自己会把结果记进黑匣子 -->
-        <service
-            android:name=".KeepAliveAccessibilityService"
-            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.accessibilityservice.AccessibilityService" />
-            </intent-filter>
-            <meta-data
-                android:name="android.accessibilityservice"
-                android:resource="@xml/accessibility_service_config" />
-        </service>
-
         <!-- 灵动贴扫描的结果（button.ScanReceiver，2026-11-04）：PendingIntent 扫描由系统用我们自己的身份送来，不导出 -->
         <receiver
             android:name=".button.ScanReceiver"
             android:exported="false" />
-
-        <!-- 开机自启动广播接收器 -->
-        <receiver
-            android:name=".BootReceiver"
-            android:enabled="true"
-            android:exported="true">
-            <intent-filter android:priority="1000">
-                <action android:name="android.intent.action.BOOT_COMPLETED" />
-                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
-                <category android:name="android.intent.category.DEFAULT" />
-            </intent-filter>
-        </receiver>
-
-        <!-- 保活广播接收器：系统有动静时确认一次前台服务在不在（该不该在由相机管家判）。
-             2026-11-10 起只留送得到的（项目所有者）：安卓 8 起大多数隐式系统广播不再送给清单里登记的接收器，
-             亮屏 / 熄屏、电量、耳机这几种从来只给动态登记的（平台笔记 §3.7）。TIME_TICK 只能动态注册
-             （KeepAliveReceiver.registerTimeTick）。要收蓝牙进程发的设备连上 / 断开，只能对外开放。 -->
-        <receiver
-            android:name=".KeepAliveReceiver"
-            android:enabled="true"
-            android:exported="true">
-            <intent-filter android:priority="1000">
-                <!-- 蓝牙设备连上 / 断开（车机启动会自动连手机蓝牙） -->
-                <action android:name="android.bluetooth.device.action.ACL_CONNECTED" />
-                <action android:name="android.bluetooth.device.action.ACL_DISCONNECTED" />
-                <!-- USB 设备插拔 -->
-                <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" />
-                <action android:name="android.hardware.usb.action.USB_DEVICE_DETACHED" />
-                <!-- 时区、时间、语言变化 -->
-                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
-                <action android:name="android.intent.action.TIME_SET" />
-                <action android:name="android.intent.action.LOCALE_CHANGED" />
-                <!-- 本应用更新之后 -->
-                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
-                <!-- 自己发的保活检查（KeepAliveReceiver.sendKeepAliveCheck，带包名） -->
-                <action android:name="com.kooo.evcam.ACTION_KEEP_ALIVE" />
-            </intent-filter>
-
-            <!-- U 盘挂上 / 卸下 / 移除 / 弹出：广播带 file 数据，要这一组才对得上 -->
-            <intent-filter android:priority="1000">
-                <action android:name="android.intent.action.MEDIA_MOUNTED" />
-                <action android:name="android.intent.action.MEDIA_UNMOUNTED" />
-                <action android:name="android.intent.action.MEDIA_REMOVED" />
-                <action android:name="android.intent.action.MEDIA_EJECT" />
-                <data android:scheme="file" />
-            </intent-filter>
-        </receiver>
     </application>
 
 </manifest>

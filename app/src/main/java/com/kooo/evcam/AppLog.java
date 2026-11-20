@@ -88,6 +88,8 @@ public final class AppLog {
                     saveToPersistentLog(sAppContext);
                     Log.e("AppLog", "Crash log saved successfully");
                 }
+                // 连着崩溃就不再自动回来（recovery.CrashHold）：这一次记下
+                com.kooo.evcam.recovery.CrashHold.noteCrash(sAppContext);
                 // 黑匣子在自己的线程上写，崩溃前等它把排队的写完
                 com.kooo.evcam.blackbox.BlackBox.flush(1500);
             } catch (Exception e) {
