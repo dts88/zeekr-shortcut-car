@@ -35,7 +35,8 @@ import java.util.Locale;
  *   <li><b>亮着时</b>（人在车上，{@link #whileLit}）：两项都知道，黑 = 事件是 1 且点火低；只知道一项就看那一项；都不知道：null
  *       （{@link ScreenTransitions} 照亮着算一阵）。人在车里、点火掉到 ACC、事件还是 0：还亮着；</li>
  *   <li><b>黑着时</b>（{@link #becomesLit}，项目所有者 2026-11-21：更保守，人拉开车门才算在）：车通电了（点火 ON、DRIVING），
- *       而且刚拉开过车门、或者刚碰过应用，才亮；车辆读不到，只认刚碰过应用；车没通电就是黑 —— 屏幕亮了也不算
+ *       而且刚拉开过车门、或者刚碰过应用，才亮；车辆读不到，只认刚碰过应用（点火读不到而事件是 1 的不算：车说屏幕黑着）；
+ *       车没通电就是黑 —— 屏幕亮了也不算
  *       （远程开空调、远程看车那一类：10-24 15:43:58 亮了整 60 秒，点火一直 ACC）。车自己通电不算人回来。</li>
  * </ul>
  *
@@ -87,18 +88,20 @@ public final class VehicleScreen {
 
     /**
      * 黑着时算不算人回来了（项目所有者 2026-11-21）：车通电了（点火 ON、DRIVING），而且刚拉开过车门或者刚碰过应用；
-     * 点火读不到（车辆接口没连着也是），只认刚碰过应用；车没通电不算。
+     * 点火读不到（车辆接口没连着也是），只认刚碰过应用 —— 屏幕电源事件说熄着的不算：车说屏幕黑着，照它亮了下一眼
+     * （{@link #whileLit}）就又黑，来回折腾；车没通电不算。
      *
-     * @param ignition 点火的原值，null 读不到
-     * @param door     刚拉开过车门
-     * @param touch    刚碰过应用
+     * @param screenPowerEvent 屏幕电源事件，TRUE = 熄，null 读不到
+     * @param ignition         点火的原值，null 读不到
+     * @param door             刚拉开过车门
+     * @param touch            刚碰过应用
      */
-    public static boolean becomesLit(Integer ignition, boolean door, boolean touch) {
+    public static boolean becomesLit(Boolean screenPowerEvent, Integer ignition, boolean door, boolean touch) {
         Boolean low = ignitionLow(ignition);
         if (Boolean.FALSE.equals(low)) {
             return door || touch;
         }
-        return low == null && touch;
+        return low == null && touch && !Boolean.TRUE.equals(screenPowerEvent);
     }
 
     /**

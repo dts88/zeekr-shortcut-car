@@ -256,7 +256,7 @@ public final class Automations {
         }
         List<Rule> rules = world.rules();
         if (!anyEnabled(rules)) {
-            // 一条开着的规则都没有：不读车，也不再排下一次；规则变了（{@link #rulesChanged}）、下一次亮屏再看
+            // 一条开着的规则都没有：不读车，也不再排下一次；规则变了（rulesChanged）、下一次亮屏再看
             watches.clear();
             wantBattery(false);
             return;
@@ -347,8 +347,8 @@ public final class Automations {
         return false;
     }
 
-    /** 规则改了（设置页存了以后叫，哪个线程都能叫）：亮着就重新开始看。 */
-    public static void rulesChanged() {
+    /** 规则改了（{@code AppConfig.onAutomationRulesChanged}：设置页存了、设置备份导入了）：亮着就重新开始看。 */
+    private static void rulesChanged() {
         Automations a = instance;
         if (a != null) {
             a.world.later(0, () -> {
@@ -707,6 +707,9 @@ public final class Automations {
         private final AppConfig config;
         private final SharedPreferences state;
         private final Handler main = new Handler(Looper.getMainLooper());
+        /** 拿住：SharedPreferences 只弱引用监听器。 */
+        @SuppressWarnings({"FieldCanBeLocal", "unused"})
+        private final SharedPreferences.OnSharedPreferenceChangeListener rulesListener;
         private String parsedJson;
         private List<Rule> parsed = Collections.emptyList();
 
@@ -714,6 +717,7 @@ public final class Automations {
             this.app = app;
             this.config = new AppConfig(app);
             this.state = app.getSharedPreferences(STATE, Context.MODE_PRIVATE);
+            this.rulesListener = config.onAutomationRulesChanged(Automations::rulesChanged);
         }
 
         @Override

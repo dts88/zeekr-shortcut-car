@@ -76,20 +76,30 @@ public class VehicleScreenTest {
      */
     @Test
     public void becomingLitNeedsAPersonAndThePower() {
-        assertTrue("拉开车门、车通电", VehicleScreen.becomesLit(ON, true, false));
-        assertTrue("碰过应用、车通电", VehicleScreen.becomesLit(DRIVING, false, true));
-        assertTrue(VehicleScreen.becomesLit(ON, true, true));
-        assertFalse("车自己通电", VehicleScreen.becomesLit(ON, false, false));
-        assertFalse(VehicleScreen.becomesLit(DRIVING, false, false));
-        assertFalse("车没通电：拉开车门也不算", VehicleScreen.becomesLit(ACC, true, false));
-        assertFalse("车没通电：碰过应用也不算", VehicleScreen.becomesLit(ACC, false, true));
-        assertFalse(VehicleScreen.becomesLit(AFTER_ACC, true, true));
-        assertFalse("下限本身算低", VehicleScreen.becomesLit(0x00200100, true, true));
-        assertTrue("点火读不到：只认碰过应用", VehicleScreen.becomesLit(null, false, true));
-        assertFalse("点火读不到：车门不算", VehicleScreen.becomesLit(null, true, false));
-        assertFalse(VehicleScreen.becomesLit(null, false, false));
-        assertTrue("没见过的码当读不到", VehicleScreen.becomesLit(0x00200106, false, true));
-        assertFalse(VehicleScreen.becomesLit(0x00200106, true, false));
+        assertTrue("拉开车门、车通电", VehicleScreen.becomesLit(false, ON, true, false));
+        assertTrue("碰过应用、车通电", VehicleScreen.becomesLit(false, DRIVING, false, true));
+        assertTrue(VehicleScreen.becomesLit(null, ON, true, true));
+        assertTrue("开车门点火先回 ON，事件还是 1", VehicleScreen.becomesLit(true, ON, true, false));
+        assertFalse("车自己通电", VehicleScreen.becomesLit(false, ON, false, false));
+        assertFalse(VehicleScreen.becomesLit(false, DRIVING, false, false));
+        assertFalse("车没通电：拉开车门也不算", VehicleScreen.becomesLit(false, ACC, true, false));
+        assertFalse("车没通电：碰过应用也不算", VehicleScreen.becomesLit(false, ACC, false, true));
+        assertFalse(VehicleScreen.becomesLit(true, AFTER_ACC, true, true));
+        assertFalse("下限本身算低", VehicleScreen.becomesLit(false, 0x00200100, true, true));
+        assertTrue("点火读不到：只认碰过应用", VehicleScreen.becomesLit(null, null, false, true));
+        assertTrue(VehicleScreen.becomesLit(false, null, false, true));
+        assertFalse("点火读不到：车门不算", VehicleScreen.becomesLit(null, null, true, false));
+        assertFalse(VehicleScreen.becomesLit(null, null, false, false));
+        assertTrue("没见过的码当读不到", VehicleScreen.becomesLit(false, 0x00200106, false, true));
+        assertFalse(VehicleScreen.becomesLit(false, 0x00200106, true, false));
+    }
+
+    /** 点火读不到、屏幕电源事件说熄着：碰了应用也不算 —— 照它亮了，下一眼（whileLit）就又黑。 */
+    @Test
+    public void aTouchDoesNotCountWhileTheCarSaysTheScreenIsOff() {
+        assertFalse(VehicleScreen.becomesLit(true, null, false, true));
+        assertFalse("没见过的码当读不到", VehicleScreen.becomesLit(true, 0x00200106, true, true));
+        assertEquals("亮了的话下一眼是黑", Boolean.TRUE, VehicleScreen.whileLit(true, null));
     }
 
     /** 人在车里、一直没黑过：点火掉到 ACC、事件还是 0，照两项「且」还是亮；事件变 1 才黑。 */

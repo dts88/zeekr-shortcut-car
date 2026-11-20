@@ -40,12 +40,13 @@ public class ScreenTransitionsTest {
     private static final long FRESH = ScreenTransitions.EVIDENCE_FRESH_MS;
     private static final long LOST = ScreenTransitions.LOST_MAX_MS;
 
-    /** 一段输入，记下跨过的边。时间是 elapsedRealtime（毫秒）。证据照 ScreenState 的记法：熄屏（E1）那一下清掉。 */
+    /** 一段输入，记下跨过的边。时间是 elapsedRealtime（毫秒）。证据照 ScreenState 的记法（同一个 PersonEvidence）：先记这一批、再判。 */
     private static final class Run {
         ScreenTransitions.State s;
         final List<String> edges = new ArrayList<>();
-        long doorAt;
-        long touchAt;
+        final PersonEvidence evidence = new PersonEvidence();
+        /** 上一批读数里有车门开着（熄屏那一下照它记；车辆接口没连着是 false）。 */
+        boolean doorOpen;
 
         Run(boolean androidOff) {
             s = ScreenTransitions.initial(androidOff);
@@ -60,24 +61,30 @@ public class ScreenTransitionsTest {
 
         /** 车辆接口连着，读到这两项，车门都关着。 */
         Run car(Boolean event, Integer ignition, long now) {
-            return judge(CONNECTED, event, ignition, now);
+            return doors(false, now).judge(CONNECTED, event, ignition, now);
         }
 
         /** 车辆接口连着，读到这两项，这一批里有一扇车门开着。 */
         Run door(Boolean event, Integer ignition, long now) {
-            doorAt = now;
-            return judge(CONNECTED, event, ignition, now);
+            return doors(true, now).judge(CONNECTED, event, ignition, now);
         }
 
-        /** 人碰了应用，照此刻的读数再判一次。 */
+        /** 人碰了应用，照此刻的读数再判一次（车门照上一批）。 */
         Run touch(Telemetry.CarLink link, Boolean event, Integer ignition, long now) {
-            touchAt = now;
+            evidence.touched(now);
             return judge(link, event, ignition, now);
         }
 
-        /** 车辆接口连着，两项都读不到（或者时限到了再看一次）。 */
+        /** 车辆接口连着，两项都读不到（或者时限到了再看一次），车门也读不到。 */
         Run unreadable(long now) {
-            return judge(CONNECTED, null, null, now);
+            return doors(false, now).judge(CONNECTED, null, null, now);
+        }
+
+        /** 车辆接口连着的一批读数里车门开没开着。 */
+        Run doors(boolean open, long now) {
+            doorOpen = open;
+            evidence.doors(open, now);
+            return this;
         }
 
         /** 车辆接口没连着（断了、在连、连不上）。 */
@@ -97,7 +104,7 @@ public class ScreenTransitionsTest {
         /** 安卓亮了，醒来那一遍读到这两项（读不到、没读回来都是 null），车门关着。 */
         Run androidOn(Boolean event, Integer ignition, long now) {
             return to(ScreenTransitions.verdict(ScreenTransitions.androidOn(s), CONNECTED, event, ignition,
-                    fresh(doorAt, now), fresh(touchAt, now), touchAt, now));
+                    evidence.door(now), evidence.touch(now), evidence.touchAtMs(), now));
         }
 
         Run androidOnNoInterface(long now) {
@@ -106,12 +113,11 @@ public class ScreenTransitionsTest {
         }
 
         private Run judge(Telemetry.CarLink link, Boolean event, Integer ignition, long now) {
-            return to(ScreenTransitions.verdict(s, link, event, ignition, fresh(doorAt, now), fresh(touchAt, now),
-                    touchAt, now));
-        }
-
-        private static boolean fresh(long at, long now) {
-            return at > 0 && now - at <= FRESH;
+            if (link != CONNECTED) {
+                doorOpen = false;
+            }
+            return to(ScreenTransitions.verdict(s, link, event, ignition, evidence.door(now), evidence.touch(now),
+                    evidence.touchAtMs(), now));
         }
 
         private Run to(ScreenTransitions.State next) {
@@ -120,8 +126,7 @@ public class ScreenTransitionsTest {
                 edges.add(edge.name());
             }
             if (edge == ScreenTransitions.Edge.DARK) {
-                doorAt = 0;
-                touchAt = 0;
+                evidence.wentDark(doorOpen);
             }
             s = next;
             return this;
@@ -199,6 +204,38 @@ public class ScreenTransitionsTest {
         assertEquals(Arrays.asList(DARK), r.edges);
     }
 
+    /**
+     * 熄屏那一下车门还读到开着（车门信号比屏幕、点火晚到，或者车门就那么开着）：这一扇不算，车自己通电还是黑；
+     * 读到关上、再读到开着才算。
+     */
+    @Test
+    public void aDoorStillOpenWhenItWentDarkDoesNotCount() {
+        Run r = Run.lit().door(true, ACC, 8_000);
+        assertEquals(Arrays.asList(DARK), r.edges);
+        r.door(true, ON, 20_000);
+        assertTrue("熄屏那一下就开着的车门：不算", r.s.dark());
+        r.car(true, ACC, 30_000).door(true, ON, 40_000);
+        assertEquals("关上再拉开：算", Arrays.asList(DARK, LIT), r.edges);
+    }
+
+    /** 点火读不到、屏幕电源事件说熄着：碰了应用也不算（照它亮了下一眼就又黑）；事件说亮着的，碰了就亮，亮了不来回。 */
+    @Test
+    public void aTouchDoesNotCountWhileTheCarSaysTheScreenIsOff() {
+        Run off = Run.lit().car(true, ACC, 0);
+        off.edges.clear();
+        off.touch(CONNECTED, true, null, 100_000);
+        assertTrue(off.s.dark());
+        off.touch(CONNECTED, true, 0x00200106, 101_000);
+        assertTrue("没见过的码当读不到，事件说熄着：不算", off.edges.isEmpty());
+
+        Run on = Run.lit().car(true, ACC, 0);
+        on.edges.clear();
+        on.touch(CONNECTED, false, null, 100_000);
+        assertEquals(Arrays.asList(LIT), on.edges);
+        on.car(false, null, 101_000);
+        assertEquals("亮了以后不来回", Arrays.asList(LIT), on.edges);
+    }
+
     /** 夜里车机自己醒：安卓亮了，没有人的证据 —— 车机醒着、屏幕黑着；两分钟后安卓又熄屏 = 车机又要睡。 */
     @Test
     public void nightWakeStaysDark() {
@@ -233,7 +270,7 @@ public class ScreenTransitionsTest {
 
         Run person = Run.lit().car(true, ACC, 0).androidOff();
         person.edges.clear();
-        person.doorAt = 7_499_000;
+        person.doors(true, 7_499_000);
         person.androidOn(false, ON, 7_500_000);
         assertEquals(Arrays.asList(LIT), person.edges);
     }

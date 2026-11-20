@@ -21,7 +21,7 @@ import com.kooo.evcam.telemetry.Telemetry;
  *
  * <ul>
  *   <li>车通电了（点火 ON、DRIVING），而且刚拉开过车门、或者刚碰过应用（{@link #EVIDENCE_FRESH_MS} 之内）；</li>
- *   <li>车辆读不到（接口没连着、点火读不到）：只认刚碰过应用；</li>
+ *   <li>车辆读不到（接口没连着、点火读不到）：只认刚碰过应用（点火读不到而屏幕电源事件说熄着的不算）；</li>
  *   <li>车没通电（点火 ACC 或更低）：黑，屏幕亮了也不算（远程开空调、远程看车）。</li>
  * </ul>
  *
@@ -107,7 +107,7 @@ final class ScreenTransitions {
      * @param link      车辆接口此刻的结果（null = 核心还没登记）
      * @param event     屏幕电源事件（TRUE = 熄，FALSE = 亮，null 读不到）；接口没连着时不看
      * @param ignition  点火的原值，null 读不到；接口没连着时不看
-     * @param door      刚拉开过车门（四扇侧门有一扇读到开着，{@link #EVIDENCE_FRESH_MS} 之内）
+     * @param door      刚拉开过车门（四扇侧门有一扇读到开着，{@link #EVIDENCE_FRESH_MS} 之内；记法在 {@link PersonEvidence}）
      * @param touch     刚碰过应用（同上）
      * @param touchAtMs 人最后一次碰应用的时刻（elapsedRealtime），0 = 没有
      * @param now       此刻（elapsedRealtime）
@@ -138,7 +138,7 @@ final class ScreenTransitions {
             return new State(false, Boolean.FALSE, since);
         }
         // 黑着：有人的证据才亮。凭碰过应用亮起来而车辆读不到的，从此刻起算读不到的时限
-        if (!VehicleScreen.becomesLit(i, door, touch)) {
+        if (!VehicleScreen.becomesLit(e, i, door, touch)) {
             return new State(false, Boolean.TRUE, 0);
         }
         return new State(false, Boolean.FALSE, plain == null ? now : 0);

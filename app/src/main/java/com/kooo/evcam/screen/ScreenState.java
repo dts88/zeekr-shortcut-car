@@ -220,10 +220,8 @@ public final class ScreenState {
      * （{@link #vehicleChanged}），不等 {@link Telemetry#reconcileNow} 的回调。一段里只再连一次（主线程）。
      */
     private static boolean wakeOnLink;
-    /** 最近一次读到有车门（四扇侧门）开着的时刻（elapsedRealtime）；0 = 没有。熄屏（E1）时清掉。主线程。 */
-    private static long doorSeenAtMs;
-    /** 人最近一次碰应用的时刻（{@link #userActed}，elapsedRealtime）；0 = 没有。熄屏（E1）时清掉。主线程写。 */
-    private static volatile long touchAtMs;
+    /** 有人的证据：最近一次读到车门（四扇侧门）开着、人最近一次碰应用（{@link #userActed}）。熄屏（E1）时作废。主线程写。 */
+    private static final PersonEvidence EVIDENCE = new PersonEvidence();
     /** 那一次是怎么碰的（ASCII，亮屏那一行写）。 */
     private static String touchHow = "";
     /** 黑着、车通电了、没有人的证据的那一段记过黑匣子了（起止各一行，主线程）。 */
@@ -346,8 +344,7 @@ public final class ScreenState {
                 f.state.androidOff, dark && f.androidOffAtMs > 0 ? now - f.androidOffAtMs : -1, f.state.vehicle,
                 r.bool(Signal.SCREEN_POWER_EVENT), r.code(Signal.IGNITION), telemetry.carLink(),
                 DisplayWatch.interactiveNow(), s == Settle.NONE, s == Settle.WAKE,
-                ScreenTransitions.litNeedsEvidence(f.state), doorSeenAtMs > 0 ? now - doorSeenAtMs : -1,
-                touchAtMs > 0 ? now - touchAtMs : -1);
+                ScreenTransitions.litNeedsEvidence(f.state), EVIDENCE.doorAgoMs(now), EVIDENCE.touchAgoMs(now));
     }
 
     /**
@@ -411,12 +408,12 @@ public final class ScreenState {
         Boolean event = connected ? readings.bool(Signal.SCREEN_POWER_EVENT) : null;
         Integer ignition = connected ? readings.code(Signal.IGNITION) : null;
         long now = SystemClock.elapsedRealtime();
-        if (connected && doorOpen(readings)) {
-            doorSeenAtMs = now;
+        if (connected) {
+            EVIDENCE.doors(doorOpen(readings), now);
         }
         ScreenTransitions.State before = facts.state;
         ScreenTransitions.State next = ScreenTransitions.verdict(before, link, event, ignition,
-                fresh(doorSeenAtMs, now), fresh(touchAtMs, now), touchAtMs, now);
+                EVIDENCE.door(now), EVIDENCE.touch(now), EVIDENCE.touchAtMs(), now);
         // 进程起来后的第一份、安卓刚亮时等着连上的那一份：读到了屏幕或点火，或者车辆接口有了结果（连上了要等那一遍读数发布出来：
         // 连上的通知比读数早 40 ms）
         boolean linkSettled = ScreenTransitions.linkSettled(link,
@@ -445,11 +442,15 @@ public final class ScreenState {
     /** 亮着时车辆读不到、照亮着算的时限到了：照此刻的读数再判一次（读数不变就不会再有回调）。 */
     private static final Runnable UNKNOWN_CHECK = () -> vehicleChanged(Telemetry.get().readings());
 
-    /** 进程起来后等第一份车辆读数，等满了：还是黑，等人的证据。 */
+    /**
+     * 进程起来后等第一份车辆读数，等满了：照读不到判一次 —— 这一段里人碰过应用（人自己点开的主界面，{@link #userActed} 那时
+     * 没当场判）就亮，不然还是黑，等人的证据。排着的事（{@link #whenKnown}）在判完之后做。
+     */
     private static final Runnable STARTUP_CAP = () -> {
         if (settle == Settle.STARTUP) {
             endSettle();
-            AppLog.i(TAG, "no vehicle reading within " + STARTUP_SETTLE_MAX_MS + "ms after start: stays dark until there is evidence");
+            AppLog.i(TAG, "no vehicle reading within " + STARTUP_SETTLE_MAX_MS + "ms after start: judged as unreadable");
+            vehicleChanged(Telemetry.get().readings());
             drainWhenKnown();
         }
     };
@@ -471,7 +472,10 @@ public final class ScreenState {
         if (startup) {
             endSettle();
         }
-        move(ScreenTransitions.androidOff(f.state), f.event, f.ignition);
+        ScreenTransitions.State next = ScreenTransitions.androidOff(f.state);
+        move(next, f.event, f.ignition);
+        // 安卓熄屏了：亮着时读不到的那个时限不用再看
+        scheduleLostCheck(next, SystemClock.elapsedRealtime());
         if (startup) {
             drainWhenKnown();
         }
@@ -546,14 +550,14 @@ public final class ScreenState {
         Integer ignition = connected ? r.code(Signal.IGNITION) : null;
         wakeCapped = capped && connected;
         long now = SystemClock.elapsedRealtime();
-        if (connected && !capped && doorOpen(r)) {
-            doorSeenAtMs = now;
+        if (connected && !capped) {
+            EVIDENCE.doors(doorOpen(r), now);
         }
         // 安卓亮了只是车机醒了：黑着的还黑着，有人的证据才亮（E3），没有就是车机醒着、屏幕黑着（E2'）。
         // 等满了没读回来的那一遍不拿来判（记着的可能是睡之前的）：照读不到算，只认刚碰过应用
         ScreenTransitions.State next = ScreenTransitions.verdict(ScreenTransitions.androidOn(facts.state), telemetry.carLink(),
-                capped ? null : event, capped ? null : ignition, fresh(doorSeenAtMs, now), fresh(touchAtMs, now),
-                touchAtMs, now);
+                capped ? null : event, capped ? null : ignition, EVIDENCE.door(now), EVIDENCE.touch(now),
+                EVIDENCE.touchAtMs(), now);
         move(next, event, ignition);
         scheduleLostCheck(next, now);
         drainWhenKnown();
@@ -696,9 +700,9 @@ public final class ScreenState {
                 + "、点火" + VehicleScreen.change(VehicleScreen.ignitionText(before.ignition),
                 VehicleScreen.ignitionText(after.ignition)) + "；安卓还亮着")
                 + "）");
-        // 下车之前的证据到此作废：再亮要人再拉一次车门、再碰一次应用
-        doorSeenAtMs = 0;
-        touchAtMs = 0;
+        // 下车之前的证据到此作废：再亮要人再拉一次车门、再碰一次应用；这一下还读到开着的车门，要先关上、再拉开才算
+        Telemetry telemetry = Telemetry.get();
+        EVIDENCE.wentDark(telemetry.carLinkConnected() && doorOpen(telemetry.readings()));
         ScreenOffRecording.onScreenOff(app);
         com.kooo.evcam.camera.CameraKeeper.get(app).screenOff(after.state.androidOff);
         for (Listener listener : new ArrayList<>(LISTENERS)) {
@@ -749,8 +753,8 @@ public final class ScreenState {
         MAIN.removeCallbacks(WAKE_POLL);
         long now = SystemClock.elapsedRealtime();
         long darkMs = before.darkAtMs > 0 ? now - before.darkAtMs : -1;
-        boolean door = fresh(doorSeenAtMs, now);
-        boolean touch = fresh(touchAtMs, now);
+        boolean door = EVIDENCE.door(now);
+        boolean touch = EVIDENCE.touch(now);
         // 总原则（规格 §0）：停车熄屏是特殊情况；人回来了，特殊情况就结束了，回到用户设定的状态
         BlackBox.noteImportant("亮屏（" + (after.state.vehicle == null ? "这台车机没有车辆接口，只看安卓：安卓亮着"
                 : (door ? "拉开过车门" : "") + (door && touch ? "、" : "") + (touch ? "碰过应用 " + touchHow : "")
@@ -803,17 +807,12 @@ public final class ScreenState {
                 || Boolean.TRUE.equals(r.bool(Signal.DOOR_REAR_LEFT)) || Boolean.TRUE.equals(r.bool(Signal.DOOR_REAR_RIGHT));
     }
 
-    /** 这一样证据还新鲜（{@link ScreenTransitions#EVIDENCE_FRESH_MS} 之内）。 */
-    private static boolean fresh(long atMs, long now) {
-        return atMs > 0 && now - atMs <= ScreenTransitions.EVIDENCE_FRESH_MS;
-    }
-
     /** 亮着时车辆读不到的时限：到点再判一次（人碰过应用就从那时重新算）；没在算时限就撤掉。 */
     private static void scheduleLostCheck(ScreenTransitions.State s, long now) {
         MAIN.removeCallbacks(UNKNOWN_CHECK);
         if (s.unknownSinceMs > 0) {
             MAIN.postDelayed(UNKNOWN_CHECK,
-                    Math.max(0L, Math.max(s.unknownSinceMs, touchAtMs) + ScreenTransitions.LOST_MAX_MS - now));
+                    Math.max(0L, Math.max(s.unknownSinceMs, EVIDENCE.touchAtMs()) + ScreenTransitions.LOST_MAX_MS - now));
         }
     }
 
@@ -834,7 +833,7 @@ public final class ScreenState {
             return;
         }
         long now = SystemClock.elapsedRealtime();
-        touchAtMs = now;
+        EVIDENCE.touched(now);
         ScreenTransitions.State s = facts.state;
         if (s.vehicle == null) {
             // 这台车机没有车辆接口：只看安卓
@@ -851,6 +850,8 @@ public final class ScreenState {
             refresh();
             return;
         }
+        // 屏幕不知道的那一小段里不当场判：进程刚起来的等第一份读数或者等满了那一下（STARTUP_CAP），安卓刚亮的等醒来那一遍
+        // （wakeRead）—— 都照这一下判
         if (settle == Settle.NONE) {
             vehicleChanged(Telemetry.get().readings());
         }

@@ -1257,6 +1257,11 @@ public class AppConfig {
         prefs.edit().putString(KEY_AUTOMATION_RULES, json == null ? "" : json).apply();
     }
 
+    /** 规则一变（设置页存了、设置备份导入了）就叫 {@code action}（主线程）。拿住返回值，同 {@link #onFisheyeChanged}。 */
+    public SharedPreferences.OnSharedPreferenceChangeListener onAutomationRulesChanged(Runnable action) {
+        return onChanged(action, KEY_AUTOMATION_RULES);
+    }
+
     /**
      * 主界面环视预览的鱼眼校正走 GPU 逐像素（{@code PreviewDewarp}），而不是分格近似。
      *
