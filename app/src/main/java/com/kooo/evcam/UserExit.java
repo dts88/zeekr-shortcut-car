@@ -80,6 +80,8 @@ public final class UserExit {
         if (buttons != null) {
             buttons.resumeAfterExit();
         }
+        // 退出期间的那一次上车，自动化没做（ui-spec §十八），清掉就补上
+        com.kooo.evcam.automation.Automations.resumeAfterExit();
     }
 
     /**

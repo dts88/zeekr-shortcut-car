@@ -76,6 +76,7 @@ public class AppConfig {
     private static final String KEY_FOOTAGE_AUDIO = "footage_audio";               // 环视录像带声音（设置 → 录制，默认开）
     private static final String KEY_DRIVE_SOUND = "drive_sound";                   // 模拟声浪（设置 → 系统，试验性）
     private static final String KEY_DRIVE_SOUND_STANDARD = "drive_sound_standard"; // 模拟声浪：标准模式下播放（默认关）
+    private static final String KEY_AUTOMATION_RULES = "automation_rules";  // 地点与自动化的规则（JSON，automation.RuleStore）
     private static final String KEY_GPU_FISHEYE_PREVIEW = "gpu_fisheye_preview";  // 预览鱼眼校正走 GPU 逐像素（开发者选项）
     private static final String KEY_GPU_FISHEYE_VIDEO = "gpu_fisheye_video";      // 视频回看鱼眼校正走 GPU 逐像素（开发者选项）
     private static final String KEY_PLAYBACK_READ_DURATIONS = "playback_read_durations";  // 录像回放逐个读取片段时长（开发者选项）
@@ -1242,6 +1243,18 @@ public class AppConfig {
 
     public void setDriveSoundExteriorVolume(String db) {
         writeEnum(SettingsRegistry.DRIVE_SOUND_EXTERIOR_VOLUME, db);
+    }
+
+    /**
+     * 地点与自动化的规则（ui-spec §十八）：{@code automation.RuleStore} 存取的 JSON，空字符串是一条都没有。
+     * 进设置备份；诊断报告里只写有几个字，不写内容（里面有用户起的名字）。
+     */
+    public String getAutomationRules() {
+        return prefs.getString(KEY_AUTOMATION_RULES, "");
+    }
+
+    public void setAutomationRules(String json) {
+        prefs.edit().putString(KEY_AUTOMATION_RULES, json == null ? "" : json).apply();
     }
 
     /**
