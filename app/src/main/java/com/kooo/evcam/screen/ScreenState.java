@@ -756,6 +756,8 @@ public final class ScreenState {
                 + (before.state.androidOff ? "；安卓：" + wakeHow : "")
                 + "）" + (darkMs < 0 ? "" : "，熄屏 " + darkMs / 1000 + " 秒"));
         wakeCapped = false;
+        // 停车结束、车辆信号先恢复：下面相机管家、恢复、各监听者这一下看的读数、登记的浮点和定位都是恢复了的
+        Parked.leave();
         ScreenOffRecording.onScreenOn();
         com.kooo.evcam.camera.CameraKeeper.get(app).screenOn();
         Recovery.bringBackUiAfterScreenOn(app);

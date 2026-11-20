@@ -284,7 +284,7 @@ public final class SmartButtons {
     private boolean parked;
     /** 车机醒了，等到这一刻才开始扫描（{@link #headUnitWoke}）。 */
     private long settledAt;
-    /** 车机醒来的时刻，开始听时记一笔；0 = 记过了。 */
+    /** 车机醒来、或者人回来（停车结束）的时刻，开始听时记一笔过了多久；0 = 记过了。 */
     private long wokeAt;
     /** 蓝牙重启过（车机睡过、蓝牙关过）：下次开扫描之前先向系统要一份现在的服务（{@link #refreshGatt}）。 */
     private boolean gattStale;
@@ -611,7 +611,11 @@ public final class SmartButtons {
      */
     public void screenLit() {
         bt.post(() -> {
-            parked = false;
+            if (parked) {
+                parked = false;
+                // 从人回来这一下起算开始听用了多久（停车着车机自己醒来的那几下不算）
+                wokeAt = SystemClock.elapsedRealtime();
+            }
             ensureScan();
         });
     }
@@ -624,7 +628,9 @@ public final class SmartButtons {
         bt.post(() -> {
             long now = SystemClock.elapsedRealtime();
             settledAt = now + SETTLE_MS;
-            wokeAt = now;
+            if (!parked) {
+                wokeAt = now;
+            }
             bluetoothRestarted();
             ensureScan();
         });
@@ -971,7 +977,7 @@ public final class SmartButtons {
         }
         note(Listen.LISTENING, "");
         if (wokeAt != 0) {
-            BlackBox.note("灵动贴：车机醒来 " + seconds(now - wokeAt) + " 秒开始听；看到蓝牙开着 " + seconds(now - bluetoothOnSince)
+            BlackBox.note("灵动贴：车机醒来（或人回来）" + seconds(now - wokeAt) + " 秒开始听；看到蓝牙开着 " + seconds(now - bluetoothOnSince)
                     + " 秒；phone " + phoneSeen.words() + ", " + ScanProbe.scanFacts(app, adapter));
             wokeAt = 0;
         } else {

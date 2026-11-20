@@ -270,6 +270,11 @@ public final class ChannelFacts implements ChannelScheduler.Facts {
     /** 在开车（{@link ChannelRules#driving}，相机管家的唯一定义）；车辆接口没连着算没在开车。 */
     @Override
     public boolean driving() {
+        return drivingNow();
+    }
+
+    /** 此刻在不在开车（同上，照车辆信号此刻的快照；停车 {@code screen.Parked} 也照它）。哪个线程都能问。 */
+    public static boolean drivingNow() {
         com.kooo.evcam.telemetry.Telemetry t = com.kooo.evcam.telemetry.Telemetry.get();
         if (!t.carLinkConnected()) {
             return false;

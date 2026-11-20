@@ -16,6 +16,7 @@ import com.kooo.evcam.AppLog;
 import com.kooo.evcam.UserExit;
 import com.kooo.evcam.blackbox.BlackBox;
 import com.kooo.evcam.button.SmartButtons;
+import com.kooo.evcam.camera.ChannelFacts;
 import com.kooo.evcam.camera.ChannelRules;
 import com.kooo.evcam.overlay.OverlayCoordinator;
 import com.kooo.evcam.telemetry.Telemetry;
@@ -30,6 +31,10 @@ import com.kooo.evcam.telemetry.Telemetry;
  * 再过 {@link #AFTER_CAMERAS_MS} 是这里（{@link #due}）。黑着时安卓也熄屏了（车机要睡）当场放，不等。进程起来时没有人的证据：
  * 从停车起，什么都还没拿。停了车就一直停着，车机自己醒来、屏幕亮了都不变；有了人的证据（亮屏，E3）才结束。</p>
  *
+ * <p>在开车时不停车（{@code ChannelFacts.drivingNow}，和相机管家同一个定义：挡位不在 P）：亮着的时候车辆信号读不到太久、
+ * 安卓在行驶中熄屏，都会判成熄屏，这时把悬浮按钮、灵动贴也放开的话，人就没有办法「碰一下应用」把它叫回来了。
+ * 不开了（挂回 P）还黑着，再照上面的时刻算。进程起来时照旧从停车起 —— 那时什么都没拿，开着车也不为它去拿。</p>
+ *
  * <h3>放什么，按这个次序</h3>
  *
  * <ol>
@@ -43,9 +48,10 @@ import com.kooo.evcam.telemetry.Telemetry;
  *
  * <h3>人回来</h3>
  *
- * <p>亮屏那条边上相机管家先接相机（{@code ScreenState.wentLit}），然后这里，同一下：车辆信号恢复（离散的当场全读一遍）、
- * 蓝牙接着听、欠着的悬浮窗照设置起（{@link OverlayCoordinator#restoreAfterParking}）—— 我们自己停掉的，不看开机自启动；
- * 用户退出了的不起。屏幕黑着时有人要起悬浮窗（主界面打开）也记成欠着，一样在这里起。</p>
+ * <p>亮屏那条边上，同一下：车辆信号最先恢复（{@link #leave}，在相机管家和各模块之前 —— 它们那一下要看的读数、要登记的
+ * 浮点和定位都是恢复了的；离散的当场全读一遍）；那条边自己的事做完之后，蓝牙接着听、欠着的悬浮窗照设置起
+ * （{@link OverlayCoordinator#restoreAfterParking}）—— 我们自己停掉的，不看开机自启动；用户退出了的不起。
+ * 屏幕黑着时有人要起悬浮窗（主界面打开）也记成欠着，一样在这里起。</p>
  */
 public final class Parked {
 
@@ -74,6 +80,12 @@ public final class Parked {
             return;
         }
         app = context.getApplicationContext();
+        // 在开车时不停车：不开了（挡位变了）还黑着的，那一下再看
+        Telemetry.get().addListener(readings -> {
+            if (!parked && ScreenState.dark()) {
+                check();
+            }
+        });
         if (!ScreenState.dark()) {
             return;
         }
@@ -112,22 +124,23 @@ public final class Parked {
 
     /**
      * 该停车了：熄屏满 {@link ChannelRules#HOLD_MS} + {@link #AFTER_CAMERAS_MS}（相机先放），或者黑着时安卓也熄屏了（车机要睡，
-     * 当场放），或者不知道什么时候黑的（进程起来时就黑着）。
+     * 当场放），或者不知道什么时候黑的。在开车时不算。
      *
      * @param dark       熄屏着（人不在车上）
      * @param darkForMs  熄屏多久了；起点不明是负数
      * @param androidOff 黑着时安卓也熄屏了
+     * @param driving    在开车（{@code ChannelRules.driving}）
      */
-    static boolean due(boolean dark, long darkForMs, boolean androidOff) {
-        return dark && (androidOff || darkForMs < 0 || darkForMs >= ChannelRules.HOLD_MS + AFTER_CAMERAS_MS);
+    static boolean due(boolean dark, long darkForMs, boolean androidOff, boolean driving) {
+        return dark && !driving && (androidOff || darkForMs < 0 || darkForMs >= ChannelRules.HOLD_MS + AFTER_CAMERAS_MS);
     }
 
-    /** 再过多久该停车（毫秒）；该了是 0，亮着是 -1。 */
-    static long untilDue(boolean dark, long darkForMs, boolean androidOff) {
-        if (!dark) {
+    /** 再过多久该停车（毫秒）；该了是 0；亮着、在开车是 -1（不用等：不开了那一下再看）。 */
+    static long untilDue(boolean dark, long darkForMs, boolean androidOff, boolean driving) {
+        if (!dark || driving) {
             return -1;
         }
-        return due(true, darkForMs, androidOff) ? 0 : ChannelRules.HOLD_MS + AFTER_CAMERAS_MS - darkForMs;
+        return due(true, darkForMs, androidOff, false) ? 0 : ChannelRules.HOLD_MS + AFTER_CAMERAS_MS - darkForMs;
     }
 
     // ================================================================= 输入（主线程）
@@ -135,8 +148,9 @@ public final class Parked {
     private static final Runnable CHECK = Parked::check;
 
     /**
-     * 熄屏判断每换一次状态叫一次（{@code ScreenState.move}，那条边自己的事做完之后）：亮屏就结束停车；黑着就看该不该停车、
-     * 还差多久（到点自己再看）。灵动贴要知道的两下也从这里转：安卓亮了（车机醒了，蓝牙多半重启过）、亮屏。
+     * 熄屏判断每换一次状态叫一次（{@code ScreenState.move}，那条边自己的事做完之后）：亮屏就把蓝牙、欠着的悬浮窗拿回来
+     * （车辆信号在那条边的开头已经恢复，{@link #leave}）；黑着就看该不该停车、还差多久（到点自己再看）。
+     * 灵动贴要知道的两下也从这里转：安卓亮了（车机醒了，蓝牙多半重启过）、亮屏。
      *
      * @param edge 这一次跨过的边，没跨是 null
      */
@@ -171,12 +185,13 @@ public final class Parked {
         if (parked || app == null || !ScreenState.dark()) {
             return;
         }
-        long wait = untilDue(true, ScreenState.darkForMs(), ScreenState.androidOff());
+        long wait = untilDue(true, ScreenState.darkForMs(), ScreenState.androidOff(), ChannelFacts.drivingNow());
         if (wait > 0) {
             MAIN.postDelayed(CHECK, wait);
-            return;
+        } else if (wait == 0) {
+            enter();
         }
-        enter();
+        // 在开车：不停车，不开了（车辆读数变了）那一下再看
     }
 
     /** 停车：按次序放开。 */
@@ -199,8 +214,11 @@ public final class Parked {
         step("telemetry", () -> Telemetry.get().setParked(true));
     }
 
-    /** 人回来了（亮屏）：还没到停车就回来的，什么都没放开过。欠着的悬浮窗由 {@link #screenMoved} 接着起。 */
-    private static void leave() {
+    /**
+     * 人回来了（亮屏那条边的开头，{@code ScreenState.wentLit}，在相机管家和各模块之前）：停车结束，车辆信号恢复。
+     * 还没到停车就回来的，什么都没放开过。蓝牙、欠着的悬浮窗由 {@link #screenMoved} 在那条边的最后拿回。重复叫无害。
+     */
+    static void leave() {
         MAIN.removeCallbacks(CHECK);
         if (!parked) {
             return;
