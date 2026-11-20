@@ -234,29 +234,6 @@ public final class SettingsRegistry {
             entry("12", "+12 dB"),
             entry("18", "+18 dB"));
 
-    /**
-     * 上车时切到哪个驾驶模式（{@code drive.DriveStart}，issue 138）：车每次通电后驾驶模式回到标准（澳洲 7X 车主实测，PR 145），
-     * 选了一种就在每次上车时切过去一次。默认关闭。只有存取和后面的逻辑：设置页里还没有这一行，放在哪、叫什么等项目所有者定，
-     * 所以选项不带界面上的名字，下面的中文只进日志。
-     */
-    public static final SettingSpec DRIVE_MODE_AT_START = SettingSpec.of(
-            "drive_mode_at_start", "上车时的驾驶模式", com.kooo.evcam.AppConfig.DRIVE_MODE_AT_START_OFF,
-            entry(com.kooo.evcam.AppConfig.DRIVE_MODE_AT_START_OFF, "关闭"),
-            entry(com.kooo.evcam.AppConfig.DRIVE_MODE_AT_START_COMFORT, "舒适"),
-            entry(com.kooo.evcam.AppConfig.DRIVE_MODE_AT_START_STANDARD, "标准"),
-            entry(com.kooo.evcam.AppConfig.DRIVE_MODE_AT_START_SPORT, "运动"));
-
-    /**
-     * 前排空调关掉再打开后，循环模式切到哪个（{@code drive.ClimateOn}，issue 138）：整个空调关掉再打开，循环模式回到自动
-     * （澳洲 7X 车主实测，PR 145）。默认关闭。只有存取和后面的逻辑，同 {@link #DRIVE_MODE_AT_START}：选项不带界面上的名字，
-     * 下面的中文只进日志。
-     */
-    public static final SettingSpec CIRCULATION_AT_CLIMATE_ON = SettingSpec.of(
-            "circulation_at_climate_on", "空调重新打开后的循环模式", com.kooo.evcam.AppConfig.CIRCULATION_AT_CLIMATE_ON_OFF,
-            entry(com.kooo.evcam.AppConfig.CIRCULATION_AT_CLIMATE_ON_OFF, "关闭"),
-            entry(com.kooo.evcam.AppConfig.CIRCULATION_AT_CLIMATE_ON_INNER, "内循环"),
-            entry(com.kooo.evcam.AppConfig.CIRCULATION_AT_CLIMATE_ON_OUTER, "外循环"));
-
     /** 全部枚举型设置项，启动自检会逐个走一遍。 */
     public static final List<SettingSpec> ALL = Collections.unmodifiableList(Arrays.asList(
             RECORDING_MODE,
@@ -277,7 +254,5 @@ public final class SettingsRegistry {
             DRIVE_SOUND_VIEW,
             DRIVE_SOUND_OUTPUT,
             DRIVE_SOUND_EXTERIOR_ROUTE,
-            DRIVE_SOUND_EXTERIOR_VOLUME,
-            DRIVE_MODE_AT_START,
-            CIRCULATION_AT_CLIMATE_ON));
+            DRIVE_SOUND_EXTERIOR_VOLUME));
 }

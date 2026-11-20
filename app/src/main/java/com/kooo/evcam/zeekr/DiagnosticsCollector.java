@@ -1238,6 +1238,10 @@ public final class DiagnosticsCollector {
                     .getSharedPreferences("app_config", Context.MODE_PRIVATE).getAll();
             for (java.util.Map.Entry<String, ?> e : new java.util.TreeMap<>(all).entrySet()) {
                 String value = String.valueOf(e.getValue());
+                if ("automation_rules".equals(e.getKey())) {
+                    // 地点与自动化的规则里有用户起的名字（以后还有地点的坐标）：只写多长（ui-spec §十八）
+                    value = "（" + value.length() + " 字，内容不导出）";
+                }
                 if (value.length() > 80) {
                     value = value.substring(0, 80) + "…（" + value.length() + " 字）";
                 }

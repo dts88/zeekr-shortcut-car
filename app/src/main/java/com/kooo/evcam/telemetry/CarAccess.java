@@ -9,7 +9,7 @@ package com.kooo.evcam.telemetry;
 
 /**
  * 车辆接口的读写（{@link Telemetry#carAccess}）：只有 {@code button.CarMoves} 用（灵动贴的动作，项目所有者 2026-10-30、11-04；
- * 上车时切驾驶模式、空调重新打开后恢复循环模式和二排空调、打开陡坡缓降，issue 138）。
+ * 地点与自动化，ui-spec §十八）。
  *
  * <p>都是同步的 binder 调用，可以在任何线程上叫，但会等车机回话：别在主线程上叫。读不到、写不进返回 null / false，不抛。
  * 车机说「受理」不等于做到了（Lab findings §2.48、§2.50）：要读回来看。</p>
@@ -45,7 +45,7 @@ public interface CarAccess {
 
     /**
      * 一个传感器事件现在的原值（挡位这一类，{@link Signal.Kind#SENSOR_EVENT}），当场问车机；读不到是 null。
-     * 上车时切驾驶模式临写之前用它读挡位：发布出来的读数是合并发布的，会晚几十毫秒。
+     * 自动化临写之前用它读挡位（Calvin，PR 261）：发布出来的读数是合并发布的，会晚几十毫秒。
      */
     Integer sensorEvent(int type);
 }

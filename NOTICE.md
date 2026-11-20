@@ -76,6 +76,10 @@ dts88 写的部分另有两条 GPL-3.0 第 7 条允许的附加条款（署名�
   都是 PR #160，2026-11-06 收录，项目所有者照界面文字规范改了动作的名字。
 - **calvinbui**（Calvin Bui，<https://github.com/calvinbui>）：在他的澳洲 7X（固件 2.1.1c）上实测 6 项设置的记录：
   内外循环、二排空调、自动远光、低速紧急制动、陡坡缓降、舒适加速（[PR #145](https://github.com/dts88/zeekr-shortcut-car/pull/145)，2026-11-06 收录）。
+  「地点与自动化」的头三条规则来自他的 [PR #261](https://github.com/dts88/zeekr-shortcut-car/pull/261)（2026-11-19）：
+  上车时切驾驶模式、前排空调关掉再打开后恢复循环模式和二排空调、陡坡缓降能用了再打开。他的提交原样并入，本项目在其上做成
+  通用的自动化（`automation` 包）：上车怎么算、临写之前现读点火和挡位、连着两次读到才算、重试的规矩，以及 `CarMoves` 里
+  这几样的读写，都是他的代码和车上的发现，代码贡献归他（项目所有者 2026-11-20）。
 - **lelelolo**（<https://github.com/lelelolo>）：盲区画面的两处改进，2026-11-08 随 PR 合并：
   - 环视被车机占用、在恢复或恢复不了时不显示黑框，提示一次（`SideViewDecision.surroundCanShow`，PR #173）；
   - 后视镜上的灯亮着时画面描边（`SideViewAlert`、`SideViewEdge`，PR #174）。

@@ -27,7 +27,6 @@ import com.kooo.evcam.telemetry.Telemetry;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import java.util.function.BiConsumer;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.BiPredicate;
@@ -53,9 +52,9 @@ import java.util.function.BiPredicate;
  *
  * <p>判断和换值都在 {@link Car} 和下面的纯函数里，测试换上假的车辆接口（{@code CarMovesTest}）。</p>
  *
- * <p>上车时切驾驶模式（{@code drive.DriveStart}）、空调重新打开后恢复循环模式和二排空调（{@code drive.ClimateOn}）、陡坡缓降能用时
- * 打开它（{@code drive.HillDescent}）不是按键按的（issue 138），读写车也走这里（{@link #driveModeAtStart}、{@link #restoreClimate}、
- * {@link #restoreHillDescent}）：排在同一条线程上，和按键的动作一件一件做。</p>
+ * <p>地点与自动化（ui-spec §十八）不是按键按的，读写车也走这里（{@link #automationWrite}、{@link #automationRead}、
+ * {@link #automationRestore}）：排在同一条线程上，和按键的动作一件一件做。读写的做法照 Calvin 的 PR 261
+ * （上车切驾驶模式、空调重新打开后恢复循环模式和二排空调、陡坡缓降能用时打开它，issue 138）。</p>
  */
 public final class CarMoves {
 
@@ -84,9 +83,10 @@ public final class CarMoves {
     /** 一键运动记下的原来的驾驶模式（运行状态，在 {@code smart_button_state} 里）。 */
     static final String SPORT_SAVED = "sport_saved_mode";
 
-    /** 循环模式的值是功能号加几（{@link #circulation}）：内循环、外循环。{@link #restoreClimate} 的参数用它，0 是不动。 */
+    /** 循环模式的值是功能号加几（{@link #circulation}）：内循环、外循环、自动。自动化的循环模式（{@link Target#CIRCULATION}）用它。 */
     public static final int CIRCULATION_INNER = 1;
     public static final int CIRCULATION_OUTER = 2;
+    public static final int CIRCULATION_AUTO = 3;
 
     /** 后雾灯闪烁：闪几下（照 jlunnn 的 7X-U，fog_count 默认 3）。 */
     static final int FOG_FLASHES = 3;
@@ -185,7 +185,7 @@ public final class CarMoves {
 
     /** 这一件是谁要做的：黑匣子那一行开头照它写。 */
     private enum By {
-        BUTTON, FLOATING, DRIVE_START, CLIMATE_ON, HILL_DESCENT
+        BUTTON, FLOATING, AUTOMATION
     }
 
     private static void run(Context app, By by, String key, Job job, Consumer<Result> done) {
@@ -216,95 +216,247 @@ public final class CarMoves {
                 }
                 detail = car.detail();
             }
-            BlackBox.note((by == By.DRIVE_START || by == By.HILL_DESCENT ? "上车设置 " : by == By.CLIMATE_ON ? "空调设置 "
-                    : by == By.FLOATING ? "悬浮按钮动作 " : "灵动贴动作 ") + key + "：" + result + "（" + detail + "）");
+            BlackBox.note((by == By.AUTOMATION ? "自动化 " : by == By.FLOATING ? "悬浮按钮动作 " : "灵动贴动作 ")
+                    + key + "：" + result + "（" + detail + "）");
             Result r = result;
             back.post(() -> done.accept(r));
         });
     }
 
+    // ================================================================= 自动化（ui-spec §十八）
+
     /**
-     * 上车时切到设置的驾驶模式（{@code drive.DriveStart}，主线程上叫）：已经是它就不写，不然同 {@link #driveMode}
-     * （{@link #driveModeUnlessAlready}）。什么时候算上车、挂着什么挡才写由 {@code drive.DriveStartRules} 定，这里只管写和读回；
-     * 黑匣子记「上车设置 drive_mode：…」。结果在主线程上交给 {@code done}。
+     * 自动化能读、能设的那几样（{@code automation.Setting} 对到这里）。值是这里的码：开关类 1 开、0 关；驾驶模式是
+     * {@link Signal#DRIVE_MODE_COMFORT} 这几个；循环模式是 {@link #CIRCULATION_AUTO}、{@link #CIRCULATION_OUTER}、
+     * {@link #CIRCULATION_INNER}。前排空调（{@link #FRONT_CLIMATE}）只读：空调开没开，车辆状态的触发用。
+     */
+    public enum Target {
+        SENTRY, DRIVE_MODE, CIRCULATION, REAR_CLIMATE, HILL_DESCENT, LOW_SPEED_BRAKING, FRONT_CLIMATE
+    }
+
+    /** 自动化写一项的结果和写之前读到的值（{@link #before}，读不到 null；结束时恢复要它）。 */
+    public static final class Outcome {
+        public final Result result;
+        public final Integer before;
+
+        public Outcome(Result result, Integer before) {
+            this.result = result;
+            this.before = before;
+        }
+    }
+
+    /**
+     * 读一项此刻的值（主线程上叫）：在写车的线程上读，换成 {@link Target} 的码，在主线程上交给 {@code seen}（读不到 null）。
+     * 只读，不记黑匣子；轮到时用户退出了（{@code UserExit}）不读车，是 null。前排空调的电源、陡坡缓降都是每秒问一次
+     * （Calvin，PR 261）。
+     */
+    public static void automationRead(Context app, Target target, Consumer<Integer> seen) {
+        query(app, c -> value(c, target), seen);
+    }
+
+    /** 一项此刻能不能写（主线程上叫）：1 能、0 车机说暂时不能（陡坡缓降刚通电时）、问不了 null。别的那几样总是 1。 */
+    public static void automationAvailable(Context app, Target target, Consumer<Integer> seen) {
+        query(app, c -> available(c, target), seen);
+    }
+
+    /**
+     * 把一项设成 {@code value}（自动化，主线程上叫）。黑匣子记「自动化 {key}：…」。结果和写之前读到的值在主线程上交给 {@code done}。
+     * 做法见 {@link #automationJob}。
+     */
+    public static void automationWrite(Context app, String key, Target target, int value,
+                                       BiPredicate<Integer, String> stillWanted, Consumer<Outcome> done) {
+        Integer[] before = {null};
+        run(app, By.AUTOMATION, key, automationJob(target, value, stillWanted, before),
+                result -> done.accept(new Outcome(result, before[0])));
+    }
+
+    /**
+     * 结束时恢复（自动化，主线程上叫）：此刻读到的还是自动化写的 {@code ours}，才写回 {@code previous}；中途被人改过的不动，算做成。
+     * 黑匣子记「自动化 {key} restore：…」。
+     */
+    public static void automationRestore(Context app, String key, Target target, int ours, int previous,
+                                         Consumer<Result> done) {
+        run(app, By.AUTOMATION, key + " restore", restoreJob(target, ours, previous), done);
+    }
+
+    /**
+     * 自动化设一项：读到已经是它就不写、算做成；写之前读到的值放进 {@code before[0]}。临写之前现读点火、再现读挡位
+     * （最后问车的一件是挡位），点火的原值、挡位字母（读不到 null）交给 {@code stillWanted}，说不要了（挂出 P 挡了、车没通电了、
+     * 这一次已经作废）不写，是 {@link Result#MOVING} —— 这一件排在写车的线程上，前面的一件（比如关门）可能要等好几秒
+     * （Calvin，PR 261：发布出来的读数合并发布，会晚几十毫秒，所以现读）。问完它到写之间不再读车。
+     */
+    static Job automationJob(Target target, int value, BiPredicate<Integer, String> stillWanted, Integer[] before) {
+        return c -> {
+            Integer cur = value(c, target);
+            before[0] = cur;
+            if (cur != null && cur == value) {
+                c.note("already " + hex(cur));
+                return Result.DONE;
+            }
+            Integer ignition = c.access.read(Signal.IGNITION.id);
+            Object gear = Signal.GEAR.decode(c.access.sensorEvent(Signal.GEAR.id));
+            String letter = gear instanceof String ? (String) gear : null;
+            if (!stillWanted.test(ignition, letter)) {
+                c.note("no longer wanted (gear " + (letter == null ? "?" : letter) + "), not written");
+                return Result.MOVING;
+            }
+            return set(c, target, value, cur);
+        };
+    }
+
+    /** 结束时恢复（{@link #automationRestore}）。 */
+    static Job restoreJob(Target target, int ours, int previous) {
+        return c -> {
+            Integer cur = value(c, target);
+            if (cur == null || cur != ours) {
+                c.note("now " + hex(cur) + ", not " + hex(ours) + ": changed since, left");
+                return Result.DONE;
+            }
+            return set(c, target, previous, cur);
+        };
+    }
+
+    /** 在写车的线程上读一个数（{@link #automationRead}、{@link #automationAvailable}）。 */
+    private static void query(Context app, java.util.function.Function<Car, Integer> read, Consumer<Integer> seen) {
+        Handler h = handler();
+        Handler back = main;
+        h.post(() -> {
+            CarAccess access = Telemetry.get().carAccess();
+            Integer v = null;
+            if (access != null && !UserExit.isExited(app)) {
+                try {
+                    v = read.apply(new Car(access, SYSTEM_NAMES, SystemClock::sleep, null, null));
+                } catch (RuntimeException e) {
+                    v = null;
+                }
+            }
+            Integer out = v;
+            back.post(() -> seen.accept(out));
+        });
+    }
+
+    /** 一项此刻的值，换成 {@link Target} 的码；读不到、读到不认识的是 null。 */
+    static Integer value(Car c, Target target) {
+        switch (target) {
+            case SENTRY: {
+                Integer id = c.function(SENTRY_FIELD, SENTRY_IFACE);
+                Integer v = id == null ? null : c.read(id, c.zone(CarNames.ALL));
+                // 锁车后布防（2）也算开着，同 sentryOn
+                return v == null ? null : v == 1 || v == 2 ? Integer.valueOf(1) : v == 0 ? Integer.valueOf(0) : null;
+            }
+            case DRIVE_MODE:
+                return c.access.read(Signal.DRIVE_MODE.id);
+            case CIRCULATION: {
+                Integer id = c.function("HVAC_FUNC_CIRCULATION", "IHvac");
+                Integer v = id == null ? null : c.read(id, c.all());
+                if (v == null) {
+                    return null;
+                }
+                int offset = v - id;
+                return offset >= CIRCULATION_INNER && offset <= CIRCULATION_AUTO ? Integer.valueOf(offset) : null;
+            }
+            case REAR_CLIMATE:
+                return power(c, CarNames.ROW_2);
+            case FRONT_CLIMATE:
+                return power(c, CarNames.ROW_1);
+            case HILL_DESCENT: {
+                Integer id = c.function("SETTING_FUNC_HDC_SWITCH", "IADAS");
+                Integer v = id == null ? null : c.access.read(id);
+                return v != null && (v == 0 || v == 1) ? v : null;
+            }
+            case LOW_SPEED_BRAKING: {
+                Integer id = c.function("SETTING_FUNC_PEB_MODE", "IADAS");
+                Integer on = c.function("PEB_MODE_PEB", "IVehicle");
+                Integer v = id == null ? null : c.access.read(id);
+                if (v == null) {
+                    return null;
+                }
+                return v == 0 ? Integer.valueOf(0) : on != null && v.intValue() == on ? Integer.valueOf(1) : null;
+            }
+            default:
+                return null;
+        }
+    }
+
+    /** 能不能写（{@link #automationAvailable}）：陡坡缓降照车机说的（{@link #hillDescentAvailable(Car)}）；别的总是 1。 */
+    static Integer available(Car c, Target target) {
+        return target == Target.HILL_DESCENT ? hillDescentAvailable(c) : Integer.valueOf(1);
+    }
+
+    /**
+     * 写一项（{@code before} 是刚读到的，换成 {@link Target} 的码）。各样的写法：
      *
-     * <p>这一件排在写车的线程上，前面的一件（比如关门）可能要等好几秒，轮到时车可能已经挂出 P 挡了：临写之前在写车的线程上
-     * 现读一次点火、一次挡位（不用发布出来的读数：它合并发布，会晚几十毫秒），把点火的原值、挡位字母（读不到 null）交给
-     * {@code stillWanted} 再问一次，说不要了就不写，结果是 {@link Result#MOVING}。{@code stillWanted} 得是哪个线程都能叫的、不读车的。</p>
+     * <ul>
+     *   <li>哨兵模式：全车区域写 1 或 0、读回（同 {@link #sentryOn}）。</li>
+     *   <li>驾驶模式：不带区域写（本项目车上验证过的写法），读回拿 {@code before} 比：写之前不再读车。</li>
+     *   <li>循环模式：写功能号加几、读回。要写内循环时，前挡除雾读到的不是关着（开着、读不到）就不写、也不算没做成：
+     *       除雾时不往内循环切（Calvin 实测时也是读到关着才写）。</li>
+     *   <li>二排空调：电源按排写（{@link CarNames#ROW_2}）；读回比写晚一两百毫秒，{@link Car#set} 等得到。前排空调只读，不写。</li>
+     *   <li>陡坡缓降：车机说能用（active）才写，不带区域，0 关 1 开（Calvin 车上实测的写法）。</li>
+     *   <li>低速紧急制动：不带区域写，开是车机的 PEB 那个值、关是 0（澳洲车主实测过 P 挡静止时写关闭）。</li>
+     * </ul>
      */
-    public static void driveModeAtStart(Context app, int mode, BiPredicate<Integer, String> stillWanted,
-                                        Consumer<Result> done) {
-        run(app, By.DRIVE_START, "drive_mode", driveModeUnlessAlready(mode, stillWanted), done);
-    }
-
-    /**
-     * 前排空调重新打开后恢复设置的那几样（{@code drive.ClimateOn}，主线程上叫）：循环模式（{@link #CIRCULATION_INNER}、
-     * {@link #CIRCULATION_OUTER}，0 不动）、二排空调打开（{@link #climateSettings}）。什么时候算重新打开由
-     * {@code drive.ClimateOnRules} 定，这里只管写和读回；黑匣子记「空调设置 climate：…」。两样各自的结果在主线程上交给
-     * {@code done}（先循环模式、后二排空调；没要的那一样是 null）：没做成的那一样再做时，做成了的不用再带上。
-     */
-    public static void restoreClimate(Context app, int circulation, boolean rear, BiConsumer<Result, Result> done) {
-        // 这一件没轮到做（车辆接口没连上、用户退出了）时，要了的那一样算做不了
-        Result[] parts = {circulation != 0 ? Result.UNAVAILABLE : null, rear ? Result.UNAVAILABLE : null};
-        run(app, By.CLIMATE_ON, "climate", climateSettings(circulation, rear, parts),
-                result -> done.accept(parts[0], parts[1]));
-    }
-
-    /**
-     * 前排空调此刻开没开（{@code drive.ClimateOn} 每秒问一次，主线程上叫）：在写车的线程上读，读到的在主线程上交给
-     * {@code seen}（1 开、0 关，读不到 null）。只读，不记黑匣子。轮到时用户退出了的不读车，是 null。
-     */
-    public static void frontClimatePower(Context app, Consumer<Integer> seen) {
-        Handler h = handler();
-        Handler back = main;
-        h.post(() -> {
-            CarAccess access = Telemetry.get().carAccess();
-            Integer power = null;
-            if (access != null && !UserExit.isExited(app)) {
-                try {
-                    power = frontClimatePower(new Car(access, SYSTEM_NAMES, SystemClock::sleep, null, null));
-                } catch (RuntimeException e) {
-                    power = null;
-                }
+    static Result set(Car c, Target target, int value, Integer before) {
+        switch (target) {
+            case SENTRY: {
+                Integer id = c.function(SENTRY_FIELD, SENTRY_IFACE);
+                return id == null ? Result.UNAVAILABLE : c.set(id, c.zone(CarNames.ALL), value == 1 ? 1 : 0);
             }
-            Integer p = power;
-            back.post(() -> seen.accept(p));
-        });
-    }
-
-    /**
-     * 陡坡缓降能用时打开它（{@code drive.HillDescent}，主线程上叫）：车机说能用（active）、读到关着才写开；已经开着算做成。
-     * 什么时候写由 {@code drive.HillDescentRules} 定；黑匣子记「上车设置 hill_descent：…」。结果在主线程上交给 {@code done}。
-     */
-    public static void restoreHillDescent(Context app, Consumer<Result> done) {
-        run(app, By.HILL_DESCENT, "hill_descent", hillDescentOn(), done);
-    }
-
-    /**
-     * 陡坡缓降此刻能不能用（{@code drive.HillDescent} 每秒问一次，主线程上叫）：在写车的线程上问车机，答案在主线程上交给
-     * {@code seen}（1 能用、0 用不了、问不了 null，{@link #hillDescentAvailable(Car)}）。只读，不记黑匣子。
-     * 轮到时用户退出了的不读车，是 null。
-     */
-    public static void hillDescentAvailable(Context app, Consumer<Integer> seen) {
-        Handler h = handler();
-        Handler back = main;
-        h.post(() -> {
-            CarAccess access = Telemetry.get().carAccess();
-            Integer available = null;
-            if (access != null && !UserExit.isExited(app)) {
-                try {
-                    available = hillDescentAvailable(new Car(access, SYSTEM_NAMES, SystemClock::sleep, null, null));
-                } catch (RuntimeException e) {
-                    available = null;
+            case DRIVE_MODE:
+                return c.writePlain(Signal.DRIVE_MODE.id, value, before);
+            case CIRCULATION: {
+                Integer id = c.function("HVAC_FUNC_CIRCULATION", "IHvac");
+                if (id == null || value < CIRCULATION_INNER || value > CIRCULATION_AUTO) {
+                    return Result.UNAVAILABLE;
                 }
+                int zone = c.all();
+                if (value == CIRCULATION_INNER) {
+                    Integer defrost = c.function("HVAC_FUNC_DEFROST_FRONT_MAX", "IHvac");
+                    Integer on = defrost == null ? null : c.read(defrost, zone);
+                    if (on == null || on != 0) {
+                        c.note("front defrost " + hex(on) + ", circulation left at " + hex(before));
+                        return Result.DONE;
+                    }
+                }
+                return c.set(id, zone, id + value);
             }
-            Integer a = available;
-            back.post(() -> seen.accept(a));
-        });
+            case REAR_CLIMATE: {
+                Integer power = c.function("HVAC_FUNC_POWER", "IHvac");
+                return power == null ? Result.UNAVAILABLE : c.set(power, c.zone(CarNames.ROW_2), value == 1 ? 1 : 0);
+            }
+            case HILL_DESCENT: {
+                Integer id = c.function("SETTING_FUNC_HDC_SWITCH", "IADAS");
+                if (id == null) {
+                    return Result.UNAVAILABLE;
+                }
+                String status = c.access.status(id, c.all());
+                if (!active(status)) {
+                    c.note("hill descent " + status);
+                    return Result.UNAVAILABLE;
+                }
+                if (before == null) {
+                    // 开关读不到、读到别的值：不当它关着（Calvin 车上只试过读到 0 / 1 时写）
+                    c.note("hill descent switch unreadable, not written");
+                    return Result.UNAVAILABLE;
+                }
+                return c.writePlain(id, value == 1 ? 1 : 0, before);
+            }
+            case LOW_SPEED_BRAKING: {
+                Integer id = c.function("SETTING_FUNC_PEB_MODE", "IADAS");
+                Integer on = c.function("PEB_MODE_PEB", "IVehicle");
+                if (id == null || (value == 1 && on == null)) {
+                    return Result.UNAVAILABLE;
+                }
+                return c.setPlain(id, value == 1 ? on : 0);
+            }
+            default:
+                c.note(target + " is read-only");
+                return Result.UNAVAILABLE;
+        }
     }
 
     /**
-     * 陡坡缓降的开关车机说能不能用：active 是 1；notactive 是 0（ACC 时、上电后还没挂过 D 挡时是它，澳洲 7X 车主实测，PR 145；
+     * 陡坡缓降的开关车机说能不能用：active 是 1；notactive 是 0（ACC 时、上电后还没挂过 D 挡时是它，Calvin 实测，PR 145；
      * 车机把出错也报成它）；别的（notavailable：这台车没有；问不了；这台车机没有这个号）是 null。
      */
     static Integer hillDescentAvailable(Car c) {
@@ -325,39 +477,11 @@ public final class CarMoves {
         return null;
     }
 
-    /**
-     * 打开陡坡缓降（{@link #restoreHillDescent}）：照车主实测过的写法，不带区域读写，0 关 1 开。车机说不能用（不是 active）不写、
-     * 是做不了；读到已经开着不写、算做成；读到关着（0）才写，读不到、读到别的值不写、是做不了。写了读回第一下可能还是 0，
-     * {@link Car#setPlain} 等得到。
-     */
-    static Job hillDescentOn() {
-        return c -> {
-            Integer id = c.function("SETTING_FUNC_HDC_SWITCH", "IADAS");
-            if (id == null) {
-                return Result.UNAVAILABLE;
-            }
-            String status = c.access.status(id, c.all());
-            if (!active(status)) {
-                c.note("hill descent " + status);
-                return Result.UNAVAILABLE;
-            }
-            Integer cur = c.access.read(id);
-            if (cur != null && cur == 1) {
-                c.note("hill descent already on");
-                return Result.DONE;
-            }
-            if (cur == null || cur != 0) {
-                c.note("hill descent read " + hex(cur) + ", not 0/1");
-                return Result.UNAVAILABLE;
-            }
-            return c.setPlain(id, 1);
-        };
-    }
-
-    /** 前排空调的电源：按排读（{@link CarNames#ROW_1}），同 {@link #openClimate}。 */
-    static Integer frontClimatePower(Car c) {
+    /** 空调的电源按排读（{@link CarNames#ROW_1}、{@link CarNames#ROW_2}），同 {@link #openClimate}：1 开、0 关，别的 null。 */
+    private static Integer power(Car c, String row) {
         Integer power = c.function("HVAC_FUNC_POWER", "IHvac");
-        return power == null ? null : c.read(power, c.zone(CarNames.ROW_1));
+        Integer v = power == null ? null : c.read(power, c.zone(row));
+        return v != null && (v == 0 || v == 1) ? v : null;
     }
 
     private static final java.util.Map<String, Turning> turning = new java.util.HashMap<>();
@@ -967,73 +1091,6 @@ public final class CarMoves {
         };
     }
 
-    /**
-     * 前排空调重新打开后恢复的那几样（{@link #restoreClimate}）：整个空调关掉再打开，循环模式回到自动、二排空调关着
-     * （澳洲 7X 车主实测，PR 145）。每一样读到已经是要的就不写；有一样没做成，结果就是它的（再做一遍时做成了的不会再写）。
-     *
-     * <ul>
-     *   <li>循环模式（{@code circulation} 不是 0）：写成内循环或外循环。要写内循环时，前挡除雾读到的不是关着（开着、读不到）
-     *       就不写、也不算没做成：除雾时不往内循环切（车主实测时也是读到关着才写）。</li>
-     *   <li>二排空调（{@code rear}）：电源按排写开（{@link CarNames#ROW_2}）；读回比写晚一两百毫秒，{@link Car#set} 等得到。</li>
-     * </ul>
-     */
-    static Job climateSettings(int circulation, boolean rear) {
-        return climateSettings(circulation, rear, new Result[2]);
-    }
-
-    /** 同上，另外把两样各自的结果放进 {@code parts}（先循环模式、后二排空调；没要的那一样不动它）。 */
-    static Job climateSettings(int circulation, boolean rear, Result[] parts) {
-        return c -> {
-            Result result = Result.DONE;
-            if (circulation != 0) {
-                parts[0] = restoreCirculation(c, circulation);
-                result = parts[0];
-            }
-            if (rear) {
-                parts[1] = restoreRearClimate(c);
-                result = result == Result.DONE ? parts[1] : result;
-            }
-            return result;
-        };
-    }
-
-    private static Result restoreCirculation(Car c, int circulation) {
-        Integer id = c.function("HVAC_FUNC_CIRCULATION", "IHvac");
-        if (id == null) {
-            return Result.UNAVAILABLE;
-        }
-        int zone = c.all();
-        int target = id + circulation;
-        Integer cur = c.read(id, zone);
-        if (cur != null && cur == target) {
-            c.note("circulation already " + hex(cur));
-            return Result.DONE;
-        }
-        if (circulation == CIRCULATION_INNER) {
-            Integer defrost = c.function("HVAC_FUNC_DEFROST_FRONT_MAX", "IHvac");
-            Integer on = defrost == null ? null : c.read(defrost, zone);
-            if (on == null || on != 0) {
-                c.note("front defrost " + hex(on) + ", circulation left at " + hex(cur));
-                return Result.DONE;
-            }
-        }
-        return c.set(id, zone, target);
-    }
-
-    private static Result restoreRearClimate(Car c) {
-        Integer power = c.function("HVAC_FUNC_POWER", "IHvac");
-        if (power == null) {
-            return Result.UNAVAILABLE;
-        }
-        int row = c.zone(CarNames.ROW_2);
-        Integer cur = c.read(power, row);
-        if (cur != null && cur == 1) {
-            c.note("rear climate already on");
-            return Result.DONE;
-        }
-        return c.set(power, row, 1);
-    }
-
     /** 写一个固定的值（座椅恢复写 1）。 */
     static Job write(String iface, String field, String zoneName, int value) {
         return c -> {
@@ -1144,30 +1201,6 @@ public final class CarMoves {
     /** 切到一种驾驶模式（不带区域，本项目车上验证过的写法）。 */
     static Job driveMode(int mode) {
         return c -> c.setPlain(Signal.DRIVE_MODE.id, mode);
-    }
-
-    /**
-     * 上车时切到设置的驾驶模式（{@link #driveModeAtStart}）：读到已经是它就不写、算做成；临写之前 {@code stillWanted} 说不要了
-     * （挂出 P 挡了、车没通电了、这一次上车已经作废）不写，是 {@link Result#MOVING}；别的同 {@link #driveMode}。
-     * 写之前现读点火、再现读挡位（最后问车的一件是挡位），点火的原值、挡位字母（读不到 null）交给 {@code stillWanted}；
-     * 问完它到写之间不再读车（读车要等车机回话，等的时候可能就挂出 P 挡了）：读回用前面读到的那个值比。
-     */
-    static Job driveModeUnlessAlready(int mode, BiPredicate<Integer, String> stillWanted) {
-        return c -> {
-            Integer cur = c.access.read(Signal.DRIVE_MODE.id);
-            if (cur != null && cur == mode) {
-                c.note("already " + hex(cur));
-                return Result.DONE;
-            }
-            Integer ignition = c.access.read(Signal.IGNITION.id);
-            Object gear = Signal.GEAR.decode(c.access.sensorEvent(Signal.GEAR.id));
-            String letter = gear instanceof String ? (String) gear : null;
-            if (!stillWanted.test(ignition, letter)) {
-                c.note("no longer wanted (gear " + (letter == null ? "?" : letter) + "), not written");
-                return Result.MOVING;
-            }
-            return c.writePlain(Signal.DRIVE_MODE.id, mode, cur);
-        };
     }
 
     /** 一键运动：不在运动就记下现在的模式、切运动；已经是运动就回到记下的（没记过是标准）。 */

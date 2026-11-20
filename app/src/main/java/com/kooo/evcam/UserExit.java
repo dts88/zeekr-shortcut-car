@@ -80,8 +80,8 @@ public final class UserExit {
         if (buttons != null) {
             buttons.resumeAfterExit();
         }
-        // 退出期间的那一次上车没切驾驶模式（issue 138），清掉就补上；空调、陡坡缓降那两样每秒自己看这个记号
-        com.kooo.evcam.drive.DriveStart.resumeAfterExit();
+        // 退出期间的那一次上车，自动化没做（ui-spec §十八），清掉就补上
+        com.kooo.evcam.automation.Automations.resumeAfterExit();
     }
 
     /**

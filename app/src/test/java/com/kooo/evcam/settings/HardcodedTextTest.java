@@ -77,6 +77,7 @@ public class HardcodedTextTest {
         }
         // ---- 不上界面的文字 ----
         JAVA_ALLOWED.put("camera/EglSurfaceEncoder.java", "GLSL 着色器源码里的注释");
+        JAVA_ALLOWED.put("automation/Automations.java", "黑匣子的行：经 World.note 写进黑匣子（测试里换成假的）");
         JAVA_ALLOWED.put("settings/SettingSpec.java", "设置定义写错时抛给开发者的异常");
         JAVA_ALLOWED.put("settings/SegmentedPreference.java", "设置定义写错时抛给开发者的异常");
         JAVA_ALLOWED.put("settings/SettingsRegistry.java", "日志用的设置名；界面上的名字走 strings");

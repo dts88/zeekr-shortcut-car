@@ -44,8 +44,7 @@ import java.util.List;
  *       熄屏判断在安卓亮屏时也叫一次（{@link #retryLinkIfFailed}）；这台车机根本没有这套接口（{@link CarLink#UNAVAILABLE}）不再试。</li>
  *   <li>要「此刻」的读数（安卓刚亮屏，记着的可能是睡前的）：{@link #reconcileNow} 立刻读一遍、立刻发布，
  *       回调排在监听者那一批后面。</li>
- *   <li>写只给灵动贴的动作（驾驶模式 2026-10-30，其他车控动作 2026-11-04，项目所有者）、上车时切驾驶模式（{@code drive.DriveStart}）、
- *       空调重新打开后恢复循环模式和二排空调（{@code drive.ClimateOn}）、陡坡缓降能用时打开它（{@code drive.HillDescent}；都是 issue 138）：
+ *   <li>写只给灵动贴的动作（驾驶模式 2026-10-30，其他车控动作 2026-11-04，项目所有者）和地点与自动化（{@code automation}，ui-spec §十八）：
  *       {@link #carAccess} 拿到车辆接口的读写，写什么、什么时候不写、读回怎么算在 {@code button.CarMoves}；别处一个号都不写。</li>
  * </ul>
  *
@@ -731,7 +730,7 @@ public final class Telemetry {
 
     /**
      * 车辆接口的读写（{@link CarAccess}）：只有 {@code button.CarMoves} 用（灵动贴的动作，项目所有者 2026-10-30、11-04；
-     * 上车时切驾驶模式、空调重新打开后恢复循环模式和二排空调、打开陡坡缓降，issue 138）。车辆接口没连上、断了是 null。拿到的那一份同步等车机回话：别在主线程上用（{@code button.CarMoves} 有自己的线程）。
+     * 地点与自动化，ui-spec §十八）。车辆接口没连上、断了是 null。拿到的那一份同步等车机回话：别在主线程上用（{@code button.CarMoves} 有自己的线程）。
      */
     public CarAccess carAccess() {
         EcarxSource c;

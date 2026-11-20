@@ -24,6 +24,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.BiPredicate;
 
 /**
  * 灵动贴写车的那些动作（{@link CarMoves}）：换法、执行前的两样检查、读回怎么算。车辆接口、常量名都是假的
@@ -73,6 +74,9 @@ public class CarMovesTest {
     private static final int WINDOW_POS = 0xCD00;
     private static final int DEFROST_FRONT = 0xCE00;
     private static final int HILL_DESCENT = 0xCF00;
+    private static final int PEB = 0xD500;
+    /** 低速紧急制动开着时车机报的值（假的，真的从车机的常量里取）。 */
+    private static final int PEB_ON = 0xD501;
     /** 挡位传感器事件的原值（{@link Signal#GEAR}）。 */
     private static final int GEAR_P = 0x00200230;
     private static final int GEAR_D = 0x00200220;
@@ -216,6 +220,8 @@ public class CarMovesTest {
             functions.put("IBcm.BCM_FUNC_WINDOW_POS", WINDOW_POS);
             functions.put("IHvac.HVAC_FUNC_DEFROST_FRONT_MAX", DEFROST_FRONT);
             functions.put("IADAS.SETTING_FUNC_HDC_SWITCH", HILL_DESCENT);
+            functions.put("IADAS.SETTING_FUNC_PEB_MODE", PEB);
+            functions.put("IVehicle.PEB_MODE_PEB", PEB_ON);
             functions.put("IAmbienceLight.SETTING_FUNC_AMBIENCE_LIGHT_MAINZONES_COLOR_SET", AMBIENT_MAIN);
             functions.put("IAmbienceLight.SETTING_FUNC_AMBIENCE_LIGHT_TOPZONES_COLOR_SET", AMBIENT_TOP);
         }
@@ -806,58 +812,65 @@ public class CarMovesTest {
         assertEquals(Signal.DRIVE_MODE.id + "=" + Signal.DRIVE_MODE_SPORT, car.writes.get(0));
     }
 
-    /** 上车时切驾驶模式（issue 138）：已经是设置的那个就不写；不是就不带区域写、读回。车机不受理是做不了。 */
+    // ---- 自动化（地点与自动化，ui-spec §十八）：读写的做法、下面这些情形照 Calvin 的 PR 261
+
+    private static CarMoves.Job automation(CarMoves.Target target, int value, BiPredicate<Integer, String> stillWanted) {
+        return CarMoves.automationJob(target, value, stillWanted, new Integer[1]);
+    }
+
+    private static CarMoves.Job automation(CarMoves.Target target, int value) {
+        return automation(target, value, (ignition, gear) -> true);
+    }
+
+    /** 驾驶模式：已经是要的那个就不写；不是就不带区域写、读回。车机不受理是做不了。 */
     @Test
-    public void driveModeUnlessAlreadyWritesOnlyWhenTheCarIsInAnotherMode() {
+    public void driveModeIsWrittenOnlyWhenTheCarIsInAnotherMode() {
         FakeCar car = new FakeCar();
         car.values.put(String.valueOf(Signal.DRIVE_MODE.id), Signal.DRIVE_MODE_COMFORT);
-        assertEquals(CarMoves.Result.DONE,
-                run(car, CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_COMFORT, (ignition, gear) -> true)));
+        assertEquals(CarMoves.Result.DONE, run(car, automation(CarMoves.Target.DRIVE_MODE, Signal.DRIVE_MODE_COMFORT)));
         assertTrue(car.writes.isEmpty());
 
         car.values.put(String.valueOf(Signal.DRIVE_MODE.id), Signal.DRIVE_MODE_STANDARD);
-        assertEquals(CarMoves.Result.DONE,
-                run(car, CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_COMFORT, (ignition, gear) -> true)));
+        assertEquals(CarMoves.Result.DONE, run(car, automation(CarMoves.Target.DRIVE_MODE, Signal.DRIVE_MODE_COMFORT)));
         assertEquals(Signal.DRIVE_MODE.id + "=" + Signal.DRIVE_MODE_COMFORT, car.writes.get(0));
         assertEquals(Signal.DRIVE_MODE_COMFORT, (int) car.read(Signal.DRIVE_MODE.id));
 
         FakeCar unread = new FakeCar();
-        assertEquals(CarMoves.Result.DONE,
-                run(unread, CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_SPORT, (ignition, gear) -> true)));
+        assertEquals(CarMoves.Result.DONE, run(unread, automation(CarMoves.Target.DRIVE_MODE, Signal.DRIVE_MODE_SPORT)));
         assertEquals(1, unread.writes.size());
 
         FakeCar refusing = new FakeCar();
         refusing.acceptPlain = false;
         assertEquals(CarMoves.Result.UNAVAILABLE,
-                run(refusing, CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_SPORT, (ignition, gear) -> true)));
+                run(refusing, automation(CarMoves.Target.DRIVE_MODE, Signal.DRIVE_MODE_SPORT)));
         FakeCar ignoring = new FakeCar();
         ignoring.applies = false;
         assertEquals(CarMoves.Result.NO_CHANGE,
-                run(ignoring, CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_SPORT, (ignition, gear) -> true)));
+                run(ignoring, automation(CarMoves.Target.DRIVE_MODE, Signal.DRIVE_MODE_SPORT)));
     }
 
-    /** 轮到写的时候说不要了（排队时挂出了 P 挡）：不写，是 MOVING；已经是设置的那个模式照样算做成。 */
+    /** 轮到写的时候说不要了（排队时挂出了 P 挡）：不写，是 MOVING；已经是要的那个照样算做成。 */
     @Test
-    public void driveModeUnlessAlreadyAsksAgainJustBeforeWriting() {
+    public void automationAsksAgainJustBeforeWriting() {
         FakeCar car = new FakeCar();
         car.values.put(String.valueOf(Signal.DRIVE_MODE.id), Signal.DRIVE_MODE_STANDARD);
         assertEquals(CarMoves.Result.MOVING,
-                run(car, CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_COMFORT, (ignition, gear) -> false)));
+                run(car, automation(CarMoves.Target.DRIVE_MODE, Signal.DRIVE_MODE_COMFORT, (ignition, gear) -> false)));
         assertTrue(car.writes.isEmpty());
         assertEquals(Signal.DRIVE_MODE_STANDARD, (int) car.read(Signal.DRIVE_MODE.id));
 
         car.values.put(String.valueOf(Signal.DRIVE_MODE.id), Signal.DRIVE_MODE_COMFORT);
         assertEquals(CarMoves.Result.DONE,
-                run(car, CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_COMFORT, (ignition, gear) -> false)));
+                run(car, automation(CarMoves.Target.DRIVE_MODE, Signal.DRIVE_MODE_COMFORT, (ignition, gear) -> false)));
         assertTrue(car.writes.isEmpty());
     }
 
     /**
      * 问完还要不要，到写为止不再读车：读车要等车机回话，等的那一下挂出 P 挡的话，回来就写了。
-     * 这里每读一次驾驶模式就算挂出了 P 挡 —— 问的时候还在 P 挡的只有「最后一次读之后才问」这一种次序。
+     * 这里每读一次就算挂出了 P 挡 —— 问的时候还在 P 挡的只有「最后一次读之后才问」这一种次序。
      */
     @Test
-    public void driveModeUnlessAlreadyDoesNotReadTheCarBetweenAskingAndWriting() {
+    public void automationDoesNotReadTheCarBetweenAskingAndWriting() {
         boolean[] inPark = {true};
         List<String> order = new ArrayList<>();
         FakeCar car = new FakeCar() {
@@ -880,7 +893,7 @@ public class CarMovesTest {
             }
         };
         car.values.put(String.valueOf(Signal.DRIVE_MODE.id), Signal.DRIVE_MODE_STANDARD);
-        assertEquals(CarMoves.Result.DONE, run(car, CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_COMFORT,
+        assertEquals(CarMoves.Result.DONE, run(car, automation(CarMoves.Target.DRIVE_MODE, Signal.DRIVE_MODE_COMFORT,
                 (ignition, gear) -> {
                     order.add("ask");
                     return inPark[0] && "P".equals(gear);
@@ -897,19 +910,19 @@ public class CarMovesTest {
             }
         };
         shifting.values.put(String.valueOf(Signal.DRIVE_MODE.id), Signal.DRIVE_MODE_STANDARD);
-        assertEquals(CarMoves.Result.MOVING,
-                run(shifting, CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_COMFORT, (ignition, gear) -> inPark[0])));
+        assertEquals(CarMoves.Result.MOVING, run(shifting,
+                automation(CarMoves.Target.DRIVE_MODE, Signal.DRIVE_MODE_COMFORT, (ignition, gear) -> inPark[0])));
         assertTrue(shifting.writes.isEmpty());
     }
 
     /** 临写之前现读的挡位交给问的那一下：车上已经是 D 挡、读不到，都不写（发布出来的读数这里根本不看）。 */
     @Test
-    public void driveModeUnlessAlreadyAsksWithTheGearReadFromTheCar() {
+    public void automationAsksWithTheGearReadFromTheCar() {
         List<String> asked = new ArrayList<>();
         FakeCar car = new FakeCar();
         car.values.put(String.valueOf(Signal.DRIVE_MODE.id), Signal.DRIVE_MODE_STANDARD);
         car.values.put(String.valueOf(Signal.IGNITION.id), Signal.IGNITION_ON);
-        CarMoves.Job job = CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_COMFORT, (ignition, gear) -> {
+        CarMoves.Job job = automation(CarMoves.Target.DRIVE_MODE, Signal.DRIVE_MODE_COMFORT, (ignition, gear) -> {
             asked.add(String.valueOf(gear));
             assertEquals("现读的点火也交过来", Signal.IGNITION_ON, (int) ignition);
             return "P".equals(gear);
@@ -927,7 +940,34 @@ public class CarMovesTest {
         assertEquals(Arrays.asList("D", "null", "null", "P"), asked);
     }
 
-    // ---- 空调重新打开后恢复循环模式、二排空调（issue 138）
+    /** 写之前读到的值交出来（结束时恢复要它）。 */
+    @Test
+    public void theValueBeforeTheWriteIsHandedBack() {
+        FakeCar car = new FakeCar();
+        car.values.put(String.valueOf(Signal.DRIVE_MODE.id), Signal.DRIVE_MODE_STANDARD);
+        Integer[] before = new Integer[1];
+        assertEquals(CarMoves.Result.DONE, run(car, CarMoves.automationJob(CarMoves.Target.DRIVE_MODE,
+                Signal.DRIVE_MODE_COMFORT, (ignition, gear) -> true, before)));
+        assertEquals(Signal.DRIVE_MODE_STANDARD, (int) before[0]);
+    }
+
+    /** 结束时恢复：此刻还是自动化写的才写回原来的；中途被人改过的不动，算做成。 */
+    @Test
+    public void restoreWritesBackOnlyWhatIsStillOurs() {
+        FakeCar car = new FakeCar();
+        car.values.put(String.valueOf(Signal.DRIVE_MODE.id), Signal.DRIVE_MODE_COMFORT);
+        assertEquals(CarMoves.Result.DONE, run(car, CarMoves.restoreJob(CarMoves.Target.DRIVE_MODE,
+                Signal.DRIVE_MODE_COMFORT, Signal.DRIVE_MODE_STANDARD)));
+        assertEquals(Signal.DRIVE_MODE_STANDARD, (int) car.read(Signal.DRIVE_MODE.id));
+
+        FakeCar changed = new FakeCar();
+        changed.values.put(String.valueOf(Signal.DRIVE_MODE.id), Signal.DRIVE_MODE_SPORT);
+        assertEquals(CarMoves.Result.DONE, run(changed, CarMoves.restoreJob(CarMoves.Target.DRIVE_MODE,
+                Signal.DRIVE_MODE_COMFORT, Signal.DRIVE_MODE_STANDARD)));
+        assertTrue(changed.writes.isEmpty());
+    }
+
+    // ---- 空调重新打开后恢复循环模式、二排空调（Calvin：整个空调关掉再打开，循环模式回到自动、二排关掉）
 
     /** 空调刚重新打开的样子：循环模式自动、二排空调关着、前挡除雾关着。 */
     private static FakeCar climateJustOn() {
@@ -940,96 +980,100 @@ public class CarMovesTest {
     }
 
     @Test
-    public void climateSettingsRestoreCirculationAndRearPower() {
+    public void circulationAndRearClimateAreRestored() {
         FakeCar car = climateJustOn();
-        assertEquals(CarMoves.Result.DONE, run(car, CarMoves.climateSettings(CarMoves.CIRCULATION_INNER, true)));
+        assertEquals(CarMoves.Result.DONE, run(car, automation(CarMoves.Target.CIRCULATION, CarMoves.CIRCULATION_INNER)));
+        assertEquals(CarMoves.Result.DONE, run(car, automation(CarMoves.Target.REAR_CLIMATE, 1)));
         assertEquals(CIRCULATION + 1, (int) car.get(CIRCULATION, ALL));
         assertEquals(1, (int) car.get(CLIMATE_POWER, ROW_2));
         assertEquals(2, car.writes.size());
 
         // 已经是要的：再做一遍一笔都不写
         car.writes.clear();
-        assertEquals(CarMoves.Result.DONE, run(car, CarMoves.climateSettings(CarMoves.CIRCULATION_INNER, true)));
+        assertEquals(CarMoves.Result.DONE, run(car, automation(CarMoves.Target.CIRCULATION, CarMoves.CIRCULATION_INNER)));
+        assertEquals(CarMoves.Result.DONE, run(car, automation(CarMoves.Target.REAR_CLIMATE, 1)));
         assertTrue(car.writes.isEmpty());
     }
 
     @Test
-    public void climateSettingsOnlyTouchWhatIsAskedFor() {
+    public void onlyWhatIsAskedForIsTouched() {
         FakeCar car = climateJustOn();
-        assertEquals(CarMoves.Result.DONE, run(car, CarMoves.climateSettings(CarMoves.CIRCULATION_OUTER, false)));
+        assertEquals(CarMoves.Result.DONE, run(car, automation(CarMoves.Target.CIRCULATION, CarMoves.CIRCULATION_OUTER)));
         assertEquals(CIRCULATION + 2, (int) car.get(CIRCULATION, ALL));
         assertEquals(0, (int) car.get(CLIMATE_POWER, ROW_2));
 
         FakeCar rearOnly = climateJustOn();
-        assertEquals(CarMoves.Result.DONE, run(rearOnly, CarMoves.climateSettings(0, true)));
+        assertEquals(CarMoves.Result.DONE, run(rearOnly, automation(CarMoves.Target.REAR_CLIMATE, 1)));
         assertEquals(CIRCULATION + 3, (int) rearOnly.get(CIRCULATION, ALL));
         assertEquals(1, (int) rearOnly.get(CLIMATE_POWER, ROW_2));
+
+        // 二排空调也能关、循环模式也能回到自动
+        assertEquals(CarMoves.Result.DONE, run(rearOnly, automation(CarMoves.Target.REAR_CLIMATE, 0)));
+        assertEquals(0, (int) rearOnly.get(CLIMATE_POWER, ROW_2));
+        rearOnly.set(CIRCULATION, ALL, CIRCULATION + 1);
+        assertEquals(CarMoves.Result.DONE, run(rearOnly, automation(CarMoves.Target.CIRCULATION, CarMoves.CIRCULATION_AUTO)));
+        assertEquals(CIRCULATION + 3, (int) rearOnly.get(CIRCULATION, ALL));
     }
 
-    /** 前挡除雾开着、读不到：不往内循环切，也不算没做成；二排空调照开。外循环不看除雾。 */
+    /** 前挡除雾开着、读不到：不往内循环切，也不算没做成。外循环不看除雾。 */
     @Test
     public void innerCirculationIsLeftAloneUnlessFrontDefrostReadsOff() {
         FakeCar defrosting = climateJustOn();
         defrosting.set(DEFROST_FRONT, ALL, 1);
-        assertEquals(CarMoves.Result.DONE, run(defrosting, CarMoves.climateSettings(CarMoves.CIRCULATION_INNER, true)));
+        assertEquals(CarMoves.Result.DONE,
+                run(defrosting, automation(CarMoves.Target.CIRCULATION, CarMoves.CIRCULATION_INNER)));
         assertEquals(CIRCULATION + 3, (int) defrosting.get(CIRCULATION, ALL));
+        assertEquals(CarMoves.Result.DONE, run(defrosting, automation(CarMoves.Target.REAR_CLIMATE, 1)));
         assertEquals(1, (int) defrosting.get(CLIMATE_POWER, ROW_2));
 
         FakeCar unreadable = climateJustOn();
         unreadable.values.remove(DEFROST_FRONT + "@" + ALL);
-        assertEquals(CarMoves.Result.DONE, run(unreadable, CarMoves.climateSettings(CarMoves.CIRCULATION_INNER, false)));
+        assertEquals(CarMoves.Result.DONE,
+                run(unreadable, automation(CarMoves.Target.CIRCULATION, CarMoves.CIRCULATION_INNER)));
         assertTrue(unreadable.writes.isEmpty());
 
         defrosting.set(CIRCULATION, ALL, CIRCULATION + 3);
-        assertEquals(CarMoves.Result.DONE, run(defrosting, CarMoves.climateSettings(CarMoves.CIRCULATION_OUTER, false)));
+        assertEquals(CarMoves.Result.DONE,
+                run(defrosting, automation(CarMoves.Target.CIRCULATION, CarMoves.CIRCULATION_OUTER)));
         assertEquals(CIRCULATION + 2, (int) defrosting.get(CIRCULATION, ALL));
     }
 
-    /** 有一样没做成，结果是它的；再做一遍时做成了的那一样不再写。 */
+    /** 车上没变是没生效、车机不受理是做不了；已经是要的那一样不写。 */
     @Test
-    public void climateSettingsReportTheOneThatFailed() {
+    public void eachClimateWriteReportsItsOwnResult() {
         FakeCar car = climateJustOn();
         car.applies = false;
-        assertEquals(CarMoves.Result.NO_CHANGE, run(car, CarMoves.climateSettings(CarMoves.CIRCULATION_INNER, true)));
+        assertEquals(CarMoves.Result.NO_CHANGE,
+                run(car, automation(CarMoves.Target.CIRCULATION, CarMoves.CIRCULATION_INNER)));
 
         FakeCar refusing = climateJustOn();
         refusing.acceptZoned = false;
         refusing.acceptPlain = false;
-        assertEquals(CarMoves.Result.UNAVAILABLE, run(refusing, CarMoves.climateSettings(0, true)));
+        assertEquals(CarMoves.Result.UNAVAILABLE, run(refusing, automation(CarMoves.Target.REAR_CLIMATE, 1)));
 
         FakeCar half = climateJustOn();
         half.set(CIRCULATION, ALL, CIRCULATION + 1);
         half.applies = false;
-        assertEquals(CarMoves.Result.NO_CHANGE, run(half, CarMoves.climateSettings(CarMoves.CIRCULATION_INNER, true)));
+        assertEquals(CarMoves.Result.DONE, run(half, automation(CarMoves.Target.CIRCULATION, CarMoves.CIRCULATION_INNER)));
+        assertEquals(CarMoves.Result.NO_CHANGE, run(half, automation(CarMoves.Target.REAR_CLIMATE, 1)));
         assertEquals("只写了二排空调", 1, half.writes.size());
-    }
 
-    /** 两样各自的结果分开交回来：没要的那一样不动。 */
-    @Test
-    public void climateSettingsReportEachPart() {
-        // 二排的区域写不进，别的照常
-        FakeCar car = new FakeCar() {
+        // 二排的区域写不进：做不了（按排写的不退回全车）
+        FakeCar rowRefused = new FakeCar() {
             @Override
             public boolean write(int id, int zone, int value) {
                 return zone != ROW_2 && super.write(id, zone, value);
             }
         };
-        car.set(CIRCULATION, ALL, CIRCULATION + 3);
-        car.set(CLIMATE_POWER, ROW_2, 0);
-        car.set(DEFROST_FRONT, ALL, 0);
-        CarMoves.Result[] parts = new CarMoves.Result[2];
-        assertEquals(CarMoves.Result.UNAVAILABLE,
-                run(car, CarMoves.climateSettings(CarMoves.CIRCULATION_INNER, true, parts)));
-        assertEquals(CarMoves.Result.DONE, parts[0]);
-        assertEquals(CarMoves.Result.UNAVAILABLE, parts[1]);
-
-        CarMoves.Result[] rearOnly = new CarMoves.Result[2];
-        assertEquals(CarMoves.Result.DONE, run(climateJustOn(), CarMoves.climateSettings(0, true, rearOnly)));
-        assertNull(rearOnly[0]);
-        assertEquals(CarMoves.Result.DONE, rearOnly[1]);
+        rowRefused.set(CIRCULATION, ALL, CIRCULATION + 3);
+        rowRefused.set(CLIMATE_POWER, ROW_2, 0);
+        rowRefused.set(DEFROST_FRONT, ALL, 0);
+        assertEquals(CarMoves.Result.DONE,
+                run(rowRefused, automation(CarMoves.Target.CIRCULATION, CarMoves.CIRCULATION_INNER)));
+        assertEquals(CarMoves.Result.UNAVAILABLE, run(rowRefused, automation(CarMoves.Target.REAR_CLIMATE, 1)));
     }
 
-    /** 一件里的每一笔写之前都看用户退出了没有：循环模式读回的时候退出了，二排空调不再写。 */
+    /** 每一笔写之前都看用户退出了没有：循环模式读回的时候退出了，二排空调那一件不再写。 */
     @Test
     public void exitingDuringTheCirculationReadbackStopsTheRearWrite() {
         boolean[] exited = {false};
@@ -1038,22 +1082,23 @@ public class CarMovesTest {
         fake.applies = false;
         CarMoves.Car car = new CarMoves.Car(fake, NAMES, ms -> exited[0] = true, null, null);
         car.blocked = () -> exited[0];
-        CarMoves.Result[] parts = new CarMoves.Result[2];
-        CarMoves.climateSettings(CarMoves.CIRCULATION_INNER, true, parts).run(car);
+        automation(CarMoves.Target.CIRCULATION, CarMoves.CIRCULATION_INNER).run(car);
+        assertEquals(CarMoves.Result.UNAVAILABLE, automation(CarMoves.Target.REAR_CLIMATE, 1).run(car));
         assertEquals("只有循环模式那一笔", 1, fake.writes.size());
         assertEquals(CIRCULATION + "@" + ALL + "=" + (CIRCULATION + 1), fake.writes.get(0));
         assertEquals(0, (int) fake.get(CLIMATE_POWER, ROW_2));
-        assertEquals(CarMoves.Result.UNAVAILABLE, parts[1]);
 
         // 一开始就退出了：一笔都不写（驾驶模式、陡坡缓降不带区域的写法也一样）
         FakeCar none = climateJustOn();
         none.values.put(String.valueOf(HILL_DESCENT), 0);
         CarMoves.Car blocked = new CarMoves.Car(none, NAMES, ms -> { }, null, null);
         blocked.blocked = () -> true;
-        assertEquals(CarMoves.Result.UNAVAILABLE, CarMoves.climateSettings(CarMoves.CIRCULATION_OUTER, true).run(blocked));
-        assertEquals(CarMoves.Result.UNAVAILABLE, CarMoves.hillDescentOn().run(blocked));
         assertEquals(CarMoves.Result.UNAVAILABLE,
-                CarMoves.driveModeUnlessAlready(Signal.DRIVE_MODE_SPORT, (ignition, gear) -> true).run(blocked));
+                automation(CarMoves.Target.CIRCULATION, CarMoves.CIRCULATION_OUTER).run(blocked));
+        assertEquals(CarMoves.Result.UNAVAILABLE, automation(CarMoves.Target.REAR_CLIMATE, 1).run(blocked));
+        assertEquals(CarMoves.Result.UNAVAILABLE, automation(CarMoves.Target.HILL_DESCENT, 1).run(blocked));
+        assertEquals(CarMoves.Result.UNAVAILABLE,
+                automation(CarMoves.Target.DRIVE_MODE, Signal.DRIVE_MODE_SPORT).run(blocked));
         assertTrue(none.writes.isEmpty());
     }
 
@@ -1073,7 +1118,8 @@ public class CarMovesTest {
         fake.set(DEFROST_FRONT, ALL, 0);
         CarMoves.Car car = new CarMoves.Car(fake, NAMES, ms -> { }, null, null);
         car.blocked = () -> exited[0];
-        assertEquals(CarMoves.Result.UNAVAILABLE, CarMoves.climateSettings(CarMoves.CIRCULATION_INNER, false).run(car));
+        assertEquals(CarMoves.Result.UNAVAILABLE,
+                automation(CarMoves.Target.CIRCULATION, CarMoves.CIRCULATION_INNER).run(car));
         assertEquals("只有带区域的那一笔", 1, fake.writes.size());
         assertEquals(CIRCULATION + "@" + ALL + "=" + (CIRCULATION + 1), fake.writes.get(0));
 
@@ -1081,24 +1127,33 @@ public class CarMovesTest {
         exited[0] = false;
         car.blocked = () -> false;
         fake.writes.clear();
-        CarMoves.climateSettings(CarMoves.CIRCULATION_INNER, false).run(car);
+        automation(CarMoves.Target.CIRCULATION, CarMoves.CIRCULATION_INNER).run(car);
         assertEquals(Arrays.asList(CIRCULATION + "@" + ALL + "=" + (CIRCULATION + 1), CIRCULATION + "=" + (CIRCULATION + 1)),
                 fake.writes);
     }
 
-    /** 前排空调的电源按排读；读不到是 null。 */
+    /** 前排空调的电源按排读（只读）；读不到是 null。循环模式读成自动、外循环、内循环。 */
     @Test
-    public void frontClimatePowerReadsTheFrontRow() {
+    public void climateReadsTheFrontRowAndTheCirculationMode() {
         FakeCar car = new FakeCar();
-        assertNull(CarMoves.frontClimatePower(car(car)));
+        assertNull(CarMoves.value(car(car), CarMoves.Target.FRONT_CLIMATE));
         car.set(CLIMATE_POWER, ROW_1, 1);
         car.set(CLIMATE_POWER, DRIVER, 0);
-        assertEquals(1, (int) CarMoves.frontClimatePower(car(car)));
+        assertEquals(1, (int) CarMoves.value(car(car), CarMoves.Target.FRONT_CLIMATE));
         car.set(CLIMATE_POWER, ROW_1, 0);
-        assertEquals(0, (int) CarMoves.frontClimatePower(car(car)));
+        assertEquals(0, (int) CarMoves.value(car(car), CarMoves.Target.FRONT_CLIMATE));
+        assertEquals(CarMoves.Result.UNAVAILABLE, run(car, automation(CarMoves.Target.FRONT_CLIMATE, 1)));
+        assertTrue("前排空调只读", car.writes.isEmpty());
+
+        car.set(CIRCULATION, ALL, CIRCULATION + 3);
+        assertEquals(CarMoves.CIRCULATION_AUTO, (int) CarMoves.value(car(car), CarMoves.Target.CIRCULATION));
+        car.set(CIRCULATION, ALL, CIRCULATION + 1);
+        assertEquals(CarMoves.CIRCULATION_INNER, (int) CarMoves.value(car(car), CarMoves.Target.CIRCULATION));
+        car.set(CIRCULATION, ALL, CIRCULATION + 7);
+        assertNull(CarMoves.value(car(car), CarMoves.Target.CIRCULATION));
     }
 
-    // ---- 陡坡缓降能用时打开它（issue 138）
+    // ---- 陡坡缓降（Calvin：刚通电时用不了，挂过 D 挡才能用）
 
     /** 能不能用照车机说的：active 是能，notactive 是不能，别的、问不了是 null。 */
     @Test
@@ -1118,6 +1173,7 @@ public class CarMovesTest {
         assertNull(CarMoves.hillDescentAvailable(car(car)));
         car.statuses.put(key, null);
         assertNull(CarMoves.hillDescentAvailable(car(car)));
+        assertEquals("别的那几样总是能写", 1, (int) CarMoves.available(car(car), CarMoves.Target.DRIVE_MODE));
     }
 
     /** 能用、关着才写开（不带区域）；已经开着不写；车机说用不了不写、是做不了。 */
@@ -1125,37 +1181,71 @@ public class CarMovesTest {
     public void hillDescentIsSwitchedOnOnlyWhenTheHeadUnitSaysItCan() {
         FakeCar car = new FakeCar();
         car.values.put(String.valueOf(HILL_DESCENT), 0);
-        assertEquals(CarMoves.Result.DONE, run(car, CarMoves.hillDescentOn()));
+        assertEquals(CarMoves.Result.DONE, run(car, automation(CarMoves.Target.HILL_DESCENT, 1)));
         assertEquals(HILL_DESCENT + "=1", car.writes.get(0));
         assertEquals(1, (int) car.read(HILL_DESCENT));
 
         car.writes.clear();
-        assertEquals(CarMoves.Result.DONE, run(car, CarMoves.hillDescentOn()));
+        assertEquals(CarMoves.Result.DONE, run(car, automation(CarMoves.Target.HILL_DESCENT, 1)));
         assertTrue(car.writes.isEmpty());
 
         FakeCar notYet = new FakeCar();
         notYet.values.put(String.valueOf(HILL_DESCENT), 0);
         notYet.statuses.put(HILL_DESCENT + "@" + ALL, "notactive");
-        assertEquals(CarMoves.Result.UNAVAILABLE, run(notYet, CarMoves.hillDescentOn()));
+        assertEquals(CarMoves.Result.UNAVAILABLE, run(notYet, automation(CarMoves.Target.HILL_DESCENT, 1)));
         assertTrue(notYet.writes.isEmpty());
 
         FakeCar ignoring = new FakeCar();
         ignoring.values.put(String.valueOf(HILL_DESCENT), 0);
         ignoring.applies = false;
-        assertEquals(CarMoves.Result.NO_CHANGE, run(ignoring, CarMoves.hillDescentOn()));
+        assertEquals(CarMoves.Result.NO_CHANGE, run(ignoring, automation(CarMoves.Target.HILL_DESCENT, 1)));
     }
 
     /** 能用、但开关读不到或读到别的值：不当它关着，不写、是做不了。 */
     @Test
     public void hillDescentIsNotWrittenWhenTheSwitchCannotBeRead() {
         FakeCar unread = new FakeCar();
-        assertEquals(CarMoves.Result.UNAVAILABLE, run(unread, CarMoves.hillDescentOn()));
+        assertEquals(CarMoves.Result.UNAVAILABLE, run(unread, automation(CarMoves.Target.HILL_DESCENT, 1)));
         assertTrue(unread.writes.isEmpty());
 
         FakeCar odd = new FakeCar();
         odd.values.put(String.valueOf(HILL_DESCENT), 255);
-        assertEquals(CarMoves.Result.UNAVAILABLE, run(odd, CarMoves.hillDescentOn()));
+        assertEquals(CarMoves.Result.UNAVAILABLE, run(odd, automation(CarMoves.Target.HILL_DESCENT, 1)));
         assertTrue(odd.writes.isEmpty());
+    }
+
+    // ---- 哨兵模式、低速紧急制动
+
+    /** 哨兵模式：锁车后布防（2）也算开着；关着写 1，已经布防的不写。 */
+    @Test
+    public void sentryCountsArmedAsOn() {
+        FakeCar car = new FakeCar();
+        car.set(SENTRY, ALL, 2);
+        assertEquals(1, (int) CarMoves.value(car(car), CarMoves.Target.SENTRY));
+        assertEquals(CarMoves.Result.DONE, run(car, automation(CarMoves.Target.SENTRY, 1)));
+        assertTrue(car.writes.isEmpty());
+
+        car.set(SENTRY, ALL, 0);
+        assertEquals(0, (int) CarMoves.value(car(car), CarMoves.Target.SENTRY));
+        assertEquals(CarMoves.Result.DONE, run(car, automation(CarMoves.Target.SENTRY, 1)));
+        assertEquals(SENTRY + "@" + ALL + "=1", car.writes.get(0));
+    }
+
+    /** 低速紧急制动：开是车机的那个值、关是 0，不带区域写；读到别的值不认识。 */
+    @Test
+    public void lowSpeedBrakingUsesTheHeadUnitValue() {
+        FakeCar car = new FakeCar();
+        car.values.put(String.valueOf(PEB), PEB_ON);
+        assertEquals(1, (int) CarMoves.value(car(car), CarMoves.Target.LOW_SPEED_BRAKING));
+        assertEquals(CarMoves.Result.DONE, run(car, automation(CarMoves.Target.LOW_SPEED_BRAKING, 0)));
+        assertEquals(PEB + "=0", car.writes.get(0));
+        assertEquals(0, (int) CarMoves.value(car(car), CarMoves.Target.LOW_SPEED_BRAKING));
+
+        assertEquals(CarMoves.Result.DONE, run(car, automation(CarMoves.Target.LOW_SPEED_BRAKING, 1)));
+        assertEquals(PEB + "=" + PEB_ON, car.writes.get(1));
+
+        car.values.put(String.valueOf(PEB), 0x77);
+        assertNull(CarMoves.value(car(car), CarMoves.Target.LOW_SPEED_BRAKING));
     }
 
     // ---- 后雾灯闪烁（jlunnn 的 PR #160，从 7X-U 搬来）
