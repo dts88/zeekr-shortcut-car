@@ -33,7 +33,8 @@ import com.kooo.evcam.overlay.OverlayCoordinator;
  * 录像要不要开（接着录「这一趟要录」、这一趟还没看过的启动自动录制）只告诉相机管家，它判（{@link CameraKeeper#appRestored}）；
  * 现在用不了相机（前台服务是后台起的）时，它开录那一下先静默把主界面拉起来，闪一下就退后台（{@link #bringUpMainForRecording}，1.6）。</p>
  *
- * <p>屏幕黑着（熄屏 = 屏幕真黑了，熄屏 v3）时不拉界面；录像黑着接不接也是相机管家照熄屏的规矩判。
+ * <p>屏幕黑着（熄屏 = 人不在车上，{@code ScreenState}）时什么都不做（项目所有者 2026-11-21：车自己醒来、进程被拉起来，
+ * 人不在就不取车机的资源）；人回来了的那一下（亮屏）再照设置恢复。
  * 屏幕此刻不知道黑没黑（进程刚起来、安卓刚亮在等车辆信号）时排到知道了再做（{@code ScreenState.whenKnown}，C11）。
  * 谁来调都先排到主线程上（C8）：保活任务在 WorkManager 的线程上调，而相机管家只在主线程上动。</p>
  */
@@ -167,11 +168,14 @@ public final class Recovery {
         if (UserExit.isExited(context)) {
             return;
         }
-        boolean dark = com.kooo.evcam.screen.ScreenState.dark();
-        // 进程是在屏幕亮着时被拉起来的：亮屏事件早过了，该接回的界面在这里接
-        if (!dark) {
-            bringBackUiAfterScreenOn(context);
+        if (com.kooo.evcam.screen.ScreenState.dark()) {
+            // 人不在车上（车自己醒来、进程被拉起来、还没有人的证据）：什么都不恢复（项目所有者 2026-11-21）。
+            // 人回来了走亮屏那一条（ScreenState.wentLit），那里再叫到这里
+            BlackBox.count("restore-skipped-dark");
+            return;
         }
+        // 进程是在屏幕亮着时被拉起来的：亮屏事件早过了，该接回的界面在这里接
+        bringBackUiAfterScreenOn(context);
         AppConfig config = new AppConfig(context);
         if (!config.isAutoStartOnBoot()) {
             BlackBox.count("restore-skipped-switch-off");

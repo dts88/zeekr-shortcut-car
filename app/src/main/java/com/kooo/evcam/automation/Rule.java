@@ -44,11 +44,8 @@ public final class Rule {
         return id != null && trigger != null && !changes.isEmpty();
     }
 
-    /** 结束时恢复不恢复：触发有结束的，勾了、或者有关掉安全功能的动作（必须恢复）。 */
+    /** 结束时恢复不恢复：勾了、或者有关掉安全功能的动作（必须恢复）。每一种触发都有结束（{@link Trigger}）。 */
     public boolean restores() {
-        if (!trigger.hasEnd()) {
-            return false;
-        }
         if (restore) {
             return true;
         }

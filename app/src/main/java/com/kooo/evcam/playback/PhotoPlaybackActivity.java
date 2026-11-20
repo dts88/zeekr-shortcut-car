@@ -83,6 +83,13 @@ import java.util.Set;
  */
 public class PhotoPlaybackActivity extends AppCompatActivity {
 
+    /** 人碰了界面：人在车上的证据（{@code ScreenState.userActed}）。 */
+    @Override
+    public void onUserInteraction() {
+        super.onUserInteraction();
+        com.kooo.evcam.screen.ScreenState.userActed("ui");
+    }
+
     // UI 组件
     private RecyclerView photoList;
     private TextView emptyText;

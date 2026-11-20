@@ -51,6 +51,13 @@ import java.util.List;
 
 public class MainActivity extends AppCompatActivity implements com.kooo.evcam.setup.SetupFragment.Host {
 
+    /** 人碰了界面（触摸、按键）：人在车上的证据。界面自己到了前台不算，所以不放在 onResume 里。 */
+    @Override
+    public void onUserInteraction() {
+        super.onUserInteraction();
+        com.kooo.evcam.screen.ScreenState.userActed("main");
+    }
+
     /**
      * 回放界面的抽屉里点了主界面上才办得了的一项（主界面、设置、退出应用；值是菜单项的 id）：
      * 回到这里由它去办（{@link NavDrawer#attachToPlayback}）。
@@ -290,6 +297,8 @@ public class MainActivity extends AppCompatActivity implements com.kooo.evcam.se
                 && !getIntent().getBooleanExtra("restored_by_app", false)) {
             // 人自己点开的是新的一趟：之前要录的（被结束的进程留下的、等亮屏接的）不再接；启动自动录制开着的照常自动开
             CameraKeeper.get(this).newTrip("manual open");
+            // 人自己点开应用是人在车上的证据（车辆读不到时只认它，ScreenState.userActed）
+            com.kooo.evcam.screen.ScreenState.userActed("launch");
         }
         instance = this;  // 设置静态实例引用
         AppLog.init(this);

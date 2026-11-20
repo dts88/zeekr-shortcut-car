@@ -45,7 +45,7 @@ import java.util.function.Predicate;
  * <ul>
  *   <li>上车：亮屏那条边（{@link ScreenState} 的 E3：黑着时车通电了）；进程起来时屏幕已经亮着的，上一个进程最后看到的是熄屏、
  *       或者车机真正开过机才算（{@link RunRules#startsAtProcessStart}）。「在等下一次上车」存在 {@link #STATE} 里。</li>
- *   <li>离车：熄屏。上车的那几次就此结束。</li>
+ *   <li>熄屏（人下车了）：上车的那几次就此结束。人下车以后不再写车（项目所有者 2026-11-21），所以没有「离车」这个触发。</li>
  *   <li>挂入某一挡：发布出来的挡位从别的挡变成这一挡；离开这一挡时，这几次结束。</li>
  *   <li>某项设置变为某个值：有开着的规则要看的那几样，亮屏、车通电时每秒读一次（{@link RunRules#WATCH_MS}），
  *       连着两次读到才算（{@link Steady}）；确认过的值存在 {@link #STATE} 里，进程没了回来也认得出变化
@@ -179,14 +179,13 @@ public final class Automations {
 
     // ================================================================= 输入（主线程）
 
-    /** 熄屏：人下车了。上车的那几次结束（勾了恢复的恢复），离车的触发来一次，记下在等下一次上车。 */
+    /** 熄屏：人下车了。上车的那几次结束（勾了恢复的恢复），记下在等下一次上车。之后不再写车。 */
     void screenWentDark() {
         lit = false;
         watchGen++;
         world.setAwaitingNextDrive(true);
         wantBattery(false);
         endRuns(t -> t.kind == Trigger.Kind.GET_IN);
-        fire(Trigger.leave());
     }
 
     /** 亮屏（车通电了）：一次上车。 */
@@ -255,8 +254,14 @@ public final class Automations {
         if (gen != watchGen || !lit) {
             return;
         }
-        world.later(RunRules.WATCH_MS, () -> watchTick(gen));
         List<Rule> rules = world.rules();
+        if (!anyEnabled(rules)) {
+            // 一条开着的规则都没有：不读车，也不再排下一次；规则变了（{@link #rulesChanged}）、下一次亮屏再看
+            watches.clear();
+            wantBattery(false);
+            return;
+        }
+        world.later(RunRules.WATCH_MS, () -> watchTick(gen));
         wantBattery(needsBattery(rules));
         Set<Setting> wanted = watched(rules);
         watches.keySet().retainAll(wanted);
@@ -331,6 +336,27 @@ public final class Automations {
             }
         }
         return set;
+    }
+
+    private static boolean anyEnabled(List<Rule> rules) {
+        for (Rule r : rules) {
+            if (r.enabled) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** 规则改了（设置页存了以后叫，哪个线程都能叫）：亮着就重新开始看。 */
+    public static void rulesChanged() {
+        Automations a = instance;
+        if (a != null) {
+            a.world.later(0, () -> {
+                if (a.lit) {
+                    a.startWatching();
+                }
+            });
+        }
     }
 
     private static boolean needsBattery(List<Rule> rules) {

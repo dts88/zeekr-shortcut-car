@@ -19,12 +19,13 @@ import org.junit.Test;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 /**
- * 熄屏判断的几条边，拿 10-12 车上那几段原样走一遍（设计 v3 §8；黑匣子 diag_18 20:04–20:57，diag_17 01:40 夜里醒来）。
- * 熄屏 = 屏幕真黑了：安卓熄屏，或者车辆说黑（项目所有者 2026-10-12 D1）。黑着、或者还没有车辆的判断时亮要有证据：
- * 车没通电还是黑（项目所有者 2026-10-27；10-24 远程开空调那一段）。
+ * 熄屏判断的几条边。亮 = 人在车上，要有证据（项目所有者 2026-11-21）：黑着时车通电了、而且刚拉开过车门或刚碰过应用才亮；
+ * 车辆读不到只认碰过应用；车自己通电、车自己醒来、读不到、连不上都还是黑；进程起来一律从黑起。亮着时有黑的证据才黑
+ * （10-12 车上那几段：黑匣子 diag_18 20:04–20:57，diag_17 01:40 夜里醒来）。
  */
 public class ScreenTransitionsTest {
 
@@ -35,44 +36,82 @@ public class ScreenTransitionsTest {
     private static final String SLEEPS = "HEAD_UNIT_SLEEPS";
     private static final String WOKE = "WOKE_WHILE_DARK";
     private static final String LIT = "LIT";
+    private static final Telemetry.CarLink CONNECTED = Telemetry.CarLink.CONNECTED;
+    private static final long FRESH = ScreenTransitions.EVIDENCE_FRESH_MS;
+    private static final long LOST = ScreenTransitions.LOST_MAX_MS;
 
-    /** 一段输入，记下跨过的边。时间是 elapsedRealtime（毫秒），只有「读不到」的时限看它。 */
+    /** 一段输入，记下跨过的边。时间是 elapsedRealtime（毫秒）。证据照 ScreenState 的记法：熄屏（E1）那一下清掉。 */
     private static final class Run {
         ScreenTransitions.State s;
         final List<String> edges = new ArrayList<>();
+        long doorAt;
+        long touchAt;
 
         Run(boolean androidOff) {
             s = ScreenTransitions.initial(androidOff);
         }
 
-        /** 车辆接口连着，读到这两项（和 ScreenState 一样，亮要不要证据照此刻的状态）。 */
-        Run car(Boolean event, Integer ignition, long now) {
-            return to(ScreenTransitions.verdict(s,
-                    VehicleScreen.verdict(event, ignition, ScreenTransitions.litNeedsEvidence(s)), true, now));
+        /** 进程起来、人已经在车上亮着的那种起点（测亮着以后的事）：拉开车门、车通电。 */
+        static Run lit() {
+            Run r = new Run(false).door(false, ON, 1);
+            r.edges.clear();
+            return r;
         }
 
-        /** 车辆接口连着，两项都读不到（或者读不到的时限到了再看一次）。 */
+        /** 车辆接口连着，读到这两项，车门都关着。 */
+        Run car(Boolean event, Integer ignition, long now) {
+            return judge(CONNECTED, event, ignition, now);
+        }
+
+        /** 车辆接口连着，读到这两项，这一批里有一扇车门开着。 */
+        Run door(Boolean event, Integer ignition, long now) {
+            doorAt = now;
+            return judge(CONNECTED, event, ignition, now);
+        }
+
+        /** 人碰了应用，照此刻的读数再判一次。 */
+        Run touch(Telemetry.CarLink link, Boolean event, Integer ignition, long now) {
+            touchAt = now;
+            return judge(link, event, ignition, now);
+        }
+
+        /** 车辆接口连着，两项都读不到（或者时限到了再看一次）。 */
         Run unreadable(long now) {
-            return to(ScreenTransitions.verdict(s, null, true, now));
+            return judge(CONNECTED, null, null, now);
         }
 
         /** 车辆接口没连着（断了、在连、连不上）。 */
         Run linkDown(long now) {
-            return to(ScreenTransitions.verdict(s, null, false, now));
+            return judge(Telemetry.CarLink.FAILED, null, null, now);
+        }
+
+        /** 这台车机没有车辆接口。 */
+        Run noInterface(long now) {
+            return judge(Telemetry.CarLink.UNAVAILABLE, null, null, now);
         }
 
         Run androidOff() {
             return to(ScreenTransitions.androidOff(s));
         }
 
-        /** 安卓亮了，醒来那一遍读到这两项（读不到、没读回来都是 null）。 */
-        Run androidOn(Boolean event, Integer ignition) {
-            return to(ScreenTransitions.androidOn(s,
-                    VehicleScreen.verdict(event, ignition, ScreenTransitions.litNeedsEvidence(s)), true));
+        /** 安卓亮了，醒来那一遍读到这两项（读不到、没读回来都是 null），车门关着。 */
+        Run androidOn(Boolean event, Integer ignition, long now) {
+            return to(ScreenTransitions.verdict(ScreenTransitions.androidOn(s), CONNECTED, event, ignition,
+                    fresh(doorAt, now), fresh(touchAt, now), touchAt, now));
         }
 
-        Run androidOnLinkDown() {
-            return to(ScreenTransitions.androidOn(s, null, false));
+        Run androidOnNoInterface(long now) {
+            return to(ScreenTransitions.verdict(ScreenTransitions.androidOn(s), Telemetry.CarLink.UNAVAILABLE, null, null,
+                    false, false, 0, now));
+        }
+
+        private Run judge(Telemetry.CarLink link, Boolean event, Integer ignition, long now) {
+            return to(ScreenTransitions.verdict(s, link, event, ignition, fresh(doorAt, now), fresh(touchAt, now),
+                    touchAt, now));
+        }
+
+        private static boolean fresh(long at, long now) {
+            return at > 0 && now - at <= FRESH;
         }
 
         private Run to(ScreenTransitions.State next) {
@@ -80,171 +119,261 @@ public class ScreenTransitionsTest {
             if (edge != null) {
                 edges.add(edge.name());
             }
+            if (edge == ScreenTransitions.Edge.DARK) {
+                doorAt = 0;
+                touchAt = 0;
+            }
             s = next;
             return this;
         }
     }
 
     /**
-     * 10-12 哨兵模式没开离车（diag_18）：20:05:10.998 车门关上就黑（事件 0 → 1、点火 ON → ACC 同一毫秒）；
-     * 20:05:15.221 车门又开，点火先回 ON（事件晚 0.1 秒才回 0）；20:05:46.709 又黑；20:11:05.976 点火 ACC → 0x00200102
-     * （事件还是 1，不是边）；20:11:33 安卓熄屏 = 车机要睡；20:22:52 早上安卓亮、醒来那一遍读到亮。
+     * 10-12 哨兵模式没开离车（diag_18）：车门关上就黑（事件 0 → 1、点火 ON → ACC 同一毫秒）；4 秒后车门又开，点火先回 ON
+     * （事件晚 0.1 秒才回 0）；又黑；点火 ACC → 0x00200102（不是边）；安卓熄屏 = 车机要睡；早上人快到了车机先醒（没有证据：
+     * 车机醒着、屏幕黑着），拉开车门、车通电才是亮屏。
      */
     @Test
-    public void sentryOffLeaveAndMorningWake() {
+    public void sentryOffLeaveAndMorningReturn() {
         Run r = new Run(false)
-                .car(false, ON, 1_000)
+                .door(false, ON, 1_000)
                 .car(true, ACC, 10_998)
-                .car(true, ON, 15_221)
+                .door(true, ON, 15_221)
                 .car(false, ON, 15_325)
                 .car(true, ACC, 46_709)
                 .car(true, AFTER_ACC, 365_976)
                 .androidOff()
-                .androidOn(false, ON);
-        assertEquals(Arrays.asList(DARK, LIT, DARK, SLEEPS, LIT), r.edges);
+                .androidOn(true, AFTER_ACC, 40_000_000)
+                .door(true, ON, 40_014_000)
+                .car(false, ON, 40_014_100);
+        assertEquals(Arrays.asList(LIT, DARK, LIT, DARK, SLEEPS, WOKE, LIT), r.edges);
         assertFalse(r.s.dark());
     }
 
-    /**
-     * 早上醒来时记着的还是睡之前的「黑」（事件 1、点火 0x00200102）：醒来那一遍读回来之前安卓先不算亮
-     * （监听者那一批先到，安卓还算熄屏，不是边），读回来是亮 —— 一条亮屏，不是「车机醒着、屏幕黑着」。
-     */
-    @Test
-    public void aMorningWakeIsNotANightWake() {
-        Run r = new Run(false).car(true, ACC, 0).androidOff();
-        r.edges.clear();
-        r.car(false, ON, 700_000).androidOn(false, ON);
-        assertEquals(Arrays.asList(LIT), r.edges);
-    }
-
-    /** 10-12 哨兵模式开着离车 20 分钟：安卓一直没熄屏，只有车辆说黑、开车门说亮（点火先回 ON）。中间哨兵模式变了不是输入。 */
+    /** 10-12 哨兵模式开着离车 20 分钟：安卓一直没熄屏，只有车辆说黑、拉开车门（点火先回 ON）才亮。 */
     @Test
     public void sentryOnParkTwentyMinutes() {
-        Run r = new Run(false)
-                .car(false, ON, 0)
+        Run r = Run.lit()
                 .car(true, ACC, 1_000)
-                .car(true, ON, 1_000 + 1_226_140)
+                .door(true, ON, 1_000 + 1_226_140)
                 .car(false, ON, 1_000 + 1_226_177);
         assertEquals(Arrays.asList(DARK, LIT), r.edges);
     }
 
-    /**
-     * 夜里车机自己醒（10-12 01:40）：安卓亮了，醒来那一遍车辆还说黑（事件 1、点火 0x00200102）—— 车机醒着、屏幕黑着；
-     * 两分钟后安卓又熄屏 = 车机又要睡；早上安卓亮、读到亮才是亮屏。
-     */
+    /** 车自己通电（没人拉车门、没人碰应用）：还是黑。之后有人拉开车门才亮。 */
+    @Test
+    public void theCarPoweringOnByItselfStaysDark() {
+        Run r = Run.lit().car(true, ACC, 1_000);
+        r.edges.clear();
+        r.car(true, ON, 500_000).car(false, ON, 500_100).car(false, Signal.IGNITION_DRIVING, 560_000);
+        assertTrue("车通电了、屏幕也亮了，没有人的证据：黑", r.s.dark());
+        assertTrue(r.edges.isEmpty());
+        r.door(false, ON, 600_000);
+        assertEquals(Arrays.asList(LIT), r.edges);
+    }
+
+    /** 拉开了车门、车没通电：还是黑；一分钟之内车通电了才亮，过了一分钟不算。 */
+    @Test
+    public void anOpenDoorNeedsThePowerSoonAfter() {
+        Run soon = Run.lit().car(true, ACC, 1_000);
+        soon.edges.clear();
+        soon.door(true, ACC, 100_000);
+        assertTrue("车门开了、车没通电：黑", soon.s.dark());
+        soon.car(true, ON, 100_000 + FRESH);
+        assertEquals(Arrays.asList(LIT), soon.edges);
+
+        Run late = Run.lit().car(true, ACC, 1_000);
+        late.edges.clear();
+        late.door(true, ACC, 100_000).car(true, ON, 100_000 + FRESH + 1);
+        assertTrue("车门是一分多钟以前开的：不算", late.s.dark());
+        assertTrue(late.edges.isEmpty());
+    }
+
+    /** 下车时开过的车门不算回来的证据：熄屏那一下证据清掉，再亮要再拉一次车门。 */
+    @Test
+    public void theDoorOpenedToLeaveDoesNotCountForTheReturn() {
+        Run r = Run.lit().door(false, ON, 5_000).car(true, ACC, 8_000);
+        assertEquals(Arrays.asList(DARK), r.edges);
+        r.car(true, ON, 20_000);
+        assertTrue("下车 12 秒后车自己通电：黑", r.s.dark());
+        assertEquals(Arrays.asList(DARK), r.edges);
+    }
+
+    /** 夜里车机自己醒：安卓亮了，没有人的证据 —— 车机醒着、屏幕黑着；两分钟后安卓又熄屏 = 车机又要睡。 */
     @Test
     public void nightWakeStaysDark() {
-        Run r = new Run(false).car(true, ACC, 0).androidOff();
+        Run r = Run.lit().car(true, ACC, 0).androidOff();
         r.edges.clear();
-        r.androidOn(true, AFTER_ACC);
+        r.androidOn(true, AFTER_ACC, 7_500_000);
         assertEquals(Arrays.asList(WOKE), r.edges);
         assertTrue("还算熄屏", r.s.dark());
         assertFalse(r.s.androidOff);
-        r.androidOff().androidOn(false, ON);
-        assertEquals(Arrays.asList(WOKE, SLEEPS, LIT), r.edges);
+        r.androidOff();
+        assertEquals(Arrays.asList(WOKE, SLEEPS), r.edges);
     }
 
-    /** 安卓刚亮那一下只认醒来后读到的：读不到（或者等满了没读回来）就只看安卓，不拿睡之前的「黑」顶上（C3）。 */
+    /** 安卓刚亮、醒来那一遍读不到（或者等满了没读回来）：还是黑，不再只看安卓判成亮屏。 */
     @Test
-    public void anUnreadableWakeReadCountsAsAndroidOnly() {
-        Run r = new Run(false).car(true, ACC, 0).androidOff();
+    public void anUnreadableWakeReadStaysDark() {
+        Run r = Run.lit().car(true, ACC, 0).androidOff();
         r.edges.clear();
-        r.androidOn(null, null);
-        assertEquals(Arrays.asList(LIT), r.edges);
-        assertNull(r.s.vehicle);
+        r.androidOn(null, null, 7_500_000);
+        assertEquals(Arrays.asList(WOKE), r.edges);
+        assertTrue(r.s.dark());
+        assertEquals(Boolean.TRUE, r.s.vehicle);
+    }
+
+    /** 醒来那一遍读到车通电了、车门没开过：还是黑（车自己醒来、自己通电）。醒来时车门正开着、车通电了：亮屏。 */
+    @Test
+    public void aWakeNeedsTheSameEvidence() {
+        Run alone = Run.lit().car(true, ACC, 0).androidOff();
+        alone.edges.clear();
+        alone.androidOn(false, ON, 7_500_000);
+        assertEquals(Arrays.asList(WOKE), alone.edges);
+
+        Run person = Run.lit().car(true, ACC, 0).androidOff();
+        person.edges.clear();
+        person.doorAt = 7_499_000;
+        person.androidOn(false, ON, 7_500_000);
+        assertEquals(Arrays.asList(LIT), person.edges);
+    }
+
+    /** 黑着时车辆接口断了、两项读不到：一直黑，没有边（以前过了 6 秒只看安卓，哨兵模式开着时就判成亮屏）。 */
+    @Test
+    public void aLostLinkWhileDarkStaysDark() {
+        Run awake = Run.lit().car(true, ACC, 0);
+        awake.edges.clear();
+        awake.linkDown(1_000).unreadable(10_000).linkDown(10_000_000);
+        assertTrue(awake.s.dark());
+        assertTrue(awake.edges.isEmpty());
+        assertEquals(0, awake.s.unknownSinceMs);
     }
 
     /**
-     * 车辆接口连着、两项一时读不到（占位值来回跳）：最多两次对账照上一次的判断算，不跨边；读回来了接着用；
-     * 过了时限还读不到就丢掉、只看安卓（车机服务坏了也不会一直黑下去，C3）。
+     * 亮着时（人在车上）车辆读不到：照亮着算，读回来了时限作废；一直读不到，满了时限按人不在算。
+     * 行驶中车机服务抖一下不能把录像停了；哨兵模式开着时也不能一直拿着相机。
      */
     @Test
-    public void unknownWhileConnectedKeepsTheLastVerdictForTwoReconciles() {
-        long keep = ScreenTransitions.KEEP_UNKNOWN_MS;
-        Run r = new Run(false).car(true, ACC, 0);
-        r.edges.clear();
+    public void unreadableWhileLitIsKeptThenCountsAsGone() {
+        Run r = Run.lit();
         r.unreadable(1_000);
         assertEquals(1_000, r.s.unknownSinceMs);
-        r.unreadable(1_000 + keep - 1);
-        assertTrue("时限之内照上一次算", r.s.dark());
-        r.car(true, ACC, 1_000 + keep);
-        assertEquals("读回来了：时限从头算", 0, r.s.unknownSinceMs);
-        r.unreadable(20_000).unreadable(20_000 + keep);
-        assertEquals("时限到了还读不到：只看安卓", Arrays.asList(LIT), r.edges);
-        assertNull(r.s.vehicle);
-        assertEquals(0, r.s.unknownSinceMs);
+        r.linkDown(1_000 + LOST - 1);
+        assertFalse("时限之内照亮着算", r.s.dark());
+        r.car(false, ON, 1_000 + LOST);
+        assertEquals("读回来了：时限作废", 0, r.s.unknownSinceMs);
+        r.linkDown(2_000_000).linkDown(2_000_000 + LOST);
+        assertEquals("满了时限：按人不在算", Arrays.asList(DARK), r.edges);
+        assertEquals(Boolean.TRUE, r.s.vehicle);
     }
 
-    /** 亮着时读不到：没有可照着算的，直接只看安卓，也不起算时限。 */
+    /** 读不到的那一段里人碰过应用：时限从那一下重新算。 */
     @Test
-    public void unknownWithNothingToKeepIsAndroidOnly() {
-        Run r = new Run(false).unreadable(5_000);
-        assertNull(r.s.vehicle);
-        assertEquals(0, r.s.unknownSinceMs);
-        assertTrue(r.edges.isEmpty());
-    }
-
-    /** 车辆接口没连着（断了）：当场只看安卓 —— 车辆说的黑结束；安卓熄屏着的还是黑着。 */
-    @Test
-    public void aLostLinkClearsTheVehicleVerdict() {
-        Run awake = new Run(false).car(true, ACC, 0).linkDown(1_000);
-        assertEquals(Arrays.asList(DARK, LIT), awake.edges);
-        Run asleep = new Run(false).car(true, ACC, 0).androidOff().linkDown(1_000);
-        assertEquals(Arrays.asList(DARK, SLEEPS), asleep.edges);
-        assertTrue(asleep.s.dark());
-    }
-
-    /** 车辆信号读不到（降级）：安卓熄屏就是熄屏和车机要睡一起来（一条熄屏边，androidOff 一起带着），安卓亮就是亮屏（和 2.11.1 一样）。 */
-    @Test
-    public void degradedModeIsAndroidOnly() {
-        Run r = new Run(false).linkDown(0).androidOff();
+    public void aTouchRestartsTheUnreadableLimit() {
+        Run r = Run.lit();
+        r.linkDown(1_000);
+        r.touch(Telemetry.CarLink.FAILED, null, null, 1_000 + LOST - 10);
+        r.linkDown(1_000 + LOST + 5);
+        assertFalse(r.s.dark());
+        r.linkDown(1_000 + LOST - 10 + LOST);
         assertEquals(Arrays.asList(DARK), r.edges);
-        assertTrue(r.s.androidOff);
-        r.androidOnLinkDown();
-        assertEquals(Arrays.asList(DARK, LIT), r.edges);
     }
 
-    /** 黑的那一下两项分两次到（合并窗口没赶上）：先到的一项判不出黑（且），后到的那一下才黑 —— 还是一条熄屏边。亮的那一下点火先到就亮。 */
+    /**
+     * 人碰了应用（项目所有者 2026-11-21）：车通电了就亮（没赶上车门那一下）；车辆读不到也亮，从那一刻起算读不到的时限；
+     * 车没通电还是黑（2026-10-27：人在车里、车没通电时点亮屏幕照黑着算）。
+     */
+    @Test
+    public void aTouchIsEvidenceUnlessTheCarIsUnpowered() {
+        Run powered = Run.lit().car(true, ACC, 0);
+        powered.edges.clear();
+        powered.car(false, ON, 100_000).touch(CONNECTED, false, ON, 130_000);
+        assertEquals(Arrays.asList(LIT), powered.edges);
+        assertEquals(0, powered.s.unknownSinceMs);
+
+        Run broken = new Run(false).linkDown(1_000);
+        assertTrue(broken.s.dark());
+        broken.touch(Telemetry.CarLink.FAILED, null, null, 5_000);
+        assertEquals(Arrays.asList(LIT), broken.edges);
+        assertEquals("车辆读不到：从亮的那一刻起算时限", 5_000, broken.s.unknownSinceMs);
+        broken.linkDown(5_000 + LOST);
+        assertEquals(Arrays.asList(LIT, DARK), broken.edges);
+
+        Run unpowered = Run.lit().car(true, ACC, 0);
+        unpowered.edges.clear();
+        unpowered.touch(CONNECTED, false, ACC, 100_000);
+        assertTrue(unpowered.s.dark());
+        assertTrue(unpowered.edges.isEmpty());
+    }
+
+    /** 碰应用也只算一分钟：一分多钟以后车才通电，不算。 */
+    @Test
+    public void aTouchGoesStaleToo() {
+        Run r = Run.lit().car(true, ACC, 0);
+        r.edges.clear();
+        r.touch(CONNECTED, true, ACC, 100_000).car(true, ON, 100_000 + FRESH + 1);
+        assertTrue(r.s.dark());
+    }
+
+    /** 黑的那一下两项分两次到：先到的一项判不出黑（且），后到的那一下才黑 —— 还是一条熄屏边。亮的那一下点火先到就亮。 */
     @Test
     public void edgesSplitAcrossTwoPublishesGiveOneTransition() {
-        Run eventFirst = new Run(false).car(false, ON, 0).car(true, ON, 10).car(true, ACC, 20);
+        Run eventFirst = Run.lit().car(true, ON, 10).car(true, ACC, 20);
         assertEquals(Arrays.asList(DARK), eventFirst.edges);
-        Run ignitionFirst = new Run(false).car(false, ON, 0).car(false, ACC, 10).car(true, ACC, 20);
+        Run ignitionFirst = Run.lit().car(false, ACC, 10).car(true, ACC, 20);
         assertEquals(Arrays.asList(DARK), ignitionFirst.edges);
-        Run lit = new Run(false).car(true, ACC, 0).car(true, ON, 100).car(false, ON, 140);
+        Run lit = Run.lit().car(true, ACC, 0).door(true, ON, 100).car(false, ON, 140);
         assertEquals(Arrays.asList(DARK, LIT), lit.edges);
     }
 
     /**
-     * 进程起来时：安卓亮着、屏幕早黑了 —— 读到第一份判断就是一条熄屏边（ScreenState 那边记「起点不明」）；
-     * 安卓熄屏着起来的 —— 已经黑着，不是边，读到车辆还黑着也不是；安卓亮、读到亮才是亮屏。
+     * 进程起来时一律从黑起，不是边：安卓亮着、车通电着（人多半在车上）也要等证据 —— 分不出是人在开车时进程重启，还是车自己醒来
+     * 时被拉起来。安卓熄屏着起来的同样。
      */
     @Test
-    public void processStart() {
-        Run litStart = new Run(false).car(true, ACC, 1_100);
-        assertEquals(Arrays.asList(DARK), litStart.edges);
-        Run darkStart = new Run(true);
-        assertTrue(darkStart.s.dark());
-        darkStart.car(true, AFTER_ACC, 500).androidOn(false, ON);
-        assertEquals(Arrays.asList(LIT), darkStart.edges);
+    public void aProcessAlwaysStartsDark() {
+        Run on = new Run(false);
+        assertTrue(on.s.dark());
+        assertEquals(Boolean.TRUE, on.s.vehicle);
+        on.car(false, ON, 1_100).car(false, Signal.IGNITION_DRIVING, 5_000).car(false, ACC, 9_000);
+        assertTrue(on.edges.isEmpty());
+        assertTrue(on.s.dark());
+        on.touch(CONNECTED, false, ON, 12_000);
+        assertEquals(Arrays.asList(LIT), on.edges);
+
+        Run asleep = new Run(true);
+        assertTrue(asleep.s.dark());
+        asleep.car(true, AFTER_ACC, 500).androidOn(true, AFTER_ACC, 600);
+        assertEquals(Arrays.asList(WOKE), asleep.edges);
     }
 
-    /** 安卓熄屏着时车辆判断怎么变都不是边（屏幕本来就黑着）；车辆说黑时安卓熄屏是车机要睡，不是第二次熄屏。 */
+    /** 安卓熄屏着时车辆读数怎么变都不是边；黑着时安卓熄屏是车机要睡，不是第二次熄屏。 */
     @Test
     public void onlyAndroidChangesMoveWithinTheDark() {
-        Run r = new Run(true).car(false, ON, 0).car(true, ACC, 10).car(false, ON, 20);
+        Run r = new Run(true).door(false, ON, 0).car(true, ACC, 10).door(false, ON, 20);
         assertTrue(r.edges.isEmpty());
-        Run v = new Run(false).car(true, ACC, 0).androidOff().androidOff();
+        Run v = Run.lit().car(true, ACC, 0).androidOff().androidOff();
         assertEquals(Arrays.asList(DARK, SLEEPS), v.edges);
+    }
+
+    /** 亮着时安卓熄屏（车辆没来得及说黑）：熄屏和车机要睡一起来；醒来不算人还在，要重新有证据。 */
+    @Test
+    public void androidOffEndsTheLitState() {
+        Run r = Run.lit().androidOff();
+        assertEquals(Arrays.asList(DARK), r.edges);
+        assertTrue(r.s.androidOff);
+        r.androidOn(false, ON, 9_000_000);
+        assertEquals("睡之前亮着、醒来车通电着，没人拉车门：黑", Arrays.asList(DARK, WOKE), r.edges);
+        assertTrue(r.s.dark());
     }
 
     /**
      * 10-24 15:43:58 远程开空调（或远程看车）：黑着，屏幕电源事件 1 → 0 亮了整 60 秒，点火一直 ACC，然后事件回到 1 ——
-     * 车没通电，从头到尾都是黑，一条边都没有（以前是一条亮屏、一条熄屏：主界面、超级镜子重新登记，座舱又被要）。
+     * 车没通电，从头到尾都是黑，一条边都没有。
      */
     @Test
     public void aLitScreenWithTheCarNotPoweredStaysDark() {
-        Run r = new Run(false).car(false, ON, 0).car(true, ACC, 1_000);
+        Run r = Run.lit().car(true, ACC, 1_000);
         r.edges.clear();
         r.car(false, ACC, 100_000);
         assertTrue("事件说亮、车没通电：还是黑", r.s.dark());
@@ -254,101 +383,55 @@ public class ScreenTransitionsTest {
         assertTrue(r.s.dark());
     }
 
-    /** 黑着时结束黑的是车通电了：点火 ACC → ON 是亮屏 —— 事件早就说亮了（远程开空调那一段里车主回来）也一样。 */
+    /** 人在车里、一直没黑过：点火掉到 ACC、事件还是 0，照两项「且」还是亮着；事件变 1 才熄屏。 */
     @Test
-    public void theCarPoweringOnIsTheRealReturn() {
-        Run r = new Run(false).car(true, ACC, 0).car(false, ACC, 10_000);
-        r.edges.clear();
-        r.car(false, ON, 20_000);
-        assertEquals(Arrays.asList(LIT), r.edges);
-        assertEquals(Boolean.FALSE, r.s.vehicle);
-    }
-
-    /**
-     * 进程在 ACC、屏幕亮着时起来（还没有车辆的判断）：读到的第一份就是黑 —— 一条熄屏边，起之前没有车辆判断
-     * （ScreenState 那边记「读到时已经黑着，起点不明」）。在 ON 时起来照旧是亮。
-     */
-    @Test
-    public void aProcessStartAtAccIsDark() {
-        Run acc = new Run(false);
-        assertNull("起之前没有车辆判断：起点不明", acc.s.vehicle);
-        acc.car(false, ACC, 1_100);
-        assertEquals(Arrays.asList(DARK), acc.edges);
-        assertEquals(Boolean.TRUE, acc.s.vehicle);
-        Run on = new Run(false).car(false, ON, 1_100);
-        assertTrue(on.edges.isEmpty());
-        assertFalse(on.s.dark());
-    }
-
-    /**
-     * 车机醒来、安卓亮了，屏幕亮着但车没通电（点火 ACC）：车机醒着、屏幕黑着（E2'），不是亮屏；之后车通电了才亮屏。
-     * 醒来读到 ON 是亮屏（早上回到车上）。
-     */
-    @Test
-    public void aWakeWithTheCarNotPoweredStaysDark() {
-        Run acc = new Run(false).car(true, ACC, 0).androidOff();
-        acc.edges.clear();
-        acc.androidOn(false, ACC);
-        assertEquals(Arrays.asList(WOKE), acc.edges);
-        assertTrue(acc.s.dark());
-        acc.car(false, ON, 700_000);
-        assertEquals(Arrays.asList(WOKE, LIT), acc.edges);
-        Run on = new Run(false).car(true, ACC, 0).androidOff();
-        on.edges.clear();
-        on.androidOn(false, ON);
-        assertEquals(Arrays.asList(LIT), on.edges);
-    }
-
-    /**
-     * 黑着，事件说亮、点火读不到（车通没通电不知道）：说不上来 —— 照上一次的「黑」算两次对账，过了只看安卓（安卓亮着：亮屏）。
-     * 之后点火读回来还是 ACC：没有车辆判断时亮要有证据，又是一条熄屏（起点不明）。
-     */
-    @Test
-    public void aLitScreenWithUnreadableCarPowerIsHeldThenAndroidOnly() {
-        long keep = ScreenTransitions.KEEP_UNKNOWN_MS;
-        Run r = new Run(false).car(true, ACC, 0);
-        r.edges.clear();
-        r.car(false, null, 1_000);
-        assertEquals(1_000, r.s.unknownSinceMs);
-        assertTrue("时限之内照上一次算", r.s.dark());
-        r.car(false, null, 1_000 + keep - 1);
-        assertTrue(r.edges.isEmpty());
-        r.car(false, null, 1_000 + keep);
-        assertEquals("时限到了：只看安卓", Arrays.asList(LIT), r.edges);
-        assertNull(r.s.vehicle);
-        r.car(false, ACC, 20_000);
-        assertEquals(Arrays.asList(LIT, DARK), r.edges);
-    }
-
-    /**
-     * 人在车里、一直没黑过（车辆判过亮）：点火掉到 ACC、事件还是 0，照两项「且」还是亮着；事件变 1 才熄屏（和以前一样）。
-     * 车辆接口断了再连上的那一下没有车辆判断，亮要有证据：ACC 就是黑。
-     */
-    @Test
-    public void aVehicleLitStateAtAccStaysLit() {
-        Run r = new Run(false).car(false, ON, 0).car(false, ACC, 1_000);
+    public void aLitStateAtAccStaysLit() {
+        Run r = Run.lit().car(false, ACC, 1_000);
         assertTrue(r.edges.isEmpty());
         assertEquals(Boolean.FALSE, r.s.vehicle);
         r.car(true, ACC, 2_000);
         assertEquals(Arrays.asList(DARK), r.edges);
-        Run relink = new Run(false).car(false, ON, 0).car(false, ACC, 1_000).linkDown(2_000).car(false, ACC, 3_000);
-        assertEquals(Arrays.asList(DARK), relink.edges);
     }
 
     /**
-     * 等车辆接口的那一段什么时候有了着落（进程刚起来；安卓刚亮、连不上的先再连了一次，审查 rev3 F1）：读到判断就算；
-     * 还在连、核心还没登记不算；连不上、这台车机没有就只看安卓；连上了的那一下读数还是空的（连上的通知比读数早约 40 ms），
-     * 等发布出有值的那一份 —— 不然醒来那一下又只看安卓判成亮屏，连上以后再黑回去。
+     * 这台车机没有车辆接口（不是极氪 7X）：没有证据可看，只看安卓 —— 接口的结果一到就照安卓算，安卓熄屏是熄屏和车机要睡
+     * 一起来，安卓亮就是亮屏（和以前一样）。
      */
     @Test
-    public void waitingForTheLinkEndsOnTheFirstVerdictOrAResult() {
+    public void withoutTheCarInterfaceItIsAndroidOnly() {
+        Run r = new Run(false).noInterface(100);
+        assertEquals(Arrays.asList(LIT), r.edges);
+        assertNull(r.s.vehicle);
+        r.androidOff();
+        assertEquals(Arrays.asList(LIT, DARK), r.edges);
+        assertNull(r.s.vehicle);
+        r.androidOnNoInterface(5_000);
+        assertEquals(Arrays.asList(LIT, DARK, LIT), r.edges);
+        assertFalse(ScreenTransitions.litNeedsEvidence(r.s));
+    }
+
+    /** 亮要不要人的证据（诊断报告里写）：黑着、有车辆接口时要。 */
+    @Test
+    public void litNeedsEvidenceWhileDarkWithACarInterface() {
+        assertTrue(ScreenTransitions.litNeedsEvidence(new Run(false).s));
+        assertTrue(ScreenTransitions.litNeedsEvidence(new Run(true).s));
+        assertFalse(ScreenTransitions.litNeedsEvidence(Run.lit().s));
+        assertEquals(Collections.emptyList(), Run.lit().edges);
+    }
+
+    /**
+     * 等车辆接口的那一段什么时候有了着落（进程刚起来；安卓刚亮、连不上的先再连了一次）：读到屏幕或点火就算；还在连、核心还没登记
+     * 不算；连不上、这台车机没有也算有了结果；连上了的那一下读数还是空的（连上的通知比读数早约 40 ms），等发布出有值的那一份。
+     */
+    @Test
+    public void waitingForTheLinkEndsOnTheFirstReadingOrAResult() {
         assertTrue(ScreenTransitions.linkSettled(Telemetry.CarLink.CONNECTED, true, 2));
         assertTrue(ScreenTransitions.linkSettled(Telemetry.CarLink.CONNECTED, false, 1));
         assertFalse("在连", ScreenTransitions.linkSettled(Telemetry.CarLink.CONNECTING, null, 0));
         assertFalse("核心还没登记", ScreenTransitions.linkSettled(null, null, 0));
-        assertTrue("连不上：只看安卓", ScreenTransitions.linkSettled(Telemetry.CarLink.FAILED, null, 0));
-        assertTrue("这台车机没有：只看安卓", ScreenTransitions.linkSettled(Telemetry.CarLink.UNAVAILABLE, null, 0));
+        assertTrue("连不上：有结果了", ScreenTransitions.linkSettled(Telemetry.CarLink.FAILED, null, 0));
+        assertTrue("这台车机没有：有结果了", ScreenTransitions.linkSettled(Telemetry.CarLink.UNAVAILABLE, null, 0));
         assertFalse("连上的通知先到、读数还是空的", ScreenTransitions.linkSettled(Telemetry.CarLink.CONNECTED, null, 0));
-        assertTrue("有值的读数到了，两项都读不到：只看安卓", ScreenTransitions.linkSettled(Telemetry.CarLink.CONNECTED, null, 3));
+        assertTrue("有值的读数到了，两项都读不到", ScreenTransitions.linkSettled(Telemetry.CarLink.CONNECTED, null, 3));
     }
 }

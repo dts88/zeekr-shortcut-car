@@ -13,18 +13,17 @@ import java.util.Objects;
  * 一条自动化的「当」（ui-spec §十八「当（触发）」）：一件事发生的那一下。不可变。
  *
  * <ul>
- *   <li>{@link Kind#GET_IN} 上车（亮屏、车通电；判法用 Calvin 的 PR 261），到离车结束。</li>
- *   <li>{@link Kind#LEAVE} 离车（熄屏），没有结束。</li>
+ *   <li>{@link Kind#GET_IN} 上车（亮屏：有了人在车上的证据；判法用 Calvin 的 PR 261），到熄屏（人下车了）结束。</li>
  *   <li>{@link Kind#GEAR} 挂入某一挡（P、R、N、D），到离开这一挡结束。</li>
  *   <li>{@link Kind#STATE} 某项设置变为某个值，到变成别的值结束。</li>
  * </ul>
  *
- * <p>地点（到达、离开）、时间（每天某个时刻）下一步加。</p>
+ * <p>没有「离车」：人下车以后应用不再写车（项目所有者 2026-11-21）。地点（到达、离开）、时间（每天某个时刻）下一步加。</p>
  */
 public final class Trigger {
 
     public enum Kind {
-        GET_IN, LEAVE, GEAR, STATE
+        GET_IN, GEAR, STATE
     }
 
     public final Kind kind;
@@ -45,10 +44,6 @@ public final class Trigger {
         return new Trigger(Kind.GET_IN, null, null, null);
     }
 
-    public static Trigger leave() {
-        return new Trigger(Kind.LEAVE, null, null, null);
-    }
-
     /** 挂入某一挡；不是 P、R、N、D 的是 null。 */
     public static Trigger gear(String gear) {
         return isGear(gear) ? new Trigger(Kind.GEAR, gear, null, null) : null;
@@ -59,18 +54,11 @@ public final class Trigger {
         return setting != null && setting.code(value) != null ? new Trigger(Kind.STATE, null, setting, value) : null;
     }
 
-    /** 有没有「结束」（结束时恢复只给有结束的）。 */
-    public boolean hasEnd() {
-        return kind != Kind.LEAVE;
-    }
-
     /** 黑匣子里的写法（不带用户打的字；界面上的写法在 strings 里）。 */
     public String describe() {
         switch (kind) {
             case GET_IN:
                 return "get-in";
-            case LEAVE:
-                return "leave";
             case GEAR:
                 return "gear " + gear;
             default:
