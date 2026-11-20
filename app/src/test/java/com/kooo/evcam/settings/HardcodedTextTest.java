@@ -81,7 +81,6 @@ public class HardcodedTextTest {
         JAVA_ALLOWED.put("settings/SettingSpec.java", "设置定义写错时抛给开发者的异常");
         JAVA_ALLOWED.put("settings/SegmentedPreference.java", "设置定义写错时抛给开发者的异常");
         JAVA_ALLOWED.put("settings/SettingsRegistry.java", "日志用的设置名；界面上的名字走 strings");
-        JAVA_ALLOWED.put("KeepAliveReceiver.java", "触发原因只写进日志");
         JAVA_ALLOWED.put("zeekr/LaneCycle.java", "日志里的方位名");
         JAVA_ALLOWED.put("repair/Mp4Repair.java",
                 "修不了时抛出的原因，只写进日志（修复报告里只说「无法修复」）");

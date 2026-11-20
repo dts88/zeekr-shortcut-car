@@ -240,8 +240,8 @@ public class SideViewService extends Service {
                 startListening();
             }
         });
-        // 被杀了要不要重启：跟着「开机自启动」开关（规格 §6），同超级镜子
-        return com.kooo.evcam.CameraForegroundService.stickiness(this);
+        // 不粘着（保活只留周期任务，规格 §6），同超级镜子
+        return START_NOT_STICKY;
     }
 
     // ================================================================= 车辆信号

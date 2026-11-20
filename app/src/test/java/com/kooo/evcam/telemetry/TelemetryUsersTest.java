@@ -144,4 +144,15 @@ public class TelemetryUsersTest {
         assertFalse(u.full());
         assertEquals(TelemetryUsers.Change.FLOATS_ON, u.unpark());
     }
+
+    /** 停车只在核心登记着时算数（进程里核心一起来就登记）：没有核心时照旧，第一个人把一切拉起来、最后一个人走了全停。 */
+    @Test
+    public void withoutTheCoreParkingChangesNothing() {
+        TelemetryUsers u = new TelemetryUsers();
+        assertEquals(TelemetryUsers.Change.NONE, u.park());
+        assertEquals(TelemetryUsers.Change.START_FULL, u.acquire("vehicle-info"));
+        assertTrue(u.full());
+        assertEquals(TelemetryUsers.Change.STOP, u.release("vehicle-info"));
+        assertEquals(TelemetryUsers.Change.NONE, u.unpark());
+    }
 }

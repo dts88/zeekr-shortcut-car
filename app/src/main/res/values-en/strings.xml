@@ -572,7 +572,6 @@
 
     <!-- Main interface -->
     <string name="about_title">About &amp; credits</string>
-    <string name="accessibility_service_description">Used by Start on boot to help keep the app running.\n\nIt does not read or control anything on screen and collects no data.</string>
     <string name="zeekr_composite_not_found">No surround composite stream found. This head unit may not be supported.</string>
     <string name="msg_no_camera_available">No camera available</string>
     <string name="zeekr_lane_front">Front</string>
@@ -1173,8 +1172,6 @@
     <string name="dev_perm_all_files_why">Used to read and write files on USB drives</string>
     <string name="dev_perm_overlay">Overlay</string>
     <string name="dev_perm_overlay_why">Used by Super mirror, Blind spot view, the floating button and the image adjustment window</string>
-    <string name="dev_perm_accessibility">Accessibility service</string>
-    <string name="dev_perm_accessibility_why">Used by Start on boot</string>
     <string name="dev_perm_usage_access">Usage access</string>
     <string name="dev_perm_usage_access_why">Used to log apps that may be using a camera</string>
     <string name="dev_perm_battery">Ignore battery optimisation</string>

@@ -279,9 +279,8 @@ public class AppConfig {
 
     /**
      * 开机自启动（规格 §2.5、§6）：App 不在了要不要自己回来。一个开关管两件事 ——
-     * 保活（WorkManager 任务、广播拉起、每分钟的 TIME_TICK、ContentProvider 起前台服务、
-     * 系统对 START_STICKY 服务的重启）让进程尽量活着、被杀了拉回来；回来之后 {@code Recovery}
-     * 按设置恢复悬浮按钮、超级镜子、盲区画面和自动录制。关 = 被杀了不回来、也不恢复。默认开。
+     * 保活（只剩 WorkManager 的周期任务，项目所有者 2026-11-21）把被关掉的进程带回来；回来之后、人在车上时 {@code Recovery}
+     * 按设置恢复悬浮按钮、超级镜子、盲区画面和自动录制。关 = 被关了不回来、也不恢复。默认开。
      */
     public boolean isAutoStartOnBoot() {
         mergeAutoStartSwitches();

@@ -25,7 +25,7 @@ import com.kooo.evcam.overlay.OverlayCoordinator;
  * 开机自启动（规格 §2.5）的统一入口：收到各类信号、判断自己能正常运行了，就把核心程序起来。
  *
  * <p>核心程序 = 用户设定状态里开着的那些：悬浮按钮、超级镜子、盲区画面、录像（自动录制；被结束之前在录、等着接回的那一次）。
- * 谁来调：前台服务起来时、保活任务跑到时（睡醒后一秒内必跑）、亮屏广播来时、应用更新后。
+ * 谁来调：人回来的那一下（亮屏，{@code ScreenState}）、周期任务跑到时（睡醒后一秒内必跑）。
  * 幂等，多调无害：已经在的不重复起。</p>
  *
  * <p>只有「开机自启动」开着才做（规格 §2.5：它管的是 App 不在时要不要带回来）；
@@ -41,15 +41,10 @@ import com.kooo.evcam.overlay.OverlayCoordinator;
 public final class Recovery {
 
     private static final String TAG = "Recovery";
-    /** 前台服务每分钟都会被例行启动一次；这种例行调用五分钟做一次就够。 */
-    private static final long ROUTINE_INTERVAL_MS = 5 * 60_000L;
-    /** 前台服务例行启动时传的原因；别的原因（睡醒、亮屏、更新）每次都做。 */
-    public static final String WHY_ROUTINE = "service-start";
     /** 拉主界面时带上：它不是人点开的，这一趟的录像选择不清（规格 §2.5）。 */
     public static final String EXTRA_SILENT = "from_service_restart";
 
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
-    private static long lastRoutineAtMs;
     private static String lastSummary = "";
 
     private Recovery() {
@@ -181,14 +176,9 @@ public final class Recovery {
             BlackBox.count("restore-skipped-switch-off");
             return;
         }
-        long now = SystemClock.elapsedRealtime();
-        if (WHY_ROUTINE.equals(why)) {
-            if (now - lastRoutineAtMs < ROUTINE_INTERVAL_MS) {
-                return;
-            }
-            lastRoutineAtMs = now;
-        }
-
+        CameraKeeper keeper = CameraKeeper.get(context);
+        // 前台服务该在而不在的（进程是被周期任务带回来的：人不在车上时没人起它）先起：没有它，后台起不了悬浮窗的服务
+        keeper.ensureForegroundService("restore " + why);
         StringBuilder did = new StringBuilder();
         if (OverlayCoordinator.canShowOverlay(context)) {
             // 按设置起悬浮按钮、后视镜和盲区画面；已经在的不会重复。它们自己知道屏幕黑着就不接相机
@@ -198,11 +188,10 @@ public final class Recovery {
 
         // 录像：被结束之前在录、在等接回、或因熄屏停下等亮屏接的（「这一趟要录」落着盘），和这一趟还没看过的启动自动录制，
         // 都交给相机管家判（黑着接不接、用不了相机时拉不拉主界面也是它）
-        CameraKeeper keeper = CameraKeeper.get(context);
         keeper.appRestored(why);
 
         String summary = did.length() == 0 ? "nothing" : did.toString();
-        // 每次都记的话，例行那一条五分钟一行；只有做的事变了，才值一行
+        // 只有做的事变了，才值一行
         if (!summary.equals(lastSummary)) {
             lastSummary = summary;
             BlackBox.noteImportant("恢复（" + why + "）：" + summary + "；录像 " + keeper.describe()

@@ -37,7 +37,7 @@ public class KeepAliveWorker extends Worker {
             KeepAliveManager.stopKeepAliveWork(getApplicationContext());
             return Result.success();
         }
-        // 它本身不用做别的：登记着这个任务，进程死了系统到点就把它拉起来，这就是它的全部作用。
+        // 保活只剩这一条（项目所有者 2026-11-21，规格 §6）。它本身不用做别的：登记着这个任务，进程死了系统到点就把它拉起来。
         // 醒来后一秒内必跑（平台笔记 §3.6），「睡醒了要恢复什么」以后挂在这里（规格 §2.5）
         AppLog.d(TAG, "应用进程保持活跃");
         // 睡醒后一秒内必跑到这里（平台笔记 §3.6）：按开机自启动的规矩恢复核心程序（规格 §2.5）

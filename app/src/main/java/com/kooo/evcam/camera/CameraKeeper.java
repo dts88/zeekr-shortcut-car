@@ -566,7 +566,10 @@ public final class CameraKeeper {
         }
     }
 
-    /** 保活（开机广播、例行叫醒、无障碍、ContentProvider）要前台服务在：该开着、又没起的才起。 */
+    /**
+     * 恢复（{@code Recovery}，人回来的那一下）要前台服务在：该开着、又没起的才起。进程被周期任务带回来时没人起它
+     * （人不在车上不取资源），到这一下才起；起来以后它把系统刚才没让起的悬浮窗补上（{@code CameraForegroundService}）。
+     */
     public void ensureForegroundService(String why) {
         if (foregroundServiceNeeded() && !CameraForegroundService.isRunning()) {
             AppLog.d(TAG, "前台服务没在，起来（" + why + "）");
@@ -606,7 +609,7 @@ public final class CameraKeeper {
      * 用户退出（主界面长按退出那一下，主线程）：照退出的次序收 —— channel-logic §五：停录 → 登记表作废 → 调度按次序关完 → 再结束进程。
      *
      * <ol>
-     *   <li>记下「用户退出了」：必须在停服务之前（前台服务的 onDestroy 会发保活广播，保活接收器收到就去重启它）；</li>
+     *   <li>记下「用户退出了」：在停服务之前（各服务的启动口、周期任务都先问它，{@link UserExit#blocks}）；</li>
      *   <li>结束进程交给看门的线程（{@link #finishExit}）：等主界面收尾、等停录收好文件、等每一路相机关完，最多等
      *       {@link #EXIT_DEADLINE_MS}，到点照样结束。以前是主线程自己关相机、关完再结束 —— 相机服务一卡，进程就退不掉；</li>
      *   <li>告诉调度「退出」：从此只关，不开、不改输出、不救；登记表从此作废，直到退出的记号清掉（人又点开主界面、真正开机）；</li>

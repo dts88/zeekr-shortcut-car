@@ -5,7 +5,6 @@
     -->
     <string name="app_name">极氪即刻</string>
     <string name="app_name_full">极氪即刻（车机版）</string>
-    <string name="accessibility_service_description">用于「开机自启动」，帮助应用在后台持续运行。\n\n本服务不读取、不操作任何界面内容，也不收集任何信息。</string>
 
     <!-- 极氪合成流模式 -->
     <string name="zeekr_lane_front">前</string>
@@ -1170,8 +1169,6 @@
     <string name="dev_perm_all_files_why">用于读写 U 盘上的文件</string>
     <string name="dev_perm_overlay">悬浮窗权限</string>
     <string name="dev_perm_overlay_why">用于超级镜子、盲区画面、悬浮按钮和画面调节窗口</string>
-    <string name="dev_perm_accessibility">无障碍服务</string>
-    <string name="dev_perm_accessibility_why">用于开机自启动</string>
     <string name="dev_perm_usage_access">使用情况访问</string>
     <string name="dev_perm_usage_access_why">用于记录可能占用摄像头的应用</string>
     <string name="dev_perm_battery">忽略电池优化</string>
