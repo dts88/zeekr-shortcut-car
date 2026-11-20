@@ -163,6 +163,7 @@ public class RecordingFloatingService extends Service {
         super.onCreate();
         com.kooo.evcam.blackbox.BlackBox.attach(this, "Service:RecordingFloatingService");
         com.kooo.evcam.blackbox.BlackBox.noteImportant("后台服务 RecordingFloatingService onCreate");
+        running = true;
         AppLog.d(TAG, "录制悬浮服务创建");
 
         mainHandler = new Handler(Looper.getMainLooper());
@@ -285,6 +286,7 @@ public class RecordingFloatingService extends Service {
     @Override
     public void onDestroy() {
         com.kooo.evcam.blackbox.BlackBox.noteImportant("RecordingFloatingService onDestroy");
+        running = false;
         super.onDestroy();
         hideFloatingWindow();
 
@@ -311,6 +313,12 @@ public class RecordingFloatingService extends Service {
      * 进程里只有一个主界面，记在这里；它不在了（进程被杀后只恢复了服务）就是不在前台。
      */
     private static volatile boolean mainScreenInFront;
+    /** 服务在跑（停车时停掉的，人回来要起：{@code OverlayCoordinator.stopForParking}）。 */
+    private static volatile boolean running;
+
+    public static boolean isRunning() {
+        return running;
+    }
 
     /** @return 变了没有；变了的话调用方再发一次 {@link #ACTION_SHOW}，让按钮照新的状态摆 */
     public static boolean setMainScreenInFront(boolean inFront) {

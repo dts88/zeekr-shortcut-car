@@ -143,6 +143,11 @@ public class SideViewService extends Service {
         context.stopService(new Intent(context, SideViewService.class));
     }
 
+    /** 服务在跑（停车时停掉的，人回来要起：{@code OverlayCoordinator.stopForParking}）。 */
+    public static boolean isRunning() {
+        return instance != null;
+    }
+
     /** 开发者选项里改了标定角度：正在挂着的窗口照新的画。 */
     public static void applyAim() {
         SideViewService svc = instance;

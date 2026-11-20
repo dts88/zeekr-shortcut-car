@@ -347,6 +347,26 @@ public enum Signal {
         return kind == Kind.SENSOR_VALUE;
     }
 
+    /**
+     * 停车时（人不在车上，{@code screen.Parked}）对账还读的那几项：判人回没回来的（屏幕电源事件、点火、四扇侧门），和相机管家
+     * 熄屏时看的（哨兵模式、挡位）。别的停车时不读 —— 订阅还在，变了照样来；人回来那一下全读一遍。
+     */
+    public boolean readWhileParked() {
+        switch (this) {
+            case SCREEN_POWER_EVENT:
+            case IGNITION:
+            case DOOR_DRIVER:
+            case DOOR_PASSENGER:
+            case DOOR_REAR_LEFT:
+            case DOOR_REAR_RIGHT:
+            case SENTRY_MODE:
+            case GEAR:
+                return true;
+            default:
+                return false;
+        }
+    }
+
     // ================================================================= 解码（纯函数）
 
     /**

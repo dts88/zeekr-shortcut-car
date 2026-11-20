@@ -1036,6 +1036,12 @@ public final class DiagnosticsCollector {
                     : n.androidOffForMs < 0 ? "安卓熄屏着，起点不明（进程起来时就熄屏着）"
                     : clock(wallNow - n.androidOffForMs) + " 起，" + duration(n.androidOffForMs) + "前"
                     + (n.wakePending ? "；安卓刚又亮了，在等车辆信号" : "")).append('\n');
+            long parkedMs = com.kooo.evcam.screen.Parked.forMs();
+            sb.append("停车（相机以外的也放开：悬浮窗、蓝牙，车辆信号只读那几项）: ")
+                    .append(!com.kooo.evcam.screen.Parked.is() ? "没有"
+                            : parkedMs < 0 ? "是，进程起来时就停着" : "是，" + duration(parkedMs) + "前起")
+                    .append(com.kooo.evcam.screen.Parked.overlaysOwed() ? "；悬浮窗欠着，人回来照设置起" : "")
+                    .append('\n');
             sb.append("说明: 熄屏 = 人不在车上。亮着时：安卓熄屏，或者车辆说黑（screen_power_event=1 且点火 ACC 或更低；")
                     .append("只读得到一项看那一项），才熄屏。黑着时：车通电了、而且刚拉开过车门或刚碰过应用，才亮屏；")
                     .append("车辆读不到只认碰过应用。时刻是墙上时钟，多久前含深睡").append('\n');
@@ -1406,8 +1412,8 @@ public final class DiagnosticsCollector {
                 return "不听（蓝牙关着）";
             case NO_PERMISSION:
                 return "不听（没有扫描权限）";
-            case ASLEEP:
-                return "不听（车机要睡，蓝牙放开了）";
+            case PARKED:
+                return "不听（停车：人不在车上，蓝牙放开了）";
             case SETTLING:
                 return "先等着（车机刚醒）";
             case CONNECTING:

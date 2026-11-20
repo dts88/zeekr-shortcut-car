@@ -99,6 +99,11 @@ public class RearViewMirrorService extends Service {
         context.stopService(new Intent(context, RearViewMirrorService.class));
     }
 
+    /** 服务在跑（停车时停掉的，人回来要起：{@code OverlayCoordinator.stopForParking}）。 */
+    public static boolean isRunning() {
+        return instance != null;
+    }
+
     /** Redraw the existing window after the label setting changes; no camera restart. */
     public static void refreshCameraLabel() {
         RearViewMirrorService svc = instance;
