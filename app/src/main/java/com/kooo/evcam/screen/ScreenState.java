@@ -658,17 +658,8 @@ public final class ScreenState {
                 BlackBox.noteImportant("熄屏判断：" + edge + " 这一步出错（" + e + "），后面的没做完");
             }
         }
-        com.kooo.evcam.button.SmartButtons buttons = com.kooo.evcam.button.SmartButtons.get();
-        if (buttons != null && before.state.androidOff != next.androidOff) {
-            if (next.androidOff) {
-                buttons.headUnitSleeps();
-            } else {
-                buttons.headUnitWoke();
-            }
-        }
-        if (buttons != null && edge == ScreenTransitions.Edge.LIT) {
-            buttons.screenLit();
-        }
+        // 停车（相机以外的什么时候放开、人回来怎么拿回）和灵动贴要知道的那几下：一处管
+        Parked.screenMoved(before.state, next, edge);
         noteUnpoweredLit(before, after, now);
     }
 

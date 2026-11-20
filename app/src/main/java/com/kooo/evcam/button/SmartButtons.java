@@ -78,8 +78,9 @@ import java.util.TreeSet;
  *       会被悄悄拒，容器里别的应用也算在这个 uid 上：{@link #STARTS_WINDOW_MS} 里最多开 {@link #MAX_STARTS} 次（{@link #startWait}）。</li>
  *   <li>没开启灵动贴（设置里的开关）、没有绑定的也没在绑定、用户退出了：不扫（车主 2026-11-04：Lab 同时开着时，Lab 好用蓝牙做测试）。
  *       退出时当场停（{@link #userExits}），不然进程没了系统还接着扫，又把应用叫起来。</li>
- *   <li>车机要睡时和相机一样放开，扫描、连接都停（{@link #headUnitSleeps}）。醒来等 {@link #SETTLE_MS}，向系统重新要蓝牙服务（{@link StaleGatt}），
- *       再开始扫描（{@link #headUnitWoke}，车主 2026-11-01）。蓝牙跟着点火走，开关的广播车上没收到过：扫描开着时每 {@link #WATCH_MS} 看一眼蓝牙开着没有、
+ *   <li>停车时（人不在车上，{@code screen.Parked}：熄屏约 40 秒后，或者车机要睡）和相机一样放开，扫描、连接都停（{@link #park}）；
+ *       车机自己醒来不开，人回来（亮屏，{@link #screenLit}）才接着听（项目所有者 2026-11-21）。车机醒过的（{@link #headUnitWoke}）
+ *       等 {@link #SETTLE_MS}、向系统重新要蓝牙服务（{@link StaleGatt}）再开始扫描（车主 2026-11-01）。蓝牙跟着点火走，开关的广播车上没收到过：扫描开着时每 {@link #WATCH_MS} 看一眼蓝牙开着没有、
  *       在不在搜索、手机跟车机的蓝牙连着没有（{@link PhoneLink}，变了记一笔）；
  *       蓝牙没开、扫描起不来的，隔 {@link #RETRY_MS} 再试，一阵里第一次起不来把现场记进黑匣子（{@link ScanProbe}）。</li>
  * </ul>
@@ -172,8 +173,8 @@ public final class SmartButtons {
         BLUETOOTH_OFF,
         /** 没有扫描权限：{@link #RETRY_MS} 后再看。 */
         NO_PERMISSION,
-        /** 车机要睡了：蓝牙放开，醒来再说。 */
-        ASLEEP,
+        /** 停车着（人不在车上）：蓝牙放开，人回来再说。 */
+        PARKED,
         /** 车机刚醒：等 {@link #SETTLE_MS}。 */
         SETTLING,
         /** 第二次起连之前先停着扫描。 */
@@ -279,8 +280,8 @@ public final class SmartButtons {
     private final ArrayDeque<Long> starts = new ArrayDeque<>();
     /** 看到蓝牙开着的时刻（{@link SystemClock#elapsedRealtime}）；关着是 0。 */
     private long bluetoothOnSince;
-    /** 车机要睡了，蓝牙放开着（{@link #headUnitSleeps}）。 */
-    private boolean asleep;
+    /** 停车着（人不在车上），蓝牙放开着（{@link #park}）；亮屏（{@link #screenLit}）才结束。 */
+    private boolean parked;
     /** 车机醒了，等到这一刻才开始扫描（{@link #headUnitWoke}）。 */
     private long settledAt;
     /** 车机醒来的时刻，开始听时记一笔；0 = 记过了。 */
@@ -389,9 +390,9 @@ public final class SmartButtons {
         enabled = config.isAccessoriesEnabled();
         exited = UserExit.isExited(app);
         bound = loadBound();
-        boolean asleepNow = ScreenState.androidOff();
+        boolean parkedNow = com.kooo.evcam.screen.Parked.is();
         bt.post(() -> {
-            asleep = asleepNow;
+            parked = parkedNow;
             forgetRetiredState();
             // 上一个进程留下的扫描也在这里停（不该扫的话），该扫的话停了重开
             ensureScan();
@@ -582,35 +583,46 @@ public final class SmartButtons {
         });
     }
 
-    /** 车机要睡（{@link ScreenState}，安卓熄屏，主线程）：和相机一样放开，扫描、连接都停，也不再看蓝牙开没开，醒来再说。 */
-    public void headUnitSleeps() {
+    /**
+     * 停车（{@code screen.Parked}，人不在车上、相机放开之后，或者车机要睡；主线程）：和相机一样放开，扫描、连接都停，
+     * 也不再看蓝牙开没开，人回来（{@link #screenLit}）再说。
+     */
+    public void park() {
         bt.post(() -> {
-            asleep = true;
+            if (parked) {
+                return;
+            }
+            parked = true;
             if (link != null) {
-                link.close("head unit sleeps");
+                link.close("parked");
             }
             dropBoosts();
             ensureScan();
             if (!bound.isEmpty()) {
-                BlackBox.note("灵动贴：车机要睡，放开蓝牙");
+                BlackBox.note("灵动贴：停车（人不在车上），放开蓝牙");
             }
         });
     }
 
     /**
-     * 亮屏（{@link ScreenState}，车通电了，主线程）：屏幕黑着、蓝牙关了时这里停着（不每 5 秒看蓝牙），亮屏再看一次 ——
-     * 开着就照常开始听；还没开（点火 ON 后要一阵才开，2026-11-15 是 24 秒）就照旧每 {@link #RETRY_MS} 看一次，开了就听。
-     * 没停着的照常，什么都不变。
+     * 亮屏（{@code screen.Parked}，人回来了，主线程）：停车时放开的从这里接着听。屏幕黑着、蓝牙关了时停着的（不每 5 秒看蓝牙）
+     * 也在这里再看一次 —— 开着就照常开始听；还没开（点火 ON 后要一阵才开，2026-11-15 是 24 秒）就照旧每 {@link #RETRY_MS}
+     * 看一次，开了就听。没停着的照常，什么都不变。
      */
     public void screenLit() {
-        bt.post(this::ensureScan);
+        bt.post(() -> {
+            parked = false;
+            ensureScan();
+        });
     }
 
-    /** 车机醒了（{@link ScreenState}，安卓亮了，主线程）：等 {@link #SETTLE_MS}，向系统重新要蓝牙服务，再开始扫描。 */
+    /**
+     * 车机醒了（{@code screen.Parked}，安卓亮了，主线程）：蓝牙多半重启过 —— 记下等 {@link #SETTLE_MS}、向系统重新要蓝牙服务。
+     * 停车着不开扫描（车自己醒来不取资源），人回来（{@link #screenLit}）才开。
+     */
     public void headUnitWoke() {
         bt.post(() -> {
             long now = SystemClock.elapsedRealtime();
-            asleep = false;
             settledAt = now + SETTLE_MS;
             wokeAt = now;
             bluetoothRestarted();
@@ -818,8 +830,8 @@ public final class SmartButtons {
         if (exited) {
             return Listen.EXITED;
         }
-        if (asleep) {
-            return Listen.ASLEEP;
+        if (parked) {
+            return Listen.PARKED;
         }
         if (wantedNames().isEmpty()) {
             return Listen.IDLE;
@@ -864,10 +876,10 @@ public final class SmartButtons {
             bluetoothRestarted();
             if (ScreenState.dark()) {
                 // 屏幕黑着、蓝牙关了（离车时车机自己关的，2026-11-15 是黑后约 3 秒）：停着，不再每 5 秒看一次蓝牙；
-                // 亮屏（screenLit）、车机醒来（headUnitWoke）时再看（项目所有者 2026-11-16）
+                // 亮屏（screenLit）时再看（项目所有者 2026-11-16；车机自己醒来不看，2026-11-21）
                 if (listen != Listen.BLUETOOTH_OFF || !DARK.equals(listenDetail)) {
                     if (!bound.isEmpty()) {
-                        BlackBox.note("灵动贴：屏幕黑着、蓝牙关了，停下，亮屏或车机醒来再看");
+                        BlackBox.note("灵动贴：屏幕黑着、蓝牙关了，停下，亮屏再看");
                     }
                 }
                 note(Listen.BLUETOOTH_OFF, DARK);
