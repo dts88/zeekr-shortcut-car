@@ -47,7 +47,7 @@ public class CameraForegroundService extends Service {
         com.kooo.evcam.blackbox.BlackBox.attach(this, "Service:CameraForegroundService");
         com.kooo.evcam.blackbox.BlackBox.noteImportant("前台服务 CameraForegroundService onCreate");
         if (UserExit.blocks(this, "CameraForegroundService.onCreate")) {
-            // 系统按 START_STICKY 重启了我们，但用户已经退出：什么都别起（尤其别去拉主界面），
+            // 有人把我们起来了，但用户已经退出：什么都别起（尤其别去拉主界面），
             // 在 onStartCommand 里把自己停掉
             exitedIdle = true;
             return;
@@ -63,8 +63,7 @@ public class CameraForegroundService extends Service {
         // 相机服务眼里每一路空不空。环视卡死、只能重启车机的那种状态，
         // 要靠它说出「是谁占着」—— 注册时系统会把当前状态报一遍
         com.kooo.evcam.camera.CameraAvailabilityWatch.start(this);
-        // 恢复（Recovery.restore）在 onStartCommand 里做：started 服务的 onCreate 后面必然跟一次 onStartCommand，
-        // 以前两处各调一次，冷启动的恢复跑两遍
+        // 恢复不在这里做：人回来的那一下（亮屏）、周期任务跑到时才看（Recovery，规格 §2.5）
     }
 
     /** 前台服务此刻在不在（startForeground 做完了）。 */

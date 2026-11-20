@@ -59,7 +59,26 @@ public final class AppLog {
         // 启动时轮换日志文件
         rotateSessionLogs(context);
         
-        // 设置崩溃处理器，确保闪退时能保存日志
+        // 崩溃处理器进程里只装一次：应用入口已经装过，这里是保底
+        installCrashHandler(context);
+    }
+
+    /** 崩溃处理器装过了。 */
+    private static boolean sCrashHandlerInstalled;
+
+    /**
+     * 装崩溃处理器，进程里只装一次（{@code ZeekrShortcutApp.onCreate} 叫）。以前只在主界面创建时装、每创建一次再装一层：
+     * 没有主界面的进程（被周期任务带回来的）崩了不留日志、也记不到连着崩溃里；装过两层以后「原来的处理器」指向我们自己那一层，
+     * 崩溃时自己叫自己，到不了系统的处理器。
+     */
+    public static synchronized void installCrashHandler(Context context) {
+        if (context != null && sAppContext == null) {
+            sAppContext = context.getApplicationContext();
+        }
+        if (sCrashHandlerInstalled) {
+            return;
+        }
+        sCrashHandlerInstalled = true;
         setupCrashHandler();
     }
     
@@ -72,6 +91,8 @@ public final class AppLog {
         sDefaultHandler = Thread.getDefaultUncaughtExceptionHandler();
         
         Thread.setDefaultUncaughtExceptionHandler((thread, throwable) -> {
+            // 连着崩溃就不再自动回来（recovery.CrashHold）：先记下这一次，后面存日志出错也不丢；它自己不抛
+            com.kooo.evcam.recovery.CrashHold.noteCrash(sAppContext);
             try {
                 // 记录崩溃信息到日志
                 String crashInfo = "!!! APPLICATION CRASH !!!\n" +
@@ -88,11 +109,10 @@ public final class AppLog {
                     saveToPersistentLog(sAppContext);
                     Log.e("AppLog", "Crash log saved successfully");
                 }
-                // 连着崩溃就不再自动回来（recovery.CrashHold）：这一次记下
-                com.kooo.evcam.recovery.CrashHold.noteCrash(sAppContext);
                 // 黑匣子在自己的线程上写，崩溃前等它把排队的写完
                 com.kooo.evcam.blackbox.BlackBox.flush(1500);
-            } catch (Exception e) {
+            } catch (Throwable e) {
+                // 存日志自己出了错（哪怕是 Error）也要走到下面：系统的处理器才会把进程结束掉
                 Log.e("AppLog", "Failed to save crash log", e);
             }
             

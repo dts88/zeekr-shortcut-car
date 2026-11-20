@@ -1246,7 +1246,7 @@ public final class DiagnosticsCollector {
         sb.append("  用户退出后暂停自启动=").append(com.kooo.evcam.UserExit.isExited(context)
                 ? "是（等手动打开或真正开机）" : "否").append('\n');
         sb.append("  连着崩溃=").append(com.kooo.evcam.recovery.CrashHold.count(context))
-                .append(" 次（满 2 次不再自动回来，照用户退出处理；好好跑满 5 分钟清零）").append('\n');
+                .append(" 次（一次接一次的运行都是崩溃结束的才算；满 2 次不再自动回来，照用户退出处理）").append('\n');
         sb.append('\n').append("全部设置的原始值（app_config）:").append('\n');
         try {
             java.util.Map<String, ?> all = context

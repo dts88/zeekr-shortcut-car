@@ -37,6 +37,8 @@ public class ZeekrShortcutApp extends Application {
         lastConfig = new Configuration(getResources().getConfiguration());
         // 黑匣子尽早接上
         com.kooo.evcam.blackbox.BlackBox.attach(this, "Application");
+        // 崩溃处理器在这里装（没有主界面的进程崩了也留日志、也记进连着崩溃里）
+        AppLog.installCrashHandler(this);
         // 连着崩溃两次：照用户退出处理（周期任务取消、下面装上的都照「退出了」什么都不做），等人自己点开（规格 §6）
         com.kooo.evcam.recovery.CrashHold.atProcessStart(this);
         // 前座舱只用一次（暂时的规矩）：上一次运行带着前座舱、没等到离车就结束了的，这次启动不带它 —— 赶在主界面摆布局、建管线之前
