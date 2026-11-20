@@ -52,6 +52,8 @@ public final class ButtonActions {
     }
 
     public static void perform(Context app, ButtonAction action, CameraKeeper.Why why, int steps) {
+        // 人按了悬浮按钮、灵动贴：人在车上的证据（ScreenState.userActed）
+        com.kooo.evcam.screen.ScreenState.userActed(why == CameraKeeper.Why.FLOATING ? "floating" : "button");
         int n = action.stepwise() ? Math.max(1, Math.min(MAX_STEPS, steps)) : 1;
         if (action.floating != null) {
             try {

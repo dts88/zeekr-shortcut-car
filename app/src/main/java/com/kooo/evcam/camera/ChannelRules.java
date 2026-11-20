@@ -1445,15 +1445,28 @@ public final class ChannelRules {
     /**
      * 这一下是不是这一趟看「启动自动录制」的那一下（规格 §3.2：启动时自动开一次）：应用启动（主界面打开、开机自启动把应用带回来）、
      * 屏幕亮着、这一趟还没看过 —— 看过（开关开着就开、关着就不开）、人开过或者停过就不再看（人按了停止之后切个日夜模式，不该看见它又录上了；
-     * 开关是这一趟中途打开的，下一趟才自动开）。屏幕黑着不看，等亮屏（不为中间不明原因的启动去试着录，项目所有者 2026-10-27）。
-     * 亮屏本身不是启动：只接「这一趟要录」。
+     * 开关是这一趟中途打开的，下一趟才自动开）。屏幕黑着不看，那一眼欠着、亮屏以后的第一眼补上（{@link #startLookOwed}；
+     * 不为中间不明原因的启动去试着录，项目所有者 2026-10-27）。亮屏本身不是启动：没欠着的只接「这一趟要录」。
      *
      * @param usedThisTrip 这一趟里看过、人开过或者停过
-     * @param appStarting  这一下是应用启动
+     * @param appStarting  这一下是应用启动，或者之前启动的那一眼欠着
      * @param dark         屏幕黑着
      */
     public static boolean autoStartMoment(boolean usedThisTrip, boolean appStarting, boolean dark) {
         return !usedThisTrip && appStarting && !dark;
+    }
+
+    /**
+     * 应用启动的那一下屏幕黑着、这一趟还没看过启动自动录制：那一眼欠着，亮屏以后的第一眼补上（{@link #autoStartMoment}）。
+     * 开机自启动开着的，亮屏那一下的恢复本来就算一次启动；关着的只有这一条 —— 人在车没通电时点开了主界面，后来车通电了。
+     * 看过了、人开过或者停过、屏幕亮了（这一眼已经看了）就不欠了。
+     *
+     * @param usedThisTrip 这一趟里看过、人开过或者停过
+     * @param appStarting  这一下是应用启动，或者之前欠着
+     * @param dark         屏幕黑着
+     */
+    public static boolean startLookOwed(boolean usedThisTrip, boolean appStarting, boolean dark) {
+        return !usedThisTrip && appStarting && dark;
     }
 
     /**

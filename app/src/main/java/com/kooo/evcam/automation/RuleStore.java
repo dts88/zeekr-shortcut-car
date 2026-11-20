@@ -128,8 +128,6 @@ public final class RuleStore {
         switch (t.kind) {
             case GET_IN:
                 return o.put("kind", "get_in");
-            case LEAVE:
-                return o.put("kind", "leave");
             case GEAR:
                 return o.put("kind", "gear").put("gear", t.gear);
             default:
@@ -144,8 +142,6 @@ public final class RuleStore {
         switch (o.optString("kind")) {
             case "get_in":
                 return Trigger.getIn();
-            case "leave":
-                return Trigger.leave();
             case "gear":
                 return Trigger.gear(o.optString("gear"));
             case "state":

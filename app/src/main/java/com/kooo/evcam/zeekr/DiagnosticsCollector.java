@@ -1016,12 +1016,17 @@ public final class DiagnosticsCollector {
                     .append(n.dark && n.darkForMs >= 0 ? "，" + clock(wallNow - n.darkForMs) + " 起" : "")
                     .append('\n');
             sb.append("屏幕此刻: ").append(n.known ? "知道"
-                    : n.wakePending ? "不知道 —— 安卓刚亮，在等醒来那一遍车辆信号（等到之前只按安卓熄屏算）"
-                    : "不知道 —— 进程刚起来，在等第一份车辆判断（恢复、接回录像排着等）").append('\n');
-            sb.append("车辆判断（判断用着的）: ").append(verdictText(n.vehicle)).append('\n');
+                    : n.wakePending ? "不知道 —— 安卓刚亮，在等醒来那一遍车辆信号（等到之前照黑着算）"
+                    : "不知道 —— 进程刚起来，在等第一份车辆读数（照黑着算，排着的事等知道了再看）").append('\n');
+            sb.append("人在不在车上（判断用着的）: ").append(n.vehicle == null ? "这台车机没有车辆接口，只看安卓"
+                    : n.vehicle ? "不在（黑）" : "在（亮）").append('\n');
             sb.append("  screen_power_event=").append(eventText(n.screenPowerEvent))
                     .append("，点火=").append(ignitionText(n.ignition))
-                    .append(" → 此刻读数判下来: ").append(verdictText(VehicleScreen.verdict(n.screenPowerEvent, n.ignition, n.litNeedsEvidence)))
+                    .append(" → 亮着时照这两项判: ").append(verdictText(VehicleScreen.whileLit(n.screenPowerEvent, n.ignition)))
+                    .append('\n');
+            sb.append("  有人的证据: 车门").append(n.doorAgoMs < 0 ? "没读到开过" : " " + duration(n.doorAgoMs) + "前开着")
+                    .append("，碰应用").append(n.touchAgoMs < 0 ? "没有" : " " + duration(n.touchAgoMs) + "前")
+                    .append(n.litNeedsEvidence ? "（黑着：车通电了、又有其中一样才亮；车辆读不到只认碰过应用）" : "")
                     .append('\n');
             sb.append("  车辆接口: ").append(linkText(n.carLink)).append('\n');
             sb.append("安卓: 可交互=").append(n.interactive ? "是" : "否")
@@ -1031,8 +1036,9 @@ public final class DiagnosticsCollector {
                     : n.androidOffForMs < 0 ? "安卓熄屏着，起点不明（进程起来时就熄屏着）"
                     : clock(wallNow - n.androidOffForMs) + " 起，" + duration(n.androidOffForMs) + "前"
                     + (n.wakePending ? "；安卓刚又亮了，在等车辆信号" : "")).append('\n');
-            sb.append("说明: 熄屏 = 安卓熄屏，或者车辆说黑（screen_power_event=1 且点火 ACC 或更低；")
-                    .append("只读得到一项看那一项，都读不到只看安卓）。时刻是墙上时钟，多久前含深睡").append('\n');
+            sb.append("说明: 熄屏 = 人不在车上。亮着时：安卓熄屏，或者车辆说黑（screen_power_event=1 且点火 ACC 或更低；")
+                    .append("只读得到一项看那一项），才熄屏。黑着时：车通电了、而且刚拉开过车门或刚碰过应用，才亮屏；")
+                    .append("车辆读不到只认碰过应用。时刻是墙上时钟，多久前含深睡").append('\n');
         } catch (RuntimeException e) {
             sb.append("!! 读取失败: ").append(e).append('\n');
         }
@@ -1084,18 +1090,19 @@ public final class DiagnosticsCollector {
      * @param darkForMs {@link ScreenState.Now#darkForMs}：-1 是不知道什么时候黑的
      */
     public static String darkText(ScreenState.Source source, long darkForMs) {
-        String who = source == ScreenState.Source.ANDROID ? "安卓熄屏" : source == null ? "?" : "车辆信号";
+        String who = source == ScreenState.Source.ANDROID ? "安卓熄屏"
+                : source == ScreenState.Source.LOST ? "车辆信号一直读不到，按人不在算"
+                : source == ScreenState.Source.VEHICLE_READ ? "没有人在车上的证据"
+                : source == null ? "?" : "车辆信号";
         if (darkForMs < 0) {
             return who + "，进程起来时就黑着，起点不明";
         }
-        // 读到时已经黑着（进程刚起来、或者之前读不到）：记下的是读到的那一刻，不是黑的那一刻
-        return who + "，" + duration(darkForMs) + "前"
-                + (source == ScreenState.Source.VEHICLE_READ ? "读到时已经黑着，起点不明" : "起");
+        return who + "，" + duration(darkForMs) + "前起";
     }
 
-    /** 车辆的判断：黑 / 亮 / 说不上来（只看安卓）。 */
+    /** 车辆的判断：黑 / 亮 / 说不上来。 */
     static String verdictText(Boolean verdict) {
-        return verdict == null ? "说不上来（只看安卓）" : verdict ? "黑" : "亮";
+        return verdict == null ? "说不上来" : verdict ? "黑" : "亮";
     }
 
     /** 屏幕电源事件：原值和意思，「1（黑）」「0（亮）」；读不到（255、没读过）是「读不到」。 */
@@ -1124,17 +1131,17 @@ public final class DiagnosticsCollector {
     /** 车辆接口此刻的结果。 */
     static String linkText(Telemetry.CarLink link) {
         if (link == null) {
-            return "没人登记（核心还没登记，熄屏只看安卓）";
+            return "没人登记（核心还没登记）";
         }
         switch (link) {
             case CONNECTED:
                 return "接上了";
             case CONNECTING:
-                return "在连（熄屏先只看安卓）";
+                return "在连（连上之前照读不到算：黑着的还黑着）";
             case UNAVAILABLE:
                 return "这台车机没有这套接口（熄屏只看安卓，不再试）";
             default:
-                return "连不上（熄屏只看安卓；每 " + (Telemetry.RETRY_MS / 60_000L) + " 分钟、安卓亮屏时再试）";
+                return "连不上（照读不到算：黑着时只认碰过应用；每 " + (Telemetry.RETRY_MS / 60_000L) + " 分钟、安卓亮屏时再试）";
         }
     }
 

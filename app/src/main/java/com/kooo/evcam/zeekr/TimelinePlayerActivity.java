@@ -81,6 +81,13 @@ import java.util.Map;
  */
 public class TimelinePlayerActivity extends AppCompatActivity {
 
+    /** 人碰了界面：人在车上的证据（{@code ScreenState.userActed}）。 */
+    @Override
+    public void onUserInteraction() {
+        super.onUserInteraction();
+        com.kooo.evcam.screen.ScreenState.userActed("ui");
+    }
+
     private static final String TAG = "TimelinePlayer";
     /** 进度刷新、几路对齐的间隔。 */
     private static final long TICK_MS = 500L;

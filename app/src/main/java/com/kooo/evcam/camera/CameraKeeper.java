@@ -174,6 +174,11 @@ public final class CameraKeeper {
      * 查盘是异步的，这中间人停了、退出了，清掉它，查完回来就不开。
      */
     private Why pending;
+    /**
+     * 应用启动的那一下屏幕黑着、这一趟还没看过启动自动录制：那一眼欠着（{@link ChannelRules#startLookOwed}），亮屏以后的第一眼补上。
+     * 只在内存里：进程没了，下一次主界面打开、应用被带回来又是一次启动。主线程。
+     */
+    private boolean startLookOwed;
     /** 自动接回这一阵试了几次（{@link ChannelRules#RESUME_TRIES}）：有一路录满一分钟、人开始录时清零。 */
     private int resumeTries;
     /** 等 U 盘从什么时候起（第一次因为盘不能用拒的那一刻，elapsedRealtime）；0 = 没在等 U 盘。 */
@@ -252,6 +257,7 @@ public final class CameraKeeper {
     /** 退出的那一下：这一趟到头（下次打开是新的一趟，启动自动录制重新生效），在录的停、在等开录的不等。主线程。 */
     private void endTripForExit() {
         newTrip("exit");
+        startLookOwed = false;
         stop(RecordStop.USER);
     }
 
@@ -296,7 +302,8 @@ public final class CameraKeeper {
      * 安卓刚亮在等车辆信号）排到知道了再判（设计 v3.1 C11）。
      *
      * <ol>
-     *   <li>应用启动的那一下、屏幕亮着、这一趟还没看过启动自动录制：看一次（{@link ChannelRules#autoStartMoment}）—— 开关开着就要开。</li>
+     *   <li>应用启动的那一下、屏幕亮着、这一趟还没看过启动自动录制：看一次（{@link ChannelRules#autoStartMoment}）—— 开关开着就要开。
+     *       启动的那一下屏幕黑着的，那一眼欠着，亮了以后的第一眼补上（{@link ChannelRules#startLookOwed}）。</li>
      *   <li>在录、在等开录：不用管。</li>
      *   <li>「这一趟要录」立着：接着录（屏幕黑着时照 {@link #darkStartNow}）。</li>
      *   <li>不然，上面那一下看到开关开着：开（{@link Why#AUTO_START}）。</li>
@@ -312,8 +319,11 @@ public final class CameraKeeper {
             if (UserExit.isExited(context)) {
                 return;
             }
+            boolean dark = ScreenState.dark();
+            boolean starting = appStarting || startLookOwed;
+            startLookOwed = ChannelRules.startLookOwed(trip.autoStartUsed(), starting, dark);
             boolean autoStart = false;
-            if (ChannelRules.autoStartMoment(trip.autoStartUsed(), appStarting, ScreenState.dark())) {
+            if (ChannelRules.autoStartMoment(trip.autoStartUsed(), starting, dark)) {
                 trip.useAutoStart();
                 autoStart = appConfig.isAutoStartRecording();
                 AppLog.d(TAG, "这一趟看启动自动录制（" + where + "）：" + (autoStart ? "开着，要录" : "关着，不录"));

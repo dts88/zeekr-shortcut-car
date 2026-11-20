@@ -179,6 +179,24 @@ public class ChannelRulesRecordingTest {
         assertFalse(ChannelRules.autoStartMoment(false, true, true));
     }
 
+    /**
+     * 启动的那一下屏幕黑着：那一眼欠着，亮屏以后的第一眼补上（开机自启动关着的没有别的路 —— 人在车没通电时点开主界面，后来车通电了）。
+     * 照相机管家的用法走一遍：欠着的并进「这一下是启动」。
+     */
+    @Test
+    public void aStartInTheDarkIsOwedUntilTheScreenIsLit() {
+        boolean owed = ChannelRules.startLookOwed(false, true, true);
+        assertTrue("黑着时启动：欠着", owed);
+        assertTrue("还黑着再看一眼（不是启动）：还欠着", ChannelRules.startLookOwed(false, owed, true));
+        assertTrue("亮屏那一眼不是启动，欠着的补上", ChannelRules.autoStartMoment(false, owed, false));
+        assertFalse("亮了、看过了：不欠了", ChannelRules.startLookOwed(false, owed, false));
+
+        assertFalse("亮着时启动：当场看，不欠", ChannelRules.startLookOwed(false, true, false));
+        assertFalse("不是启动、也没欠着：不欠", ChannelRules.startLookOwed(false, false, true));
+        assertFalse("这一趟看过、人开过或停过：不欠", ChannelRules.startLookOwed(true, true, true));
+        assertFalse("欠着的时候人停过：不补", ChannelRules.autoStartMoment(true, true, false));
+    }
+
     // ------------------------------------------------------------------ 熄屏后的帧率（项目所有者 2026-11-04）
 
     /** 只在环视留着只录像时（通道的熄屏决定是 KEPT）按选的帧率；亮着、在开车、放开了，一律照视频流配置。 */

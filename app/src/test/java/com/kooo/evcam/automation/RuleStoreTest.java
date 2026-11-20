@@ -36,11 +36,9 @@ public class RuleStoreTest {
                 Collections.emptyList(), Collections.singletonList(Change.of(Setting.CIRCULATION, "inner")), false);
         Rule start = new Rule("c", null, true, Trigger.getIn(), Collections.emptyList(),
                 Arrays.asList(Change.of(Setting.DRIVE_MODE, "comfort"), Change.of(Setting.HILL_DESCENT, "on")), false);
-        Rule leave = new Rule("d", null, true, Trigger.leave(), Collections.emptyList(),
-                Collections.singletonList(Change.of(Setting.SENTRY, "on")), true);
 
-        List<Rule> back = RuleStore.parse(RuleStore.format(Arrays.asList(reverse, climate, start, leave)));
-        assertEquals(4, back.size());
+        List<Rule> back = RuleStore.parse(RuleStore.format(Arrays.asList(reverse, climate, start)));
+        assertEquals(3, back.size());
         Rule r = back.get(0);
         assertEquals("a", r.id);
         assertEquals("倒车入库 \"家\"", r.name);
@@ -62,7 +60,6 @@ public class RuleStoreTest {
         assertEquals(Trigger.state(Setting.FRONT_CLIMATE, "on"), back.get(1).trigger);
         assertEquals(Trigger.getIn(), back.get(2).trigger);
         assertEquals(2, back.get(2).changes.size());
-        assertEquals(Trigger.leave(), back.get(3).trigger);
     }
 
     /** 读不懂的那一条整条不要：少了一个条件的规则会在不该做的时候做。 */
@@ -71,6 +68,7 @@ public class RuleStoreTest {
         String json = "["
                 + "{\"id\":\"ok\",\"on\":true,\"when\":{\"kind\":\"get_in\"},\"then\":[{\"setting\":\"sentry\",\"value\":\"on\"}]},"
                 + "{\"id\":\"no-trigger\",\"on\":true,\"then\":[{\"setting\":\"sentry\",\"value\":\"on\"}]},"
+                + "{\"id\":\"leave\",\"on\":true,\"when\":{\"kind\":\"leave\"},\"then\":[{\"setting\":\"sentry\",\"value\":\"on\"}]},"
                 + "{\"id\":\"bad-gear\",\"on\":true,\"when\":{\"kind\":\"gear\",\"gear\":\"X\"},\"then\":[{\"setting\":\"sentry\",\"value\":\"on\"}]},"
                 + "{\"id\":\"no-change\",\"on\":true,\"when\":{\"kind\":\"get_in\"},\"then\":[]},"
                 + "{\"id\":\"read-only\",\"on\":true,\"when\":{\"kind\":\"get_in\"},\"then\":[{\"setting\":\"front_climate\",\"value\":\"on\"}]},"
@@ -89,18 +87,15 @@ public class RuleStoreTest {
         assertTrue(RuleStore.parse("not json").isEmpty());
     }
 
-    /** 结束时恢复：有结束的触发才恢复；关掉安全功能的不管勾没勾都恢复。 */
+    /** 结束时恢复：勾了才恢复；关掉安全功能的不管勾没勾都恢复。没有「离车」触发（人下车以后不写车），存着的也读不进来。 */
     @Test
-    public void safetyOffAlwaysRestoresWhenTheTriggerCanEnd() {
+    public void safetyOffAlwaysRestores() {
         Rule unticked = new Rule("a", null, true, Trigger.gear("R"), Collections.emptyList(),
                 Collections.singletonList(Change.of(Setting.LOW_SPEED_BRAKING, "off")), false);
         assertTrue(unticked.restores());
         Rule plain = new Rule("b", null, true, Trigger.gear("R"), Collections.emptyList(),
                 Collections.singletonList(Change.of(Setting.REAR_CLIMATE, "on")), false);
         assertFalse(plain.restores());
-        Rule noEnd = new Rule("c", null, true, Trigger.leave(), Collections.emptyList(),
-                Collections.singletonList(Change.of(Setting.LOW_SPEED_BRAKING, "off")), true);
-        assertFalse("离车没有结束", noEnd.restores());
         assertTrue(Change.of(Setting.LOW_SPEED_BRAKING, "off").safetyOff());
         assertFalse(Change.of(Setting.LOW_SPEED_BRAKING, "on").safetyOff());
         assertNull("只读的不能当动作", Change.of(Setting.FRONT_CLIMATE, "on"));
