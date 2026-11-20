@@ -75,26 +75,17 @@ def main():
             out.append(section)
             out.append("")
 
-
-    out.append("## Known issue")
-    out.append("")
-    out.append("**App Lab lost after a restart.** Some users report that App Lab disappears after "
-               "the head unit restarts and must be reinstalled. This is likely related to this app; "
-               "the cause is under investigation. If this happens, or the app stutters or camera "
-               "images are unavailable, **export a report from Settings → General → Diagnostics "
-               "before restarting the head unit** and report it via a "
-               "[GitHub issue](" + REPO + "/issues) or other channels.")
-    out.append("")
-    out.append("For now, the front cabin camera is one-shot: it turns itself off when you leave the "
-               "car.")
-    out.append("")
-
     out.append("## Getting started")
     out.append("")
-    out.append("Plug in a USB drive.")
+    out.append("First time? See [First install](" + REPO + "/wiki/First-install) on the wiki; the "
+               "app's first-time setup takes you through the rest. A USB drive on the USB-A port is "
+               "recommended: the Type-C port loses power after you leave the car.")
     out.append("")
-    out.append("Something wrong? Export a report from **Settings \u2192 General \u2192 Diagnostics** "
-               "and attach it to an issue.")
+    out.append("Something wrong? Restart the app. If it keeps happening, open an [issue](" + REPO
+               + "/issues) and describe what happened. A diagnostics report from "
+               "**Settings \u2192 General \u2192 Diagnostics** helps the most, but it includes your "
+               "settings, so please don't post it in public: send it to dts88 by private message in "
+               "the owners' group chat.")
     out.append("")
 
     out.append("## Safety")
