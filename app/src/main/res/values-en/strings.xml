@@ -668,8 +668,6 @@
     <string name="reason_timeout">connection timed out</string>
     <string name="reason_no_space">not enough storage space</string>
     <string name="reason_file_not_found">file not found</string>
-    <string name="msg_screen_off_stopped">Recording stopped after the screen turned off</string>
-    <string name="msg_screen_off_background">Screen off for 15 seconds. Moved to the background.</string>
     <plurals name="return_notice_text">
         <item quantity="one">The app is back in the foreground and running normally. It returns to the background in %d second.</item>
         <item quantity="other">The app is back in the foreground and running normally. It returns to the background in %d seconds.</item>

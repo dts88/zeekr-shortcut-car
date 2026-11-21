@@ -7,6 +7,7 @@
 
 package com.kooo.evcam.screen;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -22,6 +23,33 @@ import org.junit.Test;
 public class ParkedTest {
 
     private static final long AT = ChannelRules.HOLD_MS + Parked.AFTER_CAMERAS_MS;
+
+    /**
+     * 放开的次序：界面最先（项目所有者 2026-11-21：「最小化」说的是运行资源最小，界面留在后台不算放开），然后悬浮窗、蓝牙、
+     * 车辆信号，前台服务最后。
+     */
+    @Test
+    public void screensAreReleasedFirstAndTheForegroundServiceLast() {
+        assertArrayEquals(new Parked.Release[] {Parked.Release.SCREENS, Parked.Release.OVERLAYS,
+                Parked.Release.BLUETOOTH, Parked.Release.TELEMETRY, Parked.Release.FOREGROUND_SERVICE},
+                Parked.Release.values());
+    }
+
+    /**
+     * 停车以后再关一次界面只在停车着做：车机要睡那一下（停车着又开出来的界面），系统催内存时（只关不在眼前的）。
+     * 人在车上时系统催内存、行驶中安卓熄屏（那时不停车）、车机自己醒来都不关界面。
+     */
+    @Test
+    public void screensAreClosedAgainOnlyWhileParked() {
+        assertTrue(Parked.closesScreensWhenHeadUnitSleeps(true, ScreenTransitions.Edge.HEAD_UNIT_SLEEPS));
+        assertFalse("没停车（在开车）", Parked.closesScreensWhenHeadUnitSleeps(false, ScreenTransitions.Edge.HEAD_UNIT_SLEEPS));
+        assertFalse("车机自己醒来", Parked.closesScreensWhenHeadUnitSleeps(true, ScreenTransitions.Edge.WOKE_WHILE_DARK));
+        assertFalse(Parked.closesScreensWhenHeadUnitSleeps(true, ScreenTransitions.Edge.DARK));
+        assertFalse(Parked.closesScreensWhenHeadUnitSleeps(true, ScreenTransitions.Edge.LIT));
+        assertFalse("没跨边", Parked.closesScreensWhenHeadUnitSleeps(true, null));
+        assertTrue(Parked.closesHiddenScreensWhenMemoryIsTight(true));
+        assertFalse("人在车上时系统催内存：不动", Parked.closesHiddenScreensWhenMemoryIsTight(false));
+    }
 
     /** 亮着（人在车上）不停车。 */
     @Test

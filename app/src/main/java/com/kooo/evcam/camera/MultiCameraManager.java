@@ -1950,13 +1950,36 @@ public class MultiCameraManager {
      * <p>盘满、写不进、录像的样子变了（一路加入 / 退出）、开录 / 停录走到哪一步这几个<b>不在这里动</b>：它们是
      * CameraKeeper 接的，它不随主界面走 —— 换掉的话主界面一重建，录像就没人停、没人接了。</p>
      */
-    public void detachUiCallbacks() {
+    private void detachUiCallbacks() {
         statusCallback = (cameraId, status) -> { };
         previewSizeCallback = (cameraKey, cameraId, previewSize) -> { };
         corruptedFilesCallback = deletedFiles -> { };
         segmentSwitchCallback = newSegmentIndex -> { };
         firstDataWrittenCallback = () -> { };
         AppLog.i(TAG, "主界面已离开，回调换成空实现，录制管线继续 recording=" + isRecording);
+    }
+
+    /**
+     * 上面那几个回调是哪一个界面设的（{@link #claimUiCallbacks}）；没人设过是 null。只在主线程上动。
+     */
+    private Object uiCallbacksOwner;
+
+    /** 界面要设回调了（紧跟着调那几个 set）：记下是谁设的。主线程。 */
+    public void claimUiCallbacks(Object owner) {
+        uiCallbacksOwner = owner;
+    }
+
+    /**
+     * 界面要走了（主线程）：回调还是它设的就摘（换成空实现，见 {@link #detachUiCallbacks()}）；已经是别的界面设的就不动 ——
+     * 在关的旧界面销毁得比新界面接上晚时（停车那一下关掉、人紧跟着回来，另起了一个），摘掉的会是新界面刚设的。
+     */
+    public void detachUiCallbacks(Object owner) {
+        if (uiCallbacksOwner != null && uiCallbacksOwner != owner) {
+            AppLog.i(TAG, "主界面已离开，回调是另一个界面设的，不摘");
+            return;
+        }
+        uiCallbacksOwner = null;
+        detachUiCallbacks();
     }
 
     public void setFirstDataWrittenCallback(FirstDataWrittenCallback callback) {

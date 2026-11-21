@@ -229,7 +229,7 @@ public final class OverlayCoordinator {
             return;
         }
         if (ScreenState.dark()) {
-            // 屏幕黑着（熄屏 15 秒主界面退下去的那一下、车机自己醒来时界面被摆来摆去）：不为它起悬浮按钮；
+            // 屏幕黑着（熄屏后主界面离开前台的那一下、车机自己醒来时界面被摆来摆去）：不为它起悬浮按钮；
             // 人回来时照设置、照那时主界面在不在前摆（Parked）
             Parked.oweOverlays();
             return;

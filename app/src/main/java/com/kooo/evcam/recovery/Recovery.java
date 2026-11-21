@@ -75,7 +75,7 @@ public final class Recovery {
      * 因熄屏自己退下去的主界面，屏幕亮了就接回来（规格 §0：停车熄屏是特殊情况，亮了就回到用户设定的状态）。
      *
      * <p>只认「是它自己因为熄屏退下去的」这个记号：用户自己切走的、从来没进过前台的，一律不动。
-     * 界面还活着就把它挪到前面；已经被系统收走了就重新起一个（带记号，这一趟的录像选择不清，规格 §2.5）。
+     * 界面还活着就把它挪到前面；已经没了（停车时我们关掉的，或者被系统收走了）就重新起一个（带记号，这一趟的录像选择不清，规格 §2.5）。
      * ScreenState 在亮屏时调；进程在屏幕亮着时被拉起来也调一次（那时没有亮屏事件可听）；为录像拉主界面时记号还在的也走这里
      * （{@link #bringUpMainForRecording}）。都在屏幕亮着时。熄屏 v3 起「熄屏」是屏幕真黑了：
      * 车主下车、屏幕一黑记号就记上，开车门亮屏时主界面就接回来（以前要等几分钟后车机下电那一次熄屏才记）。</p>
@@ -88,11 +88,11 @@ public final class Recovery {
             }
             config.setUiLeftForScreenOff(false);
             if (com.kooo.evcam.camera.StallWatch.isForeground()) {
-                // 记号是熄屏那一刻记的（主界面在前就记，进程被车机结束了也接得回来）；熄屏期间它一直没退下去（在录、在等开录、
-                // 熄屏录制开着）就还在前面，不用再拉
+                // 记号是熄屏那一刻记的（主界面在前就记，进程被车机结束了也接得回来）；人在停车之前就回来了（熄屏不到 40 秒）
+                // 它就还在前面，不用再拉
                 return;
             }
-            boolean alive = MainActivity.getInstance() != null;
+            boolean alive = mainScreenAlive();
             Intent intent = new Intent(context, MainActivity.class);
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_ANIMATION
                     | (alive ? Intent.FLAG_ACTIVITY_SINGLE_TOP : 0));
@@ -160,13 +160,22 @@ public final class Recovery {
      * （{@link #EXTRA_RETURNS}）。还活着就挪到前面。
      */
     private static void launchMainBriefly(Context context) {
-        boolean alive = MainActivity.getInstance() != null;
+        boolean alive = mainScreenAlive();
         Intent main = new Intent(context, MainActivity.class);
         main.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_ANIMATION
                 | (alive ? Intent.FLAG_ACTIVITY_SINGLE_TOP : 0));
         main.putExtra(EXTRA_RETURNS, true);
         main.putExtra(EXTRA_SILENT, true);
         context.startActivity(main);
+    }
+
+    /**
+     * 主界面还活着、能挪到前面：建了，而且没在关。停车那一下关掉的（{@code screen.Parked}）到销毁完之前还查得到，
+     * 那一个挪不回来 —— 系统会另起一个，照「重新起一个」带上记号。
+     */
+    private static boolean mainScreenAlive() {
+        MainActivity main = MainActivity.getInstance();
+        return main != null && !main.isFinishing();
     }
 
     private static void restoreNow(Context context, String why) {
