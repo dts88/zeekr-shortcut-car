@@ -51,26 +51,25 @@ import java.util.List;
 
 public class MainActivity extends AppCompatActivity implements com.kooo.evcam.setup.SetupFragment.Host {
 
-    /** 人碰了界面（触摸、按键）：人在车上的证据。界面自己到了前台不算，所以不放在 onResume 里。 */
-    @Override
-    public void onUserInteraction() {
-        super.onUserInteraction();
-        com.kooo.evcam.screen.ScreenState.userActed("main");
-    }
-
     /**
-     * 回到前台的提示在数的时候（ui-spec §十九），按下的那一下触摸只算「留下」，整个吞掉、不往下传。
-     * 吞掉的没经过 super，人碰了界面照样记（{@link #onUserInteraction}）。
+     * 人碰了界面（触摸、按键）：人在车上的证据（{@code ScreenState.touched} / {@code keyed}：只认真的触摸和按键，
+     * 不用 onUserInteraction —— 别的界面盖上来时安卓也叫它）。界面自己到了前台不算，所以不放在 onResume 里。
+     *
+     * <p>回到前台的提示在数的时候（ui-spec §十九），按下的那一下触摸只算「留下」，整个吞掉、不往下传；人碰了界面照样记。</p>
      */
     @Override
     public boolean dispatchTouchEvent(android.view.MotionEvent event) {
+        com.kooo.evcam.screen.ScreenState.touched(event, "main");
         if (returnNotice != null && returnNotice.takes(event)) {
-            if (event.getActionMasked() == android.view.MotionEvent.ACTION_DOWN) {
-                onUserInteraction();
-            }
             return true;
         }
         return super.dispatchTouchEvent(event);
+    }
+
+    @Override
+    public boolean dispatchKeyEvent(android.view.KeyEvent event) {
+        com.kooo.evcam.screen.ScreenState.keyed(event, "main");
+        return super.dispatchKeyEvent(event);
     }
 
     /**
