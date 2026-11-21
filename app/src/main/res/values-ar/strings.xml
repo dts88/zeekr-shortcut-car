@@ -666,6 +666,15 @@
     <string name="reason_file_not_found">الملف غير موجود</string>
     <string name="msg_screen_off_stopped">توقف التسجيل بعد انطفاء الشاشة</string>
     <string name="msg_screen_off_background">الشاشة مطفأة منذ 15 ثانية. انتقل التطبيق إلى الخلفية.</string>
+    <plurals name="return_notice_text">
+        <item quantity="zero">عاد التطبيق إلى المقدمة ويعمل طبيعيًا. سيعود إلى الخلفية تلقائيًا الآن.</item>
+        <item quantity="one">عاد التطبيق إلى المقدمة ويعمل طبيعيًا. سيعود إلى الخلفية تلقائيًا خلال ثانية واحدة.</item>
+        <item quantity="two">عاد التطبيق إلى المقدمة ويعمل طبيعيًا. سيعود إلى الخلفية تلقائيًا خلال ثانيتين.</item>
+        <item quantity="few">عاد التطبيق إلى المقدمة ويعمل طبيعيًا. سيعود إلى الخلفية تلقائيًا خلال %d ثوانٍ.</item>
+        <item quantity="many">عاد التطبيق إلى المقدمة ويعمل طبيعيًا. سيعود إلى الخلفية تلقائيًا خلال %d ثانية.</item>
+        <item quantity="other">عاد التطبيق إلى المقدمة ويعمل طبيعيًا. سيعود إلى الخلفية تلقائيًا خلال %d ثانية.</item>
+    </plurals>
+    <string name="return_notice_stay">انقر على الشاشة للبقاء هنا</string>
     <string name="msg_stats_on">تم تشغيل عرض حالة التسجيل</string>
     <string name="msg_stats_off">تم إيقاف عرض حالة التسجيل</string>
     <string name="msg_need_overlay_adjust">يتطلب فتح نافذة ضبط الصورة إذن الظهور فوق التطبيقات الأخرى</string>

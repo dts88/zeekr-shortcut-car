@@ -665,6 +665,10 @@
     <string name="reason_file_not_found">fail tidak ditemui</string>
     <string name="msg_screen_off_stopped">Rakaman dihentikan selepas skrin padam</string>
     <string name="msg_screen_off_background">Skrin padam selama 15 saat. Dialihkan ke latar belakang.</string>
+    <plurals name="return_notice_text">
+        <item quantity="other">Apl kembali ke latar depan dan berjalan seperti biasa. Apl akan kembali ke latar belakang dalam %d saat.</item>
+    </plurals>
+    <string name="return_notice_stay">Ketik skrin untuk kekal di sini</string>
     <string name="msg_stats_on">Paparan status rakaman dihidupkan</string>
     <string name="msg_stats_off">Paparan status rakaman dimatikan</string>
     <string name="msg_need_overlay_adjust">Kebenaran paparan di atas apl lain diperlukan untuk membuka tetingkap pelarasan</string>

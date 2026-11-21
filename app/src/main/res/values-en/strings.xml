@@ -670,6 +670,11 @@
     <string name="reason_file_not_found">file not found</string>
     <string name="msg_screen_off_stopped">Recording stopped after the screen turned off</string>
     <string name="msg_screen_off_background">Screen off for 15 seconds. Moved to the background.</string>
+    <plurals name="return_notice_text">
+        <item quantity="one">The app is back in the foreground and running normally. It returns to the background in %d second.</item>
+        <item quantity="other">The app is back in the foreground and running normally. It returns to the background in %d seconds.</item>
+    </plurals>
+    <string name="return_notice_stay">Tap the screen to stay</string>
     <string name="msg_stats_on">Recording status readout on</string>
     <string name="msg_stats_off">Recording status readout off</string>
     <string name="msg_need_overlay_adjust">The overlay permission is required to open the adjustment window</string>

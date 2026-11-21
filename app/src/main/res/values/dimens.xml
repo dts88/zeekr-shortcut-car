@@ -31,6 +31,11 @@
     <!-- 初始设置（fragment_setup）右边内容那一列的宽度：和设置页的一列差不多宽，字不会拉成一长行 -->
     <dimen name="setup_content_width">920dp</dimen>
     <dimen name="icon_button_size">48dp</dimen>
+    <!--
+      回到前台的提示那条横幅的高（ui-spec §十九）：和 ① 标题区同高，正好把菜单键、画面角标整个盖住。
+      单独起名：它不是标题区，里面跟着语言的方向（TitleBarDirectionTest 把写 title_bar_height 的都当标题区查）
+    -->
+    <dimen name="return_notice_height">@dimen/title_bar_height</dimen>
     <!-- 车辆信号页每一行旁边的信息条图标（ui.InfoBarCellView）：高固定，宽按那一格的比例 -->
     <dimen name="info_cell_icon_height">44dp</dimen>
     <dimen name="info_cell_icon_radius">6dp</dimen>
