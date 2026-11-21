@@ -378,6 +378,89 @@ public class SettingsShotsTest {
                 new AppConfig(RuntimeEnvironment.getApplication()).isPlaybackReadDurations());
     }
 
+    /**
+     * 测试环境里没有外置存储目录，系统查「所有文件访问权限」的那一句会抛（{@code Environment.isExternalStorageManager}
+     * 取第一个外置目录）：这里照「没给」答。
+     */
+    @org.robolectric.annotation.Implements(android.os.Environment.class)
+    public static class NoAllFilesAccess extends org.robolectric.shadows.ShadowEnvironment {
+        @org.robolectric.annotation.Implementation
+        protected static boolean isExternalStorageManager() {
+            return false;
+        }
+    }
+
+    /**
+     * 开发者选项 → 权限设置：「忽略电池优化」灰着、点不动（项目所有者 2026-11-21「变灰」）—— 停车时应用交给车机处置，
+     * 不再带人去给这一条；名字和状态那一行照旧。别的几条不变：没给的能点。
+     */
+    @Test
+    @Config(shadows = NoAllFilesAccess.class)
+    public void batteryOptimisationRowIsGreyedOut() {
+        permissionsPage(Shots.DAY, "day");
+    }
+
+    @Test
+    @Config(shadows = NoAllFilesAccess.class)
+    public void batteryOptimisationRowIsGreyedOutByNight() {
+        permissionsPage(Shots.NIGHT, "night");
+    }
+
+    @Test
+    @Config(shadows = NoAllFilesAccess.class)
+    public void batteryOptimisationRowIsGreyedOutInEnglish() {
+        permissionsPage(Shots.DAY_EN, "day-en");
+    }
+
+    private void permissionsPage(String qualifiers, String tag) {
+        RuntimeEnvironment.setQualifiers(qualifiers);
+        ShotActivity activity = Robolectric.buildActivity(ShotActivity.class).setup().get();
+        Shots.stillFrames(activity);
+        SettingsShellFragment shell = new SettingsShellFragment();
+        activity.getSupportFragmentManager().beginTransaction().replace(activity.container, shell).commitNow();
+        Shots.settle();
+        shell.openDetail(new PermissionsPreferenceFragment(), activity.getString(R.string.dev_permissions_title));
+        Shots.settle();
+        PermissionsPreferenceFragment page = (PermissionsPreferenceFragment)
+                shell.getChildFragmentManager().findFragmentById(R.id.settings_detail);
+        assertNotNull(page);
+
+        Preference battery = permissionRow(page, activity.getString(R.string.dev_perm_battery));
+        assertNotNull("少了「忽略电池优化」那一行", battery);
+        assertFalse("灰着", battery.isEnabled());
+        assertFalse("点不动", battery.isSelectable());
+        org.junit.Assert.assertNull("不带人去系统设置", battery.getOnPreferenceClickListener());
+        assertEquals("状态那一行照旧", activity.getString(R.string.dev_perm_not_granted,
+                activity.getString(R.string.dev_perm_battery_why)), String.valueOf(battery.getSummary()));
+        Preference overlay = permissionRow(page, activity.getString(R.string.dev_perm_overlay));
+        assertNotNull(overlay);
+        assertTrue("别的没给的照旧能点", overlay.isEnabled() && overlay.isSelectable());
+        assertNotNull(overlay.getOnPreferenceClickListener());
+
+        // 这一页回到前台时把各行拿掉重建一遍（授权是去系统设置里点的），新的一行是淡入的：先排一遍，等淡入放完再画。
+        // 那一行在最下面，滚到它
+        Shots.save(activity, "settings-permissions-" + tag);
+        page.scrollToPreference(battery);
+        org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(600));
+        File file = Shots.save(activity, "settings-permissions-" + tag);
+        assertTrue(file + " 是空的", file.length() > 10_000);
+    }
+
+    /** 权限设置页的行没有 key，照名字找。 */
+    private static Preference permissionRow(PermissionsPreferenceFragment page, String title) {
+        androidx.preference.PreferenceScreen screen = page.getPreferenceScreen();
+        for (int i = 0; i < screen.getPreferenceCount(); i++) {
+            androidx.preference.PreferenceGroup group = (androidx.preference.PreferenceGroup) screen.getPreference(i);
+            for (int j = 0; j < group.getPreferenceCount(); j++) {
+                Preference row = group.getPreference(j);
+                if (title.equals(String.valueOf(row.getTitle()))) {
+                    return row;
+                }
+            }
+        }
+        return null;
+    }
+
     private static boolean shown(SettingsPreferenceFragment section, String key) {
         Preference row = section.findPreference(key);
         assertNotNull("少了 " + key, row);
