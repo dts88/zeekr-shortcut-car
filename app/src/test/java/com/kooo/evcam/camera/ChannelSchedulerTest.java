@@ -151,11 +151,11 @@ public class ChannelSchedulerTest {
     // ================================================================= 车机睡醒；相机服务的通知用的时候挂上
 
     /**
-     * 车机睡醒了（系统的深睡计时比上一轮多了）：醒来满 6 秒才开相机 —— 它醒来那几秒在重新初始化相机，通知没挂着时听不到
+     * 车机睡醒了（系统的深睡计时比上一轮多了）：醒来满 8 秒才开相机 —— 它醒来那几秒在重新初始化相机，通知没挂着时听不到
      * （项目所有者 2026-11-21：用普通的信号判车机醒来）。黑匣子一行，相机的来历从头数。
      */
     @Test
-    public void afterTheHeadUnitWakesNothingOpensForSixSeconds() {
+    public void afterTheHeadUnitWakesNothingOpensUntilItHasSettled() {
         settle();
         assertTrue("第一轮没有上一轮可比，不算醒来", lines("woke").isEmpty());
         sleep(2 * 3_600_000L);
@@ -185,7 +185,7 @@ public class ChannelSchedulerTest {
         assertEquals(Arrays.asList("open [PREVIEW]"), surround.actions);
     }
 
-    /** 睡醒的那 6 秒和相机服务的安静一起算：两样都还要等的，等晚到点的那一个。 */
+    /** 睡醒的那一段和相机服务的安静一起算：两样都还要等的，等晚到点的那一个。 */
     @Test
     public void wakeSettleAndQuietWaitForWhicheverEndsLater() {
         settle();
@@ -193,17 +193,52 @@ public class ChannelSchedulerTest {
         s.wake();
         settle();
         assertEquals(1, lines("woke").size());
-        at(4_000);
-        // 通知挂着：听见环视回来了（别人引起的变化），安静从这一刻再算 3 秒，比睡醒的 6 秒晚到点
+        long heardAt = ChannelRules.WAKE_SETTLE_MS - 1_000;
+        at(heardAt);
+        // 通知挂着：听见环视回来了（别人引起的变化），安静从这一刻再算 3 秒，比睡醒的那一段晚到点
         say(surround, true, false);
         claim(Holder.PREVIEW);
         declare(surround, pvS);
         settle();
         assertTrue(surround.actions.isEmpty());
-        at(4_000 + ChannelRules.QUIET_MS - 1);
-        assertTrue("睡醒的 6 秒到了，安静还差一点", surround.actions.isEmpty());
-        at(4_000 + ChannelRules.QUIET_MS);
+        at(heardAt + ChannelRules.QUIET_MS - 1);
+        assertTrue("睡醒的那一段到了，安静还差一点", surround.actions.isEmpty());
+        at(heardAt + ChannelRules.QUIET_MS);
         assertEquals(Arrays.asList("open [PREVIEW]"), surround.actions);
+    }
+
+    /**
+     * 可以晚，不能早（项目所有者 2026-11-21）：通知挂着、早早听见环视回来了，安静的 3 秒先到点 —— 还是等睡醒的那一段满了才开，
+     * 可能系统还没把相机初始化完。
+     */
+    @Test
+    public void anEarlyQuietDoesNotShortenTheWaitAfterAWake() {
+        settle();
+        sleep(60_000);
+        s.wake();
+        settle();
+        at(1_000);
+        say(surround, true, false);
+        claim(Holder.PREVIEW);
+        declare(surround, pvS);
+        settle();
+        at(1_000 + ChannelRules.QUIET_MS);
+        assertTrue("安静到了，睡醒的那一段还没满", surround.actions.isEmpty());
+        at(ChannelRules.WAKE_SETTLE_MS - 1);
+        assertTrue(surround.actions.isEmpty());
+        at(ChannelRules.WAKE_SETTLE_MS);
+        assertEquals(Arrays.asList("open [PREVIEW]"), surround.actions);
+    }
+
+    /**
+     * 睡醒以后等的时间不比听着的时候短：那时候听见相机回来再等安静才开，记录里最慢的一次是醒来后 3.38 秒回来
+     * （2026-09-26～11-21 的 82 次睡醒）。现在不听了，照「留给重新初始化的时间 + 安静」等。
+     */
+    @Test
+    public void theWaitAfterAWakeIsNotShorterThanWhenTheCamerasWereHeard() {
+        long slowestRecordedMs = 3_380L;
+        assertTrue(ChannelRules.WAKE_REINIT_MS > slowestRecordedMs);
+        assertEquals(ChannelRules.WAKE_REINIT_MS + ChannelRules.QUIET_MS, ChannelRules.WAKE_SETTLE_MS);
     }
 
     /** 相机这一块用着没有：人在车上就算；停车着只在有人要相机、或者还有相机没关完时算。 */
@@ -303,7 +338,7 @@ public class ChannelSchedulerTest {
     }
 
     /**
-     * 车机睡醒只管关着的那一路：睡过这一觉还开着的没被重新初始化，改它的输出不等那 6 秒，它的来历也不从头数。
+     * 车机睡醒只管关着的那一路：睡过这一觉还开着的没被重新初始化，改它的输出不等睡醒的那一段，它的来历也不从头数。
      * （只启用环视：没有别的关着的路等着开。有的话，照旧先等那一路 —— 一轮只出一个答案。）
      */
     @Test
