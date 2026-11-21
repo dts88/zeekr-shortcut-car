@@ -296,6 +296,29 @@ public final class ChannelScheduler {
         /** 上一次别人引起的变化（{@link #elapsedNow} 的钟）；0 = 没有过。 */
         long lastOthersChangeAt();
 
+        /** 停车着（人不在车上，{@code screen.Parked}）。相机服务的通知这时不用了就摘（{@link ChannelScheduler#tendCameraService}）。 */
+        boolean parked();
+
+        /**
+         * 相机服务的通知挂上（true）、摘掉（false）：用的时候挂上，不用了摘掉（项目所有者 2026-11-21）。已经是那样的什么都不做。
+         * 新挂上时系统把每一路此刻的样子报一遍（回放），排在主线程的队列里。
+         *
+         * @return 这一下真的挂上了 / 摘掉了；本来就是那样、挂不上是 false
+         */
+        boolean listenToCameraService(boolean on);
+
+        /**
+         * 相机服务的通知刚挂上、回放还没收全（{@code CameraAvailabilityWatch.settling}）：每一路此刻的样子还没人说，
+         * 这时的一轮不判；收全了那一层叫醒调度。
+         */
+        boolean cameraServiceSettling();
+
+        /**
+         * 车机睡醒了（{@link ChannelScheduler#noticeWake}）：这几台相机（关着的那几台）的来历从头数
+         * （{@link CameraHistory.Reset#WOKE}）—— 它醒来会把相机重新初始化一遍。通知挂着时不用记：那时听得到它「没了又回来」。
+         */
+        void headUnitWoke(List<String> cameraIds);
+
         /** 相机服务对这一路说的最后一句（时刻是 {@link #elapsedNow} 的钟）。 */
         CameraAvailabilityWatch.Word word(String cameraId);
 
@@ -340,6 +363,12 @@ public final class ChannelScheduler {
 
         /** 退出以后主界面又回来了（{@link ChannelScheduler#resumeAfterExit}）：不再只关，照常开。 */
         void resumed();
+
+        /** 车机睡醒了：睡了多久（毫秒）；这之后 {@link ChannelRules#WAKE_SETTLE_MS} 里不开、不改输出、不救。 */
+        void woke(long sleptMs);
+
+        /** 相机服务的通知挂上了 / 摘掉了（{@code parked}：那一刻停车着）。 */
+        void listening(boolean on, boolean parked);
     }
 
     /**
@@ -875,7 +904,7 @@ public final class ChannelScheduler {
         final long ms;
         /** 在途的是什么（LOSING / BUSY）。 */
         final String busy;
-        /** QUIET：别人引起的变化是多久以前；LOSING / BUSY：在途多久了。 */
+        /** QUIET：别人引起的变化是多久以前；WOKE：车机多久以前睡醒的；LOSING / BUSY：在途多久了。 */
         final long agoMs;
         /** QUIET：是相机服务对哪一路说的那一句（认不出是 null）。 */
         final String wordCameraId;
@@ -1643,6 +1672,8 @@ public final class ChannelScheduler {
         final List<Orphan> orphans;
         /** 上一次别人引起的变化（调度的钟）；0 = 没有过。 */
         final long lastOthersChangeAt;
+        /** 车机上一次睡醒的那一刻（调度的钟）；0 = 这个进程里没见过。 */
+        final long headUnitWokeAt;
         /** 手上那一步；null = 没有。 */
         final ChannelRules.Step step;
         /** 这一轮的答案：动作、为什么、哪一路；等的话等的是哪一种动作、最多还要等多久（-1 说不准）；先不开的那一路。 */
@@ -1683,6 +1714,7 @@ public final class ChannelScheduler {
             this.waiting = pending;
             this.orphans = Collections.unmodifiableList(new ArrayList<>(orphans));
             this.lastOthersChangeAt = w.lastOthersChangeAt;
+            this.headUnitWokeAt = w.headUnitWokeAt;
             this.step = w.step;
             this.move = d.move;
             this.why = d.why;
@@ -1869,6 +1901,16 @@ public final class ChannelScheduler {
     private long sleepNoted;
     /** 写过「退出」、还没写「主界面又回来了」。只在主线程上读写。 */
     private boolean exitNoted;
+    /** 相机服务的通知刚挂上、回放还没收全时，兜底多久再看一眼（{@link #round}）。 */
+    static final long SETTLING_RECHECK_MS = 100L;
+    /** 车机睡过一觉才算数的最短时长：系统的深睡计时比上一轮多这么多（两个钟读的先后差远不到这个数）。 */
+    static final long SLEPT_MIN_MS = 1_000L;
+    /** 上一轮读到的深睡计时（含深睡的钟减调度的钟）；还没跑过一轮是 {@link Long#MIN_VALUE}。只在主线程上读写。 */
+    private long lastSleptMs = Long.MIN_VALUE;
+    /** 车机上一次睡醒的那一刻（调度的钟，{@link #noticeWake}）；0 = 这个进程里没见过。只在主线程上读写。 */
+    private long headUnitWokeAt;
+    /** 这一轮读到的登记表（{@link #round} 开头读一次，这一轮里都用它）；不在一轮里是 null。只在主线程上读写。 */
+    private Set<CameraNeeds.Holder> roundHolders;
 
     // ---- 环视这一段熄屏留不留、通道的决定：跟着进程，不跟着管线（项目所有者 2026-10-27；只在主线程上读写）----
 
@@ -2236,6 +2278,27 @@ public final class ChannelScheduler {
     private void round() {
         roundPosted.set(false);
         long now = clock.now();
+        noticeWake(now);
+        // 登记表一轮里只读一次：挂不挂相机服务的通知、各份管线的世界看的是同一份（别的线程这时登记的，下一轮再认）
+        roundHolders = facts.holders();
+        try {
+            tendCameraService(roundHolders);
+            if (facts.cameraServiceSettling()) {
+                // 相机服务的通知刚挂上，每一路此刻的样子（回放）还排在主线程的队列里：这一轮不判 —— 判的话，被别人拿着的、
+                // 不在的那一路还没人说，会去开一次。这之前已经排着的轮、到点的计时器也一样跳过；回放收全了那一层叫醒调度。
+                // 兜底：收尾就排在主线程的队列里，正常用不上；万一那一声没叫到，过一会儿自己再看一眼
+                poster.cancel(timerTask);
+                poster.postDelayed(timerTask, SETTLING_RECHECK_MS);
+                return;
+            }
+            decide(now);
+        } finally {
+            roundHolders = null;
+        }
+    }
+
+    /** 一轮里判和照做的那一半（{@link #round}：相机服务的事实齐了才到这里）。 */
+    private void decide(long now) {
         ChannelRules.Decision d = attached.run(now);
         Pipeline waiting = pending;
         if (waiting != null) {
@@ -2253,6 +2316,59 @@ public final class ChannelScheduler {
         }
         // 关完了（或者车机要睡被亮屏清掉）：等「关完」的那几位现在叫（{@link #whenClosed}）
         tellClosedWaiters();
+    }
+
+    /**
+     * 车机睡过一觉、刚醒来（项目所有者 2026-11-21：用普通的信号判车机醒来）：系统的深睡计时（含深睡的钟减去不含的，
+     * 黑匣子每一行的 slept= 就是它）比上一轮多了 {@link #SLEPT_MIN_MS} 以上。记下这一刻（{@link ChannelRules.World#headUnitWokeAt}，
+     * 规则照它等 {@link ChannelRules#WAKE_SETTLE_MS}），进程这一层写一行；接着的那一份里每一台相机的来历从头数。
+     * 第一轮没有上一轮可比，不算。
+     */
+    private void noticeWake(long now) {
+        long slept = facts.elapsedNow() - now;
+        long before = lastSleptMs;
+        lastSleptMs = slept;
+        if (before == Long.MIN_VALUE || slept - before < SLEPT_MIN_MS) {
+            return;
+        }
+        headUnitWokeAt = now;
+        processJournal.woke(slept - before);
+        // 来历只动关着的那几台：睡过这一觉还开着的没被重新初始化
+        List<String> ids = new ArrayList<>();
+        for (ChannelRules.Lane lane : attached.w.lanes) {
+            if (lane.cameraId != null && lane.device == ChannelRules.Device.CLOSED && !ids.contains(lane.cameraId)) {
+                ids.add(lane.cameraId);
+            }
+        }
+        facts.headUnitWoke(ids);
+    }
+
+    /**
+     * 相机服务的通知：用的时候挂上，不用了摘掉（项目所有者 2026-11-21，照安卓通常的做法）。每一轮开头判一次：
+     *
+     * <ul>
+     *   <li>用着 —— 人在车上（没停车）；或者停车着还有人要相机、还有相机没关完（哨兵模式开着接着录的、收尾中的）：挂着；</li>
+     *   <li>不用了 —— 停车着、谁都不要、都关完了：摘掉。没在听的那一段里车机睡醒会重新初始化相机，那一种看 {@link #noticeWake}。</li>
+     * </ul>
+     *
+     * <p>新挂上以后回放收全之前不判（{@link Facts#cameraServiceSettling}，{@link #round}）。</p>
+     *
+     * @param holders 这一轮读到的登记表（和各份管线这一轮看的是同一份）
+     */
+    private void tendCameraService(Set<CameraNeeds.Holder> holders) {
+        boolean parked = facts.parked();
+        boolean on = inUse(parked, !holders.isEmpty(), allClosed());
+        if (facts.listenToCameraService(on)) {
+            processJournal.listening(on, parked);
+        }
+    }
+
+    /**
+     * 相机这一块此刻用着没有（纯函数）：人在车上就算用着（随时可能要：转向灯、录制键、拍照）；停车着只在有人要相机、
+     * 或者还有相机没关完时算。
+     */
+    static boolean inUse(boolean parked, boolean anyoneWants, boolean allClosed) {
+        return !parked || anyoneWants || !allClosed;
     }
 
     /**
@@ -3211,7 +3327,7 @@ public final class ChannelScheduler {
          */
         private void refresh(long now, boolean run) {
             long offset = facts.elapsedNow() - now;
-            Set<CameraNeeds.Holder> holders = facts.holders();
+            Set<CameraNeeds.Holder> holders = roundHolders != null ? roundHolders : facts.holders();
             if (run) {
                 for (java.util.Iterator<CameraNeeds.Holder> it = changedHolders.iterator(); it.hasNext(); ) {
                     w.changed.add(it.next());
@@ -3258,6 +3374,7 @@ public final class ChannelScheduler {
             w.cameraUsable = main || serviceStartedVisible;
             w.heardAnything = facts.heardAnything();
             w.lastOthersChangeAt = ourClock(facts.lastOthersChangeAt(), offset);
+            w.headUnitWokeAt = headUnitWokeAt;
             w.frontCabinOneShot = facts.frontCabinOneShot();
             readCar(w);
 
@@ -3914,6 +4031,11 @@ public final class ChannelScheduler {
                     case QUIET:
                         sig = d.why + "|" + key + "|" + d.pending;
                         wait = quietWait(d, now);
+                        break;
+                    case WOKE:
+                        // 车机刚睡醒，先不开、不改、不救：变了才写（多久以前醒的记在 agoMs）
+                        sig = d.why + "|" + key + "|" + d.pending;
+                        wait = new Wait(d.why, key, d.pending, d.ms, "", now - w.headUnitWokeAt, null, null, false, false);
                         break;
                     case RECORD_OUTPUT:
                         sig = d.why + "|" + key;

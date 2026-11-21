@@ -60,9 +60,7 @@ public class CameraForegroundService extends Service {
         // 全在这些行的 slept= 里；中间断掉的那一段就是「我们不在」
         startBlackBoxHeartbeat();
 
-        // 相机服务眼里每一路空不空。环视卡死、只能重启车机的那种状态，
-        // 要靠它说出「是谁占着」—— 注册时系统会把当前状态报一遍
-        com.kooo.evcam.camera.CameraAvailabilityWatch.start(this);
+        // 相机服务的通知（每一路空不空）不在这里挂：用的时候由通道调度挂上、不用了摘掉（CameraAvailabilityWatch，2026-11-21）
         // 恢复不在这里做：人回来的那一下（亮屏）、周期任务跑到时才看（Recovery，规格 §2.5）
     }
 

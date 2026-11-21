@@ -253,8 +253,11 @@ public final class DiagnosticsCollector {
     private static void appendCameraAvailability(StringBuilder sb, Context context) {
         sb.append("## 2.3.1 相机可用性（相机服务视角）").append('\n');
         if (!com.kooo.evcam.camera.CameraAvailabilityWatch.heardAnything()) {
-            sb.append("没收到过可用性回调（前台服务没起来，或者容器没转这条接口）").append('\n');
+            sb.append("没收到过可用性回调（还没挂上过，或者容器没转这条接口）").append('\n');
         } else {
+            if (!com.kooo.evcam.camera.CameraAvailabilityWatch.listening()) {
+                sb.append("  此刻没挂着（停车着、相机都关了、没人要；用的时候再挂上，那时从头记）").append('\n');
+            }
             for (java.util.Map.Entry<String, long[]> e
                     : com.kooo.evcam.camera.CameraAvailabilityWatch.snapshot().entrySet()) {
                 long[] v = e.getValue();

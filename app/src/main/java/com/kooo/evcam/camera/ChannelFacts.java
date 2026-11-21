@@ -16,6 +16,7 @@ import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.AppLog;
 
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -70,6 +71,19 @@ public final class ChannelFacts implements ChannelScheduler.Facts {
         @Override
         public void resumed() {
             com.kooo.evcam.blackbox.BlackBox.noteImportant("通道：退出以后主界面又打开了：不再只关，照常开");
+        }
+
+        @Override
+        public void woke(long sleptMs) {
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("通道：车机睡醒了（睡了 " + sleptMs / 1000
+                    + " 秒）：它醒来会把相机重新初始化一遍，醒来满 " + (ChannelRules.WAKE_SETTLE_MS / 1000) + " 秒再开相机");
+        }
+
+        @Override
+        public void listening(boolean on, boolean parked) {
+            com.kooo.evcam.blackbox.BlackBox.noteImportant(on
+                    ? "相机服务的通知：挂上（" + (parked ? "停车着，有人要相机" : "人在车上") + "）"
+                    : "相机服务的通知：摘掉（停车着，相机都关了、没人要）" + com.kooo.evcam.blackbox.BlackBox.afterScreenOff());
         }
     };
 
@@ -341,6 +355,37 @@ public final class ChannelFacts implements ChannelScheduler.Facts {
     @Override
     public CameraAvailabilityWatch.Word word(String cameraId) {
         return CameraAvailabilityWatch.word(cameraId);
+    }
+
+    /** 停车着（{@code screen.Parked}）：调度据此摘、挂相机服务的通知。 */
+    @Override
+    public boolean parked() {
+        return com.kooo.evcam.screen.Parked.is();
+    }
+
+    /** 相机服务的通知挂上、摘掉（{@link CameraAvailabilityWatch#start}、{@link CameraAvailabilityWatch#stop}，主线程）。 */
+    @Override
+    public boolean listenToCameraService(boolean on) {
+        return on ? CameraAvailabilityWatch.start(app) : CameraAvailabilityWatch.stop();
+    }
+
+    @Override
+    public boolean cameraServiceSettling() {
+        return CameraAvailabilityWatch.settling();
+    }
+
+    /**
+     * 车机睡醒了：这几台相机的来历从头数（{@link CameraHistory.Reset#WOKE}）。通知挂着时不记 —— 那时它「没了又回来」听得到，
+     * 照听到的记（{@link CameraHistory.Reset#CAME_BACK}）。
+     */
+    @Override
+    public void headUnitWoke(List<String> cameraIds) {
+        if (CameraAvailabilityWatch.listening()) {
+            return;
+        }
+        for (String id : cameraIds) {
+            StepLog.cameraReset(id, CameraHistory.Reset.WOKE);
+        }
     }
 
     /** 这一台相机的来历（{@link CameraHistory}，内存里的那一份，主线程不碰盘）。 */

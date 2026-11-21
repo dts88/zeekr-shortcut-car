@@ -33,6 +33,33 @@ import java.util.Set;
  */
 public class CameraAvailabilityWatchTest {
 
+    /**
+     * 通知摘掉时记的都忘掉（项目所有者 2026-11-21：用的时候挂上，不用了摘掉）：再挂上时每一路照「初始状态」从头记，
+     * 不拿没在听之前的旧话当事实，也不为重新发现的「不在」等安静。
+     */
+    @Test
+    public void aDroppedNotificationForgetsWhatItHeard() {
+        CameraAvailabilityWatch.Ledger ledger = new CameraAvailabilityWatch.Ledger();
+        ledger.heard("2", true, true, false, false, 1_000);
+        ledger.replayed(java.util.Collections.singletonMap("2", true), java.util.Arrays.asList("1", "2"), 1_001);
+        org.junit.Assert.assertTrue("回放里没有 1：不在", ledger.word("1").absent);
+        ledger.heard("2", false, false, false, false, 2_000);
+        org.junit.Assert.assertEquals("别人引起的变化", 2_000, ledger.lastOthersChangeAt());
+
+        ledger.reset();
+        org.junit.Assert.assertEquals(0, ledger.lastOthersChangeAt());
+        org.junit.Assert.assertSame(CameraAvailabilityWatch.Word.NONE, ledger.word("2"));
+        org.junit.Assert.assertSame("还没收全过回放：判不出不在", CameraAvailabilityWatch.Word.NONE, ledger.word("1"));
+
+        // 再挂上：回放照初始状态记；回放里没有的那一路第一次记成不在，不算变化
+        org.junit.Assert.assertEquals(CameraAvailabilityWatch.Cause.INITIAL,
+                ledger.heard("2", true, true, false, false, 9_000));
+        ledger.replayed(java.util.Collections.singletonMap("2", true), java.util.Arrays.asList("1", "2"), 9_001);
+        org.junit.Assert.assertEquals(Boolean.TRUE, ledger.word("2").free);
+        org.junit.Assert.assertTrue(ledger.word("1").absent);
+        org.junit.Assert.assertEquals("重新挂上时才发现它不在：不挡安静", 0, ledger.lastOthersChangeAt());
+    }
+
     private static final CameraAvailabilityWatch.Cause INITIAL = CameraAvailabilityWatch.Cause.INITIAL;
     private static final CameraAvailabilityWatch.Cause SAME = CameraAvailabilityWatch.Cause.SAME;
     private static final CameraAvailabilityWatch.Cause OURS = CameraAvailabilityWatch.Cause.OURS;
