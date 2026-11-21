@@ -185,6 +185,16 @@ public class ChannelRulesRecordingTest {
         assertTrue("这一趟要录、哨兵变成开还接得上：留", ChannelRules.foregroundServiceNeeded(false, false, false, true, true, true));
         assertFalse("这一趟要录、接不上了：停，人回来再接", ChannelRules.foregroundServiceNeeded(false, true, false, true, true, false));
         assertFalse("退出了", ChannelRules.foregroundServiceNeeded(true, true, true, true, true, true));
+        assertFalse("开机自启动关着、没立着「这一趟要录」：哨兵开了也没有要接的",
+                ChannelRules.foregroundServiceNeeded(false, false, false, false, true, true));
+    }
+
+    /** 没停车时「哨兵变成开还接不接得上」不管用：照人在车上的规矩。 */
+    @Test
+    public void theSentryFactOnlyMattersWhileParked() {
+        assertTrue(ChannelRules.foregroundServiceNeeded(false, true, false, false, false, true));
+        assertTrue(ChannelRules.foregroundServiceNeeded(false, false, false, true, false, false));
+        assertFalse(ChannelRules.foregroundServiceNeeded(false, false, false, false, false, true));
     }
 
     /** 熄屏中哨兵模式变成开还接得上录像：熄屏持续录制开着、计划里有环视、车机还没睡过。 */

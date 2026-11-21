@@ -122,7 +122,20 @@ public class CameraForegroundService extends Service {
                 keeper.notificationTitle(), keeper.notificationContent());
 
         // 启动前台服务（录制声音开着时试着带上麦克风类型，见 startForegroundWithSound）
-        startForegroundWithSound(notification);
+        if (!startForegroundWithSound(notification)) {
+            // 系统不让进前台（应用在后台时起的，安卓 12）：这一次不算起来。已经在前台的照旧；没进过的停掉自己，
+            // 主界面下一次到前台时相机管家再起（refreshForegroundService）
+            if (!isForegroundReady) {
+                stopSelf();
+            }
+            return START_NOT_STICKY;
+        }
+        if (!keeper.foregroundServiceNeeded()) {
+            // 起的那一下之后已经不该在了（刚好停车了、停录了）：这就停，不留到下一次有人来对
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("前台服务起来时已经不该在了（起的那一下之后停车了、停录了）：停掉");
+            stop(this);
+            return START_NOT_STICKY;
+        }
 
         // 这一次 start 时主界面在前：从此能用相机（只升不降，见 startedWhileVisible）
         if (com.kooo.evcam.camera.StallWatch.isForeground()) {
@@ -155,15 +168,18 @@ public class CameraForegroundService extends Service {
      * 起前台。平时和以前一模一样（照清单里的类型）。「录制声音」（设置 → 录制）开着、又有录音权限时，试着带上麦克风类型 ——
      * 安卓 11 起后台用麦克风要它；带不上（清单里没声明这个类型；容器里 CarPiano 也见过这个报错）就照旧起，记一行：
      * 熄屏、后台时可能录不到声音（诊断报告里看录音那一节有没有连着全是 0）。
+     *
+     * @return 进了前台。系统不让进（安卓 12 起应用在后台时起的前台服务，容器里放不放行没有保证）是 false：兜住不崩 ——
+     *         停车时前台服务停掉以后，人回来那一下它常常是后台起的（项目所有者 2026-11-21）
      */
-    private void startForegroundWithSound(Notification notification) {
+    private boolean startForegroundWithSound(Notification notification) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
                 && com.kooo.evcam.camera.FootageAudio.sourceFor(this, new AppConfig(this)) != null) {
             try {
                 startForeground(NOTIFICATION_ID, notification,
                         ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA | ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE);
                 foregroundTypes = "camera|microphone";
-                return;
+                return true;
             } catch (RuntimeException e) {
                 foregroundTypes = "manifest (microphone refused: " + e.getClass().getSimpleName() + ")";
                 if (!microphoneRefusedNoted) {
@@ -175,7 +191,14 @@ public class CameraForegroundService extends Service {
         } else {
             foregroundTypes = "manifest";
         }
-        startForeground(NOTIFICATION_ID, notification);
+        try {
+            startForeground(NOTIFICATION_ID, notification);
+            return true;
+        } catch (RuntimeException e) {
+            foregroundTypes = "refused (" + e.getClass().getSimpleName() + ")";
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("前台服务进不了前台（" + e + "）：这一次不起，主界面到前台时再起");
+            return false;
+        }
     }
 
     /** 黑匣子心跳间隔：一分钟看一次。 */
@@ -353,12 +376,10 @@ public class CameraForegroundService extends Service {
     /**
      * 停掉前台服务。只由相机管家叫（{@code CameraKeeper}）：停不停它判（{@code CameraKeeper#foregroundServiceNeeded}）。
      *
-     * <p>前台服务的寿命 = 人在车上时「开机自启动」开着、在录、或者等着接回；停车着没在录就停（规格 §3.5，2026-11-21）。
-     * 该在的时候停录：这里只把通知照录像此刻的样子换回「在后台运行」（{@link #showText}，不再 start 一次），不停。等着接回的也一样
-     * （「这一趟要录」立着：存储一类被打断等自动接回、因熄屏停下等亮屏，2026-10-10）—— 接回时相机是从后台开的，
-     * 后台拿着相机安卓要求有前台服务。都不是、或用户退出了，才真的停。
-     * 以前一律 stopService，保活开着时它 onDestroy 里一秒后又把自己拉起来 ——
-     * 每次停录都停一次、起一次，通知闪一下，冷启动的恢复再跑一遍。</p>
+     * <p>前台服务的寿命（规格 §3.5，{@code ChannelRules.foregroundServiceNeeded}）：在录；人在车上时「开机自启动」开着、或者等着接回
+     * （「这一趟要录」立着：接回时相机是从后台开的，后台拿着相机安卓要求有前台服务）；停车着没在录就不留（2026-11-21）。
+     * 该留着的时候停录不经过这里：相机管家只把通知照录像此刻的样子换回「在后台运行」（{@link #showText}，不再 start 一次）——
+     * 以前一律 stopService，每次停录都停一次、起一次，通知闪一下。</p>
      */
     public static void stop(Context context) {
         isForegroundReady = false;

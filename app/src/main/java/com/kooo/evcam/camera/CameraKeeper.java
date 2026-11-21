@@ -564,12 +564,13 @@ public final class CameraKeeper {
     /**
      * 照规矩起、停前台服务（录像开、停那几下）：要的，没起就起、起着就照录像此刻的样子换通知上的字（不为换字再 start 一次）；
      * 不要的，起着就停 —— 先停服务再放相机：调度看到没有前台服务，没人要的相机当场按次序关，不在后台拿着相机保持 30 秒。
+     * 停车着只停不起：这时起的是后台起的，用不了相机；停车着接得上录像的，靠的是一直留着没停过的那一个。
      */
     private void syncForegroundService() {
         if (foregroundServiceNeeded()) {
             if (CameraForegroundService.isRunning()) {
                 CameraForegroundService.showText(context, notificationTitle(), notificationContent());
-            } else {
+            } else if (!com.kooo.evcam.screen.Parked.is()) {
                 CameraForegroundService.start(context);
             }
         } else {
