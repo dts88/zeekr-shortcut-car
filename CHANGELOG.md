@@ -11,6 +11,10 @@ commit message, not here.
 
 Nothing yet.
 
+## [4.13.5-alpha] - 2026-11-21
+
+- After the head unit wakes from sleep, cameras open no earlier than 8 seconds later, up from 6.
+
 ## [4.13.4-alpha] - 2026-11-21
 
 - The camera availability notification is registered only while cameras are in use: dropped once parked with every camera closed, registered again when someone gets back in.
