@@ -87,6 +87,17 @@ public final class ChannelRules {
      */
     public static final long QUIET_MS = CameraTaken.QUIET_MS;
 
+    /**
+     * 车机睡醒以后多久才开、改输出、救（项目所有者 2026-11-21）。车机从睡眠里醒来会把相机重新初始化一遍
+     * （2026-11-19～11-21 的五次：醒来 0.6–0.9 秒后相机从列表里消失，2.2–2.7 秒后回来），那几秒里开相机会撞上。
+     * 以前靠一直挂着的相机服务通知听见它「没了又回来」，再等安静 {@link #QUIET_MS}；通知改成用的时候才挂以后
+     * （CameraAvailabilityWatch），停车着那几声听不到，改看车机醒来本身 —— 系统的深睡计时变多了
+     * （{@code ChannelScheduler.noticeWake}）。数：重新初始化最晚 2.7 秒完，加同样的安静，凑整；从调度发现睡醒的那一轮起算
+     * （比真正醒来晚不到 1 秒）。只管关着的那一路（{@link #quietLeft}）：睡过这一觉还开着的没被动过。
+     * 挂上以后它再动相机，照样听得到、照样等安静。
+     */
+    public static final long WAKE_SETTLE_MS = 6_000L;
+
     /** 被拿着的一路有人要时，多久问一次相机服务它空没空（只问，不开；§二.7）。数在 {@link CameraTaken#ASK_EVERY_MS}。 */
     public static final long ASK_EVERY_MS = CameraTaken.ASK_EVERY_MS;
 
@@ -507,6 +518,8 @@ public final class ChannelRules {
         boolean heardAnything;
         /** 上一次<b>别人引起的</b>变化（CameraAvailabilityWatch.lastOthersChangeAt）；0 = 没有过。 */
         long lastOthersChangeAt;
+        /** 车机上一次睡醒的那一刻（{@code ChannelScheduler.noticeWake}：系统的深睡计时变多了）；0 = 这个进程里没见过。 */
+        long headUnitWokeAt;
         /** 「车机要睡」从什么时候起（熄屏那张表判成现在停）；0 = 没有。亮屏时清。 */
         long sleepSince;
         /** 「退出」从什么时候起；0 = 没有。 */
@@ -638,6 +651,8 @@ public final class ChannelRules {
         JUDGING,
         /** 相机服务 3 秒内报过别人引起的变化。 */
         QUIET,
+        /** 车机刚睡醒，还不到 {@link ChannelRules#WAKE_SETTLE_MS}：等它把相机重新初始化完（项目所有者 2026-11-21）。 */
+        WOKE,
         /** 开之前等这一路的录像输出（最多 2 秒）。 */
         RECORD_OUTPUT,
         /**
@@ -2756,8 +2771,7 @@ public final class ChannelRules {
         if (judgingKey != null) {
             return Decision.waitFor(Why.JUDGING, judgingKey, Math.max(0, judgingLeft));
         }
-        long quietLeft = w.lastOthersChangeAt == 0 ? 0 : QUIET_MS - (now - w.lastOthersChangeAt);
-        boolean quiet = quietLeft <= 0;
+        // 安静不安静一路一路问（quietLeft）：相机服务 3 秒内报过别人引起的变化，谁都要等；车机刚睡醒，只有关着的那一路要等
         boolean usable = usable(w);
 
         // 摘死输出
@@ -2765,8 +2779,9 @@ public final class ChannelRules {
             if (!hasDead(lane) || !reconfigurable(lane) || !shouldOpen(w, lane)) {
                 continue;
             }
-            if (!quiet) {
-                return Decision.waitFor(Why.QUIET, lane.key, quietLeft).about(Move.APPLY);
+            long quietLeft = quietLeft(w, lane);
+            if (quietLeft > 0) {
+                return Decision.waitFor(quietWhy(w, lane), lane.key, quietLeft).about(Move.APPLY);
             }
             return apply(w, lane, Why.DEAD);
         }
@@ -2790,8 +2805,9 @@ public final class ChannelRules {
                 break;
             }
             // 走到这里能用相机：「先不开」的没有（deferredKey 还是 null），也照样标上「看过了」
-            if (!quiet) {
-                return withDeferred(Decision.waitFor(Why.QUIET, lane.key, quietLeft).about(Move.OPEN), deferredKey);
+            long quietLeft = quietLeft(w, lane);
+            if (quietLeft > 0) {
+                return withDeferred(Decision.waitFor(quietWhy(w, lane), lane.key, quietLeft).about(Move.OPEN), deferredKey);
             }
             long recordLeft = recordOutputLeft(w, lane);
             if (recordLeft > 0) {
@@ -2807,8 +2823,9 @@ public final class ChannelRules {
             if (why == null) {
                 continue;
             }
-            if (!quiet) {
-                return withDeferred(Decision.waitFor(Why.QUIET, lane.key, quietLeft).about(Move.APPLY), deferredKey);
+            long quietLeft = quietLeft(w, lane);
+            if (quietLeft > 0) {
+                return withDeferred(Decision.waitFor(quietWhy(w, lane), lane.key, quietLeft).about(Move.APPLY), deferredKey);
             }
             return withDeferred(apply(w, lane, why), deferredKey);
         }
@@ -2830,11 +2847,12 @@ public final class ChannelRules {
                 }
                 continue;
             }
-            if (!quiet) {
+            long quietLeft = quietLeft(w, lane);
+            if (quietLeft > 0) {
                 if (lane.ladder.gaveUp()) {
                     continue;
                 }
-                Decision waiting = Decision.waitFor(Why.QUIET, lane.key, quietLeft).about(Move.RESCUE);
+                Decision waiting = Decision.waitFor(quietWhy(w, lane), lane.key, quietLeft).about(Move.RESCUE);
                 waiting.events.addAll(ladderEvents);
                 return withDeferred(waiting, deferredKey);
             }
@@ -2860,6 +2878,29 @@ public final class ChannelRules {
         Decision idle = Decision.idle();
         idle.events.addAll(ladderEvents);
         return withDeferred(idle, deferredKey);
+    }
+
+    /**
+     * 这一路还要等多久才算安静（开、改输出、救之前；不用等是 0 或负数）。相机服务 {@link #QUIET_MS} 内报过别人引起的变化，
+     * 哪一路都要等；车机刚睡醒（{@link #WAKE_SETTLE_MS}）只管关着的那一路 —— 它醒来重新初始化的是没开着的相机，
+     * 睡过这一觉还开着的没被动过（被动了相机自己会报丢失）。两样都要等的，等晚到点的那一个。
+     */
+    static long quietLeft(World w, Lane lane) {
+        return Math.max(othersLeft(w), wokeLeft(w, lane));
+    }
+
+    /** 等安静的那一行写哪个原因：车机睡醒那一样还要等、而且不比相机服务那一样早到点，写它；不然是相机服务的。 */
+    static Why quietWhy(World w, Lane lane) {
+        long woke = wokeLeft(w, lane);
+        return woke > 0 && woke >= othersLeft(w) ? Why.WOKE : Why.QUIET;
+    }
+
+    private static long othersLeft(World w) {
+        return w.lastOthersChangeAt == 0 ? 0 : QUIET_MS - (w.now - w.lastOthersChangeAt);
+    }
+
+    private static long wokeLeft(World w, Lane lane) {
+        return w.headUnitWokeAt == 0 || lane.device != Device.CLOSED ? 0 : WAKE_SETTLE_MS - (w.now - w.headUnitWokeAt);
     }
 
     /**

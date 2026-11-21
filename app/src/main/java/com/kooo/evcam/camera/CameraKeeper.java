@@ -552,7 +552,8 @@ public final class CameraKeeper {
 
     /**
      * 停车了、停车着车机要睡了（{@code screen.Parked}，主线程；项目所有者 2026-11-21）：前台服务不该留的停掉。这里只停不起 ——
-     * 停车时起的前台服务是后台起的，用不了相机，起了也没用。
+     * 停车时起的前台服务是后台起的，用不了相机，起了也没用。再叫醒调度一次：相机服务的通知不用了就摘
+     * （{@code ChannelScheduler.tendCameraService}：停车着、谁都不要相机、都关完了）。
      */
     public void parkingChanged() {
         if (CameraForegroundService.isRunning() && !foregroundServiceNeeded()) {
@@ -560,6 +561,7 @@ public final class CameraKeeper {
                     + "）" + BlackBox.afterScreenOff());
             CameraForegroundService.stop(context);
         }
+        factsChanged();
     }
 
     /**

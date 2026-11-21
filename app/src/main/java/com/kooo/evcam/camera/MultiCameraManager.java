@@ -494,9 +494,8 @@ public class MultiCameraManager {
         this.context = context;
         // 录像让了之后什么时候再试：相机管家给这一份开一本（3c 第二步 2b）
         retries = CameraKeeper.get(context).recordRetries(this::retryLane);
-        // 相机服务眼里每一路空不空：管线一建就听。以前只有前台服务调它，前台服务没起来时相机服务说的话一句都没收，
-        // 每次丢失都被判成「没说空闲」。注册那一刻的回放在主线程上收全，排在之后 post 的每一轮之前（重复调用无害）
-        CameraAvailabilityWatch.start(context);
+        // 相机服务的通知（每一路空不空）不在这里挂：通道调度每一轮判，用的时候挂上、不用了摘掉（CameraAvailabilityWatch，
+        // 2026-11-21）；新挂上的那一轮不判，回放收全以后的那一轮才判
         // 接上进程里那一个通道调度（唯一动相机的地方）：先装上（ChannelFacts.install：应用一起来就装上了，装过了什么都不做）。没有别的管线接着就当场接上，
         // 旧的那一份还在关（重建）就排着，它关完再换上这一份。录像那一侧：每一路的相机走了、样子变了、带着新会话出了画面，
         // 调度一轮最后告诉录像宿主（它只声明录像输出、照这几声进出）。登记表、相机服务、亮熄屏、车辆信号叫醒调度的监听在进程那一层，挂一次
@@ -2404,7 +2403,9 @@ public class MultiCameraManager {
         } else {
             sb.append("上一次重置以来开过 ").append(h.opens).append(" 台（上次重置：")
                     .append(h.reset == CameraHistory.Reset.BOOT ? "车机开机"
-                            : h.reset == CameraHistory.Reset.TAKEN ? "别的程序拿了它又空出来" : "它在相机服务里没了又回来")
+                            : h.reset == CameraHistory.Reset.TAKEN ? "别的程序拿了它又空出来"
+                            : h.reset == CameraHistory.Reset.WOKE ? "车机睡醒（照它醒来会重新初始化相机算）"
+                            : "它在相机服务里没了又回来")
                     .append(h.resetWall > 0 ? "，" + clock.format(new Date(h.resetWall)) : "").append("）");
         }
         sb.append("；最近开的那一台是").append(h.lastOrdinal > 0 ? "第 " + h.lastOrdinal + " 台" : "还没开过");
@@ -2642,6 +2643,11 @@ public class MultiCameraManager {
         sb.append("别人引起的变化：").append(s.lastOthersChangeAt == 0 ? "没有过"
                 : "上一次 " + timeText(now - s.lastOthersChangeAt) + "前（安静满 " + (ChannelRules.QUIET_MS / 1000)
                 + " 秒才开、改输出、救）").append('\n');
+        sb.append("车机睡醒：").append(s.headUnitWokeAt == 0 ? "这个进程里没见过"
+                : "上一次 " + timeText(now - s.headUnitWokeAt) + "前（醒来满 " + (ChannelRules.WAKE_SETTLE_MS / 1000)
+                + " 秒才开、改输出、救）").append('\n');
+        sb.append("相机服务的通知：").append(CameraAvailabilityWatch.listening() ? "挂着" : "没挂")
+                .append("（用的时候挂上：人在车上，或者停车着还有人要相机、还有相机没关完）").append('\n');
         sb.append("问相机服务：").append(askText(s, now)).append('\n');
         for (ChannelScheduler.LaneView lane : s.lanes) {
             appendLane(sb, lane, now);
@@ -2754,6 +2760,10 @@ public class MultiCameraManager {
                 break;
             case QUIET:
                 text = "通道安静（相机服务 " + (ChannelRules.QUIET_MS / 1000) + " 秒内报过别人引起的变化），再"
+                        + channelSide.pendingText(s.pending, s.key);
+                break;
+            case WOKE:
+                text = "车机睡醒满 " + (ChannelRules.WAKE_SETTLE_MS / 1000) + " 秒（它醒来会重新初始化相机），再"
                         + channelSide.pendingText(s.pending, s.key);
                 break;
             case RECORD_OUTPUT:
@@ -3515,6 +3525,10 @@ public class MultiCameraManager {
                             + (wait.weHoldIt ? "，我们开着它" : "") + "）")
                             + "，安静满 " + (ChannelRules.QUIET_MS / 1000) + " 秒再" + pendingText(wait.pending, wait.key);
                     break;
+                case WOKE:
+                    line = "通道：车机 " + seconds(wait.agoMs) + "前睡醒，等它把相机重新初始化完，醒来满 "
+                            + (ChannelRules.WAKE_SETTLE_MS / 1000) + " 秒再" + pendingText(wait.pending, wait.key);
+                    break;
                 case RECORD_OUTPUT:
                     line = "通道：开 " + roleName(wait.key) + " 之前先等它的录像输出（录制器在建，最多 "
                             + (ChannelRules.RECORD_OUTPUT_WAIT_MS / 1000) + " 秒）";
@@ -3702,6 +3716,8 @@ public class MultiCameraManager {
                     return "车机开机";
                 case TAKEN:
                     return "别的程序拿了它又空出来";
+                case WOKE:
+                    return "车机睡醒（照它醒来会重新初始化相机算）";
                 default:
                     return "它在相机服务里没了又回来";
             }

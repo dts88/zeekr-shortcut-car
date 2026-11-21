@@ -59,6 +59,18 @@ public final class CameraContention {
     }
 
     /**
+     * 相机服务的通知摘掉了（{@link CameraAvailabilityWatch#stop}）：别人拿着哪一路的那张表忘掉。没在听的那一段里它放没放
+     * 我们不知道；留着的话，再挂上时回放里的一句「空闲」会被写成「别的程序拿了 N 毫秒、现在空出来了」，相机的来历也跟着记错。
+     * 我们自己开、开不起来的那几样不动。
+     */
+    static void reset() {
+        OTHERS_TOOK_AT.clear();
+        VANISHED.clear();
+        lastOthersId = "";
+        lastOthersAt = 0;
+    }
+
+    /**
      * 相机服务报：这一路不可用了，不是我们 —— 别的程序拿了它，或者它从相机列表消失了。
      *
      * @param initial  注册回调时报的当前状态：什么时候拿的不知道，前后几秒的嫌疑应用对不上，不查
