@@ -16,6 +16,7 @@ import com.kooo.evcam.AppLog;
 import com.kooo.evcam.UserExit;
 import com.kooo.evcam.blackbox.BlackBox;
 import com.kooo.evcam.button.SmartButtons;
+import com.kooo.evcam.camera.CameraKeeper;
 import com.kooo.evcam.camera.ChannelFacts;
 import com.kooo.evcam.camera.ChannelRules;
 import com.kooo.evcam.overlay.OverlayCoordinator;
@@ -40,11 +41,12 @@ import com.kooo.evcam.telemetry.Telemetry;
  * <ol>
  *   <li>悬浮窗：悬浮按钮、超级镜子、盲区画面的服务停掉，窗口移走（{@link OverlayCoordinator#stopForParking}）；</li>
  *   <li>蓝牙：灵动贴的扫描和连接（{@code SmartButtons.park}）；</li>
- *   <li>车辆信号：对账只读判人回没回来、相机管家熄屏时看的那几项，浮点传感器、定位、后视镜上的灯停掉（{@code Telemetry.setParked}）。</li>
+ *   <li>车辆信号：对账只读判人回没回来、相机管家熄屏时看的那几项，浮点传感器、定位、后视镜上的灯停掉（{@code Telemetry.setParked}）；</li>
+ *   <li>前台服务：没在录就停掉（{@code CameraKeeper.parkingChanged}，项目所有者 2026-11-21）—— 应用停车时车机随时可以收走。
+ *       「熄屏持续录制」开着、「这一趟要录」立着的，留到车机睡过（{@link #headUnitSlept}）：这之前哨兵模式变成开还接得上录像。</li>
  * </ol>
  *
- * <p>「熄屏持续录制」在录时（哨兵模式开着）一样放这几样：录像要的是相机、编码、录音、存储和前台服务，都不在这里。
- * 一步出错不挡后面的。</p>
+ * <p>「熄屏持续录制」在录时（哨兵模式开着）前三样一样放：录像要的是相机、编码、录音、存储和前台服务。一步出错不挡后面的。</p>
  *
  * <h3>人回来</h3>
  *
@@ -67,6 +69,8 @@ public final class Parked {
     private static volatile long parkedAtMs;
     /** 停车时停掉的、黑着时没起的悬浮窗：人回来照设置起。 */
     private static volatile boolean overlaysOwed;
+    /** 这一段熄屏里车机睡过（安卓熄过屏）；亮屏清掉。前台服务留不留看它（{@link #headUnitSlept}）。 */
+    private static volatile boolean slept;
 
     private Parked() {
     }
@@ -90,6 +94,7 @@ public final class Parked {
             return;
         }
         parked = true;
+        slept = ScreenState.androidOff();
         step("telemetry", () -> Telemetry.get().setParked(true));
         BlackBox.noteImportant("进程起来时没有人在车上的证据：从停车起，相机以外的也不拿（悬浮窗、蓝牙；车辆信号只读判人回来的那几项）");
     }
@@ -103,6 +108,14 @@ public final class Parked {
     public static long forMs() {
         long at = parkedAtMs;
         return parked && at > 0 ? SystemClock.elapsedRealtime() - at : -1;
+    }
+
+    /**
+     * 这一段熄屏里车机睡过（安卓熄过屏）。相机管家问（{@code ChannelRules.sentryCanStartWhileParked}）：睡过以后前台服务不再为
+     * 「熄屏中哨兵模式变成开就接着录」留着 —— 车自己醒来时不为它拿着。
+     */
+    public static boolean headUnitSlept() {
+        return slept;
     }
 
     /** 悬浮窗欠着：人回来要照设置起（诊断报告、恢复看）。 */
@@ -176,7 +189,20 @@ public final class Parked {
             return;
         }
         if (after.dark()) {
+            if (after.androidOff && !slept) {
+                slept = true;
+                if (parked) {
+                    // 停车着车机要睡了：前台服务不再留
+                    step("foreground service", Parked::tellKeeper);
+                }
+            }
             check();
+        }
+    }
+
+    private static void tellKeeper() {
+        if (app != null) {
+            CameraKeeper.get(app).parkingChanged();
         }
     }
 
@@ -199,7 +225,7 @@ public final class Parked {
         parked = true;
         parkedAtMs = SystemClock.elapsedRealtime();
         BlackBox.noteImportant("停车：人不在车上" + (ScreenState.androidOff() ? "、车机要睡" : "")
-                + "，相机以外的也放开（悬浮窗 → 蓝牙 → 车辆信号只读判人回来的那几项）" + BlackBox.afterScreenOff());
+                + "，相机以外的也放开（悬浮窗 → 蓝牙 → 车辆信号只读判人回来的那几项 → 前台服务）" + BlackBox.afterScreenOff());
         step("overlays", () -> {
             if (OverlayCoordinator.stopForParking(app)) {
                 overlaysOwed = true;
@@ -212,6 +238,7 @@ public final class Parked {
             }
         });
         step("telemetry", () -> Telemetry.get().setParked(true));
+        step("foreground service", Parked::tellKeeper);
     }
 
     /**
@@ -220,6 +247,7 @@ public final class Parked {
      */
     static void leave() {
         MAIN.removeCallbacks(CHECK);
+        slept = false;
         if (!parked) {
             return;
         }
