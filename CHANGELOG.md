@@ -11,6 +11,10 @@ commit message, not here.
 
 Nothing yet.
 
+## [4.13.2-alpha] - 2026-11-21
+
+- Developer options → Permissions: Ignore battery optimisation is greyed out; the app no longer asks for it.
+
 ## [4.13.1-alpha] - 2026-11-21
 
 - Getting back in with a recording, Super mirror or Blind spot view on: the main screen now shows normally with a notice and a 3-second countdown instead of appearing for about a second. Tap the screen to keep it in front; untouched, it returns to the background.
