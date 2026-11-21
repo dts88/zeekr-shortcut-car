@@ -2647,6 +2647,8 @@ public class MultiCameraManager {
                 : "上一次 " + timeText(now - s.headUnitWokeAt) + "前（醒来满 " + (ChannelRules.WAKE_SETTLE_MS / 1000)
                 + " 秒才开、改输出、救）").append('\n');
         sb.append("相机服务的通知：").append(CameraAvailabilityWatch.listening() ? "挂着" : "没挂")
+                .append(s.listenedSince == 0 ? "" : "，" + timeText(now - s.listenedSince) + "前挂上（挂上以后听满 "
+                        + (ChannelRules.QUIET_MS / 1000) + " 秒才开、改输出、救）")
                 .append("（用的时候挂上：人在车上，或者停车着还有人要相机、还有相机没关完）").append('\n');
         sb.append("问相机服务：").append(askText(s, now)).append('\n');
         for (ChannelScheduler.LaneView lane : s.lanes) {
@@ -2764,6 +2766,10 @@ public class MultiCameraManager {
                 break;
             case WOKE:
                 text = "车机睡醒满 " + (ChannelRules.WAKE_SETTLE_MS / 1000) + " 秒（它醒来会重新初始化相机），再"
+                        + channelSide.pendingText(s.pending, s.key);
+                break;
+            case UNHEARD:
+                text = "相机服务的通知挂上满 " + (ChannelRules.QUIET_MS / 1000) + " 秒（挂上之前别人动没动过相机听不到），再"
                         + channelSide.pendingText(s.pending, s.key);
                 break;
             case RECORD_OUTPUT:
@@ -3528,6 +3534,10 @@ public class MultiCameraManager {
                 case WOKE:
                     line = "通道：车机 " + seconds(wait.agoMs) + "前睡醒，等它把相机重新初始化完，醒来满 "
                             + (ChannelRules.WAKE_SETTLE_MS / 1000) + " 秒再" + pendingText(wait.pending, wait.key);
+                    break;
+                case UNHEARD:
+                    line = "通道：相机服务的通知 " + seconds(wait.agoMs) + "前才挂上，之前别人动没动过相机听不到，听满 "
+                            + (ChannelRules.QUIET_MS / 1000) + " 秒再" + pendingText(wait.pending, wait.key);
                     break;
                 case RECORD_OUTPUT:
                     line = "通道：开 " + roleName(wait.key) + " 之前先等它的录像输出（录制器在建，最多 "
