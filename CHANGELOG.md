@@ -11,6 +11,11 @@ commit message, not here.
 
 Nothing yet.
 
+## [4.13.3-alpha] - 2026-11-21
+
+- About 40 seconds after everyone has left, the app's own screens (main screen, playback, diagnostics) are closed, not just moved to the back. A main screen that was in front is opened again when someone gets back in.
+- No messages are shown after the screen has gone dark.
+
 ## [4.13.2-alpha] - 2026-11-21
 
 - Developer options → Permissions: Ignore battery optimisation is greyed out; the app no longer asks for it.
