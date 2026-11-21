@@ -11,6 +11,11 @@ commit message, not here.
 
 Nothing yet.
 
+## [4.13.4-alpha] - 2026-11-21
+
+- The camera availability notification is registered only while cameras are in use: dropped once parked with every camera closed, registered again when someone gets back in.
+- After the head unit wakes from sleep, cameras open no earlier than 6 seconds later.
+
 ## [4.13.3-alpha] - 2026-11-21
 
 - About 40 seconds after everyone has left, the app's own screens (main screen, playback, diagnostics) are closed, not just moved to the back. A main screen that was in front is opened again when someone gets back in.
