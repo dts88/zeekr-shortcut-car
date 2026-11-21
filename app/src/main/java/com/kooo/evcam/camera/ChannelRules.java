@@ -88,15 +88,25 @@ public final class ChannelRules {
     public static final long QUIET_MS = CameraTaken.QUIET_MS;
 
     /**
-     * 车机睡醒以后多久才开、改输出、救（项目所有者 2026-11-21）。车机从睡眠里醒来会把相机重新初始化一遍
-     * （2026-11-19～11-21 的五次：醒来 0.6–0.9 秒后相机从列表里消失，2.2–2.7 秒后回来），那几秒里开相机会撞上。
-     * 以前靠一直挂着的相机服务通知听见它「没了又回来」，再等安静 {@link #QUIET_MS}；通知改成用的时候才挂以后
-     * （CameraAvailabilityWatch），停车着那几声听不到，改看车机醒来本身 —— 系统的深睡计时变多了
-     * （{@code ChannelScheduler.noticeWake}）。数：重新初始化最晚 2.7 秒完，加同样的安静，凑整；从调度发现睡醒的那一轮起算
-     * （比真正醒来晚不到 1 秒）。只管关着的那一路（{@link #quietLeft}）：睡过这一觉还开着的没被动过。
-     * 挂上以后它再动相机，照样听得到、照样等安静。
+     * 车机睡醒以后，留给它重新初始化相机的时间。车机从睡眠里醒来会把相机重新初始化一遍，那几秒里开相机会撞上。
+     * 上传过的诊断里 2026-09-26～11-21 的 82 次睡醒：醒来 0.5–1.2 秒后相机被拿走，2.3–3.3 秒后回来，最长 3.38 秒；
+     * 每次睡醒都有，没睡醒的时候没有过。留得比量到的最长的多一截。
      */
-    public static final long WAKE_SETTLE_MS = 6_000L;
+    public static final long WAKE_REINIT_MS = 5_000L;
+
+    /**
+     * 车机睡醒以后多久才开、改输出、救（项目所有者 2026-11-21）：{@link #WAKE_REINIT_MS} 加同样的安静 {@link #QUIET_MS}。
+     * 以前靠一直挂着的相机服务通知听见它「没了又回来」，再等安静；通知改成用的时候才挂以后
+     * （CameraAvailabilityWatch），停车着那几声听不到，改看车机醒来本身 —— 系统的深睡计时变多了
+     * （{@code ChannelScheduler.noticeWake}），从调度发现睡醒的那一轮起算（比真正醒来晚 0–2 秒）。
+     *
+     * <p>可以晚，不能早（项目所有者 2026-11-21：可能系统还没把相机初始化完；不着急，最迟主驾坐下以后才开也可以）：
+     * 听着的时候最晚是醒来后 6.4 秒开（3.38 秒回来 + 安静），现在最早是醒来后 8 秒，哪一次都不比那时候早。
+     * 同一批记录里主驾最快在醒来后 7.5 秒坐下（中位 14 秒），最快 14.5 秒挂出 P 挡。</p>
+     *
+     * <p>只管关着的那一路（{@link #quietLeft}）：睡过这一觉还开着的没被动过。挂上以后它再动相机，照样听得到、照样等安静。</p>
+     */
+    public static final long WAKE_SETTLE_MS = WAKE_REINIT_MS + QUIET_MS;
 
     /** 被拿着的一路有人要时，多久问一次相机服务它空没空（只问，不开；§二.7）。数在 {@link CameraTaken#ASK_EVERY_MS}。 */
     public static final long ASK_EVERY_MS = CameraTaken.ASK_EVERY_MS;
