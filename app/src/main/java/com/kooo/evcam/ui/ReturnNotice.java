@@ -124,11 +124,16 @@ public final class ReturnNotice {
      * 触摸事件先经过这里（主界面的 dispatchTouchEvent）。在数的时候按下的那一下算「留下」，从按下到抬起整个吞掉，不往下传：
      * 提示请人点屏幕，点在画面上不该顺手放大那一格，点在录制键上不该顺手停录。
      *
+     * <p>「走了」以后主界面还被人碰到（请它退回后台而它没退成、还在前面）：这一趟到此为止，这一下照常往下传。</p>
+     *
      * @return 这一下吞掉了
      */
     public boolean takes(MotionEvent event) {
         int action = event.getActionMasked();
         if (action == MotionEvent.ACTION_DOWN) {
+            if (state == State.LEFT) {
+                state = State.OFF;
+            }
             swallowing = stay("touch");
             return swallowing;
         }
@@ -140,9 +145,10 @@ public final class ReturnNotice {
     }
 
     /**
-     * 主界面暂停了。还在数的：界面在重建（日夜切换、换语言、照存下的配置重摆）就只停表，新界面照剩下的秒数接着数
-     * （{@link #secondsLeft}）；别的都是界面被盖住或离开了 —— 这一次算数完，退回后台，不然盖住它的界面一走主界面露出来、
-     * 留在前面。安卓送来新意图时先暂停再恢复，那不算离开：等这一轮生命周期走完再看（{@link #resumed}）。
+     * 主界面暂停了，或者停下了（没到过前台就被盖住的没有暂停那一下，主界面在 onStop 里也叫）。还在数的：界面在重建
+     * （日夜切换、换语言、照存下的配置重摆）就只停表，新界面照剩下的秒数接着数（{@link #secondsLeft}）；别的都是界面被盖住或
+     * 离开了 —— 这一次算数完，退回后台，不然盖住它的界面一走主界面露出来、留在前面。安卓送来新意图时先暂停再恢复，
+     * 那不算离开：等这一轮生命周期走完再看（{@link #resumed}）。
      */
     public void paused(boolean rebuilding) {
         if (state != State.COUNTING) {

@@ -141,6 +141,37 @@ public class ReturnNoticeTest {
         assertEquals("表停了，不再叫第二次", 1, leaves);
     }
 
+    /** 主界面起来了却没到过前台就被盖住（窗口没就绪过，表没走过）：停下那一下也算数完，退回后台。 */
+    @Test
+    public void stoppedBeforeEverBeingInFrontCountsAsTimeUp() {
+        notice.show(stage, ReturnNotice.SECONDS);
+
+        notice.paused(false);
+        assertNull(banner());
+        Shots.settle();
+        assertEquals(1, leaves);
+        notice.paused(false);
+        Shots.settle();
+        assertEquals("暂停、停下各叫一次也只退一次", 1, leaves);
+        assertTrue(notice.visiting());
+    }
+
+    /** 请它退回后台而它还在前面、又被人碰到：这一趟到此为止，这一下照常往下传。 */
+    @Test
+    public void aTouchAfterLeavingEndsTheVisit() {
+        notice.show(stage, ReturnNotice.SECONDS);
+        notice.start();
+        pass(3);
+        assertEquals(1, leaves);
+        assertTrue(notice.visiting());
+
+        assertFalse("不吞", notice.takes(touch(MotionEvent.ACTION_DOWN)));
+        assertFalse(notice.takes(touch(MotionEvent.ACTION_UP)));
+        assertFalse(notice.visiting());
+        pass(10);
+        assertEquals(1, leaves);
+    }
+
     /** 安卓给在前的界面送新意图时先暂停、再恢复：那不是离开，不退。 */
     @Test
     public void aPauseFollowedByResumeAtOnceIsNotLeaving() {

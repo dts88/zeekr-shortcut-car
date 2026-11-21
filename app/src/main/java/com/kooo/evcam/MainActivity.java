@@ -2699,6 +2699,9 @@ public class MainActivity extends AppCompatActivity implements com.kooo.evcam.se
     @Override
     protected void onStop() {
         super.onStop();
+        // 回到前台的提示放出来了、主界面却没到过前台就被盖住（没有暂停那一下）：和数的时候被盖住一样，算数完（ui-spec §十九）。
+        // 暂停过的这里不再做什么
+        returnNotice.paused(isChangingConfigurations());
         com.kooo.evcam.storage.StorageState.removeListener(storageListener);
         // 界面是怎么离开的：关掉？只是切走？还是在重建？三种后果完全不同
         com.kooo.evcam.blackbox.BlackBox.note("主界面 onStop finishing=" + isFinishing()
