@@ -323,7 +323,7 @@
     <string name="set_floating_appearance_value">%1$d dp · %2$d%%</string>
     <string name="dlg_floating_reset_title">إعادة ضبط الزر العائم؟</string>
     <string name="set_auto_start_title">التشغيل التلقائي</string>
-    <string name="set_auto_start_summary">يُبقي التطبيق يعمل في الخلفية، ويعيد تشغيله تلقائيًا ويستعيد الميزات التي كانت قيد التشغيل بعد إعادة تشغيل نظام المعلومات والترفيه أو إغلاق النظام له. عند الإيقاف، لا يعاد تشغيله تلقائيًا.</string>
+    <string name="set_auto_start_summary">يعيد تشغيل التطبيق تلقائيًا بعد إعادة تشغيل نظام المعلومات والترفيه أو إغلاق النظام له، ويستعيد الميزات التي كانت قيد التشغيل عند ركوب السيارة. عند الإيقاف، لا يعاد تشغيله تلقائيًا.</string>
     <string name="set_auto_record_title">التسجيل عند فتح التطبيق</string>
     <string name="set_auto_record_summary">يبدأ التسجيل عند فتح التطبيق، ويستأنف التسجيل الذي توقف بسبب انطفاء الشاشة عند إضاءتها؛ ولا يعيد بدء التسجيل بعد إيقافه يدويًا</string>
     <string name="set_screen_off_keep_title">متابعة التسجيل عند انطفاء الشاشة</string>

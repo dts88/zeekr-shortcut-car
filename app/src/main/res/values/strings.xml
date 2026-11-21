@@ -338,7 +338,7 @@
     <string name="set_floating_appearance_value">%1$d dp · %2$d%%</string>
     <string name="dlg_floating_reset_title">重置悬浮按钮？</string>
     <string name="set_auto_start_title">开机自启动</string>
-    <string name="set_auto_start_summary">保持应用在后台运行。车机重启或应用被系统关闭后自动重新启动，并恢复已开启的功能。关闭后不再自动启动。</string>
+    <string name="set_auto_start_summary">车机重启或应用被系统关闭后自动重新启动，上车时恢复已开启的功能。关闭后不再自动启动。</string>
     <string name="set_auto_record_title">启动自动录制</string>
     <string name="set_auto_record_summary">应用启动时自动开始录制，因熄屏停止的录制在亮屏后自动恢复；手动停止后不再自动开始</string>
     <!-- 熄屏录制 2026-11-02 停用，开发者选项里那一行拿掉了；要恢复时放回下面几条 -->
