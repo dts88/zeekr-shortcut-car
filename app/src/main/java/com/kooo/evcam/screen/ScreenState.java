@@ -821,6 +821,27 @@ public final class ScreenState {
     }
 
     /**
+     * 我们的界面收到的触摸（各界面的 {@code dispatchTouchEvent} 叫）：按下的那一下算人碰了应用。
+     *
+     * <p>不用 {@code Activity.onUserInteraction}：界面要离开前台时安卓也叫它（在 {@code onUserLeaveHint} 之前）——
+     * 别的界面盖上来就算，车机自己弹出来的界面盖住我们时不是人碰的（2026-11-21）。</p>
+     *
+     * @param how 哪一种（ASCII，进黑匣子）
+     */
+    public static void touched(android.view.MotionEvent event, String how) {
+        if (event != null && event.getActionMasked() == android.view.MotionEvent.ACTION_DOWN) {
+            userActed(how);
+        }
+    }
+
+    /** 我们的界面收到的按键（各界面的 {@code dispatchKeyEvent} 叫）：按下算人碰了应用。 */
+    public static void keyed(android.view.KeyEvent event, String how) {
+        if (event != null && event.getAction() == android.view.KeyEvent.ACTION_DOWN) {
+            userActed(how);
+        }
+    }
+
+    /**
      * 人碰了应用（项目所有者 2026-11-21：车辆接口坏了读不到点火时，人自己点开应用算人在）：我们的界面上的触摸和按键、
      * 人自己从桌面点开主界面、按了悬浮按钮或灵动贴。哪个线程都能调。黑着时照它再判一次：车通电了就亮；车辆读不到也亮；
      * 车没通电还是黑（项目所有者 2026-10-27：人在车里、车没通电时点亮屏幕照黑着算）。界面自己到了前台不算
