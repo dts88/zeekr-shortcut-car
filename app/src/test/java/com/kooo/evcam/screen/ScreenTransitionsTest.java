@@ -47,6 +47,8 @@ public class ScreenTransitionsTest {
         final PersonEvidence evidence = new PersonEvidence();
         /** 上一批读数里有车门开着（熄屏那一下照它记；车辆接口没连着是 false）。 */
         boolean doorOpen;
+        /** 驾驶座此刻有人（照车辆读数：接口没连着时不算）。 */
+        boolean seat;
 
         Run(boolean androidOff) {
             s = ScreenTransitions.initial(androidOff);
@@ -80,6 +82,12 @@ public class ScreenTransitionsTest {
             return doors(false, now).judge(CONNECTED, null, null, now);
         }
 
+        /** 驾驶座从这一下起有人 / 没人。 */
+        Run seated(boolean taken) {
+            seat = taken;
+            return this;
+        }
+
         /** 车辆接口连着的一批读数里车门开没开着。 */
         Run doors(boolean open, long now) {
             doorOpen = open;
@@ -104,12 +112,12 @@ public class ScreenTransitionsTest {
         /** 安卓亮了，醒来那一遍读到这两项（读不到、没读回来都是 null），车门关着。 */
         Run androidOn(Boolean event, Integer ignition, long now) {
             return to(ScreenTransitions.verdict(ScreenTransitions.androidOn(s), CONNECTED, event, ignition,
-                    evidence.door(now), evidence.touch(now), evidence.touchAtMs(), now));
+                    evidence.door(now), evidence.touch(now), seat, evidence.touchAtMs(), now));
         }
 
         Run androidOnNoInterface(long now) {
             return to(ScreenTransitions.verdict(ScreenTransitions.androidOn(s), Telemetry.CarLink.UNAVAILABLE, null, null,
-                    false, false, 0, now));
+                    false, false, false, 0, now));
         }
 
         private Run judge(Telemetry.CarLink link, Boolean event, Integer ignition, long now) {
@@ -117,7 +125,7 @@ public class ScreenTransitionsTest {
                 doorOpen = false;
             }
             return to(ScreenTransitions.verdict(s, link, event, ignition, evidence.door(now), evidence.touch(now),
-                    evidence.touchAtMs(), now));
+                    seat, evidence.touchAtMs(), now));
         }
 
         private Run to(ScreenTransitions.State next) {
@@ -234,6 +242,38 @@ public class ScreenTransitionsTest {
         assertEquals(Arrays.asList(LIT), on.edges);
         on.car(false, null, 101_000);
         assertEquals("亮了以后不来回", Arrays.asList(LIT), on.edges);
+    }
+
+    /**
+     * 驾驶座有人也是证据（项目所有者 2026-11-21）：行驶中进程重启，第一份读数里车通电、驾驶座有人就亮；
+     * 人坐在车里没下车（熄屏时就坐着），车通电就亮，不用开车门、不用碰应用。
+     */
+    @Test
+    public void someoneInTheDriversSeatIsEvidence() {
+        Run restart = new Run(false).seated(true);
+        assertTrue("进程起来从黑起", restart.s.dark());
+        restart.car(false, Signal.IGNITION_DRIVING, 1_100);
+        assertEquals("行驶中进程重启：不用碰应用", Arrays.asList(LIT), restart.edges);
+
+        Run resting = Run.lit().seated(true).car(true, ACC, 1_000);
+        assertEquals("人坐着、车下电：照熄屏算", Arrays.asList(DARK), resting.edges);
+        resting.car(true, ACC, 600_000);
+        assertTrue("坐着、车没通电：还是黑", resting.s.dark());
+        resting.car(true, ON, 900_000);
+        assertEquals("车通电了：亮，不用开车门", Arrays.asList(DARK, LIT), resting.edges);
+    }
+
+    /** 驾驶座没人、车自己通电：还是黑。车辆接口没连着时座椅读不到，不算证据（那时只认碰过应用）。 */
+    @Test
+    public void anEmptySeatOrAnUnreadableOneIsNotEvidence() {
+        Run empty = Run.lit().car(true, ACC, 1_000);
+        empty.edges.clear();
+        empty.seated(false).car(false, ON, 500_000);
+        assertTrue(empty.s.dark());
+
+        Run down = new Run(false).seated(true).linkDown(1_000);
+        assertTrue("接口没连着：座椅读不到", down.s.dark());
+        assertTrue(down.edges.isEmpty());
     }
 
     /** 夜里车机自己醒：安卓亮了，没有人的证据 —— 车机醒着、屏幕黑着；两分钟后安卓又熄屏 = 车机又要睡。 */
