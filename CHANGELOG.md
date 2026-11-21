@@ -11,6 +11,10 @@ commit message, not here.
 
 Nothing yet.
 
+## [4.13.6-alpha] - 2026-11-21
+
+- Cameras open only after the camera availability notification has been listened to for 3 seconds: getting back in, or opening the app after it was closed, the picture and the recording come about 3 seconds later.
+
 ## [4.13.5-alpha] - 2026-11-21
 
 - After the head unit wakes from sleep, cameras open no earlier than 8 seconds later, up from 6.
