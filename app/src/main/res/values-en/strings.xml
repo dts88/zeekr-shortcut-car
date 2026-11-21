@@ -317,7 +317,7 @@
     <string name="set_floating_appearance_value">%1$d dp · %2$d%%</string>
     <string name="dlg_floating_reset_title">Reset floating button?</string>
     <string name="set_auto_start_title">Start on boot</string>
-    <string name="set_auto_start_summary">Keeps the app running in the background. After the head unit restarts or the system closes the app, restarts it and restores the features that were on. When off, it isn\'t restarted.</string>
+    <string name="set_auto_start_summary">After the head unit restarts or the system closes the app, restarts it; the features that were on come back when you get in. When off, it isn\'t restarted.</string>
     <string name="set_auto_record_title">Record on launch</string>
     <string name="set_auto_record_summary">Starts recording when the app opens and resumes a recording stopped by screen-off when the screen turns on; never restarts one you stopped</string>
     <!-- Screen-off recording was switched off on 2026-11-02 and removed from the developer options; restore these with it -->

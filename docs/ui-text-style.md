@@ -697,6 +697,12 @@
   msg_screenshot_no_drive「截图失败：未检测到 U 盘」/ No screenshot: no USB drive found /
   Tiada tangkapan skrin: tiada pemacu USB ditemui（照 msg_photo_no_drive 的写法）。截不到用已有的
   msg_car_action_unavailable「无法执行「截屏」」；通知标题就是动作名。
+- 2026-11-21 批准（「开机自启动」的说明：保活只剩周期任务、停车时前台服务也停了，不再是「保持应用在后台运行」；项目所有者：「同意你的调整和说明」）：
+  set_auto_start_summary「车机重启或应用被系统关闭后自动重新启动，上车时恢复已开启的功能。关闭后不再自动启动。」/
+  After the head unit restarts or the system closes the app, restarts it; the features that were on come back when you get in.
+  When off, it isn't restarted. /
+  Selepas unit kepala dimulakan semula atau sistem menutup apl, memulakannya semula; ciri yang dihidupkan dipulihkan apabila anda
+  masuk ke dalam kenderaan. Jika dimatikan, apl tidak dimulakan semula.（阿拉伯文照改，同别的阿拉伯文一样等审校。）
 - vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
 - 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
 

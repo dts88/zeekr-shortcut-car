@@ -317,7 +317,7 @@
     <string name="set_floating_appearance_value">%1$d dp · %2$d%%</string>
     <string name="dlg_floating_reset_title">Set semula butang terapung?</string>
     <string name="set_auto_start_title">Mula semasa but</string>
-    <string name="set_auto_start_summary">Memastikan apl terus berjalan di latar belakang. Selepas unit kepala dimulakan semula atau sistem menutup apl, memulakannya semula dan memulihkan ciri yang dihidupkan. Jika dimatikan, apl tidak dimulakan semula.</string>
+    <string name="set_auto_start_summary">Selepas unit kepala dimulakan semula atau sistem menutup apl, memulakannya semula; ciri yang dihidupkan dipulihkan apabila anda masuk ke dalam kenderaan. Jika dimatikan, apl tidak dimulakan semula.</string>
     <string name="set_auto_record_title">Rakam semasa dibuka</string>
     <string name="set_auto_record_summary">Mula merakam apabila apl dibuka, dan menyambung rakaman yang berhenti kerana skrin padam apabila skrin hidup semula; rakaman yang anda hentikan tidak dimulakan semula</string>
     <!-- Screen-off recording was switched off on 2026-11-02 and removed from the developer options; restore these with it -->
