@@ -139,10 +139,12 @@ public final class ScreenState {
         /** 最近一次读到车门开着、人碰应用是多久以前（毫秒）；没有是 -1。熄屏那一下清掉。 */
         public final long doorAgoMs;
         public final long touchAgoMs;
+        /** 此刻读数里驾驶座有没有人（TRUE 有）；读不到是 null。 */
+        public final Boolean seat;
 
         Now(boolean dark, Source source, long darkForMs, boolean androidOff, long androidOffForMs, Boolean vehicle,
             Boolean screenPowerEvent, Integer ignition, Telemetry.CarLink carLink, boolean interactive, boolean known,
-            boolean wakePending, boolean litNeedsEvidence, long doorAgoMs, long touchAgoMs) {
+            boolean wakePending, boolean litNeedsEvidence, long doorAgoMs, long touchAgoMs, Boolean seat) {
             this.dark = dark;
             this.source = source;
             this.darkForMs = darkForMs;
@@ -158,6 +160,7 @@ public final class ScreenState {
             this.litNeedsEvidence = litNeedsEvidence;
             this.doorAgoMs = doorAgoMs;
             this.touchAgoMs = touchAgoMs;
+            this.seat = seat;
         }
     }
 
@@ -344,7 +347,8 @@ public final class ScreenState {
                 f.state.androidOff, dark && f.androidOffAtMs > 0 ? now - f.androidOffAtMs : -1, f.state.vehicle,
                 r.bool(Signal.SCREEN_POWER_EVENT), r.code(Signal.IGNITION), telemetry.carLink(),
                 DisplayWatch.interactiveNow(), s == Settle.NONE, s == Settle.WAKE,
-                ScreenTransitions.litNeedsEvidence(f.state), EVIDENCE.doorAgoMs(now), EVIDENCE.touchAgoMs(now));
+                ScreenTransitions.litNeedsEvidence(f.state), EVIDENCE.doorAgoMs(now), EVIDENCE.touchAgoMs(now),
+                r.bool(Signal.SEAT_DRIVER));
     }
 
     /**
@@ -413,7 +417,7 @@ public final class ScreenState {
         }
         ScreenTransitions.State before = facts.state;
         ScreenTransitions.State next = ScreenTransitions.verdict(before, link, event, ignition,
-                EVIDENCE.door(now), EVIDENCE.touch(now), EVIDENCE.touchAtMs(), now);
+                EVIDENCE.door(now), EVIDENCE.touch(now), connected && seatTaken(readings), EVIDENCE.touchAtMs(), now);
         // 进程起来后的第一份、安卓刚亮时等着连上的那一份：读到了屏幕或点火，或者车辆接口有了结果（连上了要等那一遍读数发布出来：
         // 连上的通知比读数早 40 ms）
         boolean linkSettled = ScreenTransitions.linkSettled(link,
@@ -557,7 +561,7 @@ public final class ScreenState {
         // 等满了没读回来的那一遍不拿来判（记着的可能是睡之前的）：照读不到算，只认刚碰过应用
         ScreenTransitions.State next = ScreenTransitions.verdict(ScreenTransitions.androidOn(facts.state), telemetry.carLink(),
                 capped ? null : event, capped ? null : ignition, EVIDENCE.door(now), EVIDENCE.touch(now),
-                EVIDENCE.touchAtMs(), now);
+                connected && !capped && seatTaken(r), EVIDENCE.touchAtMs(), now);
         move(next, event, ignition);
         scheduleLostCheck(next, now);
         drainWhenKnown();
@@ -746,9 +750,11 @@ public final class ScreenState {
         long darkMs = before.darkAtMs > 0 ? now - before.darkAtMs : -1;
         boolean door = EVIDENCE.door(now);
         boolean touch = EVIDENCE.touch(now);
+        Telemetry telemetry = Telemetry.get();
+        boolean seat = telemetry.carLinkConnected() && seatTaken(telemetry.readings());
         // 总原则（规格 §0）：停车熄屏是特殊情况；人回来了，特殊情况就结束了，回到用户设定的状态
         BlackBox.noteImportant("亮屏（" + (after.state.vehicle == null ? "这台车机没有车辆接口，只看安卓：安卓亮着"
-                : (door ? "拉开过车门" : "") + (door && touch ? "、" : "") + (touch ? "碰过应用 " + touchHow : "")
+                : (door ? "拉开过车门 " : "") + (touch ? "碰过应用 " + touchHow + " " : "") + (seat ? "驾驶座有人" : "")
                 + "；车辆信号：screen_power_event"
                 + VehicleScreen.change(VehicleScreen.eventText(before.event), VehicleScreen.eventText(after.event))
                 + "、点火" + VehicleScreen.change(VehicleScreen.ignitionText(before.ignition),
@@ -788,10 +794,15 @@ public final class ScreenState {
         poweredAloneNoted = alone;
         if (alone) {
             BlackBox.noteImportant("车通电了（点火=" + VehicleScreen.ignitionText(ignition)
-                    + "），没有人拉开车门、碰应用的证据：照熄屏算，不恢复");
+                    + "），没有人的证据（没拉开过车门、没碰过应用、驾驶座没人）：照熄屏算，不恢复");
         } else if (s.dark()) {
             BlackBox.noteImportant("车通电、没有人的证据的那一段完了，还是熄屏（点火=" + VehicleScreen.ignitionText(ignition) + "）");
         }
+    }
+
+    /** 驾驶座此刻有人（主驾座椅读到有人；读不到不算）。 */
+    private static boolean seatTaken(Readings r) {
+        return Boolean.TRUE.equals(r.bool(Signal.SEAT_DRIVER));
     }
 
     /** 四扇侧门有一扇读到开着（前备箱、后备箱不算：人不从那里上车）。 */

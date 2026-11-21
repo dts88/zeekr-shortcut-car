@@ -1026,6 +1026,7 @@ public final class DiagnosticsCollector {
                     .append('\n');
             sb.append("  有人的证据: 车门").append(n.doorAgoMs < 0 ? "没读到开过" : " " + duration(n.doorAgoMs) + "前开着")
                     .append("，碰应用").append(n.touchAgoMs < 0 ? "没有" : " " + duration(n.touchAgoMs) + "前")
+                    .append("，驾驶座").append(n.seat == null ? "读不到" : n.seat ? "有人" : "没人")
                     .append(n.litNeedsEvidence ? "（黑着：车通电了、又有其中一样才亮；车辆读不到只认碰过应用）" : "")
                     .append('\n');
             sb.append("  车辆接口: ").append(linkText(n.carLink)).append('\n');
@@ -1043,7 +1044,7 @@ public final class DiagnosticsCollector {
                     .append(com.kooo.evcam.screen.Parked.overlaysOwed() ? "；悬浮窗欠着，人回来照设置起" : "")
                     .append('\n');
             sb.append("说明: 熄屏 = 人不在车上。亮着时：安卓熄屏，或者车辆说黑（screen_power_event=1 且点火 ACC 或更低；")
-                    .append("只读得到一项看那一项），才熄屏。黑着时：车通电了、而且刚拉开过车门或刚碰过应用，才亮屏；")
+                    .append("只读得到一项看那一项），才熄屏。黑着时：车通电了，而且刚拉开过车门、刚碰过应用或者驾驶座有人，才亮屏；")
                     .append("车辆读不到只认碰过应用。时刻是墙上时钟，多久前含深睡").append('\n');
         } catch (RuntimeException e) {
             sb.append("!! 读取失败: ").append(e).append('\n');
