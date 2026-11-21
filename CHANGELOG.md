@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [4.13.1-alpha] - 2026-11-21
+
+- Getting back in with a recording, Super mirror or Blind spot view on: the main screen now shows normally with a notice and a 3-second countdown instead of appearing for about a second. Tap the screen to keep it in front; untouched, it returns to the background.
+- Only a touch or a key press on the app's screens counts as someone touching the app, not another screen opening over it.
+- Start on boot: the description no longer says it keeps the app running in the background.
+
 ## [4.13.0-alpha] - 2026-11-21
 
 - Someone counts as being in the car only with the car powered and a side door just opened, the driver's seat occupied, or the app just touched. The head unit waking by itself restores nothing.
