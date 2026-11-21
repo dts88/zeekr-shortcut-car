@@ -703,6 +703,14 @@
   When off, it isn't restarted. /
   Selepas unit kepala dimulakan semula atau sistem menutup apl, memulakannya semula; ciri yang dihidupkan dipulihkan apabila anda
   masuk ke dalam kenderaan. Jika dimatikan, apl tidak dimulakan semula.（阿拉伯文照改，同别的阿拉伯文一样等审校。）
+- 2026-11-21（回到前台的提示，ui-spec §十九。项目所有者给的草稿是「App已被从后台拉起，开始正常运行，如果没有操作将会在3秒钟
+  （倒计时）后退回后台」，要求润色得简练专业；润色后的句子连同三种摆法画给项目所有者看，选了画着这两句的「画面顶部横幅」；
+  一并给的短句「应用运行正常，3 秒后返回后台」没有选）：
+  return_notice_text「应用已回到前台并正常运行，%d 秒后自动返回后台」/
+  The app is back in the foreground and running normally. It returns to the background in %d seconds. /
+  Apl kembali ke latar depan dan berjalan seperti biasa. Apl akan kembali ke latar belakang dalam %d saat.
+  return_notice_stay「点击屏幕可留在此页」/ Tap the screen to stay / Ketik skrin untuk kekal di sini
+  （阿拉伯文照写，同别的阿拉伯文一样等审校。数字每秒减一，英文、阿拉伯文照复数写。）
 - vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
 - 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
 
@@ -771,6 +779,7 @@
 | 开机 / 启动 | 开机 = 车机开机（开机自启动）；启动 = 应用启动（启动自动录制） | boot（Start on boot）；launch / open（Record on launch） | but（Mula semasa but）；buka（Rakam semasa dibuka） | بدء التشغيل = تشغيل نظام المعلومات والترفيه (التشغيل التلقائي)؛ فتح التطبيق (التسجيل عند فتح التطبيق) | — |
 | 需重启生效 | 重启应用后生效（放在句末） | Takes effect after restarting the app | Berkuat kuasa selepas apl dimulakan semula | يسري بعد إعادة تشغيل التطبيق (في آخر الجملة) | — |
 | 确认按钮 | 知道了 | Got it | Faham | حسنًا | 不用「我知道了」 |
+| 前台 / 后台 | 前台、后台；人按的：隐藏到后台；应用自己退的：已转入后台（熄屏 15 秒）、自动返回后台（回到前台的提示：它从后台来）；在后台运行 | foreground / background；Hide to background；Moved to the background、returns to the background；Running in the background | latar depan / latar belakang；Sembunyi ke latar belakang；Dialihkan ke latar belakang、kembali ke latar belakang；Berjalan di latar belakang | المقدمة / الخلفية؛ النقل إلى الخلفية؛ انتقل التطبيق إلى الخلفية، سيعود إلى الخلفية؛ يعمل في الخلفية | 2026-11-21 加；不用「拉起」「退回」「切到后台」 |
 | 画面调节 | 画面调节；画面调节窗口 | Image adjustment | Pelarasan imej | ضبط الصورة؛ نافذة ضبط الصورة | 不用「亮度 / 降噪调节」 |
 | 设置分区与页面 | 4.0 起：录制、存储、超级镜子、盲区画面、按键、通用、更新与关于、开发者选项；页：详细参数、车辆信号、关于与致谢、初始设置（4.0 以前的「悬浮键与灵动贴」「界面」「系统」「检查更新」不再是页名） | Recording、Storage、Super mirror、Blind spot view、Buttons、General、Updates & about、Developer options（草稿） | Rakaman、Storan、Cermin super、Paparan titik buta、Butang、Umum、Kemas kini & perihal、Pilihan pembangun（草稿） | التسجيل، التخزين، المرآة الفائقة، رؤية النقطة العمياء، الأزرار، عام، التحديثات وحول التطبيق، خيارات المطوّرين؛ الصفحات: الإعدادات التفصيلية، إشارات السيارة، حول التطبيق وشكر وتقدير، الإعداد الأولي | 英文、马来文 4.0 全部做完后统一整理 |
 | 灵动贴 | 灵动贴（只有页名里和「悬浮键」连着写，别处的悬浮按钮照旧） | smart button | butang pintar | الزر الذكي (ج. الأزرار الذكية) | — |

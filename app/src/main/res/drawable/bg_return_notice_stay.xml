@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 回到前台的提示行尾那一枚「点击屏幕可留在此页」的底：黑底上垫一层淡白，两头是圆的（docs/ui-spec.md §十九） -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#33FFFFFF" />
+    <corners android:radius="20dp" />
+</shape>

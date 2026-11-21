@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  回到前台的提示（docs/ui-spec.md §十九）：压在画面顶边的一条横幅，一句说明带倒数，行尾一枚小块写怎么留下。
+
+  高是 ① 标题区那一档：正好把菜单键、画面角标整个盖住，不露半截。压在画面上，所以底和字不跟日夜变
+  （和 ⑤ 状态条压在画面上时同一个道理）。主界面不镜像，这一条是文字，里面跟着语言的方向。
+  由 ui/ReturnNotice 放进画面区（摆着设置页时放进那一页的容器）；方向照界面的语言定，也在它那里
+  （布局里写 layoutDirection="locale" 看的是进程的默认语言，不是这个界面的）。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/return_notice"
+    android:layout_width="match_parent"
+    android:layout_height="@dimen/return_notice_height"
+    android:layout_gravity="top"
+    android:background="@drawable/bg_return_notice"
+    android:elevation="8dp"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:outlineProvider="none"
+    android:paddingStart="20dp"
+    android:paddingEnd="14dp">
+
+    <ImageView
+        android:layout_width="28dp"
+        android:layout_height="28dp"
+        android:importantForAccessibility="no"
+        android:src="@drawable/ic_info"
+        android:tint="@color/status_overlay_text" />
+
+    <!-- 说明：最多两行（英文、马来文、阿拉伯文一行写不下）；数字等宽，倒数时字不左右跳 -->
+    <TextView
+        android:id="@+id/return_notice_text"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:layout_weight="1"
+        android:ellipsize="end"
+        android:fontFeatureSettings="tnum"
+        android:maxLines="2"
+        android:textAlignment="viewStart"
+        android:textAppearance="@style/TextAppearance.Cam.Caption"
+        android:textColor="@color/status_overlay_text" />
+
+    <TextView
+        android:id="@+id/return_notice_stay"
+        android:layout_width="wrap_content"
+        android:layout_height="40dp"
+        android:layout_marginStart="16dp"
+        android:background="@drawable/bg_return_notice_stay"
+        android:gravity="center"
+        android:maxLines="1"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:text="@string/return_notice_stay"
+        android:textAppearance="@style/TextAppearance.Cam.Caption"
+        android:textColor="@color/status_overlay_text" />
+</LinearLayout>

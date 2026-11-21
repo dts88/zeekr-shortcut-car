@@ -31,7 +31,8 @@ import com.kooo.evcam.overlay.OverlayCoordinator;
  * <p>只有「开机自启动」开着才做（规格 §2.5：它管的是 App 不在时要不要带回来）；
  * 用户退出了不做（§2.5）。主界面还在的时候，它自己会回到设定状态（§0），这里只管它不在的情况。
  * 录像要不要开（接着录「这一趟要录」、这一趟还没看过的启动自动录制）只告诉相机管家，它判（{@link CameraKeeper#appRestored}）；
- * 现在用不了相机（前台服务是后台起的）时，它开录那一下先静默把主界面拉起来，闪一下就退后台（{@link #bringUpMainForRecording}，1.6）。</p>
+ * 现在用不了相机（前台服务是后台起的）时，它开录那一下先把主界面带到前面，带着提示显示 3 秒、没人碰就退回后台
+ * （{@link #bringUpMainForRecording}，1.6；2026-11-21 以前是闪一下就退）。</p>
  *
  * <p>屏幕黑着（熄屏 = 人不在车上，{@code ScreenState}）时什么都不做（项目所有者 2026-11-21：车自己醒来、进程被拉起来，
  * 人不在就不取车机的资源）；人回来了的那一下（亮屏）再照设置恢复。
@@ -43,6 +44,11 @@ public final class Recovery {
     private static final String TAG = "Recovery";
     /** 拉主界面时带上：它不是人点开的，这一趟的录像选择不清（规格 §2.5）。 */
     public static final String EXTRA_SILENT = "from_service_restart";
+    /**
+     * 拉主界面时带上：它是应用为了用相机带到前面的，照常显示、带一条提示倒数 3 秒，没人碰就退回后台
+     * （ui-spec §十九「回到前台的提示」）。
+     */
+    public static final String EXTRA_RETURNS = "returns_to_background";
 
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
     private static String lastSummary = "";
@@ -94,7 +100,7 @@ public final class Recovery {
                 intent.putExtra("restored_by_app", true);
             }
             context.startActivity(intent);
-            // 主界面这就起来了：这一阵不再为接录像另外静默拉一次（那样它起来闪一下又退回后台）
+            // 主界面这就起来了：这一阵不再为接录像另外带一次（那样它倒数 3 秒又退回后台）
             broughtUpAtMs = SystemClock.elapsedRealtime();
             BlackBox.noteImportant("亮屏：把因熄屏退下去的主界面接回前台（" + (alive ? "界面还在" : "重新起一个") + "）");
         } catch (Exception e) {
@@ -116,7 +122,8 @@ public final class Recovery {
      * 刷新了前台服务（从此能用相机）、登记了预览，调度开的时候带着预览和录像输出。不拉的话录像输出声明了、
      * 相机却开不起来，没人打开主界面就永远开不起来。
      *
-     * <p>静默：带着不是人点开的记号（这一趟的录像选择不清，规格 §2.5），起来闪一下就退后台（§2.5）。用户退出了不拉；
+     * <p>带着不是人点开的记号（这一趟的录像选择不清，规格 §2.5）；起来照常显示，带一条提示倒数 3 秒，没人碰就退回后台
+     * （§2.5，ui-spec §十九；项目所有者 2026-11-21：原来闪一下就退，用户以为应用出错了）。用户退出了不拉；
      * 5 秒内拉过（亮屏那一下接回界面、接回录像各来一次）不再拉。只由相机管家调，屏幕亮着时（开录那一下 —— 人按的、悬浮按钮、
      * 灵动贴、启动自动录制、亮屏接回、存储一类的自动接回都经那里 —— 和亮屏那一下）。屏幕黑着时它不调（项目所有者 2026-10-13：
      * 熄屏不拉主界面，没有例外）。</p>
@@ -135,10 +142,10 @@ public final class Recovery {
         try {
             if (new AppConfig(context).didUiLeaveForScreenOff()) {
                 // 熄屏那一刻主界面就在前（因熄屏退下去的记号还在）：照亮屏接回界面那样接回来、留在前面 ——
-                // 静默拉的话它起来闪一下又退回后台，人上车看到的是车机桌面
+                // 照下面那样带的话它倒数 3 秒又退回后台，人上车看到的是车机桌面
                 bringBackUiAfterScreenOn(context);
             } else {
-                launchMainSilently(context);
+                launchMainBriefly(context);
             }
         } catch (RuntimeException e) {
             AppLog.w(TAG, "bringUpMainForRecording failed: " + e);
@@ -148,13 +155,16 @@ public final class Recovery {
                 + "先拉起主界面，等它起来再开相机");
     }
 
-    /** 静默拉起主界面：不是人点开的（这一趟的录像选择不清），起来闪一下就退后台。还活着就挪到前面。 */
-    private static void launchMainSilently(Context context) {
+    /**
+     * 把主界面带到前面一会儿：不是人点开的（这一趟的录像选择不清），照常显示，带着提示倒数 3 秒，没人碰就退回后台
+     * （{@link #EXTRA_RETURNS}）。还活着就挪到前面。
+     */
+    private static void launchMainBriefly(Context context) {
         boolean alive = MainActivity.getInstance() != null;
         Intent main = new Intent(context, MainActivity.class);
         main.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_ANIMATION
                 | (alive ? Intent.FLAG_ACTIVITY_SINGLE_TOP : 0));
-        main.putExtra("auto_start_from_boot", true);
+        main.putExtra(EXTRA_RETURNS, true);
         main.putExtra(EXTRA_SILENT, true);
         context.startActivity(main);
     }

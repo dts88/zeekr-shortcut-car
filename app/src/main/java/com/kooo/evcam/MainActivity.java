@@ -59,6 +59,21 @@ public class MainActivity extends AppCompatActivity implements com.kooo.evcam.se
     }
 
     /**
+     * 回到前台的提示在数的时候（ui-spec §十九），按下的那一下触摸只算「留下」，整个吞掉、不往下传。
+     * 吞掉的没经过 super，人碰了界面照样记（{@link #onUserInteraction}）。
+     */
+    @Override
+    public boolean dispatchTouchEvent(android.view.MotionEvent event) {
+        if (returnNotice != null && returnNotice.takes(event)) {
+            if (event.getActionMasked() == android.view.MotionEvent.ACTION_DOWN) {
+                onUserInteraction();
+            }
+            return true;
+        }
+        return super.dispatchTouchEvent(event);
+    }
+
+    /**
      * 回放界面的抽屉里点了主界面上才办得了的一项（主界面、设置、退出应用；值是菜单项的 id）：
      * 回到这里由它去办（{@link NavDrawer#attachToPlayback}）。
      */
@@ -169,7 +184,13 @@ public class MainActivity extends AppCompatActivity implements com.kooo.evcam.se
     // 录制异常提示防抖
     private long lastRecordingErrorToastTime = 0;  // 上次显示录制异常提示的时间
     private static final long RECORDING_ERROR_TOAST_INTERVAL = 20000;  // 最小显示间隔（20秒）
-    private boolean shouldMoveToBackgroundOnReady = false;  // 开机自启动后，窗口准备好时移到后台
+    /**
+     * 回到前台的提示（ui-spec §十九）：主界面是应用自己带到前面的（要用相机），照常显示、说明一句、倒数 3 秒，
+     * 没人碰就退回后台。onCreate 建，onDestroy 收。
+     */
+    private com.kooo.evcam.ui.ReturnNotice returnNotice;
+    /** 界面重建时把还剩几秒带给新界面（{@link #onSaveInstanceState}）。 */
+    private static final String STATE_RETURN_NOTICE = "return_notice_seconds";
 
     // 熄屏：屏幕状态只有 ScreenState 一份（熄屏广播 + 黑着时每 2 秒问系统一次代替亮屏广播）。
     // 唤醒锁、录像照熄屏那张表停不停 / 亮屏接回、「车机要睡」、亮屏把退下去的界面接回来，
@@ -204,9 +225,10 @@ public class MainActivity extends AppCompatActivity implements com.kooo.evcam.se
             new com.kooo.evcam.screen.ScreenState.Listener() {
                 @Override
                 public void onScreenOff() {
-                    if (!isInBackground || pausedByScreenOff) {
+                    if ((!isInBackground || pausedByScreenOff) && !(returnNotice != null && returnNotice.visiting())) {
                         // 主界面在前（或者正是熄屏把它暂停的）：是我们自己因为熄屏退下去的，亮屏时 Recovery 据此把界面接回来。
-                        // 在后台时熄屏不记（人自己切走的，亮屏不抢到最前面）
+                        // 在后台时熄屏不记（人自己切走的，亮屏不抢到最前面）。应用自己把它带到前面、还在倒数或数完退回去的
+                        // 那一趟也不记（ui-spec §十九）：那不是人把它留在前面的，记了下次亮屏它被接回来留在前面
                         appConfig.setUiLeftForScreenOff(true);
                     }
                     AppLog.d(TAG, "检测到息屏，15 秒后退后台（录像中、在等开录、熄屏录制生效则留在前台）");
@@ -353,15 +375,15 @@ public class MainActivity extends AppCompatActivity implements com.kooo.evcam.se
         storageCleanupManager = new StorageCleanupManager(this);
         storageCleanupManager.start();
 
-        // 检查是否是开机自启动
-        boolean autoStartFromBoot = getIntent().getBooleanExtra("auto_start_from_boot", false);
-        if (autoStartFromBoot) {
-            // 清除标志，避免后续重复检测
-            getIntent().removeExtra("auto_start_from_boot");
-
-            // 静默拉起来的主界面闪一下就退后台（规格 §2.5）：录像不靠主界面显示，退到后台照常录
-            AppLog.d(TAG, "开机自启动模式：等待窗口准备好后移到后台");
-            shouldMoveToBackgroundOnReady = true;
+        // 应用自己把主界面带到前面的（Recovery：要用相机而那时用不了，规格 §2.5）：照常显示，带一条提示倒数 3 秒，
+        // 没人碰就退回后台（ui-spec §十九）；录像不靠主界面显示，退到后台照常录。只认新来的意图：系统照存下的状态重建时
+        // （savedState 非空）意图还是当初那一个，那时不是应用带到前面的。界面重建前还在数的，接着数剩下的
+        returnNotice = new com.kooo.evcam.ui.ReturnNotice(this::leaveAfterReturnNotice);
+        boolean brought = takeReturnsExtra(getIntent()) && savedInstanceState == null;
+        int owed = brought ? com.kooo.evcam.ui.ReturnNotice.SECONDS
+                : savedInstanceState != null ? savedInstanceState.getInt(STATE_RETURN_NOTICE, 0) : 0;
+        if (owed > 0) {
+            showReturnNotice(owed);
         }
 
         // 按设置把该开的悬浮窗恢复出来（画面悬浮窗 / 超级镜子 /
@@ -384,27 +406,64 @@ public class MainActivity extends AppCompatActivity implements com.kooo.evcam.se
         AppLog.d(TAG, "onNewIntent called");
         navigateIfAsked(intent);
 
-        // 还活着的主界面被静默拉到前面（Recovery：要接录像、而那时用不了相机）：接上之后照样退回后台（规格 §2.5）
-        if (intent.getBooleanExtra("auto_start_from_boot", false)) {
-            intent.removeExtra("auto_start_from_boot");
-            shouldMoveToBackgroundOnReady = true;
+        // 还活着的主界面被应用自己带到前面（Recovery：要用相机、而那时用不了）：带着提示倒数，没人碰就退回后台
+        // （规格 §2.5，ui-spec §十九）。别的意图是人要它到前面的（点通知、悬浮按钮和灵动贴的动作、从回放的抽屉回来）
+        // 或者亮屏接回来留在前面的：在数的话不退了
+        if (takeReturnsExtra(intent)) {
+            showReturnNotice(com.kooo.evcam.ui.ReturnNotice.SECONDS);
+        } else {
+            returnNotice.stay("opened");
+        }
+    }
+
+    /** 这个意图是应用自己把主界面带到前面的那一种（{@code Recovery.EXTRA_RETURNS}）；是的话摘掉记号，只认一次。 */
+    private static boolean takeReturnsExtra(Intent intent) {
+        if (intent == null || !intent.getBooleanExtra(com.kooo.evcam.recovery.Recovery.EXTRA_RETURNS, false)) {
+            return false;
+        }
+        intent.removeExtra(com.kooo.evcam.recovery.Recovery.EXTRA_RETURNS);
+        return true;
+    }
+
+    /**
+     * 放出回到前台的提示（ui-spec §十九）：摆着录制界面时压在画面区的顶边，摆着设置这类页面时盖在那一页的顶边。
+     * 窗口已经就绪的当场开始数，否则等就绪（{@link #onWindowFocusChanged}）。
+     */
+    private void showReturnNotice(int seconds) {
+        View stage = recordingLayout.getVisibility() == View.VISIBLE
+                ? findViewById(R.id.preview_stage) : fragmentContainer;
+        if (!(stage instanceof android.view.ViewGroup)) {
+            return;
+        }
+        returnNotice.show((android.view.ViewGroup) stage, seconds);
+        if (hasWindowFocus()) {
+            returnNotice.start();
+        }
+    }
+
+    /** 回到前台的提示数完了（或者还在数时界面被盖住、离开了）：退回后台，和「隐藏到后台」同一个动作。 */
+    private boolean leaveAfterReturnNotice() {
+        if (isFinishing() || isDestroyed()) {
+            return false;
+        }
+        return moveTaskToBack(true);
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        // 回到前台的提示这时还在数，只可能是界面在重建（别的暂停都已经让它收了）：把剩下的秒数带给新界面
+        if (returnNotice != null && returnNotice.secondsLeft() > 0) {
+            outState.putInt(STATE_RETURN_NOTICE, returnNotice.secondsLeft());
         }
     }
 
     @Override
     public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
-        
-        // 如果是开机自启动模式，窗口准备好后自动移到后台
-        if (hasFocus && shouldMoveToBackgroundOnReady) {
-            AppLog.d(TAG, "开机自启动：窗口已就绪，移到后台（无感启动）");
-            shouldMoveToBackgroundOnReady = false;  // 清除标志，避免重复执行
-            
-            // 延迟移到后台，确保初始化完成
-            new android.os.Handler().postDelayed(() -> {
-                moveTaskToBack(true);  // 将应用移到后台
-                AppLog.d(TAG, "应用已移到后台，开机自启动完成");
-            }, 500);  // 延迟 500ms
+        // 窗口就绪：回到前台的提示从这一下开始数（ui-spec §十九）。没有提示、已经在数的不动
+        if (hasFocus && returnNotice != null) {
+            returnNotice.start();
         }
     }
     
@@ -2586,6 +2645,8 @@ public class MainActivity extends AppCompatActivity implements com.kooo.evcam.se
     protected void onPause() {
         super.onPause();
         isInBackground = true;
+        // 回到前台的提示还在数：界面在重建就只停表、新界面接着数；别的都算这一次数完，退回后台（ui-spec §十九）
+        returnNotice.paused(isChangingConfigurations());
         // 熄屏带来的暂停：那一刻系统已经不交互了（人切走、重建、关掉时还交互着）。熄屏广播后到时据此照样记「因熄屏退下去」
         android.os.PowerManager power = (android.os.PowerManager) getSystemService(Context.POWER_SERVICE);
         pausedByScreenOff = !isFinishing() && !isChangingConfigurations() && power != null && !power.isInteractive();
@@ -2638,6 +2699,9 @@ public class MainActivity extends AppCompatActivity implements com.kooo.evcam.se
     @Override
     protected void onStop() {
         super.onStop();
+        // 回到前台的提示放出来了、主界面却没到过前台就被盖住（没有暂停那一下）：和数的时候被盖住一样，算数完（ui-spec §十九）。
+        // 暂停过的这里不再做什么
+        returnNotice.paused(isChangingConfigurations());
         com.kooo.evcam.storage.StorageState.removeListener(storageListener);
         // 界面是怎么离开的：关掉？只是切走？还是在重建？三种后果完全不同
         com.kooo.evcam.blackbox.BlackBox.note("主界面 onStop finishing=" + isFinishing()
@@ -2660,6 +2724,7 @@ public class MainActivity extends AppCompatActivity implements com.kooo.evcam.se
         boolean wasInBackground = isInBackground;
         isInBackground = false;
         pausedByScreenOff = false;
+        returnNotice.resumed();
         keeper.mainScreenForeground(true);
         reportMainScreenInFront();
         previewStall.start();
@@ -2708,6 +2773,9 @@ public class MainActivity extends AppCompatActivity implements com.kooo.evcam.se
         AppLog.i(TAG, "onDestroy " + instanceTag() + " finishing=" + isFinishing()
                 + " changingConfigurations=" + isChangingConfigurations());
         previewStall.detachAll();
+        if (returnNotice != null) {
+            returnNotice.drop();
+        }
 
         // 相机管线属于应用，不属于主界面（大纲 §2 阶段 6，channel-logic §五）：主界面销毁不放它，相机关不关交给通道调度 ——
         // 主界面只是登记表里的一个需要方。预览画布在画布销毁那一下交给管线（CanvasSlot.keep；onSurfaceTextureDestroyed 在
