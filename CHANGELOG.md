@@ -11,6 +11,16 @@ commit message, not here.
 
 Nothing yet.
 
+## [4.13.0-alpha] - 2026-11-21
+
+- Someone counts as being in the car only with the car powered and a side door just opened, the driver's seat occupied, or the app just touched. The head unit waking by itself restores nothing.
+- About 40 seconds after everyone has left: the floating button, Super mirror and Blind spot view close, the smart buttons and X knobs stop listening, most car signals are no longer read, and the background service stops unless a recording continues. All of it returns when someone gets back in.
+- Getting back in with a recording, Super mirror or Blind spot view on: the main screen shows for about a second so the cameras can be used.
+- Start on boot: only the periodic task brings the app back, within about 15 minutes or when the head unit wakes. After an update or after exiting the app, open it once.
+- After two crashes in a row the app waits to be opened.
+- Developer options → Permissions: the Accessibility service row is removed.
+- Places & automation: groundwork only, no settings yet; built on Calvin Bui's restore-at-start work.
+
 ## [4.12.1-alpha] - 2026-11-19
 
 - Temperature up / down, and the X knob's temperature and air direction: the climate is switched on first only when the car reports it off.
