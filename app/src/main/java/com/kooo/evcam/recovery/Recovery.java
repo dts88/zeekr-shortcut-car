@@ -144,8 +144,8 @@ public final class Recovery {
             AppLog.w(TAG, "bringUpMainForRecording failed: " + e);
             return;
         }
-        BlackBox.noteImportant("要录像（" + where + "）：现在用不了相机（主界面不在前、前台服务是后台起的），"
-                + "先拉起主界面，录像等它起来再开相机");
+        BlackBox.noteImportant("要用相机（" + where + "）：现在用不了（主界面不在前、前台服务是后台起的），"
+                + "先拉起主界面，等它起来再开相机");
     }
 
     /** 静默拉起主界面：不是人点开的（这一趟的录像选择不清），起来闪一下就退后台。还活着就挪到前面。 */

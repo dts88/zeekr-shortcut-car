@@ -274,12 +274,25 @@ public final class CameraKeeper {
         }
     }
 
-    /** 亮屏了（ScreenState 在主线程调）：「这一趟要录」立着就接着录；黑着时开起来、用不了相机一直等待摄像头的，照开录时那条规矩拉主界面。 */
+    /**
+     * 亮屏了（ScreenState 在主线程调）：「这一趟要录」立着就接着录；黑着时开起来、用不了相机一直等待摄像头的，照开录时那条规矩拉主界面。
+     * 设置里开着超级镜子、盲区画面的也一样（{@link #overlaysWantCameras}）：停车时前台服务停掉了，回来时是后台起的，
+     * 主界面在前一次它才用得了相机（项目所有者 2026-11-21：停掉，接受上车时主界面闪一下）。
+     */
     public void screenOn() {
         reconsider(false, "screen-on");
-        if (isRecording()) {
+        if (isRecording() || overlaysWantCameras()) {
             bringUpMainIfCamerasUnusable(Why.SCREEN_ON);
         }
+    }
+
+    /**
+     * 设置里开着要相机的悬浮窗（超级镜子、盲区画面），而且前台服务该在（没有前台服务时它们本来就只在主界面在前时有画面，
+     * 拉一下也没用）。
+     */
+    private boolean overlaysWantCameras() {
+        return (appConfig.isRearViewEnabled() || appConfig.isSideViewEnabled())
+                && com.kooo.evcam.overlay.OverlayCoordinator.canShowOverlay(context) && foregroundServiceNeeded();
     }
 
     /** 应用被开机自启动带回来了（Recovery：进程起来、例行、车机醒了、亮屏、更新后；开机自启动开着才来）：照「这一趟」看要不要开。 */
@@ -525,12 +538,27 @@ public final class CameraKeeper {
     // ================================================================= 前台服务（3b）
 
     /**
-     * 前台服务该不该开着 —— 只在这里判（规格 §3.5）：没退出，而且开机自启动开着、在录、或者「这一趟要录」（被打断等接回、因熄屏停下
-     * 等亮屏接：接回时相机是从后台开的，后台拿着相机安卓要求有前台服务）。
+     * 前台服务该不该开着 —— 只在这里判（规格 §3.5，{@link ChannelRules#foregroundServiceNeeded}）：没退出，而且在录；
+     * 或者人在车上时开机自启动开着、「这一趟要录」立着；停车着只为「熄屏中哨兵模式变成开就接着录」留着。
      */
     public boolean foregroundServiceNeeded() {
+        boolean parked = com.kooo.evcam.screen.Parked.is();
+        boolean sentryCanStart = parked && ChannelRules.sentryCanStartWhileParked(appConfig.isScreenOffKeepRecording(),
+                surroundPlanned(), com.kooo.evcam.screen.Parked.headUnitSlept());
         return ChannelRules.foregroundServiceNeeded(UserExit.isExited(context), appConfig.isAutoStartOnBoot(),
-                isRecording(), trip.wanted());
+                isRecording(), trip.wanted(), parked, sentryCanStart);
+    }
+
+    /**
+     * 停车了、停车着车机要睡了（{@code screen.Parked}，主线程；项目所有者 2026-11-21）：前台服务不该留的停掉。这里只停不起 ——
+     * 停车时起的前台服务是后台起的，用不了相机，起了也没用。
+     */
+    public void parkingChanged() {
+        if (CameraForegroundService.isRunning() && !foregroundServiceNeeded()) {
+            BlackBox.noteImportant("停车：前台服务停掉（没在录" + (com.kooo.evcam.screen.Parked.headUnitSlept() ? "、车机要睡" : "")
+                    + "）" + BlackBox.afterScreenOff());
+            CameraForegroundService.stop(context);
+        }
     }
 
     /**
@@ -1293,7 +1321,8 @@ public final class CameraKeeper {
     }
 
     /**
-     * 在录、屏幕亮着、现在用不了相机（主界面不在前、前台服务是后台起的 —— 安卓 12 起后台才起的前台服务用不了相机）：先把主界面拉起来，
+     * 要相机（在录；亮屏那一下还有设置里开着的超级镜子、盲区画面）、屏幕亮着、现在用不了相机（主界面不在前、前台服务是后台起的 ——
+     * 安卓 12 起后台才起的前台服务用不了相机）：先把主界面拉起来，
      * 不然录像输出声明了、相机却开不起来，一直「等待摄像头」。开录那一下、亮屏那一下判。屏幕黑着一律不拉（项目所有者 2026-10-13）。
      */
     private void bringUpMainIfCamerasUnusable(Why why) {

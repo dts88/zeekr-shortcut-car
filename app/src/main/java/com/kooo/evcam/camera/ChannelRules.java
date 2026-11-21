@@ -1470,17 +1470,43 @@ public final class ChannelRules {
     }
 
     /**
-     * 前台服务该不该开着（规格 §3.5，3b 起只有相机管家照它起停）：没退出，而且开机自启动开着、在录、或者「这一趟要录」
-     * （被打断等接回、因熄屏停下等亮屏接 —— 接回时相机是从后台开的，后台拿着相机安卓要求有前台服务）。
+     * 前台服务该不该开着（规格 §3.5，3b 起只有相机管家照它起停）。没退出，而且：
      *
-     * @param exited       用户退出了
+     * <ul>
+     *   <li>在录：要（后台拿着相机安卓要求有前台服务）；</li>
+     *   <li>停车着（人不在车上，{@code screen.Parked}；项目所有者 2026-11-21「停掉」）：不要 —— 应用停车时车机随时可以收走。
+     *       只有一种留着：「这一趟要录」立着、熄屏中哨兵模式变成开还能把录像接上（{@link #sentryCanStartWhileParked}）——
+     *       那一下相机是从后台开的，停掉再起的前台服务用不了相机；</li>
+     *   <li>人在车上：开机自启动开着，或者「这一趟要录」立着（被打断等接回：接回时相机是从后台开的）。</li>
+     * </ul>
+     *
+     * @param exited          用户退出了
      * @param autoStartOnBoot 「开机自启动」开着
-     * @param recording    在录（开录中、在录）
-     * @param wanted       「这一趟要录」立着
+     * @param recording       在录（开录中、在录）
+     * @param wanted          「这一趟要录」立着
+     * @param parked          停车着
+     * @param sentryCanStart  停车着，熄屏中哨兵模式变成开还能把录像接上
      */
     public static boolean foregroundServiceNeeded(boolean exited, boolean autoStartOnBoot, boolean recording,
-                                                  boolean wanted) {
-        return !exited && (autoStartOnBoot || recording || wanted);
+                                                  boolean wanted, boolean parked, boolean sentryCanStart) {
+        if (exited) {
+            return false;
+        }
+        if (recording) {
+            return true;
+        }
+        if (parked) {
+            return wanted && sentryCanStart;
+        }
+        return autoStartOnBoot || wanted;
+    }
+
+    /**
+     * 停车着，熄屏中哨兵模式变成开还能不能把录像接上（{@link #startsInDark} 最后那一条）：熄屏持续录制开着、计划里有环视，
+     * 而且车机还没睡过 —— 车机睡过以后前台服务停掉了（车自己醒来不为它留着），之后才开的哨兵要到人回来才接着录。
+     */
+    public static boolean sentryCanStartWhileParked(boolean keepWhenDark, boolean surroundPlanned, boolean headUnitSlept) {
+        return keepWhenDark && surroundPlanned && !headUnitSlept;
     }
 
     // ================================================================= 熄屏时的录像（相机管家，项目所有者 2026-11-02）
