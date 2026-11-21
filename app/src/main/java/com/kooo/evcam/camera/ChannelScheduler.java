@@ -1674,6 +1674,8 @@ public final class ChannelScheduler {
         final long lastOthersChangeAt;
         /** 车机上一次睡醒的那一刻（调度的钟）；0 = 这个进程里没见过。 */
         final long headUnitWokeAt;
+        /** 相机服务的通知这一次挂上的那一刻（调度的钟）；0 = 没挂着，或者不是调度挂的。 */
+        final long listenedSince;
         /** 手上那一步；null = 没有。 */
         final ChannelRules.Step step;
         /** 这一轮的答案：动作、为什么、哪一路；等的话等的是哪一种动作、最多还要等多久（-1 说不准）；先不开的那一路。 */
@@ -1715,6 +1717,7 @@ public final class ChannelScheduler {
             this.orphans = Collections.unmodifiableList(new ArrayList<>(orphans));
             this.lastOthersChangeAt = w.lastOthersChangeAt;
             this.headUnitWokeAt = w.headUnitWokeAt;
+            this.listenedSince = w.listenedSince;
             this.step = w.step;
             this.move = d.move;
             this.why = d.why;
@@ -1909,6 +1912,11 @@ public final class ChannelScheduler {
     private long lastSleptMs = Long.MIN_VALUE;
     /** 车机上一次睡醒的那一刻（调度的钟，{@link #noticeWake}）；0 = 这个进程里没见过。只在主线程上读写。 */
     private long headUnitWokeAt;
+    /**
+     * 相机服务的通知这一次是什么时候挂上的（调度的钟，{@link #tendCameraService} 新挂上的那一轮）；0 = 没挂着，或者不是这里挂的。
+     * 只在主线程上读写。
+     */
+    private long listenedSince;
     /** 这一轮读到的登记表（{@link #round} 开头读一次，这一轮里都用它）；不在一轮里是 null。只在主线程上读写。 */
     private Set<CameraNeeds.Holder> roundHolders;
 
@@ -2282,7 +2290,7 @@ public final class ChannelScheduler {
         // 登记表一轮里只读一次：挂不挂相机服务的通知、各份管线的世界看的是同一份（别的线程这时登记的，下一轮再认）
         roundHolders = facts.holders();
         try {
-            tendCameraService(roundHolders);
+            tendCameraService(roundHolders, now);
             if (facts.cameraServiceSettling()) {
                 // 相机服务的通知刚挂上，每一路此刻的样子（回放）还排在主线程的队列里：这一轮不判 —— 判的话，被别人拿着的、
                 // 不在的那一路还没人说，会去开一次。这之前已经排着的轮、到点的计时器也一样跳过；回放收全了那一层叫醒调度。
@@ -2351,14 +2359,18 @@ public final class ChannelScheduler {
      *   <li>不用了 —— 停车着、谁都不要、都关完了：摘掉。没在听的那一段里车机睡醒会重新初始化相机，那一种看 {@link #noticeWake}。</li>
      * </ul>
      *
-     * <p>新挂上以后回放收全之前不判（{@link Facts#cameraServiceSettling}，{@link #round}）。</p>
+     * <p>新挂上以后回放收全之前不判（{@link Facts#cameraServiceSettling}，{@link #round}）。新挂上的那一刻记下
+     * （{@link #listenedSince}）：挂上之前别人动没动过相机听不到，从这一刻起听满安静的那一段才开、改输出、救
+     * （{@link ChannelRules#quietLeft}；项目所有者 2026-11-21：可以晚，不能早）。</p>
      *
      * @param holders 这一轮读到的登记表（和各份管线这一轮看的是同一份）
+     * @param now     这一轮的此刻
      */
-    private void tendCameraService(Set<CameraNeeds.Holder> holders) {
+    private void tendCameraService(Set<CameraNeeds.Holder> holders, long now) {
         boolean parked = facts.parked();
         boolean on = inUse(parked, !holders.isEmpty(), allClosed());
         if (facts.listenToCameraService(on)) {
+            listenedSince = on ? now : 0;
             processJournal.listening(on, parked);
         }
     }
@@ -3375,6 +3387,7 @@ public final class ChannelScheduler {
             w.heardAnything = facts.heardAnything();
             w.lastOthersChangeAt = ourClock(facts.lastOthersChangeAt(), offset);
             w.headUnitWokeAt = headUnitWokeAt;
+            w.listenedSince = listenedSince;
             w.frontCabinOneShot = facts.frontCabinOneShot();
             readCar(w);
 
@@ -4036,6 +4049,11 @@ public final class ChannelScheduler {
                         // 车机刚睡醒，先不开、不改、不救：变了才写（多久以前醒的记在 agoMs）
                         sig = d.why + "|" + key + "|" + d.pending;
                         wait = new Wait(d.why, key, d.pending, d.ms, "", now - w.headUnitWokeAt, null, null, false, false);
+                        break;
+                    case UNHEARD:
+                        // 相机服务的通知刚挂上，还没听满安静的那一段：变了才写（多久以前挂上的记在 agoMs）
+                        sig = d.why + "|" + key + "|" + d.pending;
+                        wait = new Wait(d.why, key, d.pending, d.ms, "", now - w.listenedSince, null, null, false, false);
                         break;
                     case RECORD_OUTPUT:
                         sig = d.why + "|" + key;

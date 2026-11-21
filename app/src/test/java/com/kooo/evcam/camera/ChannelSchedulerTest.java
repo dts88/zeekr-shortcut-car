@@ -334,6 +334,8 @@ public class ChannelSchedulerTest {
         // 回放其实到了，只是收尾那一声没叫醒调度
         host.settling = false;
         at(ChannelScheduler.SETTLING_RECHECK_MS);
+        assertEquals("自己再看了一眼：判了，新挂上的先听", Arrays.asList("waiting UNHEARD " + SUR), lines("waiting UNHEARD"));
+        at(ChannelRules.QUIET_MS);
         assertEquals(Arrays.asList("open [PREVIEW]"), surround.actions);
     }
 
@@ -360,9 +362,32 @@ public class ChannelSchedulerTest {
         assertTrue("开着的那一台来历不动", history == null || history.reset != CameraHistory.Reset.WOKE);
     }
 
-    /** 新挂上、回放里环视空着：紧接着的那一轮照常开，不多等。 */
+    /**
+     * 可以晚，不能早（项目所有者 2026-11-21）：通知新挂上、回放里环视空着 —— 挂上之前别人动没动过相机听不到，
+     * 没听着的那一段不算安静，从挂上那一刻起听满 3 秒才开。
+     */
     @Test
-    public void aFreshlyAttachedNotificationDoesNotDelayAnOpen() {
+    public void aFreshlyAttachedNotificationIsListenedToBeforeAnythingOpens() {
+        settle();
+        host.parked = true;
+        s.wake();
+        settle();
+        at(60_000);
+        host.parked = false;
+        claim(Holder.PREVIEW);
+        declare(surround, pvS);
+        settle();
+        assertTrue("刚挂上：先听", surround.actions.isEmpty());
+        assertEquals(Arrays.asList("waiting UNHEARD " + SUR), lines("waiting UNHEARD"));
+        at(60_000 + ChannelRules.QUIET_MS - 1);
+        assertTrue(surround.actions.isEmpty());
+        at(60_000 + ChannelRules.QUIET_MS);
+        assertEquals(Arrays.asList("open [PREVIEW]"), surround.actions);
+    }
+
+    /** 挂上以后听见别人动了相机：照旧从那一声起再安静 3 秒 —— 两样都要等的，等晚到点的那一个。 */
+    @Test
+    public void aChangeHeardAfterAttachingStartsTheQuietAgain() {
         settle();
         host.parked = true;
         s.wake();
@@ -371,8 +396,59 @@ public class ChannelSchedulerTest {
         claim(Holder.PREVIEW);
         declare(surround, pvS);
         settle();
+        at(2_000);
+        say(surround, true, false);
+        s.wake();
+        settle();
+        at(ChannelRules.QUIET_MS);
+        assertTrue("挂上满 3 秒了，可 1 秒前刚听见别人动过", surround.actions.isEmpty());
+        at(2_000 + ChannelRules.QUIET_MS - 1);
+        assertTrue(surround.actions.isEmpty());
+        at(2_000 + ChannelRules.QUIET_MS);
         assertEquals(Arrays.asList("open [PREVIEW]"), surround.actions);
-        assertTrue("没睡过、没人动过：不等", lines("waiting").isEmpty());
+    }
+
+    /** 进程起来第一次挂上也一样：之前车机动没动过相机，新进程更不知道。 */
+    @Test
+    public void theFirstRegistrationIsListenedToAsWell() {
+        host.listening = false;
+        claim(Holder.PREVIEW);
+        declare(surround, pvS);
+        settle();
+        assertTrue(host.listening);
+        assertEquals(Arrays.asList("listening true"), lines("listening"));
+        assertTrue(surround.actions.isEmpty());
+        at(ChannelRules.QUIET_MS - 1);
+        assertTrue(surround.actions.isEmpty());
+        at(ChannelRules.QUIET_MS);
+        assertEquals(Arrays.asList("open [PREVIEW]"), surround.actions);
+    }
+
+    /**
+     * 车上 2026-11-21 20:34 的那一种：停车着车机睡过，醒来 8.9 秒人才回来 —— 后座舱 7.7 秒时已经回到相机列表，那一声没听到。
+     * 睡醒的那一段这时已经满了；新挂上的照样听满 3 秒才开，不比一直听着的时候（听到那一声再等 3 秒）早。
+     */
+    @Test
+    public void afterASleepALateReturnStillListensFirst() {
+        settle();
+        host.parked = true;
+        s.wake();
+        settle();
+        sleep(60_000);
+        s.wake();
+        settle();
+        assertEquals(1, lines("woke").size());
+        at(8_900);
+        host.parked = false;
+        claim(Holder.PREVIEW);
+        declare(surround, pvS);
+        settle();
+        assertTrue(surround.actions.isEmpty());
+        assertEquals(Arrays.asList("waiting UNHEARD " + SUR), lines("waiting UNHEARD"));
+        at(8_900 + ChannelRules.QUIET_MS - 1);
+        assertTrue(surround.actions.isEmpty());
+        at(8_900 + ChannelRules.QUIET_MS);
+        assertEquals(Arrays.asList("open [PREVIEW]"), surround.actions);
     }
 
     // ================================================================= 一步做完没有、到点

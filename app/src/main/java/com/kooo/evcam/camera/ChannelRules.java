@@ -100,8 +100,9 @@ public final class ChannelRules {
      * （CameraAvailabilityWatch），停车着那几声听不到，改看车机醒来本身 —— 系统的深睡计时变多了
      * （{@code ChannelScheduler.noticeWake}），从调度发现睡醒的那一轮起算（比真正醒来晚 0–2 秒）。
      *
-     * <p>可以晚，不能早（项目所有者 2026-11-21：可能系统还没把相机初始化完；不着急，最迟主驾坐下以后才开也可以）：
-     * 听着的时候最晚是醒来后 6.4 秒开（3.38 秒回来 + 安静），现在最早是醒来后 8 秒，哪一次都不比那时候早。
+     * <p>可以晚，不能早（项目所有者 2026-11-21：可能系统还没把相机初始化完；不着急，最迟主驾坐下以后才开也可以）。
+     * 这一条管的是重新初始化还没开始的那一小段（醒来后最晚 2.3 秒才开始，那之前相机看着是空的）；车机别的动作 ——
+     * 醒来约 7.6 秒后把后座舱放回相机列表 —— 靠听：挂着就听得到，新挂上的听满 {@link #QUIET_MS} 才开（{@link #quietLeft}）。
      * 同一批记录里主驾最快在醒来后 7.5 秒坐下（中位 14 秒），最快 14.5 秒挂出 P 挡。</p>
      *
      * <p>只管关着的那一路（{@link #quietLeft}）：睡过这一觉还开着的没被动过。挂上以后它再动相机，照样听得到、照样等安静。</p>
@@ -530,6 +531,11 @@ public final class ChannelRules {
         long lastOthersChangeAt;
         /** 车机上一次睡醒的那一刻（{@code ChannelScheduler.noticeWake}：系统的深睡计时变多了）；0 = 这个进程里没见过。 */
         long headUnitWokeAt;
+        /**
+         * 相机服务的通知这一次是什么时候挂上的（{@code ChannelScheduler.tendCameraService} 新挂上的那一轮）；0 = 没挂着，
+         * 或者不是调度挂的。挂上之前别人动没动过相机听不到，安静从这一刻起才数得出来（{@link ChannelRules#quietLeft}）。
+         */
+        long listenedSince;
         /** 「车机要睡」从什么时候起（熄屏那张表判成现在停）；0 = 没有。亮屏时清。 */
         long sleepSince;
         /** 「退出」从什么时候起；0 = 没有。 */
@@ -661,6 +667,11 @@ public final class ChannelRules {
         JUDGING,
         /** 相机服务 3 秒内报过别人引起的变化。 */
         QUIET,
+        /**
+         * 相机服务的通知挂上还不到 {@link ChannelRules#QUIET_MS}：挂上之前的听不到，听满了才算安静
+         * （项目所有者 2026-11-21：可以晚，不能早）。
+         */
+        UNHEARD,
         /** 车机刚睡醒，还不到 {@link ChannelRules#WAKE_SETTLE_MS}：等它把相机重新初始化完（项目所有者 2026-11-21）。 */
         WOKE,
         /** 开之前等这一路的录像输出（最多 2 秒）。 */
@@ -2891,22 +2902,38 @@ public final class ChannelRules {
     }
 
     /**
-     * 这一路还要等多久才算安静（开、改输出、救之前；不用等是 0 或负数）。相机服务 {@link #QUIET_MS} 内报过别人引起的变化，
-     * 哪一路都要等；车机刚睡醒（{@link #WAKE_SETTLE_MS}）只管关着的那一路 —— 它醒来重新初始化的是没开着的相机，
-     * 睡过这一觉还开着的没被动过（被动了相机自己会报丢失）。两样都要等的，等晚到点的那一个。
+     * 这一路还要等多久才算安静（开、改输出、救之前；不用等是 0 或负数）。三样，都要等的等晚到点的那一个：
+     *
+     * <ul>
+     *   <li>相机服务 {@link #QUIET_MS} 内报过别人引起的变化，哪一路都要等；</li>
+     *   <li>相机服务的通知挂上还不到 {@link #QUIET_MS}（{@link World#listenedSince}），哪一路都要等：通知是用的时候才挂的，
+     *       挂上之前别人动没动过相机听不到，没听着的那一段不能算安静（项目所有者 2026-11-21：可以晚，不能早）。
+     *       挂上之前的变化都不晚于挂上那一刻，所以哪一次都不比一直挂着的时候早；</li>
+     *   <li>车机刚睡醒（{@link #WAKE_SETTLE_MS}）只管关着的那一路 —— 它醒来重新初始化的是没开着的相机，
+     *       睡过这一觉还开着的没被动过（被动了相机自己会报丢失）。</li>
+     * </ul>
      */
     static long quietLeft(World w, Lane lane) {
-        return Math.max(othersLeft(w), wokeLeft(w, lane));
+        return Math.max(Math.max(othersLeft(w), unheardLeft(w)), wokeLeft(w, lane));
     }
 
-    /** 等安静的那一行写哪个原因：车机睡醒那一样还要等、而且不比相机服务那一样早到点，写它；不然是相机服务的。 */
+    /** 等安静的那一行写哪个原因：还要等的几样里晚到点的那一个；一样晚的，车机睡醒先于刚挂上，刚挂上先于相机服务报的。 */
     static Why quietWhy(World w, Lane lane) {
+        long others = othersLeft(w);
+        long unheard = unheardLeft(w);
         long woke = wokeLeft(w, lane);
-        return woke > 0 && woke >= othersLeft(w) ? Why.WOKE : Why.QUIET;
+        if (woke > 0 && woke >= others && woke >= unheard) {
+            return Why.WOKE;
+        }
+        return unheard > 0 && unheard >= others ? Why.UNHEARD : Why.QUIET;
     }
 
     private static long othersLeft(World w) {
         return w.lastOthersChangeAt == 0 ? 0 : QUIET_MS - (w.now - w.lastOthersChangeAt);
+    }
+
+    private static long unheardLeft(World w) {
+        return w.listenedSince == 0 ? 0 : QUIET_MS - (w.now - w.listenedSince);
     }
 
     private static long wokeLeft(World w, Lane lane) {
