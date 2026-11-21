@@ -663,8 +663,6 @@
     <string name="reason_timeout">sambungan tamat masa</string>
     <string name="reason_no_space">ruang storan tidak cukup</string>
     <string name="reason_file_not_found">fail tidak ditemui</string>
-    <string name="msg_screen_off_stopped">Rakaman dihentikan selepas skrin padam</string>
-    <string name="msg_screen_off_background">Skrin padam selama 15 saat. Dialihkan ke latar belakang.</string>
     <plurals name="return_notice_text">
         <item quantity="other">Apl kembali ke latar depan dan berjalan seperti biasa. Apl akan kembali ke latar belakang dalam %d saat.</item>
     </plurals>

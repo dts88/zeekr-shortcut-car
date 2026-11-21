@@ -311,7 +311,6 @@ public final class ScreenState {
 
     /**
      * 屏幕此刻知道：不在等进程起来后的第一份车辆判断，也不在等安卓刚亮那一遍车辆信号（C6、C11）。
-     * 主界面熄屏 15 秒那一步在不知道的时候过一会儿再看（C7）。
      */
     public static boolean known() {
         return settle == Settle.NONE;

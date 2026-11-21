@@ -39,6 +39,8 @@ import com.kooo.evcam.telemetry.Telemetry;
  * <h3>放什么，按这个次序</h3>
  *
  * <ol>
+ *   <li>界面：我们开着的界面都关掉（{@link OpenScreens#close}，项目所有者 2026-11-21）—— 关掉，不是退到后台：
+ *       留在后台的界面，视图、画布、播放器都还占着。在录的照录，录像不靠界面；</li>
  *   <li>悬浮窗：悬浮按钮、超级镜子、盲区画面的服务停掉，窗口移走（{@link OverlayCoordinator#stopForParking}）；</li>
  *   <li>蓝牙：灵动贴的扫描和连接（{@code SmartButtons.park}）；</li>
  *   <li>车辆信号：对账只读判人回没回来、相机管家熄屏时看的那几项，浮点传感器、定位、后视镜上的灯停掉（{@code Telemetry.setParked}）；</li>
@@ -46,7 +48,10 @@ import com.kooo.evcam.telemetry.Telemetry;
  *       「熄屏持续录制」开着、「这一趟要录」立着的，留到车机睡过（{@link #headUnitSlept}）：这之前哨兵模式变成开还接得上录像。</li>
  * </ol>
  *
- * <p>「熄屏持续录制」在录时（哨兵模式开着）前三样一样放：录像要的是相机、编码、录音、存储和前台服务。一步出错不挡后面的。</p>
+ * <p>「熄屏持续录制」在录时（哨兵模式开着）前四样一样放：录像要的是相机、编码、录音、存储和前台服务。一步出错不挡后面的。</p>
+ *
+ * <p>停车着又开出来的界面（人在车里、车没通电时点开的）：车机要睡那一下关掉（{@link #screenMoved}）；系统催内存时，
+ * 不在眼前的关掉（{@link #memoryTight}）。</p>
  *
  * <h3>人回来</h3>
  *
@@ -58,6 +63,19 @@ import com.kooo.evcam.telemetry.Telemetry;
 public final class Parked {
 
     private static final String TAG = "Parked";
+
+    /** 停车时放开的几样，照这个先后（规格 §3.3「停车」）：界面最先，前台服务最后。{@link #enter} 照它一样一样做。 */
+    enum Release {
+        SCREENS("screens"), OVERLAYS("overlays"), BLUETOOTH("bluetooth"), TELEMETRY("telemetry"),
+        FOREGROUND_SERVICE("foreground service");
+
+        /** 出错时黑匣子里写的名字（ASCII）。 */
+        final String label;
+
+        Release(String label) {
+            this.label = label;
+        }
+    }
     /** 相机在黑满 {@link ChannelRules#HOLD_MS} 那一刻开始放；相机以外的排在它后面这么久。 */
     static final long AFTER_CAMERAS_MS = 10_000L;
 
@@ -95,7 +113,7 @@ public final class Parked {
         }
         parked = true;
         slept = ScreenState.androidOff();
-        step("telemetry", () -> Telemetry.get().setParked(true));
+        step(Release.TELEMETRY.label, () -> Telemetry.get().setParked(true));
         BlackBox.noteImportant("进程起来时没有人在车上的证据：从停车起，相机以外的也不拿（悬浮窗、蓝牙；车辆信号只读判人回来的那几项）");
     }
 
@@ -156,6 +174,19 @@ public final class Parked {
         return due(true, darkForMs, androidOff, false) ? 0 : ChannelRules.HOLD_MS + AFTER_CAMERAS_MS - darkForMs;
     }
 
+    /**
+     * 车机要睡那一下把界面再关一遍：停车着才关 —— 关的是停车着又开出来的。还没停车的由 {@link #enter} 在同一下关（它自己会关界面）；
+     * 在开车时不停车，安卓在行驶中熄屏也不关界面。
+     */
+    static boolean closesScreensWhenHeadUnitSleeps(boolean parked, ScreenTransitions.Edge edge) {
+        return parked && edge == ScreenTransitions.Edge.HEAD_UNIT_SLEEPS;
+    }
+
+    /** 系统催内存时关不在眼前的界面：停车着才关，人在车上时不动。 */
+    static boolean closesHiddenScreensWhenMemoryIsTight(boolean parked) {
+        return parked;
+    }
+
     // ================================================================= 输入（主线程）
 
     private static final Runnable CHECK = Parked::check;
@@ -178,7 +209,7 @@ public final class Parked {
                 buttons.screenLit();
             }
             if (overlaysOwed && app != null) {
-                step("overlays", () -> {
+                step(Release.OVERLAYS.label, () -> {
                     if (UserExit.isExited(app)) {
                         overlaysOwed = false;
                     } else {
@@ -189,11 +220,15 @@ public final class Parked {
             return;
         }
         if (after.dark()) {
+            if (closesScreensWhenHeadUnitSleeps(parked, edge)) {
+                // 停车着车机要睡了（每一次）：停车着又开出来的界面关掉（人在车里、车没通电时点开的）
+                step(Release.SCREENS.label, () -> OpenScreens.close(false, "head-unit-sleeps"));
+            }
             if (after.androidOff && !slept) {
                 slept = true;
                 if (parked) {
                     // 停车着车机要睡了：前台服务不再留
-                    step("foreground service", Parked::tellKeeper);
+                    step(Release.FOREGROUND_SERVICE.label, Parked::tellKeeper);
                 }
             }
             check();
@@ -225,20 +260,53 @@ public final class Parked {
         parked = true;
         parkedAtMs = SystemClock.elapsedRealtime();
         BlackBox.noteImportant("停车：人不在车上" + (ScreenState.androidOff() ? "、车机要睡" : "")
-                + "，相机以外的也放开（悬浮窗 → 蓝牙 → 车辆信号只读判人回来的那几项 → 前台服务）" + BlackBox.afterScreenOff());
-        step("overlays", () -> {
-            if (OverlayCoordinator.stopForParking(app)) {
-                overlaysOwed = true;
-            }
-        });
-        step("bluetooth", () -> {
-            SmartButtons buttons = SmartButtons.get();
-            if (buttons != null) {
-                buttons.park();
-            }
-        });
-        step("telemetry", () -> Telemetry.get().setParked(true));
-        step("foreground service", Parked::tellKeeper);
+                + "，相机以外的也放开（界面 → 悬浮窗 → 蓝牙 → 车辆信号只读判人回来的那几项 → 前台服务）"
+                + BlackBox.afterScreenOff());
+        for (Release what : Release.values()) {
+            step(what.label, () -> release(what));
+        }
+    }
+
+    /** 放开一样（{@link #enter} 照 {@link Release} 的先后叫）。 */
+    private static void release(Release what) {
+        switch (what) {
+            case SCREENS:
+                OpenScreens.close(false, "parked");
+                break;
+            case OVERLAYS:
+                if (OverlayCoordinator.stopForParking(app)) {
+                    overlaysOwed = true;
+                }
+                break;
+            case BLUETOOTH:
+                SmartButtons buttons = SmartButtons.get();
+                if (buttons != null) {
+                    buttons.park();
+                }
+                break;
+            case TELEMETRY:
+                Telemetry.get().setParked(true);
+                break;
+            case FOREGROUND_SERVICE:
+                tellKeeper();
+                break;
+            default:
+                throw new IllegalStateException("unhandled " + what);
+        }
+    }
+
+    /**
+     * 系统催内存了（{@code ZeekrShortcutApp.onTrimMemory}，主线程；项目所有者 2026-11-21）：停车着就把不在眼前的界面关掉。
+     * 停车那一下都关过了，这里关的是停车着又开出来、又离开了的（人在车里、车没通电时点开过）。在眼前的不动：人可能正在用。
+     * 没停车什么都不做。
+     *
+     * @param level 系统给的级别（进黑匣子）
+     */
+    public static void memoryTight(int level) {
+        if (!closesHiddenScreensWhenMemoryIsTight(parked)) {
+            return;
+        }
+        step(Release.SCREENS.label, () -> OpenScreens.close(true, "trim-memory " + level));
     }
 
     /**
@@ -256,7 +324,7 @@ public final class Parked {
         parkedAtMs = 0;
         BlackBox.noteImportant("人回来了：停车结束" + (ms < 0 ? "" : "（停了 " + ms / 1000 + " 秒）")
                 + "，车辆信号恢复、蓝牙接着听" + (overlaysOwed ? "、悬浮窗照设置起" : ""));
-        step("telemetry", () -> Telemetry.get().setParked(false));
+        step(Release.TELEMETRY.label, () -> Telemetry.get().setParked(false));
     }
 
     /** 一步出错不挡后面的。 */

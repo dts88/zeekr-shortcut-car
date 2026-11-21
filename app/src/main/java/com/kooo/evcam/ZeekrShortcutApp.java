@@ -48,6 +48,8 @@ public class ZeekrShortcutApp extends Application {
         // 熄屏判断活在进程上：熄屏 / 亮屏广播在这里注册、车辆信号的核心在这里登记（屏幕真黑了看车辆信号，熄屏 v3），
         // 主界面在不在都一样（规格 §3.3）。这里不会当场判出熄屏：车辆信号在自己的线程上连、读到了才排到主线程，下面的相机管家先起来
         com.kooo.evcam.screen.ScreenState.install(this);
+        // 开着的界面记着（停车时关掉，下一行）：在任何界面建出来之前装上
+        com.kooo.evcam.screen.OpenScreens.install(this);
         // 停车（人不在车上，相机以外的也放开）：紧跟熄屏判断装上 —— 进程起来时没有人的证据，从停车起；下面的灵动贴照它决定扫不扫
         com.kooo.evcam.screen.Parked.install(this);
         // 通道调度（唯一动相机的地方）进程里只有一个：在这里最先装上，不换、不停（第 2 步；建管线、相机管家也各自先装一次，装过了什么都不做）。
@@ -131,5 +133,7 @@ public class ZeekrShortcutApp extends Application {
         super.onTrimMemory(level);
         // 系统在催内存。卡顿报告带着日志尾巴，内存紧张和卡住是不是同时发生，一看便知
         AppLog.w("App", "onTrimMemory level " + level);
+        // 停车着（人不在车上）：不在眼前的界面关掉（规格 §3.3「停车」，项目所有者 2026-11-21）。人在车上时不动
+        com.kooo.evcam.screen.Parked.memoryTight(level);
     }
 }

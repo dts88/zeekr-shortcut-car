@@ -678,8 +678,6 @@
     <string name="reason_timeout">连接超时</string>
     <string name="reason_no_space">存储空间不足</string>
     <string name="reason_file_not_found">文件不存在</string>
-    <string name="msg_screen_off_stopped">熄屏后已停止录制</string>
-    <string name="msg_screen_off_background">熄屏 15 秒，已转入后台</string>
     <plurals name="return_notice_text">
         <item quantity="other">应用已回到前台并正常运行，%d 秒后自动返回后台</item>
     </plurals>
