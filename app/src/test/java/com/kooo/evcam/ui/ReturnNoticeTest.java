@@ -65,21 +65,22 @@ public class ReturnNoticeTest {
     }
 
     @Test
-    public void countsThreeSecondsFromTheWindowBeingReadyThenLeaves() {
+    public void countsDownFromTheWindowBeingReadyThenLeaves() {
+        assertEquals("项目所有者 2026-11-22：5 秒", 5, ReturnNotice.SECONDS);
         notice.show(stage, ReturnNotice.SECONDS);
-        assertEquals(sentence(3), shown());
+        assertEquals(sentence(ReturnNotice.SECONDS), shown());
         assertTrue(notice.visiting());
 
-        pass(5);
-        assertEquals("窗口就绪之前不数", sentence(3), shown());
+        pass(10);
+        assertEquals("窗口就绪之前不数", sentence(ReturnNotice.SECONDS), shown());
         assertEquals(0, leaves);
 
         notice.start();
         notice.start();
-        pass(1);
-        assertEquals(sentence(2), shown());
-        pass(1);
-        assertEquals(sentence(1), shown());
+        for (int left = ReturnNotice.SECONDS - 1; left >= 1; left--) {
+            pass(1);
+            assertEquals(sentence(left), shown());
+        }
         assertEquals("还没数完", 0, leaves);
         pass(1);
         assertNull("数完横幅拿掉，不显示 0", banner());
@@ -161,7 +162,7 @@ public class ReturnNoticeTest {
     public void aTouchAfterLeavingEndsTheVisit() {
         notice.show(stage, ReturnNotice.SECONDS);
         notice.start();
-        pass(3);
+        pass(ReturnNotice.SECONDS);
         assertEquals(1, leaves);
         assertTrue(notice.visiting());
 
@@ -196,19 +197,21 @@ public class ReturnNoticeTest {
         pass(1);
 
         notice.paused(true);
-        assertEquals(2, notice.secondsLeft());
+        int remaining = notice.secondsLeft();
+        assertEquals(ReturnNotice.SECONDS - 1, remaining);
         pass(10);
-        assertEquals("重建时表停着", 2, notice.secondsLeft());
+        assertEquals("重建时表停着", remaining, notice.secondsLeft());
         assertEquals(0, leaves);
         notice.drop();
         assertNull(banner());
 
         ReturnNotice next = newNotice();
-        next.show(stage, 2);
-        assertEquals(sentence(2), shown());
+        next.show(stage, remaining);
+        assertEquals(sentence(remaining), shown());
         next.start();
-        pass(1);
+        pass(remaining - 1);
         assertEquals(sentence(1), shown());
+        assertEquals(0, leaves);
         pass(1);
         assertEquals(1, leaves);
     }
@@ -218,7 +221,7 @@ public class ReturnNoticeTest {
         leaveWorks = false;
         notice.show(stage, ReturnNotice.SECONDS);
         notice.start();
-        pass(3);
+        pass(ReturnNotice.SECONDS);
         assertEquals(1, leaves);
         assertFalse("没退成（界面正在关）：不再算不是人要的", notice.visiting());
     }
@@ -244,9 +247,9 @@ public class ReturnNoticeTest {
         pass(2);
         notice.show(stage, ReturnNotice.SECONDS);
         assertEquals("只有一条横幅", 1, stage.getChildCount());
-        assertEquals(sentence(3), shown());
+        assertEquals(sentence(ReturnNotice.SECONDS), shown());
         notice.start();
-        pass(2);
+        pass(ReturnNotice.SECONDS - 1);
         assertEquals(0, leaves);
         pass(1);
         assertEquals(1, leaves);

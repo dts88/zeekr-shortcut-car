@@ -39,8 +39,8 @@ import com.kooo.evcam.blackbox.BlackBox;
  */
 public final class ReturnNotice {
 
-    /** 数几秒（项目所有者 2026-11-21）。 */
-    public static final int SECONDS = 3;
+    /** 数几秒（项目所有者 2026-11-21 定 3 秒；2026-11-22 改成 5 秒：3 秒太短）。 */
+    public static final int SECONDS = 5;
     private static final long TICK_MS = 1_000L;
 
     /** 主界面。 */
