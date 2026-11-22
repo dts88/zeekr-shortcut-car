@@ -73,6 +73,9 @@ public class PermissionsPreferenceFragment extends PreferenceFragmentCompat {
         if (screen != null && getContext() != null) {
             screen.removeAll();
             build(screen, getContext());
+            // 重建的行在同一帧里套上行样式（PreferenceRows：交给列表之前、或者加完行的同一帧里调）。以前漏了：
+            // 这一页每次显示都走到这里，看到的永远是 androidx 默认的样子，不是别的设置页那种灰底卡片
+            PreferenceRows.apply(screen);
         }
     }
 

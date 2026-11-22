@@ -436,6 +436,9 @@ public class SettingsShotsTest {
         assertNotNull(overlay);
         assertTrue("别的没给的照旧能点", overlay.isEnabled() && overlay.isSelectable());
         assertNotNull(overlay.getOnPreferenceClickListener());
+        // 回到前台重建过的行也是别的设置页那种卡片：能点的行尾 ›，点不动的（灰着的、已给的）没有
+        assertEquals(R.layout.pref_row_nav, overlay.getLayoutResource());
+        assertEquals(R.layout.pref_row_info, battery.getLayoutResource());
 
         // 这一页回到前台时把各行拿掉重建一遍（授权是去系统设置里点的），新的一行是淡入的：先排一遍，等淡入放完再画。
         // 那一行在最下面，滚到它
