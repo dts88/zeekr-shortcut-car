@@ -138,7 +138,8 @@ public class ReturnNoticeShotsTest {
         assertTrue("横幅压到状态条了", covered.bottom <= status.top);
 
         TextView sentence = banner.findViewById(R.id.return_notice_text);
-        assertEquals("照 3 秒写", activity.getResources().getQuantityString(R.plurals.return_notice_text, 3, 3),
+        assertEquals("照 " + ReturnNotice.SECONDS + " 秒写", activity.getResources().getQuantityString(
+                        R.plurals.return_notice_text, ReturnNotice.SECONDS, ReturnNotice.SECONDS),
                 sentence.getText().toString());
         assertWrittenOut(banner);
         return banner;
