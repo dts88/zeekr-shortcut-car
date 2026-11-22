@@ -234,6 +234,8 @@ public final class ScreenState {
     private static String touchHow = "";
     /** 黑着、车通电了、没有人的证据的那一段记过黑匣子了（起止各一行，主线程）。 */
     private static boolean poweredAloneNoted;
+    /** 遥控挪车（推断，{@link RemoteMove}）：只记录，熄屏、停车、相机照旧。主线程。 */
+    private static final RemoteMove REMOTE = new RemoteMove();
 
     private ScreenState() {
     }
@@ -438,6 +440,11 @@ public final class ScreenState {
         move(next, event, ignition);
         scheduleLostCheck(next, now);
         notePoweredAlone(next, connected, ignition);
+        if (connected) {
+            noteRemoteMove(REMOTE.readings(next.dark(), next.androidOff, readings.text(Signal.GEAR),
+                    readings.bool(Signal.SEAT_DRIVER), VehicleScreen.ignitionLow(ignition),
+                    readings.code(Signal.SENTRY_MODE), now), now);
+        }
         if (startupEnds) {
             drainWhenKnown();
         }
@@ -728,6 +735,8 @@ public final class ScreenState {
         // （2026-11-02「熄屏判断收归通道调度」，以前这里先叫录像那一侧照它那张表判）。
         // 相机：通道眼里的熄屏也看安卓熄没熄屏（车机要睡不等黑满 30 秒，ChannelRules.darkForChannel）—— 叫醒调度，不等下一个两秒
         com.kooo.evcam.camera.CameraKeeper.factsChanged();
+        long now = SystemClock.elapsedRealtime();
+        noteRemoteMove(REMOTE.headUnitSleeps(now), now);
         startWakePoll();
     }
 
@@ -803,6 +812,28 @@ public final class ScreenState {
                     + "），没有人的证据（没拉开过车门、没碰过应用、驾驶座没人）：照熄屏算，不恢复");
         } else if (s.dark()) {
             BlackBox.noteImportant("车通电、没有人的证据的那一段完了，还是熄屏（点火=" + VehicleScreen.ignitionText(ignition) + "）");
+        }
+    }
+
+    /**
+     * 遥控挪车（推断）那一段的开头、汇总写黑匣子（{@link RemoteMove}，项目所有者 2026-11-22：照没人在车上处理，
+     * 但标注、记录下来，看这时车上发生了什么）。只记录：熄屏、停车、相机照旧。
+     */
+    private static void noteRemoteMove(RemoteMove.Change change, long now) {
+        if (change == RemoteMove.Change.STARTED) {
+            BlackBox.noteImportant("遥控挪车（推断）：熄屏、没有人的证据，挂了 " + REMOTE.gear()
+                    + " 挡、主驾座椅没人 —— 照没人在车上处理（只记录：熄屏、停车、相机照旧），这一段的变化照常一项一行，"
+                    + "完了写一行汇总；哨兵模式 " + REMOTE.sentryAtStart());
+        } else if (change == RemoteMove.Change.ENDED) {
+            RemoteMove.End end = REMOTE.end();
+            long lag = REMOTE.quietLagMs(now);
+            BlackBox.noteImportant("遥控挪车（推断）完了（"
+                    + (end == RemoteMove.End.PERSON ? "有了人的证据" : end == RemoteMove.End.SLEEP ? "车机要睡"
+                    : "挡位回到 P、点火掉到 ACC 或更低满 " + RemoteMove.QUIET_MS / 1000 + " 秒")
+                    + "）：历时 " + REMOTE.durationMs(now) / 1000 + " 秒；挂挡 D " + REMOTE.drive() + " 次、R "
+                    + REMOTE.reverse() + " 次、N " + REMOTE.neutral() + " 次；点火通电 " + REMOTE.powerOn() + " 次、断电 "
+                    + REMOTE.powerOff() + " 次；哨兵模式 " + REMOTE.sentryAtStart() + " → " + REMOTE.sentryNow()
+                    + (lag > 0 ? "；停稳在 " + lag / 1000 + " 秒前" : ""));
         }
     }
 
