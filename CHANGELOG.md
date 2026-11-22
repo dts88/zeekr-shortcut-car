@@ -11,6 +11,12 @@ commit message, not here.
 
 Nothing yet.
 
+## [4.13.9-beta] - 2026-11-22
+
+**Do not update App Lab to 1.0.0.26 or later: you would lose the ability to sideload apps.**
+
+Improved stability and efficiency.
+
 ## [4.13.8-alpha] - 2026-11-22
 
 - Developer options → Permissions uses the same card rows as the other settings pages.
