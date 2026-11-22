@@ -459,6 +459,7 @@ public class AutomationsTest {
         w.rules.add(rule(Trigger.gear("R"), Change.of(Setting.LOW_SPEED_BRAKING, "off")));
         w.car.put(Setting.LOW_SPEED_BRAKING, 1);
         Automations a = new Automations(w);
+        a.screenWentLit();
         a.readingsChanged();
         w.gear = "R";
         a.readingsChanged();
@@ -473,6 +474,56 @@ public class AutomationsTest {
         assertEquals(1, (int) w.car.get(Setting.LOW_SPEED_BRAKING));
     }
 
+    /**
+     * 只在人在车上时运作（项目所有者 2026-11-22）：熄屏时挂挡（车主遥控挪车，车里没人）不触发；人上车以后照常。
+     */
+    @Test
+    public void aGearChangeWithNobodyInTheCarDoesNotFire() {
+        FakeWorld w = new FakeWorld();
+        w.rules.add(rule(Trigger.gear("P"), Change.of(Setting.SENTRY, "on")));
+        w.car.put(Setting.SENTRY, 0);
+        w.ignition = Signal.IGNITION_DRIVING;
+        Automations a = new Automations(w);
+        a.processStarted(true, false);
+        a.readingsChanged();
+        w.gear = "D";
+        a.readingsChanged();
+        w.gear = "P";
+        a.readingsChanged();
+        w.run(10_000);
+        assertTrue("车里没人：不写车", w.writes.isEmpty());
+
+        a.screenWentLit();
+        w.gear = "D";
+        a.readingsChanged();
+        w.gear = "P";
+        a.readingsChanged();
+        w.run(10_000);
+        assertEquals(Collections.singletonList("sentry=on"), w.writes);
+    }
+
+    /** 熄屏那一下：还在走的、等着恢复的一律放下，不写车 —— 关掉的安全功能也不在人下车以后去恢复（车自己会重新打开）。 */
+    @Test
+    public void leavingTheCarDropsEverythingWithoutWriting() {
+        FakeWorld w = new FakeWorld();
+        w.rules.add(rule(Trigger.gear("R"), Change.of(Setting.LOW_SPEED_BRAKING, "off")));
+        w.car.put(Setting.LOW_SPEED_BRAKING, 1);
+        Automations a = new Automations(w);
+        a.screenWentLit();
+        a.readingsChanged();
+        w.gear = "R";
+        a.readingsChanged();
+        w.run(100);
+        assertEquals(Collections.singletonList("low_speed_braking=off"), w.writes);
+
+        a.screenWentDark();
+        w.gear = "P";
+        a.readingsChanged();
+        w.run(10_000);
+        assertTrue("人下车了：不恢复", w.restores.isEmpty());
+        assertEquals(1, w.writes.size());
+    }
+
     /** 本来就是关着的（人自己关的）：不写，也不恢复。 */
     @Test
     public void nothingIsRestoredWhenItWasAlreadySo() {
@@ -480,6 +531,7 @@ public class AutomationsTest {
         w.rules.add(rule(Trigger.gear("R"), Change.of(Setting.LOW_SPEED_BRAKING, "off")));
         w.car.put(Setting.LOW_SPEED_BRAKING, 0);
         Automations a = new Automations(w);
+        a.screenWentLit();
         a.readingsChanged();
         w.gear = "R";
         a.readingsChanged();
@@ -499,6 +551,7 @@ public class AutomationsTest {
         w.car.put(Setting.SENTRY, 0);
         w.gear = "D";
         Automations a = new Automations(w);
+        a.screenWentLit();
         a.readingsChanged();
         w.gear = "P";
         a.readingsChanged();
@@ -521,6 +574,7 @@ public class AutomationsTest {
         w.battery = 10;
         w.gear = "D";
         Automations a = new Automations(w);
+        a.screenWentLit();
         a.readingsChanged();
         w.gear = "P";
         a.readingsChanged();
@@ -541,6 +595,7 @@ public class AutomationsTest {
         w.battery = null;
         w.gear = "D";
         Automations a = new Automations(w);
+        a.screenWentLit();
         a.readingsChanged();
         w.gear = "P";
         a.readingsChanged();
@@ -556,6 +611,7 @@ public class AutomationsTest {
         never.battery = null;
         never.gear = "D";
         Automations b = new Automations(never);
+        b.screenWentLit();
         b.readingsChanged();
         never.gear = "P";
         b.readingsChanged();
