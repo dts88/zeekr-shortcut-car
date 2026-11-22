@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  展开以后的一行「标签 + 内容」（ClauseItemPreference，ui-spec §十六「地点与自动化」）：名称、当、而且、就。
+
+  开关那一格空着（名字对齐那条竖线），标签在前（次要文字色，同一个宽度），内容在后（正文色），从上往下读是一句话；
+  能点的行尾一个 ›。「添加条件」「添加动作」这一种标签空着，内容是加号带文字（energy_text）。卡片的形状照 CardItemPreference。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="8dp"
+    android:background="@drawable/bg_pref_row"
+    android:baselineAligned="false"
+    android:gravity="center_vertical"
+    android:minHeight="64dp"
+    android:orientation="horizontal"
+    android:paddingStart="@dimen/pref_row_padding_start"
+    android:paddingEnd="14dp">
+
+    <LinearLayout
+        android:id="@android:id/widget_frame"
+        android:layout_width="@dimen/pref_switch_width"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="@dimen/pref_switch_gap"
+        android:orientation="vertical" />
+
+    <TextView
+        android:id="@+id/pref_label"
+        android:layout_width="@dimen/pref_clause_label_width"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="16dp"
+        android:maxLines="2"
+        android:textAlignment="viewStart"
+        android:textColor="@color/pref_summary"
+        android:textAppearance="@style/TextAppearance.Cam.Body" />
+
+    <TextView
+        android:id="@android:id/title"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:drawablePadding="8dp"
+        android:ellipsize="end"
+        android:gravity="center_vertical"
+        android:maxLines="3"
+        android:paddingTop="12dp"
+        android:paddingBottom="12dp"
+        android:textAlignment="viewStart"
+        android:textColor="@color/pref_title"
+        android:textAppearance="@style/TextAppearance.Cam.Body" />
+
+    <ImageView
+        android:id="@+id/pref_chevron"
+        android:layout_width="26dp"
+        android:layout_height="26dp"
+        android:layout_marginStart="8dp"
+        android:importantForAccessibility="no"
+        android:src="@drawable/ic_chevron_right"
+        android:tint="@color/text_tertiary" />
+</LinearLayout>

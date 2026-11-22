@@ -76,6 +76,8 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
                     this::onMicPermission);
     /** 「按键」页上的那几组（{@link AccessoryRows}）；别的页是空的。 */
     private final java.util.List<AccessoryRows> accessoryRows = new java.util.ArrayList<>();
+    /** 「地点与自动化」页上的「自动化」那一组；别的页是 null。 */
+    private AutomationRows automationRows;
     /** 绑定前要「附近的设备」权限（扫描、连接），结果交给那几组。登记规矩同上。 */
     private final androidx.activity.result.ActivityResultLauncher<String[]> bluetoothPermissions =
             registerForActivityResult(
@@ -199,6 +201,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         bindRearView();
         bindSideView();
         bindFloating();
+        bindAutomation();
         bindInterface();
         bindSystem();
         // 开发者选项分区：没开时不接线。左栏已经把整块拿掉了；万一是直接跳进来的，点了也不起作用 ——
@@ -1503,9 +1506,27 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         accessoryRows.clear();
     }
 
+    /** 「地点与自动化」页上的「自动化」那一组（{@link AutomationRows}）。重绑时先把上一份收掉。 */
+    private void bindAutomation() {
+        detachAutomation();
+        androidx.preference.PreferenceCategory category = findPreference(AutomationRows.CATEGORY_KEY);
+        if (category != null) {
+            automationRows = new AutomationRows(this, category);
+            automationRows.bind();
+        }
+    }
+
+    private void detachAutomation() {
+        if (automationRows != null) {
+            automationRows.detach();
+            automationRows = null;
+        }
+    }
+
     @Override
     public void onDestroy() {
         detachAccessories();
+        detachAutomation();
         super.onDestroy();
     }
 

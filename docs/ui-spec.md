@@ -1021,6 +1021,8 @@ Provided without any warranty.」），下面才是 GPL 和 EVCam 那一段。�
 ### 地点与自动化
 
 项目所有者 2026-11-20 定名、定模型（规则在 §十八）。文字是草稿，等项目所有者批。
+分两步做：第一步是「自动化」这一组（`settings/AutomationRows`、`AutomationPickers`、`AutomationTexts`）；「地点」这一组是第二步，
+那之前「当」「而且」里没有地点。「此车不支持」的灰项、「改同一项」的提示也跟着第二步。
 
 | 组 | 行 | 控件 | 出现 / 变灰 |
 |---|---|---|---|

@@ -1332,4 +1332,96 @@
     <string name="setup_record_note">These can be changed in Settings → Recording</string>
     <string name="setup_features_note">Turn on what\'s needed. These can be changed in Settings → Super mirror, Settings → Blind spot view and Settings → Buttons</string>
     <string name="setup_done_title">Setup complete</string>
+
+    <!-- 地点与自动化（ui-spec §十六、§十八） -->
+    <string name="set_section_automation">Places and automation</string>
+    <string name="auto_group_rules">Automation</string>
+    <string name="auto_add">Add automation</string>
+    <string name="auto_add_summary">Start from a common one, or pick When and Then yourself</string>
+    <string name="auto_template_reverse">Turn off low-speed emergency braking when reversing</string>
+    <string name="auto_template_reverse_desc">When shifted to R, turn off low-speed emergency braking; restore it when leaving R</string>
+    <string name="auto_template_get_in">Set things when you get in</string>
+    <string name="auto_template_get_in_desc">When you get in, set the chosen items to fixed values</string>
+    <string name="auto_template_blank">Blank</string>
+    <string name="auto_template_blank_desc">Pick When and Then yourself</string>
+    <string name="auto_label_name">Name</string>
+    <string name="auto_label_when">When</string>
+    <string name="auto_label_and">And</string>
+    <string name="auto_label_then">Then</string>
+    <string name="auto_add_condition">Add condition</string>
+    <string name="auto_add_change">Add action</string>
+    <string name="auto_restore">Restore when it ends</string>
+    <string name="auto_restore_summary">%1$s, set the changed settings back to what they were</string>
+    <string name="auto_restore_summary_safety">%1$s, set the changed settings back to what they were. Required when a safety feature is turned off</string>
+    <string name="auto_delete_title">Delete this automation?</string>
+    <string name="auto_delete_msg">Once deleted, it no longer runs.</string>
+    <string name="auto_remove_condition">Delete this condition</string>
+    <string name="auto_remove_change">Delete this action</string>
+    <string name="auto_setting_sentry">Sentry Mode</string>
+    <string name="auto_setting_drive_mode">Drive mode</string>
+    <string name="auto_setting_circulation">Air circulation</string>
+    <string name="auto_setting_rear_climate">Rear climate</string>
+    <string name="auto_setting_hill_descent">Hill descent control</string>
+    <string name="auto_setting_low_speed_braking">Low-speed emergency braking</string>
+    <string name="auto_setting_front_climate">Climate</string>
+    <string name="auto_value_on">On</string>
+    <string name="auto_value_off">Off</string>
+    <string name="auto_value_comfort">Comfort</string>
+    <string name="auto_value_standard">Standard</string>
+    <string name="auto_value_sport">Sport</string>
+    <string name="auto_value_auto">Auto</string>
+    <string name="auto_value_outer">Fresh air</string>
+    <string name="auto_value_inner">Recirculation</string>
+    <string name="auto_trigger_get_in">You get in</string>
+    <string name="auto_trigger_gear">Shifted to %1$s</string>
+    <string name="auto_trigger_state_switch">%1$s turns %2$s</string>
+    <string name="auto_trigger_state_value">%1$s changes to %2$s</string>
+    <string name="auto_when">When: %1$s</string>
+    <string name="auto_end_gear">When leaving %1$s</string>
+    <string name="auto_end_state_switch">When %1$s turns %2$s</string>
+    <string name="auto_end_state_value">When %1$s is no longer %2$s</string>
+    <string name="auto_restore_short">%1$s, restore</string>
+    <string name="auto_cond_gear">In %1$s</string>
+    <string name="auto_cond_battery_at_least">Battery at least %1$d%%</string>
+    <string name="auto_cond_battery_below">Battery below %1$d%%</string>
+    <string name="auto_cond_time">%1$s–%2$s</string>
+    <string name="auto_cond_state_switch">%1$s is %2$s</string>
+    <string name="auto_cond_state_value">%1$s is %2$s</string>
+    <string name="auto_days_every">Every day</string>
+    <string name="auto_days_weekdays">Mon–Fri</string>
+    <string name="auto_days_weekend">Sat, Sun</string>
+    <string-array name="auto_day_names">
+        <item>Mon</item>
+        <item>Tue</item>
+        <item>Wed</item>
+        <item>Thu</item>
+        <item>Fri</item>
+        <item>Sat</item>
+        <item>Sun</item>
+    </string-array>
+    <string name="auto_list_sep">", "</string>
+    <string name="auto_summary_sep">" · "</string>
+    <string name="auto_change">%1$s: %2$s</string>
+    <string name="auto_pick_when_get_in_desc">Once someone is confirmed in the car and the car is on</string>
+    <string name="auto_pick_when_gear">Gear</string>
+    <string name="auto_pick_when_gear_desc">Shifted to P, R, D or N</string>
+    <string name="auto_pick_state">Vehicle status</string>
+    <string name="auto_pick_when_state_desc">A setting changes to a value, such as Climate turning on or Drive mode changing to Sport</string>
+    <string name="auto_pick_and_gear_desc">Gear is P, R, D or N</string>
+    <string name="auto_pick_battery">Battery</string>
+    <string name="auto_pick_battery_desc">Battery at least or below a percentage</string>
+    <string name="auto_pick_time">Time of day</string>
+    <string name="auto_pick_time_desc">A time range each day; it can cross midnight</string>
+    <string name="auto_pick_days">Days of the week</string>
+    <string name="auto_pick_days_desc">Which days of the week</string>
+    <string name="auto_pick_and_state_desc">A setting is a certain value</string>
+    <string name="auto_pick_battery_at_least">Battery at least…</string>
+    <string name="auto_pick_battery_below">Battery below…</string>
+    <string name="auto_pick_time_from">Start time</string>
+    <string name="auto_pick_time_to">End time</string>
+    <string name="auto_pick_get_in_unavailable">%1$s (not with You get in: nothing is restored when you leave)</string>
+    <string name="auto_pick_get_in_blocked">You get in (not while an action turns off a safety feature)</string>
+    <string name="auto_pick_then_drive_desc">Drive mode, hill descent control, low-speed emergency braking</string>
+    <string name="auto_pick_then_climate_desc">Air circulation, rear climate</string>
+    <string name="auto_pick_then_scenes_desc">Sentry Mode</string>
 </resources>

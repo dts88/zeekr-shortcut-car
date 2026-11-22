@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ic_add：加号（「添加条件」「添加动作」，ui-spec §十六）。颜色由用的地方着。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M12,5v14 M5,12h14"
+        android:strokeWidth="1.9"
+        android:strokeColor="@color/energy_text"
+        android:strokeLineCap="round" />
+</vector>

@@ -265,6 +265,23 @@
         </PreferenceCategory>
     </PreferenceScreen>
 
+    <!-- ==================== 地点与自动化 ==================== -->
+    <!-- 人在车上（亮屏）时才跑（项目所有者 2026-11-22，ui-spec §十八）。每一条一行（代码里加，AutomationRows），最后是「添加自动化」 -->
+    <PreferenceScreen
+        android:key="screen_automation"
+        android:title="@string/set_section_automation">
+
+        <PreferenceCategory
+            android:key="cat_automation"
+            android:title="@string/auto_group_rules">
+
+            <Preference
+                android:key="pref_automation_add"
+                android:title="@string/auto_add"
+                android:summary="@string/auto_add_summary" />
+        </PreferenceCategory>
+    </PreferenceScreen>
+
     <!-- ==================== 通用 ==================== -->
     <!-- 原来的「界面」「系统」两页合成这一页；声音收在这里（项目所有者 2026-11-12） -->
     <PreferenceScreen
