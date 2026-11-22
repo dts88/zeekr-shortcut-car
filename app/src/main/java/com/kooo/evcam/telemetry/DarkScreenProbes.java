@@ -71,6 +71,13 @@ final class DarkScreenProbes {
             Signal.GEAR,
             Signal.SENTRY_MODE,
             Signal.DOOR_DRIVER,
+            // 别的车门、后备箱、前备箱（项目所有者 2026-11-22：停着车回来开了哪扇门、遥控挪车时车上发生了什么，记下来）。
+            // 四扇侧门停车时也读（判人回来要它们），后备箱、前备箱只靠订阅：变了照样来，不多读
+            Signal.DOOR_PASSENGER,
+            Signal.DOOR_REAR_LEFT,
+            Signal.DOOR_REAR_RIGHT,
+            Signal.DOOR_TRUNK,
+            Signal.DOOR_FRUNK,
             Signal.SEAT_DRIVER,
             Signal.BELT_DRIVER
     };

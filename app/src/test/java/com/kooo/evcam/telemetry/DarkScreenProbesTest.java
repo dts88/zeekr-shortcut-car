@@ -60,7 +60,12 @@ public class DarkScreenProbesTest {
         assertTrue(DarkScreenProbes.watches(Signal.SEAT_DRIVER));
         assertTrue(DarkScreenProbes.watches(Signal.BELT_DRIVER));
         assertFalse(DarkScreenProbes.watches(Signal.SPEED));
-        assertFalse(DarkScreenProbes.watches(Signal.DOOR_PASSENGER));
+        assertTrue("别的车门也记（2026-11-22）", DarkScreenProbes.watches(Signal.DOOR_PASSENGER));
+        assertTrue(DarkScreenProbes.watches(Signal.DOOR_REAR_LEFT));
+        assertTrue(DarkScreenProbes.watches(Signal.DOOR_REAR_RIGHT));
+        assertTrue(DarkScreenProbes.watches(Signal.DOOR_TRUNK));
+        assertTrue(DarkScreenProbes.watches(Signal.DOOR_FRUNK));
+        assertEquals("door_trunk", DarkScreenProbes.key(Signal.DOOR_TRUNK));
         assertEquals("door_driver", DarkScreenProbes.key(Signal.DOOR_DRIVER));
         assertEquals("黑匣子里的名字和它还在原值那几项里时一样", "screen_power_event",
                 DarkScreenProbes.key(Signal.SCREEN_POWER_EVENT));
