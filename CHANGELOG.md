@@ -11,6 +11,10 @@ commit message, not here.
 
 Nothing yet.
 
+## [4.13.10-alpha] - 2026-11-22
+
+- Diagnostics mark a car moved by remote control with nobody inside, and log every door, the trunk and the frunk.
+
 ## [4.13.9-beta] - 2026-11-22
 
 **Do not update App Lab to 1.0.0.26 or later: you would lose the ability to sideload apps.**
