@@ -19,20 +19,26 @@ final class PersonEvidence {
 
     /** 最近一次算数的「车门开着」的时刻（elapsedRealtime）；0 = 没有。 */
     private volatile long doorAtMs;
+    /**
+     * 那一下开着的是哪几扇（照黑匣子「车辆信号」行的写法：door_passenger 这样，几扇用「+」连）；没有是 null。
+     * 只给记录看（亮屏那一行、诊断报告），判断不看它。
+     */
+    private volatile String doorWhich;
     /** 人最近一次碰应用的时刻（elapsedRealtime）；0 = 没有。 */
     private volatile long touchAtMs;
     /** 熄屏那一下就开着、之后还没读到关上过：这段时间里读到开着不算。 */
     private boolean doorHeld;
 
     /**
-     * 一批车辆读数（车辆接口连着时才叫）：四扇侧门有一扇读到开着没有。
+     * 一批车辆读数（车辆接口连着时才叫）：四扇侧门里读到开着的是哪几扇。
      *
-     * @param open 有一扇开着（都关着、读不到是 false）
+     * @param open 开着的那几扇（照黑匣子「车辆信号」行的写法，几扇用「+」连）；都关着、读不到是 null
      */
-    void doors(boolean open, long now) {
-        if (!open) {
+    void doors(String open, long now) {
+        if (open == null) {
             doorHeld = false;
         } else if (!doorHeld) {
+            doorWhich = open;
             doorAtMs = now;
         }
     }
@@ -49,6 +55,7 @@ final class PersonEvidence {
      */
     void wentDark(boolean doorOpenNow) {
         doorAtMs = 0;
+        doorWhich = null;
         touchAtMs = 0;
         doorHeld = doorOpenNow;
     }
@@ -66,6 +73,11 @@ final class PersonEvidence {
     /** 人最后一次碰应用的时刻；0 = 没有（亮着时读不到的时限从它重新算）。 */
     long touchAtMs() {
         return touchAtMs;
+    }
+
+    /** 最近一次算数的那一下开着的是哪几扇（{@link #doors} 的写法）；没有是 null。只给记录看。 */
+    String doorWhich() {
+        return doorAtMs > 0 ? doorWhich : null;
     }
 
     /** 多久以前读到车门开着（毫秒）；没有是 -1。 */

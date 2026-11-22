@@ -27,6 +27,7 @@ import com.kooo.evcam.telemetry.Telemetry;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * 屏幕亮着还是黑着，也就是<b>人在不在车上</b> —— 进程里唯一的一份，也是唯一写它的地方。
@@ -141,10 +142,13 @@ public final class ScreenState {
         public final long touchAgoMs;
         /** 此刻读数里驾驶座有没有人（TRUE 有）；读不到是 null。 */
         public final Boolean seat;
+        /** 车门那一样证据是哪几扇（照黑匣子「车辆信号」行的写法）；没有是 null。 */
+        public final String doorWhich;
 
         Now(boolean dark, Source source, long darkForMs, boolean androidOff, long androidOffForMs, Boolean vehicle,
             Boolean screenPowerEvent, Integer ignition, Telemetry.CarLink carLink, boolean interactive, boolean known,
-            boolean wakePending, boolean litNeedsEvidence, long doorAgoMs, long touchAgoMs, Boolean seat) {
+            boolean wakePending, boolean litNeedsEvidence, long doorAgoMs, long touchAgoMs, Boolean seat,
+            String doorWhich) {
             this.dark = dark;
             this.source = source;
             this.darkForMs = darkForMs;
@@ -161,6 +165,7 @@ public final class ScreenState {
             this.doorAgoMs = doorAgoMs;
             this.touchAgoMs = touchAgoMs;
             this.seat = seat;
+            this.doorWhich = doorWhich;
         }
     }
 
@@ -347,7 +352,7 @@ public final class ScreenState {
                 r.bool(Signal.SCREEN_POWER_EVENT), r.code(Signal.IGNITION), telemetry.carLink(),
                 DisplayWatch.interactiveNow(), s == Settle.NONE, s == Settle.WAKE,
                 ScreenTransitions.litNeedsEvidence(f.state), EVIDENCE.doorAgoMs(now), EVIDENCE.touchAgoMs(now),
-                r.bool(Signal.SEAT_DRIVER));
+                r.bool(Signal.SEAT_DRIVER), EVIDENCE.doorWhich());
     }
 
     /**
@@ -412,7 +417,7 @@ public final class ScreenState {
         Integer ignition = connected ? readings.code(Signal.IGNITION) : null;
         long now = SystemClock.elapsedRealtime();
         if (connected) {
-            EVIDENCE.doors(doorOpen(readings), now);
+            EVIDENCE.doors(openDoors(readings), now);
         }
         ScreenTransitions.State before = facts.state;
         ScreenTransitions.State next = ScreenTransitions.verdict(before, link, event, ignition,
@@ -554,7 +559,7 @@ public final class ScreenState {
         wakeCapped = capped && connected;
         long now = SystemClock.elapsedRealtime();
         if (connected && !capped) {
-            EVIDENCE.doors(doorOpen(r), now);
+            EVIDENCE.doors(openDoors(r), now);
         }
         // 安卓亮了只是车机醒了：黑着的还黑着，有人的证据才亮（E3），没有就是车机醒着、屏幕黑着（E2'）。
         // 等满了没读回来的那一遍不拿来判（记着的可能是睡之前的）：照读不到算，只认刚碰过应用
@@ -748,12 +753,14 @@ public final class ScreenState {
         long now = SystemClock.elapsedRealtime();
         long darkMs = before.darkAtMs > 0 ? now - before.darkAtMs : -1;
         boolean door = EVIDENCE.door(now);
+        String doorWhich = EVIDENCE.doorWhich();
         boolean touch = EVIDENCE.touch(now);
         Telemetry telemetry = Telemetry.get();
         boolean seat = telemetry.carLinkConnected() && seatTaken(telemetry.readings());
         // 总原则（规格 §0）：停车熄屏是特殊情况；人回来了，特殊情况就结束了，回到用户设定的状态
         BlackBox.noteImportant("亮屏（" + (after.state.vehicle == null ? "这台车机没有车辆接口，只看安卓：安卓亮着"
-                : (door ? "拉开过车门 " : "") + (touch ? "碰过应用 " + touchHow + " " : "") + (seat ? "驾驶座有人" : "")
+                : (door ? "拉开过车门 " + (doorWhich == null ? "" : doorWhich + " ") : "")
+                + (touch ? "碰过应用 " + touchHow + " " : "") + (seat ? "驾驶座有人" : "")
                 + "；车辆信号：screen_power_event"
                 + VehicleScreen.change(VehicleScreen.eventText(before.event), VehicleScreen.eventText(after.event))
                 + "、点火" + VehicleScreen.change(VehicleScreen.ignitionText(before.ignition),
@@ -804,10 +811,28 @@ public final class ScreenState {
         return Boolean.TRUE.equals(r.bool(Signal.SEAT_DRIVER));
     }
 
-    /** 四扇侧门有一扇读到开着（前备箱、后备箱不算：人不从那里上车）。 */
+    /** 四扇侧门（前备箱、后备箱不算：人不从那里上车）。 */
+    private static final Signal[] SIDE_DOORS = {Signal.DOOR_DRIVER, Signal.DOOR_PASSENGER, Signal.DOOR_REAR_LEFT,
+            Signal.DOOR_REAR_RIGHT};
+
+    /** 四扇侧门有一扇读到开着。 */
     private static boolean doorOpen(Readings r) {
-        return Boolean.TRUE.equals(r.bool(Signal.DOOR_DRIVER)) || Boolean.TRUE.equals(r.bool(Signal.DOOR_PASSENGER))
-                || Boolean.TRUE.equals(r.bool(Signal.DOOR_REAR_LEFT)) || Boolean.TRUE.equals(r.bool(Signal.DOOR_REAR_RIGHT));
+        return openDoors(r) != null;
+    }
+
+    /**
+     * 四扇侧门里读到开着的那几扇，照黑匣子「车辆信号」行的写法（信号名小写：door_driver、door_passenger……），几扇用「+」连；
+     * 一扇都没有是 null。亮屏那一行、诊断报告写是哪扇门给的证据（2026-11-21 车上：副驾门开了 20 秒后主驾门才开，
+     * 记录里只看得到主驾门）。
+     */
+    private static String openDoors(Readings r) {
+        StringBuilder which = new StringBuilder();
+        for (Signal door : SIDE_DOORS) {
+            if (Boolean.TRUE.equals(r.bool(door))) {
+                which.append(which.length() == 0 ? "" : "+").append(door.name().toLowerCase(Locale.US));
+            }
+        }
+        return which.length() == 0 ? null : which.toString();
     }
 
     /** 亮着时车辆读不到的时限：到点再判一次（人碰过应用就从那时重新算）；没在算时限就撤掉。 */

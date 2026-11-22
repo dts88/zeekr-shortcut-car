@@ -1027,7 +1027,8 @@ public final class DiagnosticsCollector {
                     .append("，点火=").append(ignitionText(n.ignition))
                     .append(" → 亮着时照这两项判: ").append(verdictText(VehicleScreen.whileLit(n.screenPowerEvent, n.ignition)))
                     .append('\n');
-            sb.append("  有人的证据: 车门").append(n.doorAgoMs < 0 ? "没读到开过" : " " + duration(n.doorAgoMs) + "前开着")
+            sb.append("  有人的证据: 车门").append(n.doorAgoMs < 0 ? "没读到开过" : " " + duration(n.doorAgoMs) + "前开着"
+                    + (n.doorWhich == null ? "" : "（" + n.doorWhich + "）"))
                     .append("，碰应用").append(n.touchAgoMs < 0 ? "没有" : " " + duration(n.touchAgoMs) + "前")
                     .append("，驾驶座").append(n.seat == null ? "读不到" : n.seat ? "有人" : "没人")
                     .append(n.litNeedsEvidence ? "（黑着：车通电了、又有其中一样才亮；车辆读不到只认碰过应用）" : "")

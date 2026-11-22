@@ -91,7 +91,7 @@ public class ScreenTransitionsTest {
         /** 车辆接口连着的一批读数里车门开没开着。 */
         Run doors(boolean open, long now) {
             doorOpen = open;
-            evidence.doors(open, now);
+            evidence.doors(open ? "door_driver" : null, now);
             return this;
         }
 

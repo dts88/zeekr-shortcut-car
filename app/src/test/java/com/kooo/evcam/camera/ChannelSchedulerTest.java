@@ -317,6 +317,44 @@ public class ChannelSchedulerTest {
         assertTrue("排在回放前面的那一轮没有去开被别人拿着的环视", surround.actions.isEmpty());
     }
 
+    /**
+     * 人回来那一下相机服务的通知新挂上、回放还没收全，这一轮不判 —— 事实照样刷新：录像这时来问（人回来那一下的开录），
+     * 读到的是此刻的亮屏，环视不再算熄屏放开（2026-11-22 车上：「开录落定」写成环视「熄屏：环视放开」，其实在等安静）。
+     */
+    @Test
+    public void aRoundWaitingForTheReplayStillSeesTheScreenLit() {
+        surroundOnly();
+        claim(Holder.RECORDING);
+        pipe.plan(SUR);
+        streaming(surround, recS);
+        host.sentry = 0;
+        settle();
+        at(1_000);
+        host.goDark();
+        s.wake();
+        settle();
+        at(1_000 + ChannelRules.HOLD_MS);
+        assertEquals(Arrays.asList("close screen-off"), surround.actions);
+        at(1_000 + ChannelRules.HOLD_MS + 120);
+        closed(surround);
+        drop(Holder.RECORDING);
+        host.parked = true;
+        settle();
+        assertTrue(p.releasedByDark(SUR));
+        assertFalse("停车着、都关了、没人要：通知摘掉", host.listening);
+
+        at(120_000);
+        host.goLit();
+        host.parked = false;
+        host.replayLost = true;
+        claim(Holder.RECORDING);
+        settle();
+        assertTrue(host.listening);
+        assertTrue("回放还没收全：这一轮不判", host.settling);
+        assertFalse("事实是此刻的：亮着，环视不算熄屏放开", p.releasedByDark(SUR));
+        assertEquals("不判、不动相机", Arrays.asList("close screen-off"), surround.actions);
+    }
+
     /** 回放迟迟收不全（那一声没叫到）：兜底过一会儿自己再看，不会就此不动。 */
     @Test
     public void aReplayThatNeverSettlesIsCheckedAgain() {
