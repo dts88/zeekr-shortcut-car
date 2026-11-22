@@ -2937,15 +2937,19 @@ public final class ChannelScheduler {
         }
 
         /**
-         * 接着的这一份这一轮不判（相机服务的通知刚挂上、回放还没收全，{@link ChannelScheduler#round}）：只刷新事实，
-         * 变了的告诉录像那一侧（{@link #tellRecording}）。不判、不动相机、不发决定、不写回。
+         * 接着的这一份这一轮不判（相机服务的通知刚挂上、回放还没收全，{@link ChannelScheduler#round}）：{@link #run} 里除了判和照做
+         * 以外的那几样，照它的先后 —— 刷新事实；关完、丢了的录像输出该派的派（{@link #dispatchDrops}），离开了会话的交来的画布放掉
+         * （{@link #releaseHandedOver}）；变了的告诉录像那一侧（{@link #tellRecording}）。不判、不动相机、不发决定、不写回。
          */
         void observe(long now) {
             w.now = now;
             refresh(now, false);
-            if (!placeholder) {
-                tellRecording();
+            if (placeholder) {
+                return;
             }
+            dispatchDrops();
+            releaseHandedOver(false);
+            tellRecording();
         }
 
         /** 接着的这一份跑一轮（{@link ChannelScheduler#round}）：交回这一轮的答案（下一次什么时候醒、快照照它）。 */

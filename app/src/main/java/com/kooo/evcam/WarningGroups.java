@@ -32,6 +32,8 @@ final class WarningGroups {
     private static final int MAX_KINDS = 500;
     /** 一种里最多记这么多个数（一分钟里同一种再多也够算中位、最大）。 */
     private static final int MAX_VALUES = 512;
+    /** 一行只看这么长（键、最后一个数都在这里面找）。 */
+    private static final int LINE_MAX = 240;
     private static final Pattern MULTI_DIGIT = Pattern.compile("\\d{2,}");
     private static final Pattern NUMBER_WITH_UNIT = Pattern.compile("(\\d{2,})([A-Za-z%]*)");
 
@@ -50,10 +52,12 @@ final class WarningGroups {
      * @return 要存：补在它后面的那一句（上一段省掉过才有，带换行；没省掉过是空串）；不存：null
      */
     synchronized String offer(String tag, String firstLine, long now) {
-        String key = key(tag, firstLine);
+        // 很长的一行（整段数据打进来的）只看前面一截：键本来就只取 120 个字，两遍正则不在锁里跑整行
+        String line = firstLine.length() > LINE_MAX ? firstLine.substring(0, LINE_MAX) : firstLine;
+        String key = key(tag, line);
         Kind kind = kinds.get(key);
         if (kind != null && now - kind.savedAt < GAP_MS) {
-            kind.skip(firstLine);
+            kind.skip(line);
             return null;
         }
         String note = kind == null ? "" : kind.note();
