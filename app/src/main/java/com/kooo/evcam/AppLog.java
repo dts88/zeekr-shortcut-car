@@ -24,10 +24,8 @@ import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 
 public final class AppLog {
     private static final int MAX_BUFFER_LINES = 5000;
@@ -303,14 +301,13 @@ public final class AppLog {
      * 2026-09-26 哨兵模式那一次，编码器为什么坏、重建为什么失败，原因就只在内存里，
      * 导出报告时已经没了。</p>
      *
-     * <p>只存警告和错误，量很小；同一句话 60 秒内只存一次（下次存时补一句中间省掉了几次），
-     * 堆栈只留前几行 —— 不为这个去磨车机的闪存。文件超过上限就只留后一半。</p>
+     * <p>只存警告和错误，量很小；同一种 60 秒内只存一条（{@link WarningGroups}：下次存时补一句中间省掉了几条、
+     * 它们的数的中位和最大），堆栈只留前几行 —— 不为这个去磨车机的闪存。文件超过上限就只留后一半。</p>
      */
     private static final String WARNINGS_LOG = "warnings.log";
     private static final long WARNINGS_LOG_LIMIT_BYTES = 512L * 1024L;
-    private static final long SAME_WARNING_GAP_MS = 60_000L;
     private static final int WARNING_LINES = 12;
-    private static final Map<String, long[]> LAST_WARNING = new HashMap<>();
+    private static final WarningGroups WARNING_GROUPS = new WarningGroups();
     private static Handler warningWriter;
 
     private static void persistWarning(String line, String tag, String message) {
@@ -320,30 +317,16 @@ public final class AppLog {
         }
         int newline = message.indexOf('\n');
         String first = newline >= 0 ? message.substring(0, newline) : message;
-        String key = tag + "|" + (first.length() > 120 ? first.substring(0, 120) : first);
-        long now = android.os.SystemClock.uptimeMillis();
-        long skipped;
-        synchronized (LAST_WARNING) {
-            long[] seen = LAST_WARNING.get(key);
-            if (seen != null && now - seen[0] < SAME_WARNING_GAP_MS) {
-                seen[1]++;
-                return;
-            }
-            skipped = seen == null ? 0 : seen[1];
-            if (LAST_WARNING.size() > 500) {
-                LAST_WARNING.clear();
-            }
-            LAST_WARNING.put(key, new long[]{now, 0});
+        String note = WARNING_GROUPS.offer(tag, first, android.os.SystemClock.uptimeMillis());
+        if (note == null) {
+            return;
         }
         String[] lines = line.split("\n", WARNING_LINES + 1);
         StringBuilder text = new StringBuilder();
         for (int i = 0; i < Math.min(lines.length, WARNING_LINES); i++) {
             text.append(lines[i]).append('\n');
         }
-        if (skipped > 0) {
-            text.append("    (").append(skipped)
-                    .append(" identical messages in the minute before this one were not saved)\n");
-        }
+        text.append(note);
         final String entry = text.toString();
         warningWriter().post(() -> appendWarning(context, entry));
     }

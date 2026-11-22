@@ -9,6 +9,7 @@ package com.kooo.evcam.screen;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
@@ -28,7 +29,7 @@ public class PersonEvidenceTest {
         assertEquals(-1, e.touchAgoMs(1_000));
         assertEquals(0, e.touchAtMs());
 
-        e.doors(true, 1_000);
+        e.doors("door_driver", 1_000);
         e.touched(2_000);
         assertTrue(e.door(1_000 + FRESH));
         assertFalse(e.door(1_001 + FRESH));
@@ -43,9 +44,9 @@ public class PersonEvidenceTest {
     @Test
     public void aDoorKeptOpenStaysFreshUntilAMinuteAfterItCloses() {
         PersonEvidence e = new PersonEvidence();
-        e.doors(true, 1_000);
-        e.doors(true, 100_000);
-        e.doors(false, 110_000);
+        e.doors("door_driver", 1_000);
+        e.doors("door_driver", 100_000);
+        e.doors(null, 110_000);
         assertTrue(e.door(100_000 + FRESH));
         assertFalse(e.door(100_001 + FRESH));
     }
@@ -54,15 +55,16 @@ public class PersonEvidenceTest {
     @Test
     public void goingDarkVoidsWhatCameBefore() {
         PersonEvidence e = new PersonEvidence();
-        e.doors(true, 1_000);
-        e.doors(false, 1_500);
+        e.doors("door_driver", 1_000);
+        e.doors(null, 1_500);
         e.touched(1_000);
         e.wentDark(false);
         assertFalse(e.door(2_000));
+        assertNull(e.doorWhich());
         assertFalse(e.touch(2_000));
         assertEquals(0, e.touchAtMs());
 
-        e.doors(true, 5_000);
+        e.doors("door_passenger", 5_000);
         e.touched(6_000);
         assertTrue(e.door(5_000));
         assertTrue(e.touch(6_000));
@@ -72,14 +74,30 @@ public class PersonEvidenceTest {
     @Test
     public void aDoorOpenWhenItWentDarkMustCloseFirst() {
         PersonEvidence e = new PersonEvidence();
-        e.doors(true, 1_000);
+        e.doors("door_driver", 1_000);
         e.wentDark(true);
-        e.doors(true, 2_000);
-        e.doors(true, 3_000);
+        e.doors("door_driver", 2_000);
+        e.doors("door_driver", 3_000);
         assertFalse(e.door(3_000));
-        e.doors(false, 4_000);
+        assertNull("不算的那一扇不记", e.doorWhich());
+        e.doors(null, 4_000);
         assertFalse(e.door(4_000));
-        e.doors(true, 5_000);
+        e.doors("door_driver", 5_000);
         assertTrue(e.door(5_000));
+    }
+
+    /** 记下是哪几扇门给的证据（只给记录看）：跟着最近一次算数的那一下走，熄屏清掉。 */
+    @Test
+    public void whichDoorGaveTheEvidenceIsKept() {
+        PersonEvidence e = new PersonEvidence();
+        assertNull(e.doorWhich());
+        e.doors("door_passenger", 1_000);
+        assertEquals("door_passenger", e.doorWhich());
+        e.doors("door_driver+door_passenger", 2_000);
+        assertEquals("door_driver+door_passenger", e.doorWhich());
+        e.doors(null, 3_000);
+        assertEquals("关上以后证据还在，记的还是那几扇", "door_driver+door_passenger", e.doorWhich());
+        e.wentDark(false);
+        assertNull(e.doorWhich());
     }
 }

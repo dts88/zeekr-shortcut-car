@@ -2294,7 +2294,10 @@ public final class ChannelScheduler {
             if (facts.cameraServiceSettling()) {
                 // 相机服务的通知刚挂上，每一路此刻的样子（回放）还排在主线程的队列里：这一轮不判 —— 判的话，被别人拿着的、
                 // 不在的那一路还没人说，会去开一次。这之前已经排着的轮、到点的计时器也一样跳过；回放收全了那一层叫醒调度。
-                // 兜底：收尾就排在主线程的队列里，正常用不上；万一那一声没叫到，过一会儿自己再看一眼
+                // 兜底：收尾就排在主线程的队列里，正常用不上；万一那一声没叫到，过一会儿自己再看一眼。
+                // 不判，事实照样刷新、变了的照样告诉录像那一侧：这时来问的（人回来那一下的开录）读到的是此刻的亮熄屏，
+                // 不是上一轮的（2026-11-22 车上：人回来那一下「开录落定」写成环视「熄屏：环视放开」，其实在等安静）
+                attached.observe(now);
                 poster.cancel(timerTask);
                 poster.postDelayed(timerTask, SETTLING_RECHECK_MS);
                 return;
@@ -2931,6 +2934,18 @@ public final class ChannelScheduler {
             dispatchDrops();
             releaseHandedOver(false);
             tellRecording();
+        }
+
+        /**
+         * 接着的这一份这一轮不判（相机服务的通知刚挂上、回放还没收全，{@link ChannelScheduler#round}）：只刷新事实，
+         * 变了的告诉录像那一侧（{@link #tellRecording}）。不判、不动相机、不发决定、不写回。
+         */
+        void observe(long now) {
+            w.now = now;
+            refresh(now, false);
+            if (!placeholder) {
+                tellRecording();
+            }
         }
 
         /** 接着的这一份跑一轮（{@link ChannelScheduler#round}）：交回这一轮的答案（下一次什么时候醒、快照照它）。 */
