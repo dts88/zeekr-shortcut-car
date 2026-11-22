@@ -11,6 +11,10 @@ commit message, not here.
 
 Nothing yet.
 
+## [4.13.8-alpha] - 2026-11-22
+
+- Developer options → Permissions uses the same card rows as the other settings pages.
+
 ## [4.13.7-alpha] - 2026-11-22
 
 - The notice shown when the app brings the main screen to the front counts down from 5 seconds, up from 3.
