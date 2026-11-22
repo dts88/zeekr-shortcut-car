@@ -52,6 +52,12 @@ import java.util.function.Predicate;
  *       （Calvin：空调关着时下车，回来打开空调照样恢复）。自动化写的值不算（{@link RunRules#OWN_WRITE_MS}，不连锁）。</li>
  * </ul>
  *
+ * <h3>只在人在车上时运作（项目所有者 2026-11-21、11-22）</h3>
+ *
+ * <p>「整个自动化，仍然是在着车 / 激活后，才开始运作的」：触发、判条件、写车、结束时恢复，都只在亮屏（有了人在车上的证据、车通电，
+ * {@link ScreenState}）时。熄屏（人下车了；车主拿手机遥控挪车时也是熄屏）挡位变了照记，不触发；熄屏那一下，没做完的不再做，
+ * 等着恢复的也不恢复 —— 一律不写车（关掉的安全功能，车自己会重新打开）。停车时放开资源那一套照旧（lifecycle-spec §3.3）。</p>
+ *
  * <p>用户退出以后（{@code UserExit}）不写车：退出期间的那一次上车先记着，人再打开应用时补上（{@link #resumeAfterExit}）。
  * 黑匣子写第几条、什么触发、做了什么或为什么没做；不写名字。都在主线程上，测试换上假的 {@link World}（{@code AutomationsTest}）。</p>
  */
@@ -179,13 +185,16 @@ public final class Automations {
 
     // ================================================================= 输入（主线程）
 
-    /** 熄屏：人下车了。上车的那几次结束（勾了恢复的恢复），记下在等下一次上车。之后不再写车。 */
+    /**
+     * 熄屏：人下车了。记下在等下一次上车。自动化只在人在车上时运作（项目所有者 2026-11-21、11-22）：还在走的几次一律放下 ——
+     * 没做完的不再做，等着恢复的也不恢复，不写车（关掉的安全功能，车自己会重新打开，ui-spec §十八）。
+     */
     void screenWentDark() {
         lit = false;
         watchGen++;
         world.setAwaitingNextDrive(true);
         wantBattery(false);
-        endRuns(t -> t.kind == Trigger.Kind.GET_IN);
+        dropAll("熄屏了（人下车了）：不再写车，没做完的不做，等着恢复的不恢复");
     }
 
     /** 亮屏（车通电了）：一次上车。 */
@@ -212,7 +221,10 @@ public final class Automations {
         }
     }
 
-    /** 车辆信号变了：挡位换了就是挂入那一挡（离开原来那一挡）。 */
+    /**
+     * 车辆信号变了：挡位换了就是挂入那一挡（离开原来那一挡）。熄屏时（人不在车上，遥控挪车这类）挡位照记、不触发
+     * （项目所有者 2026-11-22）。
+     */
     void readingsChanged() {
         String gear = world.gear();
         if (gear == null) {
@@ -224,6 +236,9 @@ public final class Automations {
             return;
         }
         endRuns(t -> t.kind == Trigger.Kind.GEAR && old.equals(t.gear));
+        if (!lit) {
+            return;
+        }
         fire(Trigger.gear(gear));
     }
 
@@ -658,6 +673,15 @@ public final class Automations {
         }
     }
 
+    /** 熄屏那一下：还在走的几次都放下，不写车、不恢复（{@link #screenWentDark}）。 */
+    private void dropAll(String why) {
+        for (Run run : new ArrayList<>(runs)) {
+            run.ended = true;
+            world.note("自动化 " + run.tag() + "：" + why);
+        }
+        runs.clear();
+    }
+
     /** 这一次算了（还没写任何东西）。 */
     private void drop(Run run, String why) {
         run.ended = true;
@@ -685,9 +709,13 @@ public final class Automations {
         }
     }
 
-    /** 写回原来的值：原来的值读不到、本来就是它的不动。 */
+    /** 写回原来的值：原来的值读不到、本来就是它的不动；人不在车上（熄屏）不写。 */
     private void restore(Run run, Step step) {
         if (!run.rule.restores() || step.before == null) {
+            return;
+        }
+        if (!lit) {
+            world.note("自动化 " + run.tag() + " " + step.change.describe() + "：熄屏了（人下车了），不恢复");
             return;
         }
         int ours = step.change.code();
