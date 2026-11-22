@@ -11,6 +11,11 @@ commit message, not here.
 
 Nothing yet.
 
+## [4.13.7-alpha] - 2026-11-22
+
+- The notice shown when the app brings the main screen to the front counts down from 5 seconds, up from 3.
+- Diagnostics name the door that showed someone is back, no longer report a camera as released in the dark right after someone gets back, and keep one saved warning per kind per minute.
+
 ## [4.13.6-alpha] - 2026-11-21
 
 - Cameras open only after the camera availability notification has been listened to for 3 seconds: getting back in, or opening the app after it was closed, the picture and the recording come about 3 seconds later.
