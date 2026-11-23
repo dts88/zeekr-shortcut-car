@@ -711,6 +711,9 @@
   Apl kembali ke latar depan dan berjalan seperti biasa. Apl akan kembali ke latar belakang dalam %d saat.
   return_notice_stay「点击屏幕可留在此页」/ Tap the screen to stay / Ketik skrin untuk kekal di sini
   （阿拉伯文照写，同别的阿拉伯文一样等审校。数字每秒减一，英文、阿拉伯文照复数写。）
+- 2026-11-23 批准（「地点与自动化」第一步「自动化」那一组，ui-spec §十六；截图和全部中文文字给项目所有者看过：「暂时没有疑问，继续」）：
+  strings.xml 里 `set_section_automation` 和 `auto_*` 全部，中文、英文、马来文（阿拉伯文照写，同别的阿拉伯文一样等审校）。
+  原厂设置的名字照车上原厂界面逐字写。
 - vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
 - 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
 
@@ -719,7 +722,6 @@
 下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
 可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
 
-- 「地点与自动化」的全部文字（strings.xml 里 `set_section_automation`、`auto_*`，2026-11-22 草稿，ui-spec §十六）。
 - 阿拉伯文全部（values-ar，2026-11-19 草稿：先定术语表和写法，再分块翻译、统一核对）。等母语使用者审校（issue 250 的 mina5500）；改的时候照本规范改，词改了连同 §10 的阿拉伯文一列一起改。
 
 ---
