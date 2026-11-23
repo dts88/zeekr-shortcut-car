@@ -11,6 +11,10 @@ commit message, not here.
 
 Nothing yet.
 
+## [4.16.0-alpha] - 2026-11-23
+
+- **Sentry alerts over ntfy (experimental), designed by Fabbbrrr** ([#211](https://github.com/dts88/zeekr-shortcut-car/pull/211)): Settings → Recording → Sentry alerts. When Sentry Mode is triggered (warning or alarm) while Keep recording when the screen goes off is recording, one alert, with a compressed surround view picture if chosen, goes straight to your phone through ntfy, never through a developer's server. One-way: the car takes no commands. Many thanks to Fabbbrrr for the idea, the design and the code.
+
 ## [4.15.0-alpha] - 2026-11-23
 
 - Places and automation: add up to 10 places, centered on the current location or on typed coordinates, with a radius of 200 to 1000 m or a custom one. Rules can start on arriving at or leaving a place, and check whether the car is at or away from some places. New common rule: turn on Sentry Mode when parked away from your places. Place names and coordinates stay in the settings and are not written to diagnostics.
