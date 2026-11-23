@@ -78,6 +78,8 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     private final java.util.List<AccessoryRows> accessoryRows = new java.util.ArrayList<>();
     /** 「地点与自动化」页上的「自动化」那一组；别的页是 null。 */
     private AutomationRows automationRows;
+    /** 同一页上的「地点」那一组；别的页是 null。 */
+    private PlaceRows placeRows;
     /** 绑定前要「附近的设备」权限（扫描、连接），结果交给那几组。登记规矩同上。 */
     private final androidx.activity.result.ActivityResultLauncher<String[]> bluetoothPermissions =
             registerForActivityResult(
@@ -255,6 +257,18 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         // 「详细参数」里可能换过画质；超级镜子、悬浮按钮可能在主界面的开关上拨过
         refreshRecordQuality();
         syncRows();
+        if (placeRows != null) {
+            placeRows.resume();
+        }
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        // 「所在地点」只在这一页看得见时读定位
+        if (placeRows != null) {
+            placeRows.pause();
+        }
     }
 
     @Override
@@ -1514,12 +1528,24 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             automationRows = new AutomationRows(this, category);
             automationRows.bind();
         }
+        androidx.preference.PreferenceCategory places = findPreference(PlaceRows.CATEGORY_KEY);
+        if (places != null) {
+            placeRows = new PlaceRows(this, places);
+            placeRows.bind();
+            if (isResumed()) {
+                placeRows.resume();
+            }
+        }
     }
 
     private void detachAutomation() {
         if (automationRows != null) {
             automationRows.detach();
             automationRows = null;
+        }
+        if (placeRows != null) {
+            placeRows.detach();
+            placeRows = null;
         }
     }
 

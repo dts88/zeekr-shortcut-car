@@ -20,6 +20,7 @@ import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.R;
 import com.kooo.evcam.automation.Change;
 import com.kooo.evcam.automation.Condition;
+import com.kooo.evcam.automation.Place;
 import com.kooo.evcam.automation.Rule;
 import com.kooo.evcam.automation.RuleStore;
 import com.kooo.evcam.automation.Setting;
@@ -62,6 +63,8 @@ final class AutomationRows {
     private String drawn;
     private AppConfig config;
     private SharedPreferences.OnSharedPreferenceChangeListener storeListener;
+    /** 地点改了（改名、删了）：规则里写的地点名跟着变。 */
+    private SharedPreferences.OnSharedPreferenceChangeListener placesListener;
 
     /** 一条自动化的几行。 */
     private static final class Rows {
@@ -89,6 +92,7 @@ final class AutomationRows {
         }
         config = new AppConfig(context);
         storeListener = config.onAutomationRulesChanged(this::storeChanged);
+        placesListener = config.onAutomationPlacesChanged(this::rebuild);
         rebuild();
     }
 
@@ -96,7 +100,11 @@ final class AutomationRows {
         if (config != null && storeListener != null) {
             config.removeChangeListener(storeListener);
         }
+        if (config != null && placesListener != null) {
+            config.removeChangeListener(placesListener);
+        }
         storeListener = null;
+        placesListener = null;
         config = null;
     }
 
@@ -393,6 +401,11 @@ final class AutomationRows {
                 c.getString(R.string.auto_template_reverse_desc)), true));
         items.add(new AutomationPickers.Item(AutomationPickers.twoLines(c, c.getString(R.string.auto_template_get_in),
                 c.getString(R.string.auto_template_get_in_desc)), true));
+        List<Place> places = AutomationTexts.places(c);
+        items.add(places.isEmpty()
+                ? new AutomationPickers.Item(c.getString(R.string.auto_template_away_unavailable), false)
+                : new AutomationPickers.Item(AutomationPickers.twoLines(c, c.getString(R.string.auto_template_away),
+                c.getString(R.string.auto_template_away_desc)), true));
         items.add(new AutomationPickers.Item(AutomationPickers.twoLines(c, c.getString(R.string.auto_template_blank),
                 c.getString(R.string.auto_template_blank_desc)), true));
         AutomationPickers.list(c, c.getString(R.string.auto_add), items, -1, which -> {
@@ -402,6 +415,15 @@ final class AutomationRows {
             } else if (which == 1) {
                 AutomationPickers.pickChange(c, null, Trigger.getIn(), ch -> append(new Rule(newId(), "", true,
                         Trigger.getIn(), Collections.emptyList(), Collections.singletonList(ch), false)), null);
+            } else if (which == 2) {
+                // 停在常用地点以外：挂入 P 挡，而且不在任何一个地点，就开启哨兵模式（ui-spec §十八）
+                List<String> ids = new ArrayList<>();
+                for (Place p : places) {
+                    ids.add(p.id);
+                }
+                append(new Rule(newId(), "", true, Trigger.gear("P"),
+                        Collections.singletonList(Condition.notInPlaces(ids)),
+                        Collections.singletonList(Change.of(Setting.SENTRY, "on")), false));
             } else {
                 AutomationPickers.pickTrigger(c, null, false, t -> AutomationPickers.pickChange(c, null, t,
                         ch -> append(new Rule(newId(), "", true, t, Collections.emptyList(),

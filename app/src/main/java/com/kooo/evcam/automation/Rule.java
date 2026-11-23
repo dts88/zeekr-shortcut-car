@@ -39,22 +39,53 @@ public final class Rule {
         this.restore = restore;
     }
 
-    /** 能不能跑：有触发、至少一个动作。存取时缺了的整条不要（{@code RuleStore}）。 */
+    /**
+     * 能不能跑：有触发、至少一个动作；有关掉安全功能的动作的，触发要在人在车上时会结束（必须恢复，ui-spec §十八），
+     * 不然整条不跑。存取时不能跑的整条不要（{@code RuleStore}）。
+     */
     boolean complete() {
-        return id != null && trigger != null && !changes.isEmpty();
+        return id != null && trigger != null && !changes.isEmpty() && (!hasSafetyOff() || trigger.endsWhileLit());
     }
 
-    /** 结束时恢复不恢复：勾了、或者有关掉安全功能的动作（必须恢复）。每一种触发都有结束（{@link Trigger}）。 */
-    public boolean restores() {
-        if (restore) {
-            return true;
-        }
+    /** 有没有关掉安全功能的动作（必须结束时恢复）。 */
+    public boolean hasSafetyOff() {
         for (Change c : changes) {
             if (c.safetyOff()) {
                 return true;
             }
         }
         return false;
+    }
+
+    /** 用没用到这个地点（触发或条件）。 */
+    public boolean usesPlace(String id) {
+        if (id.equals(trigger.place)) {
+            return true;
+        }
+        for (Condition c : conditions) {
+            if (c.places.contains(id)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** 要不要定位：触发是到达 / 离开某个地点，或者有地点条件。 */
+    boolean needsPlace() {
+        if (trigger.place != null) {
+            return true;
+        }
+        for (Condition c : conditions) {
+            if (c.needsPlace()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** 结束时恢复不恢复：勾了、或者有关掉安全功能的动作（必须恢复）。会不会结束看触发（{@link Trigger#endsWhileLit}）。 */
+    public boolean restores() {
+        return (restore || hasSafetyOff()) && trigger.endsWhileLit();
     }
 
     /** 要不要读电量（{@link Condition#needsBattery}）。 */
