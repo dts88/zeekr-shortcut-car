@@ -697,6 +697,27 @@
   msg_screenshot_no_drive「截图失败：未检测到 U 盘」/ No screenshot: no USB drive found /
   Tiada tangkapan skrin: tiada pemacu USB ditemui（照 msg_photo_no_drive 的写法）。截不到用已有的
   msg_car_action_unavailable「无法执行「截屏」」；通知标题就是动作名。
+- 2026-11-17 / 11-18 批准（「设置 → 录制」最下面一组哨兵提醒；项目所有者看过样稿：「文字同意」，11-18 改了结构后再「文字同意」）。中文是批准的原文，英文、马来文照本规范起草：
+  set_group_sentry_alerts「哨兵提醒」/ Sentry alerts / Amaran Sentry；
+  set_sentry_alerts_mode_title「手机订阅模式」/ Phone subscription / Langganan telefon，三段 opt_off、opt_sentry_alerts_ntfy「ntfy」、opt_sentry_alerts_telegram「Telegram」（两个服务名三种语言都照写）；
+  set_sentry_alerts_mode_summary：11-18 项目所有者把时间改成布防满 30 秒，新句见下面「待项目所有者确认」；
+  set_sentry_alerts_last「上次提醒：%1$s」、set_sentry_alerts_last_failed「上次提醒发送失败：%1$s」；
+  set_sentry_alerts_picture_title「附带画面」；set_sentry_alerts_picture_summary 11-18 审查后补了条件，新句见下面「待项目所有者确认」；
+  set_ntfy_topic_title「ntfy 话题」、set_ntfy_topic_value「尾号 %1$s」、set_ntfy_topic_summary「点击显示二维码，用手机上的 ntfy 应用扫码订阅」；
+  set_ntfy_server_title「ntfy 服务器」、set_ntfy_server_summary「仅支持 https；更换后需重新扫码订阅」、msg_ntfy_server_https_only「仅支持 https」；
+  dlg_sentry_alerts_risk_title「开启哨兵提醒？」、dlg_sentry_alerts_risk_body「提醒和画面会发到公开的 ntfy 服务器，知道话题名的人都能查看。话题名随机生成，只保存在本机，请勿分享二维码或截图。如有泄露，可随时更换话题。」、sentry_alerts_action_turn_on「开启」；
+  dlg_ntfy_subscribe_title「用手机订阅」、dlg_ntfy_subscribe_steps「在手机上安装 ntfy 应用，扫描二维码订阅。」、dlg_ntfy_subscribe_tail「话题尾号 %1$s」、sentry_alerts_action_rotate「更换话题」、sentry_alerts_action_done「完成」、sentry_alerts_action_test「发送测试」；
+  dlg_ntfy_rotate_title「更换话题？」、dlg_ntfy_rotate_body「更换后，旧话题不再收到提醒，手机需重新扫码订阅。新话题同样公开，请勿分享二维码或截图。」、sentry_alerts_action_rotate_confirm「更换」；
+  msg_sentry_alerts_test_sent「已发送测试提醒」、msg_sentry_alerts_test_failed「测试提醒发送失败：%1$s」；
+  手机上收到的：订阅名用 app_name「极氪即刻」，sentry_alert_title「哨兵提醒」，图上打时间（正文 11-23 跟着触发改了，见下面「待项目所有者确认」）。
+- 2026-11-23 批准（哨兵提醒 11-18 写代码时多出来的几句，项目所有者：「全部同意」）：
+  sentry_alert_test「测试提醒 · %1$s」/ Test alert · %1$s / Amaran ujian · %1$s；
+  sentry_alerts_reason_unreachable「无法连接服务器」/ can't reach the server / tidak dapat menghubungi pelayan，sentry_alerts_reason_timeout「连接超时」，
+  sentry_alerts_reason_refused「服务器拒绝（HTTP %1$d）」/ the server refused it (HTTP %1$d) / pelayan menolaknya (HTTP %1$d)；
+  sentry_alerts_qr_failed「无法生成二维码」/ Couldn't create the QR code / Tidak dapat mencipta kod QR；
+  msg_ntfy_server_address_only「只填服务器地址，如 ntfy.sh」/ Enter only the server address, for example ntfy.sh / Masukkan alamat pelayan sahaja, contohnya ntfy.sh；
+  about_credits_copyright 加的署名行「ntfy 提醒由 Fab（Fabbbrrr）设计 - https://github.com/Fabbbrrr」/ ntfy alerts designed by Fab (Fabbbrrr) - https://github.com/Fabbbrrr；
+  关于页「隐私与联网」加上哨兵提醒这一种联网（about_privacy_body；触发那半句 11-23 跟着改，见下面）。
 - 2026-11-21 批准（「开机自启动」的说明：保活只剩周期任务、停车时前台服务也停了，不再是「保持应用在后台运行」；项目所有者：「同意你的调整和说明」）：
   set_auto_start_summary「车机重启或应用被系统关闭后自动重新启动，上车时恢复已开启的功能。关闭后不再自动启动。」/
   After the head unit restarts or the system closes the app, restarts it; the features that were on come back when you get in.
@@ -718,6 +739,15 @@
   strings.xml 里 `auto_group_places`、`auto_place_*`、`auto_trigger_arrive`、`auto_trigger_leave`、`auto_end_arrive`、
   `auto_cond_in_places`、`auto_cond_not_in_places`、`auto_pick_place*`、`auto_pick_in*`、`auto_pick_not_in*`、
   `auto_pick_safety_blocked`、`auto_pick_leave_unavailable`、`auto_template_away*`，中文、英文、马来文（阿拉伯文照写，等审校）。
+- 2026-11-23 批准（项目所有者定触发用「哨兵被触发」—— 警戒或报警，只在「熄屏持续录制」正在录时运作；跟着改的这几句项目所有者：「同意」；阿拉伯文照写，等审校）：
+  set_sentry_alerts_mode_summary「哨兵模式被触发（警戒或报警）时，推送一条提醒到手机。需开启「熄屏持续录制」，且锁车时正在录制。提醒直接发送，不经过开发者的服务器。」/
+  Sends an alert to the phone when Sentry Mode is triggered (warning or alarm). Requires Keep recording when the screen goes off and recording to be running when you lock the car. Alerts are sent directly, not through the developer's servers. /
+  Menghantar amaran ke telefon apabila Mod Sentry dicetuskan (amaran atau penggera). Memerlukan Terus merakam apabila skrin padam dan rakaman berjalan semasa kereta dikunci. Amaran dihantar terus, tidak melalui pelayan pembangun.
+  set_sentry_alerts_picture_summary「每条提醒附一张环视拼图，大小不超过 100 KB。」/ Adds a surround view picture of up to 100 KB to each alert. /
+  Menambah gambar paparan sekeliling hingga 100 KB pada setiap amaran.（条件挪到上一句：整个提醒都要它）；
+  手机上收到的正文：sentry_alert_alert「哨兵警戒 · %1$s」/ Sentry warning · %1$s / Sentry berwaspada · %1$s，
+  sentry_alert_alarm「哨兵报警 · %1$s」/ Sentry alarm · %1$s / Penggera Sentry · %1$s（替换原来的「双闪亮起」「车灯亮起」）；
+  about_privacy_body 哨兵提醒那一条的触发半句（中文、英文两份）。
 - vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
 - 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
 
@@ -734,6 +764,63 @@
 
 每个概念只用一个叫法。「例外」列之外，不用其他说法。
 
+| 概念 | 中文 | English | Bahasa Melayu | 例外与说明 |
+|---|---|---|---|---|
+| 录制（动作） | 录制：开始录制、停止录制、录制中、录制中断 | record / recording | rakam / merakam / rakaman | 「录像」不作动词；不用单字「录」 |
+| 录像（保存的文件） | 录像；「存储上限」里的「录像」 | recording(s)；与照片并列时 video(s)；Storage caps → Videos | rakaman；与照片并列时 video；Had storan → Video | 「视频」只用于「视频流」「视频流配置」，以及转述手机浏览器的叫法（「图片或视频」） |
+| 片段与一次录像 | 片段（量词「段」：每段 3 分钟、第 2 段）；一次从开始到停止的录制 = 录像；回放里切换用「上一条 / 下一条」 | clip；recording；Previous / Next | klip；rakaman；Sebelumnya / Seterusnya | — |
+| 丢帧 | 丢帧（录像里少了画面）；U 盘写入速度跟不上 | dropped frames、drop frames；writes too slowly | bingkai tercicir；menulis terlalu perlahan | 不用「掉帧」「卡帧」 |
+| 影像 | 影像（录像和照片的合称） | footage | rakaman | 单指一种时写录像或照片；「倒车影像」「泊车影像」是原厂功能名 |
+| 照片 | 照片（量词「张」「组」）；「存储上限」里的「照片」 | photo(s)；Storage caps → Photos | foto；Had storan → Foto | 「图片」只指非照片的图像（使用指南插图） |
+| 回放 | 回放；页面名：录像回放、照片回放 | playback；页面名 Videos、Photos | main semula；页面名 Video、Foto | 不用「回看」 |
+| U 盘 | U 盘；需区分类型时写「U 盘或固态硬盘」 | USB drive | pemacu USB | 不用「录像盘」「固态盘」 |
+| 存储位置 / 录像保存在 | 存储位置（设置中选定的 U 盘）；「录像保存在 …」（实际写入的目录，写在选存储位置的框里） | Storage location；Videos are saved in … | Lokasi storan；Video disimpan di … | — |
+| 内置存储 | 内置存储 | internal storage | storan dalaman | 解释寿命时写「内置存储的写入寿命有限」；不用「闪存」「车机存储」「内部存储」作名称 |
+| 环视 | 环视；技术处：环视合成流；版式：四格显示 / 整幅显示 | surround view（标签 Surround）；composite stream；2×2 grid / full frame | paparan sekeliling（标签 Sekeliling）；strim komposit；grid 2×2 / bingkai penuh | 马来文用 sekeliling，不用 keliling |
+| 座舱 | 座舱；前座舱、后座舱 | cabin；front cabin、rear cabin | kabin；kabin depan、kabin belakang | 不用「车厢」；「前排 / 后排」只指座位排 |
+| 摄像头 | 摄像头；摄像头映射 | camera；Camera mapping | kamera；Pemetaan kamera | Android 权限名照系统写「相机权限」；关于页致谢原文不动 |
+| 路 / 画面 | 量词「路」（4 路、录制 3 路）；指某一路用「该路」「此路画面」；看到的内容叫「画面」 | camera；view | kamera；paparan | 不用「那一路」「换一路」；英文、马来文不用 lane / lorong（lorong 只指车道） |
+| 视频流配置 | 视频流配置；入口「编辑视频流配置」；预设：极氪7X（环视）、极氪7X（环视 + 后座舱） | Stream profile；Edit stream profile；Zeekr 7X (surround)、Zeekr 7X (surround + rear cabin) | Profil strim；Edit profil strim；Zeekr 7X (sekeliling)、Zeekr 7X (sekeliling + kabin belakang) | 同一预设在设置列表和状态条上同名；2.20 之前叫「极氪7X（环视 + 前后座舱）」 |
+| 超级镜子 | 超级镜子（2.12 起，原「超级后视镜」）；其窗口在本分区内称「窗口」 | Super mirror（句中也大写 S） | Cermin super | 「电子后视镜」只作解释；贴边标签三种语言都写 Super mirror |
+| 盲区画面 | 盲区画面（按情境在中控屏或 HUD 上该侧显示侧方摄像头画面的窗口，设置在「超级镜子」分区里；显示位置：中控屏 / HUD / 中控屏和 HUD） | Blind spot view（句中也大写 B） | Paparan titik buta | 2026-10-17 项目所有者批准；不用「盲区辅助」（原厂功能的名字）、「侧视弹窗」 |
+| 转向灯 | 转向灯；打转向灯 | turn signal | lampu isyarat | 双闪见「闪远光 / 双闪」 |
+| 盲区指示灯 / 开门预警 | 盲区指示灯（后视镜上那盏灯，开车时旁边有车亮）；开门预警（停车后亮，后视镜上同一盏灯） | blind spot light；door open warning | lampu titik buta；amaran buka pintu | 2026-11-03 加，项目所有者批准；2026-11-04 加的附加项名「盲区提醒」2026-11-09 随附加项去掉；「后视镜」指车外两侧的，英文 side mirror / 马来文 cermin sisi |
+| 情境（盲区画面） | 情境：丰富、标准、简洁（盲区画面那一行除「关闭」外的三档：什么情形显示画面，一档包含下一档） | mode：Full、Standard、Minimal | mod：Penuh、Piawai、Minimum | 2026-11-09 加，中文名字是项目所有者定的，2026-11-09 项目所有者批准 |
+| 方向标签 | 方向标签（超级镜子窗口左上角那块写着前、后、左、右的标签） | Direction label | Label arah | 2.12 加；标签上的字用「前 / 后 / 左 / 右」（zeekr_lane_*），后座舱写「后座舱」（slot_cabin_rear） |
+| 切换范围 | 切换范围（超级镜子在哪几路之间切）：四向、前后、后视 + 后座舱；设置里是「超级镜子」那一行除「关闭」外的三档，不单独成行（2026-11-11） | Views：All four、Front and rear、Rear + rear cabin | Paparan：Empat arah、Depan dan belakang、Belakang + kabin belakang | 2026-10-19 加，取代「只显示前后视」 |
+| 悬浮按钮 | 悬浮按钮；按钮大小、按钮透明度、时长文字大小 | floating button；Button opacity | butang terapung；Kelegapan butang | 「悬浮窗」只用于系统权限名「悬浮窗权限」（Overlay / Paparan di atas apl lain） |
+| 行驶信息条 | 行驶信息条；仅车辆信号页每行下方的小字可简称「信息条」 | Driving info bar（行下小字 Info bar） | Bar maklumat pemanduan | — |
+| 车辆信号（那一页） | 车辆信号（试验性） | Vehicle signals (experimental) | Isyarat kenderaan (percubaan) | 2026-10-23 前叫「系统信息」；说的是车机读得到的那些信号 |
+| 车辆状态 / 车辆信号 | 车辆状态（试验性）只作主界面面板的功能名；泛指读到的数据用「车辆信号」 | Vehicle status (experimental)；vehicle signals | Status kenderaan (percubaan)；isyarat kenderaan | — |
+| 车机 / 车辆 / 车 | 车机 = 运行本应用的中控主机；车辆 = 整车；单字「车」只在固定词里（下车、锁车、车门、车速、车牌、左舵车） | head unit；vehicle | unit kepala；kenderaan | 休眠、重启、占用摄像头的是车机；日常短语可用 car / kereta（leave the car） |
+| 熄屏 / 休眠 | 熄屏、亮屏（屏幕）；休眠、唤醒（车机）；保持唤醒状态（车机，哨兵模式）；熄屏录制（阻止休眠）（开发者选项）；熄屏持续录制（录制）；熄屏后的帧率（熄屏持续录制的下一层） | screen off / on；sleep / wake；keep the head unit awake；Screen-off recording (keep awake)；Keep recording when the screen goes off；Screen-off frame rate | skrin padam / hidup；tidur / bangun；unit kepala kekal berjaga；Rakaman skrin padam (kekal berjaga)；Terus merakam apabila skrin padam；Kadar bingkai skrin padam | 不用「睡」「不让车机睡」；马来文不用 skrin mati |
+| 中控屏 | 中控屏（车机的那块屏幕；系统信息页屏幕电源事件 0x20290300 那一行就叫它，值写熄屏 / 亮屏） | Center screen | Skrin tengah | 2.11.2 加；只在要指那块屏幕本身时用，说状态仍用熄屏 / 亮屏 |
+| HUD | HUD（抬头显示，投在前挡风玻璃上的那块屏；盲区画面可以投到上面） | HUD | HUD | 2026-10-21 加；三种语言都写 HUD，界面上不写「抬头显示」「平视显示」 |
+| 主界面 | 主界面；返回主界面 | Main screen；Back to main screen | Skrin utama；Kembali ke skrin utama | 不用「录制界面」 |
+| 应用 | 应用；需区分时「本应用」「其他应用」 | app；this app | apl；apl ini | 不用「软件」「程序」（关于页致谢原文除外） |
+| 开发者选项 | 开发者选项；条件写「需开启开发者选项」 | developer options | pilihan pembangun | 不用「开发者模式」 |
+| 锁定 / 解锁 | 锁定、解锁、已锁定；「受保护」只描述锁定的效果 | lock、unlock、locked；protected | kunci、buka kunci、dikunci；dilindungi | 悬浮按钮的「锁定位置」是另一个概念 |
+| 开关与窗口 | 开关：开启 / 关闭（已开启、未开启、需开启「X」）；窗口、页面、文件、应用：打开 / 关闭；紧凑值标签：开 / 关 | turn on / off、On / Off；open / close | hidupkan / matikan、Hidup / Mati；buka / tutup | 马来文开关不用 buka / tutup |
+| 手势 | 点击、长按、拖动、滑动（上下滑动 / 左右滑动） | tap、long press、drag、swipe | ketik、tekan lama、seret、leret | 不用「点一下」「划」「单击」 |
+| 诊断信息 / 诊断报告 | 诊断信息（设置项与页面）；诊断报告（导出的文件） | Diagnostics；Diagnostics report | Maklumat diagnostik；Laporan diagnostik | — |
+| 引用写法 | 「设置 → 通用 → 诊断信息」 | Settings → General → Diagnostics | Tetapan → Umum → Maklumat diagnostik | 见 §5 |
+| 开机自启动 | 开机自启动（2.10.4 起含保活，不再有「保持后台运行」） | Start on boot | Mula semasa but | 不用「保活」 |
+| 水印 | 时间水印、应用水印、车牌号水印、水印显示录制规格 | stamp：Timestamp、App stamp、Plate number stamp、Include recording specs | tera：Tera masa、Tera nama apl、Tera nombor plat、Sertakan spesifikasi rakaman | 不用「角标」；英文不用 overlay、badge |
+| 试验性 | 名称旁的标签「试验性」（4.0 起；以前是功能名后缀「（试验性）」） | Experimental | Percubaan | 不用「实验性」「试验功能」 |
+| 鱼眼校正 | 鱼眼校正（按钮与设置项同名）；鱼眼校正方式：直线、宽视野（地平线弯曲）、全圆（直线略弯）；视野角度（超级镜子）、校正视野（界面） | 按钮 Straighten；Fisheye correction、Fisheye projection；Straight lines、Wide (curved horizon)、Full circle (lines slightly curved) | 按钮 Luruskan；Pembetulan mata ikan、Unjuran mata ikan | 英文引用按钮时写 Straighten |
+| 闪远光 / 双闪 | 闪远光；双闪（说明文字里可写全称「双闪警示灯」，项目所有者 2026-10-23） | flash-to-pass；hazard lights（值标签 Hazard；设置里的按钮 Hazard lights） | kelip lampu tinggi；lampu kecemasan | — |
+| 原厂 | 原厂（原厂 360、原厂界面、原厂行车记录仪） | factory | kilang | 英文不用 stock |
+| 挡位 | 挡位 | gear | gear | 不写「档位」；「码率档」的「档」指等级，用字正确 |
+| 驾驶座 / 操作按钮 | 驾驶座（一侧）；操作按钮、操作按钮位置 | driver's side；action buttons、Action button side | sebelah pemandu；butang tindakan、Sebelah butang tindakan | 不用「驾驶位」 |
+| 自动清理 / 删除 | 自动清理（超出上限或空间不足时应用删除最旧的文件）；删除（用户手动） | automatic cleanup；delete | pembersihan automatik；padam | — |
+| 开机 / 启动 | 开机 = 车机开机（开机自启动）；启动 = 应用启动（启动自动录制） | boot（Start on boot）；launch / open（Record on launch） | but（Mula semasa but）；buka（Rakam semasa dibuka） | — |
+| 需重启生效 | 重启应用后生效（放在句末） | Takes effect after restarting the app | Berkuat kuasa selepas apl dimulakan semula | — |
+| 确认按钮 | 知道了 | Got it | Faham | 不用「我知道了」 |
+| 画面调节 | 画面调节；画面调节窗口 | Image adjustment | Pelarasan imej | 不用「亮度 / 降噪调节」 |
+| 设置分区与页面 | 4.0 起：录制、存储、超级镜子、盲区画面、按键、通用、更新与关于、开发者选项；页：详细参数、车辆信号、关于与致谢、初始设置（4.0 以前的「悬浮键与灵动贴」「界面」「系统」「检查更新」不再是页名） | Recording、Storage、Super mirror、Blind spot view、Buttons、General、Updates & about、Developer options（草稿） | Rakaman、Storan、Cermin super、Paparan titik buta、Butang、Umum、Kemas kini & perihal、Pilihan pembangun（草稿） | 英文、马来文 4.0 全部做完后统一整理 |
+| 灵动贴 | 灵动贴（只有页名里和「悬浮键」连着写，别处的悬浮按钮照旧） | smart button | butang pintar | — |
+| 哨兵提醒 | 哨兵提醒（哨兵模式被触发 —— 警戒或报警 —— 时推送到手机的提醒）；手机订阅模式；话题（ntfy 的订阅名）、服务器；订阅（手机扫码收提醒） | Sentry alerts（单条 Sentry alert）；Phone subscription；topic、server；subscribe | Amaran Sentry；Langganan telefon；topik、pelayan；langgan | 2026-11-17 加；「哨兵模式」是原厂功能名，马来文照已有的 Mod Sentry 写 Sentry；ntfy、Telegram 三种语言都照写 |
+| 绑定（灵动贴） | 绑定：绑定灵动贴、已绑定 | pair：Pair smart button、paired | pasangkan：Pasangkan butang pintar、dipasangkan | 「连接」只指连上蓝牙的那一下（长按时）；不用「搜索」「登记」「配对」（2026-11-04 加，2026-11-05 项目所有者批准） |
 | 概念 | 中文 | English | Bahasa Melayu | العربية | 例外与说明 |
 |---|---|---|---|---|---|
 | 录制（动作） | 录制：开始录制、停止录制、录制中、录制中断 | record / recording | rakam / merakam / rakaman | التسجيل (يسجّل)؛ بدء التسجيل، إيقاف التسجيل، جارٍ التسجيل، انقطاع التسجيل | 「录像」不作动词；不用单字「录」 |

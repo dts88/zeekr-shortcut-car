@@ -74,6 +74,8 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     private final androidx.activity.result.ActivityResultLauncher<String> micPermission =
             registerForActivityResult(new androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
                     this::onMicPermission);
+    /** 「录制」页最下面的「哨兵提醒」一组（{@link SentryAlertRows}）；别的页上是 null。 */
+    private SentryAlertRows sentryAlerts;
     /** 「按键」页上的那几组（{@link AccessoryRows}）；别的页是空的。 */
     private final java.util.List<AccessoryRows> accessoryRows = new java.util.ArrayList<>();
     /** 「地点与自动化」页上的「自动化」那一组；别的页是 null。 */
@@ -252,6 +254,9 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         }
         // 权限、存储用量这些可能在别处被改过，回到这个界面时重新读一次
         updateSavedIn();
+        if (sentryAlerts != null) {
+            sentryAlerts.refresh();
+        }
         refreshRearViewWindow();
         refreshOverlayRows();
         // 「详细参数」里可能换过画质；超级镜子、悬浮按钮可能在主界面的开关上拨过
@@ -319,6 +324,12 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         SwitchNavPreference infoBar = findPreference("pref_info_bar");
         if (infoBar != null) {
             infoBar.setValue(getString(R.string.set_info_bar_value, appConfig.getInfoBarItems().size()));
+        }
+
+        // 哨兵提醒（试验性）：存在 alarm.AlertStore（不进设置备份、不进诊断报告），接线在 SentryAlertRows
+        if (findPreference(SentryAlertRows.MODE_KEY) != null) {
+            sentryAlerts = new SentryAlertRows(this, this::requestSync);
+            sentryAlerts.bind();
         }
     }
 
@@ -2300,6 +2311,10 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         show("pref_drive_sound_standard", sound);
         show("pref_drive_sound_volume", sound);
         show("pref_drive_sound_output", sound);
+
+        if (sentryAlerts != null) {
+            sentryAlerts.syncRows();
+        }
     }
 
     private void show(String key, boolean visible) {
@@ -2338,7 +2353,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
     /** 试验性的功能：名称旁一个小标签（ui-spec §三「试验性标签」），名称后面不再写「（试验性）」。 */
     private void tagExperimental() {
         for (String key : new String[] {"pref_info_bar", "cat_smart_buttons", "cat_drive_sound",
-                "pref_vehicle_status"}) {
+                "pref_vehicle_status", SentryAlertRows.CATEGORY_KEY}) {
             Preference pref = findPreference(key);
             if (pref != null && getContext() != null) {
                 pref.setTitle(com.kooo.evcam.ui.TagSpan.append(requireContext(), pref.getTitle(),

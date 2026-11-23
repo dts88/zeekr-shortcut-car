@@ -392,11 +392,14 @@ public final class CameraKeeper {
     }
 
     /**
-     * 拍一张（主界面的拍照键、悬浮按钮、灵动贴）：相机没开就先开（登记表的规矩），出了画面再拍，提示按真的存下了几路说。
+     * 拍一张（主界面的拍照键、悬浮按钮、灵动贴、哨兵提醒）：相机没开就先开（登记表的规矩），出了画面再拍，提示按真的存下了几路说。
      * 主界面在不在前台都一样。主线程。
+     *
+     * @return true：接了，结果之后在主线程上回报；false：这一次没拍 —— 上一张还在拍（{@code callback} 不会被叫），
+     *         或者管线放掉了、配置里一路都没启用（{@code callback} 已经当场回报过）
      */
-    public void takePhoto(MultiCameraManager.PhotoCallback callback) {
-        pipeline().takePhoto(callback);
+    public boolean takePhoto(MultiCameraManager.PhotoCallback callback) {
+        return pipeline().takePhoto(callback);
     }
 
     // ================================================================= 画布（3c 第二步）

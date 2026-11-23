@@ -1308,6 +1308,45 @@
     <string name="setup_features_note">Hidupkan yang diperlukan. Boleh ditukar dalam Tetapan → Cermin super, Tetapan → Paparan titik buta dan Tetapan → Butang</string>
     <string name="setup_done_title">Persediaan selesai</string>
 
+    <!-- Amaran Sentry (bahagian bawah Tetapan → Rakaman) -->
+    <string name="set_group_sentry_alerts">Amaran Sentry</string>
+    <string name="set_sentry_alerts_mode_title">Langganan telefon</string>
+    <string name="set_sentry_alerts_mode_summary">Menghantar amaran ke telefon apabila Mod Sentry dicetuskan (amaran atau penggera). Memerlukan Terus merakam apabila skrin padam dan rakaman berjalan semasa kereta dikunci. Amaran dihantar terus, tidak melalui pelayan pembangun.</string>
+    <string name="opt_sentry_alerts_ntfy">ntfy</string>
+    <string name="opt_sentry_alerts_telegram">Telegram</string>
+    <string name="set_sentry_alerts_last">Amaran terakhir: %1$s</string>
+    <string name="set_sentry_alerts_last_failed">Amaran terakhir gagal: %1$s</string>
+    <string name="set_sentry_alerts_picture_title">Sertakan gambar</string>
+    <string name="set_sentry_alerts_picture_summary">Menambah gambar paparan sekeliling hingga 100 KB pada setiap amaran.</string>
+    <string name="set_ntfy_topic_title">Topik ntfy</string>
+    <string name="set_ntfy_topic_value">Berakhir dengan %1$s</string>
+    <string name="set_ntfy_topic_summary">Ketik untuk memaparkan kod QR, kemudian imbas dengan apl ntfy pada telefon untuk melanggan</string>
+    <string name="set_ntfy_server_title">Pelayan ntfy</string>
+    <string name="set_ntfy_server_summary">Mesti https. Imbas kod QR sekali lagi selepas menukarnya.</string>
+    <string name="msg_ntfy_server_https_only">Mesti https</string>
+    <string name="dlg_sentry_alerts_risk_title">Hidupkan Amaran Sentry?</string>
+    <string name="dlg_sentry_alerts_risk_body">Amaran dan gambar dihantar ke pelayan ntfy awam, dan sesiapa yang tahu nama topik boleh melihatnya. Nama topik dijana secara rawak dan disimpan pada unit kepala ini sahaja. Jangan kongsi kod QR atau tangkapan skrinnya. Jika terdedah, tukar topik pada bila-bila masa.</string>
+    <string name="sentry_alerts_action_turn_on">Hidupkan</string>
+    <string name="dlg_ntfy_subscribe_title">Langgan pada telefon</string>
+    <string name="dlg_ntfy_subscribe_steps">Pasang apl ntfy pada telefon dan imbas kod QR untuk melanggan.</string>
+    <string name="dlg_ntfy_subscribe_tail">Topik berakhir dengan %1$s</string>
+    <string name="sentry_alerts_action_rotate">Tukar topik</string>
+    <string name="sentry_alerts_action_done">Selesai</string>
+    <string name="sentry_alerts_action_test">Hantar ujian</string>
+    <string name="dlg_ntfy_rotate_title">Tukar topik?</string>
+    <string name="dlg_ntfy_rotate_body">Topik lama tidak lagi menerima amaran, dan telefon perlu mengimbas kod QR baharu. Topik baharu juga awam. Jangan kongsi kod QR atau tangkapan skrinnya.</string>
+    <string name="sentry_alerts_action_rotate_confirm">Tukar</string>
+    <string name="msg_sentry_alerts_test_sent">Amaran ujian dihantar</string>
+    <string name="msg_sentry_alerts_test_failed">Amaran ujian gagal: %1$s</string>
+    <string name="sentry_alert_title">Amaran Sentry</string>
+    <string name="sentry_alert_alert">Sentry berwaspada · %1$s</string>
+    <string name="sentry_alert_alarm">Penggera Sentry · %1$s</string>
+    <string name="sentry_alert_test">Amaran ujian · %1$s</string>
+    <string name="sentry_alerts_reason_unreachable">tidak dapat menghubungi pelayan</string>
+    <string name="sentry_alerts_reason_timeout">sambungan tamat masa</string>
+    <string name="sentry_alerts_reason_refused">pelayan menolaknya (HTTP %1$d)</string>
+    <string name="sentry_alerts_qr_failed">Tidak dapat mencipta kod QR</string>
+    <string name="msg_ntfy_server_address_only">Masukkan alamat pelayan sahaja, contohnya ntfy.sh</string>
     <!-- 地点与自动化（ui-spec §十六、§十八） -->
     <string name="set_section_automation">Tempat dan automasi</string>
     <string name="auto_group_rules">Automasi</string>

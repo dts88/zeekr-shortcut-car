@@ -10,6 +10,7 @@ package com.kooo.evcam.settings;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertTrue;
 
 import androidx.preference.Preference;
@@ -464,6 +465,130 @@ public class SettingsShotsTest {
                 Preference row = group.getPreference(j);
                 if (title.equals(String.valueOf(row.getTitle()))) {
                     return row;
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 「录制」最下面的「哨兵提醒」一组（项目所有者 2026-11-17 / 11-18）：「关闭」时只有一行；选 ntfy 时附带画面、话题、服务器，
+     * 说明下面一行写上一次提醒；Telegram 那一段置灰、点不动。截图里的话题是这里现生成的随机名，二维码也是它。
+     */
+    @Test
+    public void sentryAlertRows() {
+        sentryAlertRows(Shots.DAY, "");
+    }
+
+    @Test
+    public void sentryAlertRowsInEnglish() {
+        sentryAlertRows(Shots.DAY_EN, "-en");
+    }
+
+    private void sentryAlertRows(String qualifiers, String suffix) {
+        android.content.Context app = RuntimeEnvironment.getApplication();
+        app.getSharedPreferences(com.kooo.evcam.alarm.AlertStore.FILE, android.content.Context.MODE_PRIVATE)
+                .edit().clear().commit();
+        RuntimeEnvironment.setQualifiers(qualifiers);
+        ShotActivity activity = Robolectric.buildActivity(ShotActivity.class).setup().get();
+        Shots.stillFrames(activity);
+        SettingsShellFragment shell = new SettingsShellFragment();
+        activity.getSupportFragmentManager().beginTransaction().replace(activity.container, shell).commitNow();
+        Shots.settle();
+        shell.showSection("screen_recording");
+        Shots.settle();
+        SettingsPreferenceFragment section = (SettingsPreferenceFragment)
+                shell.getChildFragmentManager().findFragmentById(R.id.settings_detail);
+        assertNotNull(section);
+
+        // 关着：只有「手机订阅模式」一行
+        assertTrue(shown(section, SentryAlertRows.MODE_KEY));
+        assertFalse(shown(section, SentryAlertRows.PICTURE_KEY));
+        assertFalse(shown(section, SentryAlertRows.TOPIC_KEY));
+        assertFalse(shown(section, SentryAlertRows.SERVER_KEY));
+        section.scrollToPreference(SentryAlertRows.MODE_KEY);
+        File off = Shots.save(activity, "settings-recording-day-alerts-off" + suffix);
+        assertTrue(off + " 是空的", off.length() > 10_000);
+
+        // 第一次选 ntfy：先问，停在「关闭」
+        Preference mode = section.findPreference(SentryAlertRows.MODE_KEY);
+        assertNotNull(mode);
+        assertFalse("先问再开", mode.callChangeListener(com.kooo.evcam.alarm.AlertStore.SERVICE_NTFY));
+        Shots.settle();
+        androidx.appcompat.app.AlertDialog risk =
+                (androidx.appcompat.app.AlertDialog) org.robolectric.shadows.ShadowDialog.getLatestDialog();
+        assertNotNull("「开启哨兵提醒？」没弹出来", risk);
+        File riskShot = Shots.save(risk, "settings-alerts-risk" + suffix);
+        assertTrue(riskShot + " 是空的", riskShot.length() > 10_000);
+        risk.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE).performClick();
+        Shots.settle();
+
+        // 开启以后：话题有了、开着，弹「用手机订阅」框
+        com.kooo.evcam.alarm.AlertStore store = com.kooo.evcam.alarm.AlertStore.of(app);
+        assertTrue(store.ready());
+        androidx.appcompat.app.AlertDialog subscribe =
+                (androidx.appcompat.app.AlertDialog) org.robolectric.shadows.ShadowDialog.getLatestDialog();
+        assertNotSame(risk, subscribe);
+        assertEquals(activity.getString(R.string.sentry_alerts_action_rotate),
+                subscribe.getButton(androidx.appcompat.app.AlertDialog.BUTTON_NEUTRAL).getText().toString());
+        File subscribeShot = Shots.save(subscribe, "settings-alerts-subscribe" + suffix);
+        assertTrue(subscribeShot + " 是空的", subscribeShot.length() > 10_000);
+        subscribe.dismiss();
+        Shots.settle();
+
+        // 选 ntfy 时四行；说明下面写上一次提醒
+        store.noteResult(1_763_384_700_000L, com.kooo.evcam.alarm.AlertChannel.Result.ok());
+        shell.showSection("screen_recording");
+        Shots.settle();
+        section = (SettingsPreferenceFragment) shell.getChildFragmentManager().findFragmentById(R.id.settings_detail);
+        assertNotNull(section);
+        mode = section.findPreference(SentryAlertRows.MODE_KEY);
+        assertNotNull(mode);
+        assertTrue(shown(section, SentryAlertRows.PICTURE_KEY));
+        assertTrue(shown(section, SentryAlertRows.TOPIC_KEY));
+        assertTrue(shown(section, SentryAlertRows.SERVER_KEY));
+        section.scrollToPreference(SentryAlertRows.SERVER_KEY);
+        File on = Shots.save(activity, "settings-recording-day-alerts" + suffix);
+        assertTrue(on + " 是空的", on.length() > 10_000);
+
+        // 服务器填错：框不关，下面写「仅支持 https」
+        Preference server = section.findPreference(SentryAlertRows.SERVER_KEY);
+        assertNotNull(server);
+        server.getOnPreferenceClickListener().onPreferenceClick(server);
+        Shots.settle();
+        androidx.appcompat.app.AlertDialog edit =
+                (androidx.appcompat.app.AlertDialog) org.robolectric.shadows.ShadowDialog.getLatestDialog();
+        android.widget.EditText input = findInput(edit.getWindow().getDecorView());
+        assertNotNull(input);
+        input.setText("http://ntfy.example.com");
+        edit.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE).performClick();
+        Shots.settle();
+        assertTrue("填错不关框", edit.isShowing());
+        assertEquals("填错不存", "", store.server());
+        File editShot = Shots.save(edit, "settings-alerts-server-https-only" + suffix);
+        assertTrue(editShot + " 是空的", editShot.length() > 10_000);
+        edit.dismiss();
+
+        // 选「关闭」：话题、同意留着，几行收起
+        assertTrue(mode.callChangeListener("off"));
+        Shots.settle();
+        assertFalse(store.isOn());
+        assertTrue("话题、同意留着", store.ntfyAccepted());
+        assertFalse(shown(section, SentryAlertRows.TOPIC_KEY));
+        // Telegram 那一段点不动
+        assertFalse(mode.callChangeListener(com.kooo.evcam.alarm.AlertStore.SERVICE_TELEGRAM));
+    }
+
+    private static android.widget.EditText findInput(android.view.View view) {
+        if (view instanceof android.widget.EditText) {
+            return (android.widget.EditText) view;
+        }
+        if (view instanceof android.view.ViewGroup) {
+            android.view.ViewGroup group = (android.view.ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                android.widget.EditText found = findInput(group.getChildAt(i));
+                if (found != null) {
+                    return found;
                 }
             }
         }

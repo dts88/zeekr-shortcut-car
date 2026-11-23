@@ -86,6 +86,38 @@
                 android:title="@string/set_info_bar_title"
                 android:summary="@string/set_info_bar_summary" />
         </PreferenceCategory>
+
+        <!--
+          哨兵提醒（试验性，组名旁带标签；项目所有者 2026-11-17 定位置、11-18 定结构，ui-spec §十六）：
+          手机订阅模式（开关合进分段：关闭 / ntfy / Telegram，Telegram 置灰）；不是「关闭」时附带画面；选 ntfy 时话题、服务器。
+          存在 alarm.AlertStore（单独的文件：不进设置备份、不进诊断报告），接线在 SentryAlertRows
+        -->
+        <PreferenceCategory
+            android:key="cat_sentry_alerts"
+            android:title="@string/set_group_sentry_alerts">
+
+            <com.kooo.evcam.settings.SegmentedPreference
+                android:key="pref_sentry_alerts"
+                android:title="@string/set_sentry_alerts_mode_title"
+                android:summary="@string/set_sentry_alerts_mode_summary" />
+
+            <SwitchPreferenceCompat
+                android:key="pref_sentry_alerts_picture"
+                android:title="@string/set_sentry_alerts_picture_title"
+                android:summary="@string/set_sentry_alerts_picture_summary" />
+
+            <!-- ntfy 话题：值是尾号，点开「用手机订阅」框（二维码里是完整的话题） -->
+            <com.kooo.evcam.settings.ValueActionPreference
+                android:key="pref_ntfy_topic"
+                android:title="@string/set_ntfy_topic_title"
+                android:summary="@string/set_ntfy_topic_summary" />
+
+            <!-- ntfy 服务器：值是主机名，点开输入框（只收 https） -->
+            <com.kooo.evcam.settings.ValueActionPreference
+                android:key="pref_ntfy_server"
+                android:title="@string/set_ntfy_server_title"
+                android:summary="@string/set_ntfy_server_summary" />
+        </PreferenceCategory>
     </PreferenceScreen>
 
     <!-- ==================== 存储 ==================== -->

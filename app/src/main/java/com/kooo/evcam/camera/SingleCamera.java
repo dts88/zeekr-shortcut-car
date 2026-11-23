@@ -169,9 +169,9 @@ public class SingleCamera {
         void onFailed(String reason);
     }
 
-    /** 这一路这一张拍完了：存下了（true）或没拍成（false）。每次拍照只回一次。 */
+    /** 这一路这一张拍完了：存下的那个文件，没拍成是 null。每次拍照只回一次。 */
     public interface PhotoDone {
-        void onDone(boolean saved);
+        void onDone(File saved);
     }
 
     /**
@@ -3435,7 +3435,7 @@ public class SingleCamera {
     public void takePicture(String timestamp, PhotoDone done) {
         if (previewSize == null) {
             AppLog.e(TAG, "Camera " + cameraId + " preview size not available");
-            done.onDone(false);
+            done.onDone(null);
             return;
         }
 
@@ -3468,7 +3468,7 @@ public class SingleCamera {
     private void saveJpeg(byte[] data, String timestamp, PhotoDone done) {
         Handler handler = backgroundHandler;
         if (handler == null) {
-            done.onDone(false);
+            done.onDone(null);
             return;
         }
         handler.post(() -> {
@@ -3485,7 +3485,7 @@ public class SingleCamera {
                 done.onDone(saveBitmapAsJPEG(bitmap, timestamp));
             } catch (Exception e) {
                 AppLog.e(TAG, "Camera " + cameraId + " 保存 JPEG 失败", e);
-                done.onDone(false);
+                done.onDone(null);
             } finally {
                 if (bitmap != null) {
                     bitmap.recycle();
@@ -3504,7 +3504,7 @@ public class SingleCamera {
         Size size = previewSize;
         if (handler == null || view == null || !view.isAvailable() || size == null) {
             AppLog.w(TAG, "Camera " + cameraId + " 没有预览画面可抓，这一路没拍成");
-            done.onDone(false);
+            done.onDone(null);
             return;
         }
         handler.post(() -> {
@@ -3512,18 +3512,18 @@ public class SingleCamera {
                 android.graphics.Bitmap bitmap = view.getBitmap(size.getWidth(), size.getHeight());
                 if (bitmap == null) {
                     AppLog.e(TAG, "Camera " + cameraId + " failed to get bitmap from TextureView");
-                    done.onDone(false);
+                    done.onDone(null);
                     return;
                 }
                 bitmap = toNormalView(bitmap);
                 AppLog.d(TAG, "Camera " + cameraId + " picture captured ("
                         + bitmap.getWidth() + "x" + bitmap.getHeight() + ")");
-                boolean saved = saveBitmapAsJPEG(bitmap, timestamp);
+                File saved = saveBitmapAsJPEG(bitmap, timestamp);
                 bitmap.recycle();
                 done.onDone(saved);
             } catch (Exception e) {
                 AppLog.e(TAG, "Camera " + cameraId + " error capturing picture", e);
-                done.onDone(false);
+                done.onDone(null);
             }
         });
     }
@@ -3531,15 +3531,15 @@ public class SingleCamera {
     /**
      * 将Bitmap保存为JPEG文件（使用指定的时间戳）
      *
-     * @return 文件写完了（EXIF 写不进不算失败，见 {@link #writeExif}）
+     * @return 写完的那个文件；没写成是 null（EXIF 写不进不算失败，见 {@link #writeExif}）
      */
-    private boolean saveBitmapAsJPEG(android.graphics.Bitmap bitmap, String timestamp) {
+    private File saveBitmapAsJPEG(android.graphics.Bitmap bitmap, String timestamp) {
         boolean saved = false;
         File photoDir = StorageHelper.getPhotoDir(context);
         if (photoDir == null) {
             // 没有地方可存（没有 U 盘、开发者选项没开）：拍照入口已经拦过，走到这里是拍的途中盘没了
             AppLog.w(TAG, "Camera " + cameraId + " 没有地方存照片（没有 U 盘），这一路没存");
-            return false;
+            return null;
         }
         if (!photoDir.exists()) {
             photoDir.mkdirs();
@@ -3623,7 +3623,7 @@ public class SingleCamera {
                 gridBitmap.recycle();
             }
         }
-        return saved;
+        return saved ? photoFile : null;
     }
 
     /**

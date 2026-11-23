@@ -1333,6 +1333,45 @@
     <string name="setup_features_note">Turn on what\'s needed. These can be changed in Settings → Super mirror, Settings → Blind spot view and Settings → Buttons</string>
     <string name="setup_done_title">Setup complete</string>
 
+    <!-- Sentry alerts (bottom of Settings → Recording) -->
+    <string name="set_group_sentry_alerts">Sentry alerts</string>
+    <string name="set_sentry_alerts_mode_title">Phone subscription</string>
+    <string name="set_sentry_alerts_mode_summary">Sends an alert to the phone when Sentry Mode is triggered (warning or alarm). Requires Keep recording when the screen goes off and recording to be running when you lock the car. Alerts are sent directly, not through the developer\'s servers.</string>
+    <string name="opt_sentry_alerts_ntfy">ntfy</string>
+    <string name="opt_sentry_alerts_telegram">Telegram</string>
+    <string name="set_sentry_alerts_last">Last alert: %1$s</string>
+    <string name="set_sentry_alerts_last_failed">Last alert failed: %1$s</string>
+    <string name="set_sentry_alerts_picture_title">Include a picture</string>
+    <string name="set_sentry_alerts_picture_summary">Adds a surround view picture of up to 100 KB to each alert.</string>
+    <string name="set_ntfy_topic_title">ntfy topic</string>
+    <string name="set_ntfy_topic_value">Ends in %1$s</string>
+    <string name="set_ntfy_topic_summary">Tap to show a QR code, then scan it with the ntfy app on the phone to subscribe</string>
+    <string name="set_ntfy_server_title">ntfy server</string>
+    <string name="set_ntfy_server_summary">Must be https. Scan the QR code again after changing it.</string>
+    <string name="msg_ntfy_server_https_only">Must be https</string>
+    <string name="dlg_sentry_alerts_risk_title">Turn on Sentry alerts?</string>
+    <string name="dlg_sentry_alerts_risk_body">Alerts and pictures go to a public ntfy server, where anyone who knows the topic name can see them. The topic name is random and stored only on this head unit. Don\'t share the QR code or screenshots of it. If it leaks, change the topic at any time.</string>
+    <string name="sentry_alerts_action_turn_on">Turn on</string>
+    <string name="dlg_ntfy_subscribe_title">Subscribe on the phone</string>
+    <string name="dlg_ntfy_subscribe_steps">Install the ntfy app on the phone and scan the QR code to subscribe.</string>
+    <string name="dlg_ntfy_subscribe_tail">Topic ends in %1$s</string>
+    <string name="sentry_alerts_action_rotate">Change topic</string>
+    <string name="sentry_alerts_action_done">Done</string>
+    <string name="sentry_alerts_action_test">Send a test</string>
+    <string name="dlg_ntfy_rotate_title">Change the topic?</string>
+    <string name="dlg_ntfy_rotate_body">The old topic gets no more alerts, and the phone needs to scan the new QR code. The new topic is just as public. Don\'t share the QR code or screenshots of it.</string>
+    <string name="sentry_alerts_action_rotate_confirm">Change</string>
+    <string name="msg_sentry_alerts_test_sent">Test alert sent</string>
+    <string name="msg_sentry_alerts_test_failed">Test alert failed: %1$s</string>
+    <string name="sentry_alert_title">Sentry alert</string>
+    <string name="sentry_alert_alert">Sentry warning · %1$s</string>
+    <string name="sentry_alert_alarm">Sentry alarm · %1$s</string>
+    <string name="sentry_alert_test">Test alert · %1$s</string>
+    <string name="sentry_alerts_reason_unreachable">can\'t reach the server</string>
+    <string name="sentry_alerts_reason_timeout">connection timed out</string>
+    <string name="sentry_alerts_reason_refused">the server refused it (HTTP %1$d)</string>
+    <string name="sentry_alerts_qr_failed">Couldn\'t create the QR code</string>
+    <string name="msg_ntfy_server_address_only">Enter only the server address, for example ntfy.sh</string>
     <!-- 地点与自动化（ui-spec §十六、§十八） -->
     <string name="set_section_automation">Places and automation</string>
     <string name="auto_group_rules">Automation</string>

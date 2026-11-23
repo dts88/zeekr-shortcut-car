@@ -7,6 +7,8 @@
     <cloud-backup>
         <!-- 开发者模式卸载重装后要关着：不让系统把它备份、再恢复回来（见 DeveloperMode） -->
         <exclude domain="sharedpref" path="developer_mode.xml"/>
+        <!-- 哨兵提醒的话题就是钥匙：只留在这台车机上，不让系统备份、换机带走（见 alarm.AlertStore） -->
+        <exclude domain="sharedpref" path="sentry_alerts.xml"/>
         <!-- TODO: Use <include> and <exclude> to control what is backed up.
         <include .../>
         <exclude .../>
@@ -14,6 +16,7 @@
     </cloud-backup>
     <device-transfer>
         <exclude domain="sharedpref" path="developer_mode.xml"/>
+        <exclude domain="sharedpref" path="sentry_alerts.xml"/>
     </device-transfer>
     <!--
     <device-transfer>
