@@ -11,6 +11,10 @@ commit message, not here.
 
 Nothing yet.
 
+## [4.15.0-alpha] - 2026-11-23
+
+- Places and automation: add up to 10 places, centered on the current location or on typed coordinates, with a radius of 200 to 1000 m or a custom one. Rules can start on arriving at or leaving a place, and check whether the car is at or away from some places. New common rule: turn on Sentry Mode when parked away from your places. Place names and coordinates stay in the settings and are not written to diagnostics.
+
 ## [4.14.0-alpha] - 2026-11-23
 
 - New settings section Places and automation: add rules of the form when / and / then. When: you get in, a gear, or a vehicle setting changing; and: gear, battery, time of day, days of the week, a vehicle setting; then: drive mode, hill descent control, low-speed emergency braking, air circulation, rear climate, Sentry Mode. Rules run only while someone is in the car; places come later. Built on Calvin Bui's restore-at-start work.
