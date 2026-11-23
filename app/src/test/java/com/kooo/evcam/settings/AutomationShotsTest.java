@@ -165,7 +165,8 @@ public class AutomationShotsTest {
         add.getOnPreferenceClickListener().onPreferenceClick(add);
         Shots.settle();
         AlertDialog templates = (AlertDialog) ShadowDialog.getLatestDialog();
-        assertEquals(3, templates.getListView().getCount());
+        assertEquals("常用的三条 + 空白", 4, templates.getListView().getCount());
+        assertFalse("没有地点：停在常用地点以外那一条灰着", templates.getListView().getAdapter().isEnabled(2));
         save(templates, "settings-automation-" + tag + "-add");
         // 选倒车那条：加在最后、开着、结束时恢复
         pick(templates, 0);
@@ -188,7 +189,8 @@ public class AutomationShotsTest {
         // 上车那条的「添加条件」
         click(section.findPreference("automation_rule_a2/and+"));
         AlertDialog and = (AlertDialog) ShadowDialog.getLatestDialog();
-        assertEquals(5, and.getListView().getCount());
+        assertEquals(6, and.getListView().getCount());
+        assertFalse("没有地点：地点灰着", and.getListView().getAdapter().isEnabled(0));
         save(and, "settings-automation-" + tag + "-and");
         and.dismiss();
 

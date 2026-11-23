@@ -280,6 +280,21 @@
                 android:title="@string/auto_add"
                 android:summary="@string/auto_add_summary" />
         </PreferenceCategory>
+
+        <!-- 地点：所在地点（状态行，有地点时才有）；每个地点一行（代码里加，PlaceRows）；最后是「添加地点」 -->
+        <PreferenceCategory
+            android:key="cat_places"
+            android:title="@string/auto_group_places">
+
+            <Preference
+                android:key="pref_place_here"
+                android:selectable="false"
+                android:title="@string/auto_place_no_fix" />
+
+            <Preference
+                android:key="pref_place_add"
+                android:title="@string/auto_place_add" />
+        </PreferenceCategory>
     </PreferenceScreen>
 
     <!-- ==================== 通用 ==================== -->

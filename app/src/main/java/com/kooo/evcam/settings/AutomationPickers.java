@@ -26,6 +26,7 @@ import com.google.android.material.timepicker.TimeFormat;
 import com.kooo.evcam.R;
 import com.kooo.evcam.automation.Change;
 import com.kooo.evcam.automation.Condition;
+import com.kooo.evcam.automation.Place;
 import com.kooo.evcam.automation.Setting;
 import com.kooo.evcam.automation.Trigger;
 import com.kooo.evcam.ui.CamDialogs;
@@ -94,22 +95,46 @@ final class AutomationPickers {
     // ================================================================= 当
 
     /**
-     * 选「当」：上车（直接选中）、挡位、车辆状态。{@code safetyOff}：这一条有关掉安全功能的动作 —— 上车不会在人在车上时结束，
-     * 恢复不了，灰着。
+     * 选「当」：上车（直接选中）、挡位、地点、车辆状态（ui-spec §十八 的先后）。{@code safetyOff}：这一条有关掉安全功能的动作 ——
+     * 上车、离开某个地点不会在人在车上时结束，恢复不了，灰着。
      */
     static void pickTrigger(Context c, Trigger current, boolean safetyOff, Consumer<Trigger> onPick) {
+        List<Place> places = AutomationTexts.places(c);
         List<Item> groups = new ArrayList<>();
         groups.add(safetyOff ? new Item(c.getString(R.string.auto_pick_get_in_blocked), false)
                 : new Item(twoLines(c, c.getString(R.string.auto_trigger_get_in),
                 c.getString(R.string.auto_pick_when_get_in_desc)), true));
         groups.add(new Item(twoLines(c, c.getString(R.string.auto_pick_when_gear),
                 c.getString(R.string.auto_pick_when_gear_desc)), true));
+        groups.add(places.isEmpty() ? new Item(c.getString(R.string.auto_pick_place_none), false)
+                : new Item(twoLines(c, c.getString(R.string.auto_pick_place),
+                c.getString(R.string.auto_pick_when_place_desc)), true));
         groups.add(new Item(twoLines(c, c.getString(R.string.auto_pick_state),
                 c.getString(R.string.auto_pick_when_state_desc)), true));
-        int checked = current == null ? -1 : current.kind.ordinal();
+        int checked = current == null ? -1 : triggerGroup(current.kind);
         list(c, c.getString(R.string.auto_label_when), groups, checked, which -> {
             if (which == 0) {
                 onPick.accept(Trigger.getIn());
+            } else if (which == 2) {
+                // 到达、离开每个地点；有关掉安全功能的动作时离开灰着（不会结束，恢复不了）
+                List<Trigger> all = new ArrayList<>();
+                List<Item> items = new ArrayList<>();
+                int at = -1;
+                for (int i = 0; i < places.size(); i++) {
+                    String name = AutomationTexts.placeName(c, places.get(i), i);
+                    for (Trigger t : new Trigger[] {Trigger.arrive(places.get(i).id), Trigger.leave(places.get(i).id)}) {
+                        if (t.equals(current)) {
+                            at = all.size();
+                        }
+                        all.add(t);
+                        String text = t.kind == Trigger.Kind.ARRIVE ? c.getString(R.string.auto_trigger_arrive, name)
+                                : c.getString(R.string.auto_trigger_leave, name);
+                        boolean blocked = safetyOff && !t.endsWhileLit();
+                        items.add(new Item(blocked ? c.getString(R.string.auto_pick_safety_blocked, text) : text,
+                                !blocked));
+                    }
+                }
+                list(c, c.getString(R.string.auto_pick_place), items, at, i -> onPick.accept(all.get(i)));
             } else if (which == 1) {
                 List<Item> gears = new ArrayList<>();
                 int at = -1;
@@ -139,20 +164,39 @@ final class AutomationPickers {
         });
     }
 
+    /** 「当」第一层的第几项。 */
+    private static int triggerGroup(Trigger.Kind kind) {
+        switch (kind) {
+            case GET_IN:
+                return 0;
+            case GEAR:
+                return 1;
+            case ARRIVE:
+            case LEAVE:
+                return 2;
+            default:
+                return 3;
+        }
+    }
+
     // ================================================================= 而且
 
     /**
-     * 选「而且」：挡位是、电量、时间段、星期、车辆状态。{@code current} 是改的那一个（新加的是 null）；{@code onRemove} 不是 null 时
+     * 选「而且」：地点、挡位是、电量、时间段、星期、车辆状态。{@code current} 是改的那一个（新加的是 null）；{@code onRemove} 不是 null 时
      * 第一层最上面是「删除这个条件」。
      */
     static void pickCondition(Context c, FragmentManager fm, Condition current, Consumer<Condition> onPick,
                               Runnable onRemove) {
+        List<Place> places = AutomationTexts.places(c);
         List<Item> groups = new ArrayList<>();
         int offset = 0;
         if (onRemove != null) {
             groups.add(new Item(c.getString(R.string.auto_remove_condition), true));
             offset = 1;
         }
+        groups.add(places.isEmpty() ? new Item(c.getString(R.string.auto_pick_place_none), false)
+                : new Item(twoLines(c, c.getString(R.string.auto_pick_place),
+                c.getString(R.string.auto_pick_and_place_desc)), true));
         groups.add(new Item(twoLines(c, c.getString(R.string.auto_pick_when_gear),
                 c.getString(R.string.auto_pick_and_gear_desc)), true));
         groups.add(new Item(twoLines(c, c.getString(R.string.auto_pick_battery),
@@ -172,15 +216,18 @@ final class AutomationPickers {
             }
             switch (which - base) {
                 case 0:
-                    pickGear(c, current, onPick);
+                    pickPlaces(c, places, current, onPick);
                     break;
                 case 1:
-                    pickBattery(c, current, onPick);
+                    pickGear(c, current, onPick);
                     break;
                 case 2:
-                    pickTime(c, fm, current, onPick);
+                    pickBattery(c, current, onPick);
                     break;
                 case 3:
+                    pickTime(c, fm, current, onPick);
+                    break;
+                case 4:
                     pickDays(c, current, onPick);
                     break;
                 default:
@@ -192,18 +239,70 @@ final class AutomationPickers {
 
     private static int conditionGroup(Condition.Kind kind) {
         switch (kind) {
-            case GEAR_IS:
+            case IN_PLACES:
+            case NOT_IN_PLACES:
                 return 0;
+            case GEAR_IS:
+                return 1;
             case BATTERY_AT_LEAST:
             case BATTERY_BELOW:
-                return 1;
-            case TIME_BETWEEN:
                 return 2;
-            case WEEKDAYS:
+            case TIME_BETWEEN:
                 return 3;
-            default:
+            case WEEKDAYS:
                 return 4;
+            default:
+                return 5;
         }
+    }
+
+    /** 在 / 不在，再勾几个地点（至少一个才能保存）。 */
+    private static void pickPlaces(Context c, List<Place> places, Condition current, Consumer<Condition> onPick) {
+        List<Item> items = new ArrayList<>();
+        items.add(new Item(c.getString(R.string.auto_pick_in), true));
+        items.add(new Item(c.getString(R.string.auto_pick_not_in), true));
+        int at = current == null ? -1 : current.kind == Condition.Kind.IN_PLACES ? 0
+                : current.kind == Condition.Kind.NOT_IN_PLACES ? 1 : -1;
+        list(c, c.getString(R.string.auto_pick_place), items, at, which -> {
+            boolean in = which == 0;
+            String[] names = new String[places.size()];
+            boolean[] on = new boolean[places.size()];
+            for (int i = 0; i < places.size(); i++) {
+                names[i] = AutomationTexts.placeName(c, places.get(i), i);
+                // 改已有的照它勾；新加的「不在」默认全勾（停在所有常用地点以外），「在」都不勾
+                on[i] = current != null && at >= 0 ? current.places.contains(places.get(i).id) : !in;
+            }
+            // 一个都没勾时「保存」点不了
+            androidx.appcompat.app.AlertDialog[] shown = new androidx.appcompat.app.AlertDialog[1];
+            Runnable sync = () -> {
+                boolean any = false;
+                for (boolean b : on) {
+                    any |= b;
+                }
+                CamDialogs.enable(shown[0], androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE, any);
+            };
+            shown[0] = CamDialogs.show(
+                    new MaterialAlertDialogBuilder(c, R.style.Theme_Cam_MaterialAlertDialog)
+                            .setTitle(in ? R.string.auto_pick_in_title : R.string.auto_pick_not_in_title)
+                            .setMultiChoiceItems(names, on, (d, i, checked) -> {
+                                on[i] = checked;
+                                sync.run();
+                            })
+                            .setPositiveButton(R.string.action_save, (d, w) -> {
+                                List<String> ids = new ArrayList<>();
+                                for (int i = 0; i < places.size(); i++) {
+                                    if (on[i]) {
+                                        ids.add(places.get(i).id);
+                                    }
+                                }
+                                Condition k = in ? Condition.inPlaces(ids) : Condition.notInPlaces(ids);
+                                if (k != null) {
+                                    onPick.accept(k);
+                                }
+                            })
+                            .setNegativeButton(R.string.action_cancel, null));
+            sync.run();
+        });
     }
 
     private static void pickGear(Context c, Condition current, Consumer<Condition> onPick) {
@@ -305,8 +404,8 @@ final class AutomationPickers {
     // ================================================================= 就
 
     /**
-     * 选「就」：驾驶、空调、场景。{@code trigger} 是这一条的「当」—— 上车时关掉安全功能的那一项灰着（人下车时不恢复）。
-     * {@code onRemove} 不是 null 时第一层最上面是「删除这个动作」。
+     * 选「就」：驾驶、空调、场景。{@code trigger} 是这一条的「当」—— 不会结束的（上车、离开某个地点）关掉安全功能的那一项灰着
+     * （恢复不了）。{@code onRemove} 不是 null 时第一层最上面是「删除这个动作」。
      */
     static void pickChange(Context c, Change current, Trigger trigger, Consumer<Change> onPick, Runnable onRemove) {
         List<Item> groups = new ArrayList<>();
@@ -346,8 +445,10 @@ final class AutomationPickers {
                     boolean blocked = noEnd && ch.safetyOff();
                     String text = AutomationTexts.change(c, ch);
                     changes.add(ch);
-                    items.add(new Item(blocked ? c.getString(R.string.auto_pick_get_in_unavailable, text) : text,
-                            !blocked));
+                    String why = blocked && trigger != null && trigger.kind == Trigger.Kind.LEAVE
+                            ? c.getString(R.string.auto_pick_leave_unavailable, text)
+                            : c.getString(R.string.auto_pick_get_in_unavailable, text);
+                    items.add(new Item(blocked ? why : text, !blocked));
                 }
             }
             list(c, c.getString(group.label), items, at, i -> onPick.accept(changes.get(i)));

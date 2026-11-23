@@ -203,6 +203,18 @@ public final class CamDialogs {
         bar.requestLayout();
     }
 
+    /**
+     * 框里的一个按钮能不能点（「保存」要填好了才能点）：按钮的颜色是这里刷死的，不能点时看不出来，所以连透明度一起改
+     * （Material 的禁用值 0.38）。
+     */
+    public static void enable(androidx.appcompat.app.AlertDialog dialog, int which, boolean enabled) {
+        Button b = dialog == null ? null : dialog.getButton(which);
+        if (b != null) {
+            b.setEnabled(enabled);
+            b.setAlpha(enabled ? 1f : 0.38f);
+        }
+    }
+
     private static Button button(Dialog dialog, int which) {
         if (dialog instanceof androidx.appcompat.app.AlertDialog) {
             return ((androidx.appcompat.app.AlertDialog) dialog).getButton(which);
