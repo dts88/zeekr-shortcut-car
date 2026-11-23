@@ -128,6 +128,12 @@ public class SettingsShotsTest {
         knobRows(Shots.DAY_EN, "-en");
     }
 
+    /** 从右往左：展开的行尾箭头照样朝上、收着的朝下（ValueActionPreference.chevronRotation）。 */
+    @Test
+    public void knobRowsInArabic() {
+        knobRows(Shots.DAY_AR, "-ar");
+    }
+
     private void knobRows(String qualifiers, String suffix) {
         android.content.Context app = RuntimeEnvironment.getApplication();
         AppConfig config = new AppConfig(app);

@@ -67,6 +67,18 @@ public class ValueActionPreference extends Preference implements PreferenceRows.
         notifyChanged();
     }
 
+    /**
+     * 行尾 › 转多少度：进下一层的不转；展开的朝上、收着的朝下。从右往左时 › 本身已经左右翻过来（‹，autoMirrored），
+     * 转的方向也要反过来，不然展开、收着上下颠倒。
+     */
+    static float chevronRotation(Boolean expanded, boolean rightToLeft) {
+        if (expanded == null) {
+            return 0f;
+        }
+        float turn = expanded ? -90f : 90f;
+        return rightToLeft ? -turn : turn;
+    }
+
     @Override
     public void onBindViewHolder(PreferenceViewHolder holder) {
         super.onBindViewHolder(holder);
@@ -90,7 +102,9 @@ public class ValueActionPreference extends Preference implements PreferenceRows.
         }
         View chevron = holder.findViewById(R.id.pref_chevron);
         if (chevron != null) {
-            chevron.setRotation(expanded == null ? 0f : expanded ? -90f : 90f);
+            // 照界面语言的方向判（绑定时这一行可能还没挂上去，它自己的方向还没解析出来）
+            chevron.setRotation(chevronRotation(expanded, chevron.getResources().getConfiguration().getLayoutDirection()
+                    == View.LAYOUT_DIRECTION_RTL));
         }
         CardItemPreference.shape(holder.itemView, Boolean.TRUE.equals(expanded) ? CardItemPreference.TOP
                 : CardItemPreference.ALONE, true);
