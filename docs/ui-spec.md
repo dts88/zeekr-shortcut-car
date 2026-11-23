@@ -1020,7 +1020,7 @@ Provided without any warranty.」），下面才是 GPL 和 EVCam 那一段。�
 
 ### 地点与自动化
 
-项目所有者 2026-11-20 定名、定模型（规则在 §十八）。「自动化」那一组的文字 2026-11-23 批准（ui-text-style §9）；「地点」那一组的还是草稿。
+项目所有者 2026-11-20 定名、定模型（规则在 §十八）。「自动化」「地点」两组的文字都是 2026-11-23 批准（ui-text-style §9）。
 分两步做：第一步是「自动化」这一组（`settings/AutomationRows`、`AutomationPickers`、`AutomationTexts`）；第二步是「地点」这一组
 （`settings/PlaceRows`，半径那一行是 `SegmentedItemPreference`）和「当」「而且」里的地点。「此车不支持」的灰项、「改同一项」的提示还没做
 （车机报不报支持要先上车看）。

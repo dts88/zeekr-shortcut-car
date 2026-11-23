@@ -714,6 +714,10 @@
 - 2026-11-23 批准（「地点与自动化」第一步「自动化」那一组，ui-spec §十六；截图和全部中文文字给项目所有者看过：「暂时没有疑问，继续」）：
   strings.xml 里 `set_section_automation` 和 `auto_*` 全部，中文、英文、马来文（阿拉伯文照写，同别的阿拉伯文一样等审校）。
   原厂设置的名字照车上原厂界面逐字写。
+- 2026-11-23 批准（「地点与自动化」第二步「地点」，ui-spec §十六；截图和全部中文文字给项目所有者看过：「可以 继续」）：
+  strings.xml 里 `auto_group_places`、`auto_place_*`、`auto_trigger_arrive`、`auto_trigger_leave`、`auto_end_arrive`、
+  `auto_cond_in_places`、`auto_cond_not_in_places`、`auto_pick_place*`、`auto_pick_in*`、`auto_pick_not_in*`、
+  `auto_pick_safety_blocked`、`auto_pick_leave_unavailable`、`auto_template_away*`，中文、英文、马来文（阿拉伯文照写，等审校）。
 - vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
 - 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
 
@@ -722,9 +726,6 @@
 下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
 可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
 
-- 「地点与自动化」地点那一组和地点相关的文字（strings.xml 里 `auto_group_places`、`auto_place_*`、`auto_trigger_arrive`、
-  `auto_trigger_leave`、`auto_end_arrive`、`auto_cond_*_places`、`auto_pick_place*`、`auto_pick_in*`、`auto_pick_not_in*`、
-  `auto_pick_safety_blocked`、`auto_pick_leave_unavailable`、`auto_template_away*`，2026-11-23 草稿，ui-spec §十六）。
 - 阿拉伯文全部（values-ar，2026-11-19 草稿：先定术语表和写法，再分块翻译、统一核对）。等母语使用者审校（issue 250 的 mina5500）；改的时候照本规范改，词改了连同 §10 的阿拉伯文一列一起改。
 
 ---
