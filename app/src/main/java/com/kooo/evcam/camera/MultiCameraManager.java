@@ -494,9 +494,8 @@ public class MultiCameraManager {
         this.context = context;
         // 录像让了之后什么时候再试：相机管家给这一份开一本（3c 第二步 2b）
         retries = CameraKeeper.get(context).recordRetries(this::retryLane);
-        // 相机服务眼里每一路空不空：管线一建就听。以前只有前台服务调它，前台服务没起来时相机服务说的话一句都没收，
-        // 每次丢失都被判成「没说空闲」。注册那一刻的回放在主线程上收全，排在之后 post 的每一轮之前（重复调用无害）
-        CameraAvailabilityWatch.start(context);
+        // 相机服务的通知（每一路空不空）不在这里挂：通道调度每一轮判，用的时候挂上、不用了摘掉（CameraAvailabilityWatch，
+        // 2026-11-21）；新挂上的那一轮不判，回放收全以后的那一轮才判
         // 接上进程里那一个通道调度（唯一动相机的地方）：先装上（ChannelFacts.install：应用一起来就装上了，装过了什么都不做）。没有别的管线接着就当场接上，
         // 旧的那一份还在关（重建）就排着，它关完再换上这一份。录像那一侧：每一路的相机走了、样子变了、带着新会话出了画面，
         // 调度一轮最后告诉录像宿主（它只声明录像输出、照这几声进出）。登记表、相机服务、亮熄屏、车辆信号叫醒调度的监听在进程那一层，挂一次
@@ -1950,13 +1949,36 @@ public class MultiCameraManager {
      * <p>盘满、写不进、录像的样子变了（一路加入 / 退出）、开录 / 停录走到哪一步这几个<b>不在这里动</b>：它们是
      * CameraKeeper 接的，它不随主界面走 —— 换掉的话主界面一重建，录像就没人停、没人接了。</p>
      */
-    public void detachUiCallbacks() {
+    private void detachUiCallbacks() {
         statusCallback = (cameraId, status) -> { };
         previewSizeCallback = (cameraKey, cameraId, previewSize) -> { };
         corruptedFilesCallback = deletedFiles -> { };
         segmentSwitchCallback = newSegmentIndex -> { };
         firstDataWrittenCallback = () -> { };
         AppLog.i(TAG, "主界面已离开，回调换成空实现，录制管线继续 recording=" + isRecording);
+    }
+
+    /**
+     * 上面那几个回调是哪一个界面设的（{@link #claimUiCallbacks}）；没人设过是 null。只在主线程上动。
+     */
+    private Object uiCallbacksOwner;
+
+    /** 界面要设回调了（紧跟着调那几个 set）：记下是谁设的。主线程。 */
+    public void claimUiCallbacks(Object owner) {
+        uiCallbacksOwner = owner;
+    }
+
+    /**
+     * 界面要走了（主线程）：回调还是它设的就摘（换成空实现，见 {@link #detachUiCallbacks()}）；已经是别的界面设的就不动 ——
+     * 在关的旧界面销毁得比新界面接上晚时（停车那一下关掉、人紧跟着回来，另起了一个），摘掉的会是新界面刚设的。
+     */
+    public void detachUiCallbacks(Object owner) {
+        if (uiCallbacksOwner != null && uiCallbacksOwner != owner) {
+            AppLog.i(TAG, "主界面已离开，回调是另一个界面设的，不摘");
+            return;
+        }
+        uiCallbacksOwner = null;
+        detachUiCallbacks();
     }
 
     public void setFirstDataWrittenCallback(FirstDataWrittenCallback callback) {
@@ -2381,7 +2403,9 @@ public class MultiCameraManager {
         } else {
             sb.append("上一次重置以来开过 ").append(h.opens).append(" 台（上次重置：")
                     .append(h.reset == CameraHistory.Reset.BOOT ? "车机开机"
-                            : h.reset == CameraHistory.Reset.TAKEN ? "别的程序拿了它又空出来" : "它在相机服务里没了又回来")
+                            : h.reset == CameraHistory.Reset.TAKEN ? "别的程序拿了它又空出来"
+                            : h.reset == CameraHistory.Reset.WOKE ? "车机睡醒（照它醒来会重新初始化相机算）"
+                            : "它在相机服务里没了又回来")
                     .append(h.resetWall > 0 ? "，" + clock.format(new Date(h.resetWall)) : "").append("）");
         }
         sb.append("；最近开的那一台是").append(h.lastOrdinal > 0 ? "第 " + h.lastOrdinal + " 台" : "还没开过");
@@ -2619,6 +2643,13 @@ public class MultiCameraManager {
         sb.append("别人引起的变化：").append(s.lastOthersChangeAt == 0 ? "没有过"
                 : "上一次 " + timeText(now - s.lastOthersChangeAt) + "前（安静满 " + (ChannelRules.QUIET_MS / 1000)
                 + " 秒才开、改输出、救）").append('\n');
+        sb.append("车机睡醒：").append(s.headUnitWokeAt == 0 ? "这个进程里没见过"
+                : "上一次 " + timeText(now - s.headUnitWokeAt) + "前（醒来满 " + (ChannelRules.WAKE_SETTLE_MS / 1000)
+                + " 秒才开、改输出、救）").append('\n');
+        sb.append("相机服务的通知：").append(CameraAvailabilityWatch.listening() ? "挂着" : "没挂")
+                .append(s.listenedSince == 0 ? "" : "，" + timeText(now - s.listenedSince) + "前挂上（挂上以后听满 "
+                        + (ChannelRules.QUIET_MS / 1000) + " 秒才开、改输出、救）")
+                .append("（用的时候挂上：人在车上，或者停车着还有人要相机、还有相机没关完）").append('\n');
         sb.append("问相机服务：").append(askText(s, now)).append('\n');
         for (ChannelScheduler.LaneView lane : s.lanes) {
             appendLane(sb, lane, now);
@@ -2731,6 +2762,14 @@ public class MultiCameraManager {
                 break;
             case QUIET:
                 text = "通道安静（相机服务 " + (ChannelRules.QUIET_MS / 1000) + " 秒内报过别人引起的变化），再"
+                        + channelSide.pendingText(s.pending, s.key);
+                break;
+            case WOKE:
+                text = "车机睡醒满 " + (ChannelRules.WAKE_SETTLE_MS / 1000) + " 秒（它醒来会重新初始化相机），再"
+                        + channelSide.pendingText(s.pending, s.key);
+                break;
+            case UNHEARD:
+                text = "相机服务的通知挂上满 " + (ChannelRules.QUIET_MS / 1000) + " 秒（挂上之前别人动没动过相机听不到），再"
                         + channelSide.pendingText(s.pending, s.key);
                 break;
             case RECORD_OUTPUT:
@@ -3492,6 +3531,14 @@ public class MultiCameraManager {
                             + (wait.weHoldIt ? "，我们开着它" : "") + "）")
                             + "，安静满 " + (ChannelRules.QUIET_MS / 1000) + " 秒再" + pendingText(wait.pending, wait.key);
                     break;
+                case WOKE:
+                    line = "通道：车机 " + seconds(wait.agoMs) + "前睡醒，等它把相机重新初始化完，醒来满 "
+                            + (ChannelRules.WAKE_SETTLE_MS / 1000) + " 秒再" + pendingText(wait.pending, wait.key);
+                    break;
+                case UNHEARD:
+                    line = "通道：相机服务的通知 " + seconds(wait.agoMs) + "前才挂上，之前别人动没动过相机听不到，听满 "
+                            + (ChannelRules.QUIET_MS / 1000) + " 秒再" + pendingText(wait.pending, wait.key);
+                    break;
                 case RECORD_OUTPUT:
                     line = "通道：开 " + roleName(wait.key) + " 之前先等它的录像输出（录制器在建，最多 "
                             + (ChannelRules.RECORD_OUTPUT_WAIT_MS / 1000) + " 秒）";
@@ -3679,6 +3726,8 @@ public class MultiCameraManager {
                     return "车机开机";
                 case TAKEN:
                     return "别的程序拿了它又空出来";
+                case WOKE:
+                    return "车机睡醒（照它醒来会重新初始化相机算）";
                 default:
                     return "它在相机服务里没了又回来";
             }
@@ -5558,7 +5607,7 @@ public class MultiCameraManager {
 
     private void pressShutter(PhotoJob job, List<String> keys) {
         // 时间戳取按快门这一刻（不是按键那一刻：中间可能等了开相机）。几路同一个，回看按它分组
-        String timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
+        String timestamp = SharedSegmentName.fileTime().format(new Date());
         job.shutterPressed = true;
         job.pressed = keys.size();
         AppLog.d(TAG, "拍照：按快门 " + keys + " ts=" + timestamp);

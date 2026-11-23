@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ic_place：地图针（地点与自动化分区，ui-spec §十六）。统一图标集。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M12,21c0,0 -6.5,-6.2 -6.5,-11.2a6.5,6.5 0,0 1,13 0c0,5 -6.5,11.2 -6.5,11.2z M12,7.5a2.3,2.3 0,1 1,0 4.6a2.3,2.3 0,1 1,0 -4.6z"
+        android:strokeWidth="1.7"
+        android:strokeColor="@color/text_primary"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+</vector>

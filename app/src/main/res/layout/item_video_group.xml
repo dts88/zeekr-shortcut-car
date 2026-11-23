@@ -22,8 +22,9 @@
         android:orientation="horizontal"
         android:padding="8dp">
 
-        <!-- 缩略图（四宫格预览） -->
+        <!-- 缩略图（四宫格预览）：照相机位摆，和预览区一样，从右往左的语言里也不镜像（ui-spec §十七） -->
         <FrameLayout
+            android:layoutDirection="ltr"
             android:layout_width="100dp"
             android:layout_height="62dp"
             android:background="#000000">

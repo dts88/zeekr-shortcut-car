@@ -24,10 +24,8 @@ import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 
 public final class AppLog {
     private static final int MAX_BUFFER_LINES = 5000;
@@ -59,7 +57,26 @@ public final class AppLog {
         // 启动时轮换日志文件
         rotateSessionLogs(context);
         
-        // 设置崩溃处理器，确保闪退时能保存日志
+        // 崩溃处理器进程里只装一次：应用入口已经装过，这里是保底
+        installCrashHandler(context);
+    }
+
+    /** 崩溃处理器装过了。 */
+    private static boolean sCrashHandlerInstalled;
+
+    /**
+     * 装崩溃处理器，进程里只装一次（{@code ZeekrShortcutApp.onCreate} 叫）。以前只在主界面创建时装、每创建一次再装一层：
+     * 没有主界面的进程（被周期任务带回来的）崩了不留日志、也记不到连着崩溃里；装过两层以后「原来的处理器」指向我们自己那一层，
+     * 崩溃时自己叫自己，到不了系统的处理器。
+     */
+    public static synchronized void installCrashHandler(Context context) {
+        if (context != null && sAppContext == null) {
+            sAppContext = context.getApplicationContext();
+        }
+        if (sCrashHandlerInstalled) {
+            return;
+        }
+        sCrashHandlerInstalled = true;
         setupCrashHandler();
     }
     
@@ -72,6 +89,8 @@ public final class AppLog {
         sDefaultHandler = Thread.getDefaultUncaughtExceptionHandler();
         
         Thread.setDefaultUncaughtExceptionHandler((thread, throwable) -> {
+            // 连着崩溃就不再自动回来（recovery.CrashHold）：先记下这一次，后面存日志出错也不丢；它自己不抛
+            com.kooo.evcam.recovery.CrashHold.noteCrash(sAppContext);
             try {
                 // 记录崩溃信息到日志
                 String crashInfo = "!!! APPLICATION CRASH !!!\n" +
@@ -90,7 +109,8 @@ public final class AppLog {
                 }
                 // 黑匣子在自己的线程上写，崩溃前等它把排队的写完
                 com.kooo.evcam.blackbox.BlackBox.flush(1500);
-            } catch (Exception e) {
+            } catch (Throwable e) {
+                // 存日志自己出了错（哪怕是 Error）也要走到下面：系统的处理器才会把进程结束掉
                 Log.e("AppLog", "Failed to save crash log", e);
             }
             
@@ -281,14 +301,13 @@ public final class AppLog {
      * 2026-09-26 哨兵模式那一次，编码器为什么坏、重建为什么失败，原因就只在内存里，
      * 导出报告时已经没了。</p>
      *
-     * <p>只存警告和错误，量很小；同一句话 60 秒内只存一次（下次存时补一句中间省掉了几次），
-     * 堆栈只留前几行 —— 不为这个去磨车机的闪存。文件超过上限就只留后一半。</p>
+     * <p>只存警告和错误，量很小；同一种 60 秒内只存一条（{@link WarningGroups}：下次存时补一句中间省掉了几条、
+     * 它们的数的中位和最大），堆栈只留前几行 —— 不为这个去磨车机的闪存。文件超过上限就只留后一半。</p>
      */
     private static final String WARNINGS_LOG = "warnings.log";
     private static final long WARNINGS_LOG_LIMIT_BYTES = 512L * 1024L;
-    private static final long SAME_WARNING_GAP_MS = 60_000L;
     private static final int WARNING_LINES = 12;
-    private static final Map<String, long[]> LAST_WARNING = new HashMap<>();
+    private static final WarningGroups WARNING_GROUPS = new WarningGroups();
     private static Handler warningWriter;
 
     private static void persistWarning(String line, String tag, String message) {
@@ -298,30 +317,16 @@ public final class AppLog {
         }
         int newline = message.indexOf('\n');
         String first = newline >= 0 ? message.substring(0, newline) : message;
-        String key = tag + "|" + (first.length() > 120 ? first.substring(0, 120) : first);
-        long now = android.os.SystemClock.uptimeMillis();
-        long skipped;
-        synchronized (LAST_WARNING) {
-            long[] seen = LAST_WARNING.get(key);
-            if (seen != null && now - seen[0] < SAME_WARNING_GAP_MS) {
-                seen[1]++;
-                return;
-            }
-            skipped = seen == null ? 0 : seen[1];
-            if (LAST_WARNING.size() > 500) {
-                LAST_WARNING.clear();
-            }
-            LAST_WARNING.put(key, new long[]{now, 0});
+        String note = WARNING_GROUPS.offer(tag, first, android.os.SystemClock.uptimeMillis());
+        if (note == null) {
+            return;
         }
         String[] lines = line.split("\n", WARNING_LINES + 1);
         StringBuilder text = new StringBuilder();
         for (int i = 0; i < Math.min(lines.length, WARNING_LINES); i++) {
             text.append(lines[i]).append('\n');
         }
-        if (skipped > 0) {
-            text.append("    (").append(skipped)
-                    .append(" identical messages in the minute before this one were not saved)\n");
-        }
+        text.append(note);
         final String entry = text.toString();
         warningWriter().post(() -> appendWarning(context, entry));
     }

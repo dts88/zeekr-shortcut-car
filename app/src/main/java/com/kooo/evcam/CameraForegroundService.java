@@ -19,9 +19,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ServiceInfo;
 import android.os.Build;
-import android.os.Handler;
 import android.os.IBinder;
-import android.os.Looper;
 import android.util.Log;
 
 import androidx.core.app.NotificationCompat;
@@ -30,19 +28,14 @@ import androidx.core.app.NotificationCompat;
  * 前台服务，用于在后台使用摄像头
  * Android 11+ 要求后台使用摄像头时必须有前台服务
  * 
- * 增强保活功能：
- * - 当无障碍服务未开启时，此服务会动态注册 TIME_TICK 广播
- * - TIME_TICK 每分钟触发一次，可以保持应用活跃
- * - onTaskRemoved: 用户滑动清除应用时自动重启
- * - onDestroy: 服务被杀时发送延迟重启广播
+ * <p>它不保活（项目所有者 2026-11-21：保活只留周期任务，规格 §6）：被系统停了、从最近任务划掉了都不自己拉自己，
+ * 也不粘着（{@code START_NOT_STICKY}），没有每分钟的 TIME_TICK。起、停只由相机管家判（{@code CameraKeeper}）。</p>
  */
 public class CameraForegroundService extends Service {
     private static final String TAG = "CameraForegroundService";
     private static final String CHANNEL_ID = "camera_service_channel";
     private static final int NOTIFICATION_ID = 1001;
     
-    // 服务重启延迟时间
-    private static final long RESTART_DELAY_MS = 1000;
 
     private static volatile boolean isForegroundReady = false;
     /** 见 {@link #startedWhileVisible()}。 */
@@ -54,7 +47,7 @@ public class CameraForegroundService extends Service {
         com.kooo.evcam.blackbox.BlackBox.attach(this, "Service:CameraForegroundService");
         com.kooo.evcam.blackbox.BlackBox.noteImportant("前台服务 CameraForegroundService onCreate");
         if (UserExit.blocks(this, "CameraForegroundService.onCreate")) {
-            // 系统按 START_STICKY 重启了我们，但用户已经退出：什么都别起（尤其别去拉主界面），
+            // 有人把我们起来了，但用户已经退出：什么都别起（尤其别去拉主界面），
             // 在 onStartCommand 里把自己停掉
             exitedIdle = true;
             return;
@@ -62,21 +55,16 @@ public class CameraForegroundService extends Service {
         AppLog.d(TAG, "Service created");
         createNotificationChannel();
         
-        // 保活开着就注册 TIME_TICK 广播（每分钟确认一次前台服务在）
-        registerTimeTickIfNeeded();
                 
         // 黑匣子心跳：每分钟一行。停车那一夜有没有真的睡过去、睡了多久，
         // 全在这些行的 slept= 里；中间断掉的那一段就是「我们不在」
         startBlackBoxHeartbeat();
 
-        // 相机服务眼里每一路空不空。环视卡死、只能重启车机的那种状态，
-        // 要靠它说出「是谁占着」—— 注册时系统会把当前状态报一遍
-        com.kooo.evcam.camera.CameraAvailabilityWatch.start(this);
-        // 恢复（Recovery.restore）在 onStartCommand 里做：started 服务的 onCreate 后面必然跟一次 onStartCommand，
-        // 以前两处各调一次，冷启动的恢复跑两遍
+        // 相机服务的通知（每一路空不空）不在这里挂：用的时候由通道调度挂上、不用了摘掉（CameraAvailabilityWatch，2026-11-21）
+        // 恢复不在这里做：人回来的那一下（亮屏）、周期任务跑到时才看（Recovery，规格 §2.5）
     }
 
-    /** 前台服务此刻在不在（startForeground 做完了）。保活的各条路只在它不在时才去启动它。 */
+    /** 前台服务此刻在不在（startForeground 做完了）。 */
     public static boolean isRunning() {
         return isForegroundReady;
     }
@@ -95,23 +83,10 @@ public class CameraForegroundService extends Service {
         return isForegroundReady && startedWhileVisible;
     }
 
-    /** 被系统杀了要不要重启：保活开着才要（规格 §6：关 = 被杀了不回来）。几个服务共用这一条。 */
-    public static int stickiness(Context context) {
-        return new AppConfig(context).isAutoStartOnBoot() ? START_STICKY : START_NOT_STICKY;
-    }
-    
     /**
      * 唤醒锁不在这里管了：它只属于「熄屏录制（阻止休眠）」（规格 §3.3，{@code ScreenOffRecording}），
      * 熄屏时在录像才拿、录像停了就放、到了用户设的时长就放。
      */
-
-    /** 保活开着就注册 TIME_TICK 广播（每分钟触发，前台服务不在就拉起来）；无障碍服务在跑的话它自己有心跳。 */
-    private void registerTimeTickIfNeeded() {
-        if (new AppConfig(this).isAutoStartOnBoot() && !KeepAliveAccessibilityService.isRunning()
-                && !KeepAliveReceiver.isTimeTickRegistered()) {
-            KeepAliveReceiver.registerTimeTick(this);
-        }
-    }
 
     /** 用户已退出、这一次是被系统重启的：onCreate 什么都没起，onStartCommand 里停掉自己。 */
     private boolean exitedIdle;
@@ -135,11 +110,8 @@ public class CameraForegroundService extends Service {
         }
         AppLog.d(TAG, "Service started");
         
-        // 每次启动时检查并注册 TIME_TICK
-        registerTimeTickIfNeeded();
                 
-        // 每次被启动都按开机自启动的规矩看一眼该恢复什么（例行的那种五分钟做一次）
-        com.kooo.evcam.recovery.Recovery.restore(this, com.kooo.evcam.recovery.Recovery.WHY_ROUTINE);
+        // 恢复不在这里做：人回来的那一下（亮屏）、周期任务跑到时才看（Recovery，规格 §2.5）
 
         // 通知上的字照录像此刻的样子写（正在录制 / 等待摄像头 / 在后台运行，大纲 5c），谁叫起来的都一样 ——
         // 以前由叫的那一处带着字来：保活那几处只会写「在后台运行」，录着时被它们叫起来，通知就说错了
@@ -148,7 +120,20 @@ public class CameraForegroundService extends Service {
                 keeper.notificationTitle(), keeper.notificationContent());
 
         // 启动前台服务（录制声音开着时试着带上麦克风类型，见 startForegroundWithSound）
-        startForegroundWithSound(notification);
+        if (!startForegroundWithSound(notification)) {
+            // 系统不让进前台（应用在后台时起的，安卓 12）：这一次不算起来。已经在前台的照旧；没进过的停掉自己，
+            // 主界面下一次到前台时相机管家再起（refreshForegroundService）
+            if (!isForegroundReady) {
+                stopSelf();
+            }
+            return START_NOT_STICKY;
+        }
+        if (!keeper.foregroundServiceNeeded()) {
+            // 起的那一下之后已经不该在了（刚好停车了、停录了）：这就停，不留到下一次有人来对
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("前台服务起来时已经不该在了（起的那一下之后停车了、停录了）：停掉");
+            stop(this);
+            return START_NOT_STICKY;
+        }
 
         // 这一次 start 时主界面在前：从此能用相机（只升不降，见 startedWhileVisible）
         if (com.kooo.evcam.camera.StallWatch.isForeground()) {
@@ -158,8 +143,13 @@ public class CameraForegroundService extends Service {
         // 服务就绪：叫醒通道调度 —— 没人要的相机可以保持 30 秒（isRunning），是主界面在前时起的、刷新的，后台也能用相机了
         // （startedWhileVisible）。以前这里还执行排着的「就绪后」回调（whenReady，开相机用的）：相机只由调度开，2.11 阶段 6 删了
         com.kooo.evcam.camera.CameraKeeper.factsChanged();
+        // 有了前台服务，后台也起得了服务：人回来那一下系统没让起的悬浮窗（还欠着的）现在起
+        if (com.kooo.evcam.screen.Parked.overlaysOwed() && !com.kooo.evcam.screen.ScreenState.dark()) {
+            com.kooo.evcam.overlay.OverlayCoordinator.restoreAfterParking(this);
+        }
 
-        return stickiness(this);
+        // 不粘着：被系统停了不回来（保活只留周期任务，规格 §6）
+        return START_NOT_STICKY;
     }
 
     /** 前台服务此刻带的类型（诊断报告读）：照清单（平时）、相机 + 麦克风，或者带不上麦克风的原因。 */
@@ -176,15 +166,18 @@ public class CameraForegroundService extends Service {
      * 起前台。平时和以前一模一样（照清单里的类型）。「录制声音」（设置 → 录制）开着、又有录音权限时，试着带上麦克风类型 ——
      * 安卓 11 起后台用麦克风要它；带不上（清单里没声明这个类型；容器里 CarPiano 也见过这个报错）就照旧起，记一行：
      * 熄屏、后台时可能录不到声音（诊断报告里看录音那一节有没有连着全是 0）。
+     *
+     * @return 进了前台。系统不让进（安卓 12 起应用在后台时起的前台服务，容器里放不放行没有保证）是 false：兜住不崩 ——
+     *         停车时前台服务停掉以后，人回来那一下它常常是后台起的（项目所有者 2026-11-21）
      */
-    private void startForegroundWithSound(Notification notification) {
+    private boolean startForegroundWithSound(Notification notification) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
                 && com.kooo.evcam.camera.FootageAudio.sourceFor(this, new AppConfig(this)) != null) {
             try {
                 startForeground(NOTIFICATION_ID, notification,
                         ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA | ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE);
                 foregroundTypes = "camera|microphone";
-                return;
+                return true;
             } catch (RuntimeException e) {
                 foregroundTypes = "manifest (microphone refused: " + e.getClass().getSimpleName() + ")";
                 if (!microphoneRefusedNoted) {
@@ -196,7 +189,14 @@ public class CameraForegroundService extends Service {
         } else {
             foregroundTypes = "manifest";
         }
-        startForeground(NOTIFICATION_ID, notification);
+        try {
+            startForeground(NOTIFICATION_ID, notification);
+            return true;
+        } catch (RuntimeException e) {
+            foregroundTypes = "refused (" + e.getClass().getSimpleName() + ")";
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("前台服务进不了前台（" + e + "）：这一次不起，主界面到前台时再起");
+            return false;
+        }
     }
 
     /** 黑匣子心跳间隔：一分钟看一次。 */
@@ -257,57 +257,17 @@ public class CameraForegroundService extends Service {
     public void onDestroy() {
         com.kooo.evcam.blackbox.BlackBox.noteImportant("CameraForegroundService onDestroy");
         blackBoxHandler.removeCallbacks(blackBoxTick);
-        AppLog.d(TAG, "Service destroyed - 尝试重启...");
+        AppLog.d(TAG, "Service destroyed");
         isForegroundReady = false;
         startedWhileVisible = false;
         // 前台服务没了：不再保持，后台用不了相机 —— 叫醒通道调度
         com.kooo.evcam.camera.CameraKeeper.factsChanged();
 
-        // 服务被杀时自己拉自己：这是保活的手段之一，保活开着才做（规格 §6）；
-        // 用户主动退出时不做 —— 这正是以前「退不掉」的一条路
-        if (!UserExit.isExited(this) && new AppConfig(this).isAutoStartOnBoot()) {
-            scheduleServiceRestart();
-        }
+        // 被停了不自己拉自己（项目所有者 2026-11-21：车机要关就关，保活只留周期任务）
 
         super.onDestroy();
     }
 
-
-    /**
-     * 当用户从最近任务中滑动清除应用时调用：保活开着就重新启动服务。
-     */
-    @Override
-    public void onTaskRemoved(Intent rootIntent) {
-        AppLog.d(TAG, "onTaskRemoved - 应用被从最近任务清除");
-        if (!UserExit.isExited(this) && new AppConfig(this).isAutoStartOnBoot()) {
-            scheduleServiceRestart();
-        }
-        super.onTaskRemoved(rootIntent);
-    }
-    
-    /**
-     * 调度服务重启
-     * 使用 Handler 延迟重启，避免立即重启被系统拦截
-     */
-    private void scheduleServiceRestart() {
-        try {
-            // 方案1：使用 Handler 延迟重启
-            new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                try {
-                    AppLog.d(TAG, "执行延迟重启...");
-                    start(getApplicationContext());
-                } catch (Exception e) {
-                    AppLog.e(TAG, "延迟重启失败: " + e.getMessage(), e);
-                }
-            }, RESTART_DELAY_MS);
-            
-            // 方案2：发送保活广播（备份）
-            KeepAliveReceiver.sendKeepAliveCheck(getApplicationContext());
-            
-        } catch (Exception e) {
-            AppLog.e(TAG, "调度重启失败: " + e.getMessage(), e);
-        }
-    }
 
     @Override
     public IBinder onBind(Intent intent) {
@@ -380,7 +340,7 @@ public class CameraForegroundService extends Service {
      * （{@code CameraKeeper#notificationTitle}）。
      */
     public static void start(Context context) {
-        // 保活广播、ContentProvider、无障碍服务都从这里启动前台服务 —— 用户退出后一律不启动
+        // 用户退出后一律不启动
         if (UserExit.blocks(context, "CameraForegroundService.start")) {
             return;
         }
@@ -414,12 +374,10 @@ public class CameraForegroundService extends Service {
     /**
      * 停掉前台服务。只由相机管家叫（{@code CameraKeeper}）：停不停它判（{@code CameraKeeper#foregroundServiceNeeded}）。
      *
-     * <p>前台服务的寿命 = 「开机自启动」开着、在录、或者等着接回（规格 §3.5）。保活开着时它本来就该一直在：
-     * 这里只把通知照录像此刻的样子换回「在后台运行」（{@link #showText}，不再 start 一次），不停。等着接回的也一样
-     * （「这一趟要录」立着：存储一类被打断等自动接回、因熄屏停下等亮屏，2026-10-10）—— 接回时相机是从后台开的，
-     * 后台拿着相机安卓要求有前台服务。都不是、或用户退出了，才真的停。
-     * 以前一律 stopService，保活开着时它 onDestroy 里一秒后又把自己拉起来 ——
-     * 每次停录都停一次、起一次，通知闪一下，冷启动的恢复再跑一遍。</p>
+     * <p>前台服务的寿命（规格 §3.5，{@code ChannelRules.foregroundServiceNeeded}）：在录；人在车上时「开机自启动」开着、或者等着接回
+     * （「这一趟要录」立着：接回时相机是从后台开的，后台拿着相机安卓要求有前台服务）；停车着没在录就不留（2026-11-21）。
+     * 该留着的时候停录不经过这里：相机管家只把通知照录像此刻的样子换回「在后台运行」（{@link #showText}，不再 start 一次）——
+     * 以前一律 stopService，每次停录都停一次、起一次，通知闪一下。</p>
      */
     public static void stop(Context context) {
         isForegroundReady = false;

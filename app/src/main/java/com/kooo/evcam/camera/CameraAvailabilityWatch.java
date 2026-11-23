@@ -49,6 +49,13 @@ import java.util.function.Consumer;
  * <p>2026-10-10 那一版看门狗按这张表重开被别的程序拿走的那一路（2.10 的 CameraTaken 闸门）；2.11 起只有通道调度读它，
  * 读的是每一路的最后一句和「上一次别人引起的变化」（见下），只问、不开。</p>
  *
+ * <h3>用的时候挂上，不用了摘掉（项目所有者 2026-11-21）</h3>
+ *
+ * <p>照安卓通常的做法：通道调度每一轮判要不要听（{@code ChannelScheduler.tendCameraService}：人在车上，或者停车着还有人要相机、
+ * 还有相机没关完），要就 {@link #start}、不要就 {@link #stop}。以前管线一建、前台服务一起就挂上，一直挂到进程结束，停车时也听着。
+ * 摘掉时记的那几句一起忘掉；再挂上时系统把每一路此刻的样子重新报一遍，照「初始状态」从头记。没在听的那一段里车机动过相机
+ * （睡醒时会把相机重新初始化一遍）我们听不到 —— 那一种改看车机醒来本身（{@code ChannelRules.WAKE_SETTLE_MS}）。</p>
+ *
  * <h3>2.11 起：每一声分我们引起的、别人引起的；问一次补漏收的</h3>
  *
  * <p>通道开、改输出、救之前要「安静」：相机服务 {@link CameraTaken#QUIET_MS} 内没报过<b>别人引起的</b>变化
@@ -93,6 +100,8 @@ public final class CameraAvailabilityWatch {
     private static final Map<String, Boolean> OURS = new ConcurrentHashMap<>();
 
     private static CameraManager.AvailabilityCallback callback;
+    /** 收到过回调没有（{@link #heardAnything}）：摘掉以后也记着 —— 说的是容器把这条接口转过来了。 */
+    private static volatile boolean everHeard;
 
     /** 2.11 的记录：相机服务对每一路说的最后一句、哪几路不在、上一次别人引起的变化（{@link Ledger}）。只在主线程上改。 */
     private static final Ledger LEDGER = new Ledger();
@@ -117,16 +126,18 @@ public final class CameraAvailabilityWatch {
     }
 
     /**
-     * 开始听（进相机服务登记可用性回调）。重复调用无害。前台服务和 MultiCameraManager 的构造都调：以前只有前台服务调，它没起来时相机服务说的话
-     * 一句都没收，每次丢失都被判成「没说空闲」。接调度（{@link #setListener}）是另一件事，装上调度时就接了。
+     * 开始听（进相机服务登记可用性回调）。挂着的再调什么都不做。只由通道调度调（见类说明「用的时候挂上」），主线程。
+     * 接调度（{@link #setListener}）是另一件事，装上调度时就接了。
      *
      * <p>登记之后紧接着在主线程上排一个收尾任务：它跑的时候注册那一刻的回放都已经到了（见类说明），回放里没有的槽位
-     * 记为「不在」。在管理器的构造里调，这个收尾就排在调度的第一轮之前 —— 冷启动时车机还拿着相机 1，调度第一眼就看得到
-     * 「1 不在」，一次也不试开。</p>
+     * 记为「不在」。收尾跑之前调度不判（{@link #settling}）、收尾叫醒它 —— 车机还拿着相机 1 时，调度判的第一眼
+     * 就看得到「1 不在」，一次也不试开。</p>
+     *
+     * @return 这一下新挂上了（回放已经排进主线程的队列，收全之前 {@link #settling} 是真）；本来就挂着、挂不上是 false
      */
-    public static synchronized void start(Context context) {
+    public static synchronized boolean start(Context context) {
         if (callback != null || context == null) {
-            return;
+            return false;
         }
         // 用应用的 Context：这里留着 CameraManager 给 ask 用，拿 Activity 取的那份会把界面留住
         Context app = context.getApplicationContext();
@@ -135,7 +146,7 @@ public final class CameraAvailabilityWatch {
         }
         CameraManager cm = (CameraManager) app.getSystemService(Context.CAMERA_SERVICE);
         if (cm == null) {
-            return;
+            return false;
         }
         // 嫌疑应用要查使用情况，得有个 Context；争用都从这里来，在这里接上
         CameraHolderSuspects.attach(context);
@@ -148,11 +159,58 @@ public final class CameraAvailabilityWatch {
             // 容器里这条 binder 走不通的话，报告里会显示「没收到过」，不影响别的
             AppLog.w(TAG, "registerAvailabilityCallback failed: " + e);
             callback = null;
-            return;
+            return false;
         }
         cameraManager = cm;
         // 回放都已经 post 进主线程的队列了：紧接着排收尾，它跑的时候回放都到了
         main.post(watcher::replayCollected);
+        return true;
+    }
+
+    /**
+     * 不用了，摘掉（通道调度判的：停车着、谁都不要相机、都关完了；主线程）。记的那几句、诊断报告那张表一起忘掉：
+     * 再挂上时每一路此刻的样子照「初始状态」从头记 —— 没在听的那一段里谁动过它我们不知道，不拿旧话当现在的事实。
+     * 摘掉之前已经排进主线程队列的那几声不再收。问相机服务用的那个管理器留着（{@link #ask}、{@link #listed}）。
+     *
+     * @return 这一下摘掉了（原来挂着）
+     */
+    public static synchronized boolean stop() {
+        CameraManager.AvailabilityCallback watcher = callback;
+        if (watcher == null) {
+            return false;
+        }
+        callback = null;
+        if (watcher instanceof Watcher) {
+            ((Watcher) watcher).stopped = true;
+        }
+        CameraManager cm = cameraManager;
+        if (cm != null) {
+            try {
+                cm.unregisterAvailabilityCallback(watcher);
+            } catch (Exception e) {
+                AppLog.w(TAG, "unregisterAvailabilityCallback failed: " + e);
+            }
+        }
+        LEDGER.reset();
+        AVAILABLE.clear();
+        SINCE.clear();
+        OURS.clear();
+        // 谁拿着哪一路的那张表也忘掉：再挂上时回放里的「空闲」不该被写成「别的程序拿了 N 毫秒、现在空出来了」
+        CameraContention.reset();
+        return true;
+    }
+
+    /** 此刻挂着没有（诊断报告）。 */
+    public static synchronized boolean listening() {
+        return callback != null;
+    }
+
+    /**
+     * 刚挂上、注册那一刻的回放还没收全（收尾任务还没跑）：这时每一路此刻的样子还没人说，调度不判（主线程问）。
+     * 收全了叫醒调度（{@link Watcher#replayCollected}）。没挂着、挂不上的不算。
+     */
+    public static synchronized boolean settling() {
+        return callback instanceof Watcher && ((Watcher) callback).replaying;
     }
 
     /**
@@ -162,11 +220,16 @@ public final class CameraAvailabilityWatch {
     private static final class Watcher extends CameraManager.AvailabilityCallback {
         /** 注册那一刻的回放还没收全：收尾任务跑之前到的每一声都算回放。只在主线程上读写（建它时写的初值除外）。 */
         private boolean replaying = true;
+        /** 摘掉了（{@link #stop}）：摘之前已经排进主线程队列的那几声、收尾任务都不再做。只在主线程上读写。 */
+        boolean stopped;
         /** 回放里收到的每一路（true 空闲）。 */
         private final Map<String, Boolean> replay = new TreeMap<>();
 
         @Override
         public void onCameraAccessPrioritiesChanged() {
+            if (stopped) {
+                return;
+            }
             // 前后台切换时相机服务重排优先级（API 29+）：记一行（2.11 起不再趁机试开 —— 被拿着的只问，不开）
             CameraContention.prioritiesChanged();
             // 调度：叫醒、马上问一次，绝不因此去开
@@ -191,6 +254,9 @@ public final class CameraAvailabilityWatch {
         }
 
         private void onWord(String cameraId, boolean available) {
+            if (stopped) {
+                return;
+            }
             if (replaying) {
                 replay.put(cameraId, available);
             }
@@ -199,6 +265,9 @@ public final class CameraAvailabilityWatch {
 
         /** 收尾任务（登记之后紧接着 post 的）：回放都到了，并进记录、补上「不在」，叫醒调度。 */
         void replayCollected() {
+            if (stopped) {
+                return;
+            }
             replaying = false;
             settleReplay(replay, false);
             wake();
@@ -216,6 +285,7 @@ public final class CameraAvailabilityWatch {
      * 不写成别的程序拿了。只改黑匣子的说法，记录（{@link Ledger}）和调度照旧。</p>
      */
     private static void heard(String cameraId, boolean available, boolean replay) {
+        everHeard = true;
         long now = SystemClock.elapsedRealtime();
         Word before = LEDGER.word(cameraId);
         boolean holdsOrOpen = weHoldOrOpen(cameraId);
@@ -322,9 +392,9 @@ public final class CameraAvailabilityWatch {
         }
     }
 
-    /** 有没有收到过回调。没有的话，多半是容器没把这条接口转过来。 */
+    /** 有没有收到过回调（摘掉以后也算收到过）。没有的话，多半是容器没把这条接口转过来。 */
     public static boolean heardAnything() {
-        return !AVAILABLE.isEmpty();
+        return everHeard;
     }
 
     /** 每一路：{空闲?, 持续多少毫秒, 当时是不是我们}，按相机编号排好。 */
@@ -473,6 +543,11 @@ public final class CameraAvailabilityWatch {
                 cm.unregisterAvailabilityCallback(this);
             } catch (Exception e) {
                 AppLog.w(TAG, "unregisterAvailabilityCallback failed: " + e);
+            }
+            if (!listening()) {
+                // 问的这会儿通知已经摘掉了（记的都忘了）：这一份不并进去，再挂上时从头记。照没问成交回
+                answer(then, new Asked(new TreeMap<>(), new ArrayList<>()));
+                return;
             }
             List<Correction> fixes = settleReplay(replay, true);
             answer(then, new Asked(replay, fixes));
@@ -854,6 +929,16 @@ public final class CameraAvailabilityWatch {
                 firstReplayAt = now;
             }
             return fixes;
+        }
+
+        /**
+         * 全忘掉（通知摘掉时，{@link CameraAvailabilityWatch#stop}）：每一路的最后一句、收全过回放没有、上一次别人引起的变化。
+         * 再挂上时照「初始状态」从头记，和进程刚起来时一样。
+         */
+        synchronized void reset() {
+            words.clear();
+            firstReplayAt = 0;
+            lastOthersChangeAt = 0;
         }
 
         /** 这一路的最后一句。收全过回放、从没听它开过口的是「不在」，从第一次收全回放算起；那之前是 {@link Word#NONE}。 */

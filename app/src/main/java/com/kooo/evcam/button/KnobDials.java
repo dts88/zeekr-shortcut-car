@@ -277,13 +277,8 @@ final class KnobDials {
 
             @Override
             void before(CarMoves.Car c, int id, int zone, int target) {
-                if (!openFirst || target == 0) {
-                    return;
-                }
-                Integer power = c.function("HVAC_FUNC_POWER", "IHvac");
-                Integer on = power == null ? null : c.read(power, zone);
-                if (power != null && (on == null || on == 0)) {
-                    c.write(power, zone, 1);
+                if (openFirst && target != 0) {
+                    CarMoves.openClimate(c, zone);
                 }
             }
         };
@@ -330,18 +325,7 @@ final class KnobDials {
                         R.string.knob_v_sweep_avoid, R.string.knob_v_sweep_natural}, "IHvac") {
             @Override
             void before(CarMoves.Car c, int id, int zone, int target) {
-                Integer power = c.function("HVAC_FUNC_POWER", "IHvac");
-                if (power != null) {
-                    int row = c.zone(CarNames.ROW_1);
-                    Integer ac = c.read(power, row);
-                    if (ac == null || ac != 1) {
-                        c.write(power, row, 1);
-                    }
-                    Integer on = c.read(power, zone);
-                    if (on != null && on == 0) {
-                        c.write(power, zone, 1);
-                    }
-                }
+                CarMoves.openClimate(c, c.zone(CarNames.ROW_1));
                 Integer blowing = c.function("HVAC_FUNC_BLOWING_MODE", "IHvac");
                 Integer flow = blowing == null ? null : c.read(blowing, zone);
                 if (blowing != null && flow != null && flow == blowing + 2) {

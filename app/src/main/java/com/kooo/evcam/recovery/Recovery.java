@@ -25,30 +25,32 @@ import com.kooo.evcam.overlay.OverlayCoordinator;
  * 开机自启动（规格 §2.5）的统一入口：收到各类信号、判断自己能正常运行了，就把核心程序起来。
  *
  * <p>核心程序 = 用户设定状态里开着的那些：悬浮按钮、超级镜子、盲区画面、录像（自动录制；被结束之前在录、等着接回的那一次）。
- * 谁来调：前台服务起来时、保活任务跑到时（睡醒后一秒内必跑）、亮屏广播来时、应用更新后。
+ * 谁来调：人回来的那一下（亮屏，{@code ScreenState}）、周期任务跑到时（睡醒后一秒内必跑）。
  * 幂等，多调无害：已经在的不重复起。</p>
  *
  * <p>只有「开机自启动」开着才做（规格 §2.5：它管的是 App 不在时要不要带回来）；
  * 用户退出了不做（§2.5）。主界面还在的时候，它自己会回到设定状态（§0），这里只管它不在的情况。
  * 录像要不要开（接着录「这一趟要录」、这一趟还没看过的启动自动录制）只告诉相机管家，它判（{@link CameraKeeper#appRestored}）；
- * 现在用不了相机（前台服务是后台起的）时，它开录那一下先静默把主界面拉起来，闪一下就退后台（{@link #bringUpMainForRecording}，1.6）。</p>
+ * 现在用不了相机（前台服务是后台起的）时，它开录那一下先把主界面带到前面，带着提示显示 3 秒、没人碰就退回后台
+ * （{@link #bringUpMainForRecording}，1.6；2026-11-21 以前是闪一下就退）。</p>
  *
- * <p>屏幕黑着（熄屏 = 屏幕真黑了，熄屏 v3）时不拉界面；录像黑着接不接也是相机管家照熄屏的规矩判。
+ * <p>屏幕黑着（熄屏 = 人不在车上，{@code ScreenState}）时什么都不做（项目所有者 2026-11-21：车自己醒来、进程被拉起来，
+ * 人不在就不取车机的资源）；人回来了的那一下（亮屏）再照设置恢复。
  * 屏幕此刻不知道黑没黑（进程刚起来、安卓刚亮在等车辆信号）时排到知道了再做（{@code ScreenState.whenKnown}，C11）。
  * 谁来调都先排到主线程上（C8）：保活任务在 WorkManager 的线程上调，而相机管家只在主线程上动。</p>
  */
 public final class Recovery {
 
     private static final String TAG = "Recovery";
-    /** 前台服务每分钟都会被例行启动一次；这种例行调用五分钟做一次就够。 */
-    private static final long ROUTINE_INTERVAL_MS = 5 * 60_000L;
-    /** 前台服务例行启动时传的原因；别的原因（睡醒、亮屏、更新）每次都做。 */
-    public static final String WHY_ROUTINE = "service-start";
     /** 拉主界面时带上：它不是人点开的，这一趟的录像选择不清（规格 §2.5）。 */
     public static final String EXTRA_SILENT = "from_service_restart";
+    /**
+     * 拉主界面时带上：它是应用为了用相机带到前面的，照常显示、带一条提示倒数 3 秒，没人碰就退回后台
+     * （ui-spec §十九「回到前台的提示」）。
+     */
+    public static final String EXTRA_RETURNS = "returns_to_background";
 
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
-    private static long lastRoutineAtMs;
     private static String lastSummary = "";
 
     private Recovery() {
@@ -73,7 +75,7 @@ public final class Recovery {
      * 因熄屏自己退下去的主界面，屏幕亮了就接回来（规格 §0：停车熄屏是特殊情况，亮了就回到用户设定的状态）。
      *
      * <p>只认「是它自己因为熄屏退下去的」这个记号：用户自己切走的、从来没进过前台的，一律不动。
-     * 界面还活着就把它挪到前面；已经被系统收走了就重新起一个（带记号，这一趟的录像选择不清，规格 §2.5）。
+     * 界面还活着就把它挪到前面；已经没了（停车时我们关掉的，或者被系统收走了）就重新起一个（带记号，这一趟的录像选择不清，规格 §2.5）。
      * ScreenState 在亮屏时调；进程在屏幕亮着时被拉起来也调一次（那时没有亮屏事件可听）；为录像拉主界面时记号还在的也走这里
      * （{@link #bringUpMainForRecording}）。都在屏幕亮着时。熄屏 v3 起「熄屏」是屏幕真黑了：
      * 车主下车、屏幕一黑记号就记上，开车门亮屏时主界面就接回来（以前要等几分钟后车机下电那一次熄屏才记）。</p>
@@ -86,11 +88,11 @@ public final class Recovery {
             }
             config.setUiLeftForScreenOff(false);
             if (com.kooo.evcam.camera.StallWatch.isForeground()) {
-                // 记号是熄屏那一刻记的（主界面在前就记，进程被车机结束了也接得回来）；熄屏期间它一直没退下去（在录、在等开录、
-                // 熄屏录制开着）就还在前面，不用再拉
+                // 记号是熄屏那一刻记的（主界面在前就记，进程被车机结束了也接得回来）；人在停车之前就回来了（熄屏不到 40 秒）
+                // 它就还在前面，不用再拉
                 return;
             }
-            boolean alive = MainActivity.getInstance() != null;
+            boolean alive = mainScreenAlive();
             Intent intent = new Intent(context, MainActivity.class);
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_ANIMATION
                     | (alive ? Intent.FLAG_ACTIVITY_SINGLE_TOP : 0));
@@ -98,7 +100,7 @@ public final class Recovery {
                 intent.putExtra("restored_by_app", true);
             }
             context.startActivity(intent);
-            // 主界面这就起来了：这一阵不再为接录像另外静默拉一次（那样它起来闪一下又退回后台）
+            // 主界面这就起来了：这一阵不再为接录像另外带一次（那样它倒数 3 秒又退回后台）
             broughtUpAtMs = SystemClock.elapsedRealtime();
             BlackBox.noteImportant("亮屏：把因熄屏退下去的主界面接回前台（" + (alive ? "界面还在" : "重新起一个") + "）");
         } catch (Exception e) {
@@ -120,7 +122,8 @@ public final class Recovery {
      * 刷新了前台服务（从此能用相机）、登记了预览，调度开的时候带着预览和录像输出。不拉的话录像输出声明了、
      * 相机却开不起来，没人打开主界面就永远开不起来。
      *
-     * <p>静默：带着不是人点开的记号（这一趟的录像选择不清，规格 §2.5），起来闪一下就退后台（§2.5）。用户退出了不拉；
+     * <p>带着不是人点开的记号（这一趟的录像选择不清，规格 §2.5）；起来照常显示，带一条提示倒数 3 秒，没人碰就退回后台
+     * （§2.5，ui-spec §十九；项目所有者 2026-11-21：原来闪一下就退，用户以为应用出错了）。用户退出了不拉；
      * 5 秒内拉过（亮屏那一下接回界面、接回录像各来一次）不再拉。只由相机管家调，屏幕亮着时（开录那一下 —— 人按的、悬浮按钮、
      * 灵动贴、启动自动录制、亮屏接回、存储一类的自动接回都经那里 —— 和亮屏那一下）。屏幕黑着时它不调（项目所有者 2026-10-13：
      * 熄屏不拉主界面，没有例外）。</p>
@@ -139,52 +142,62 @@ public final class Recovery {
         try {
             if (new AppConfig(context).didUiLeaveForScreenOff()) {
                 // 熄屏那一刻主界面就在前（因熄屏退下去的记号还在）：照亮屏接回界面那样接回来、留在前面 ——
-                // 静默拉的话它起来闪一下又退回后台，人上车看到的是车机桌面
+                // 照下面那样带的话它倒数 3 秒又退回后台，人上车看到的是车机桌面
                 bringBackUiAfterScreenOn(context);
             } else {
-                launchMainSilently(context);
+                launchMainBriefly(context);
             }
         } catch (RuntimeException e) {
             AppLog.w(TAG, "bringUpMainForRecording failed: " + e);
             return;
         }
-        BlackBox.noteImportant("要录像（" + where + "）：现在用不了相机（主界面不在前、前台服务是后台起的），"
-                + "先拉起主界面，录像等它起来再开相机");
+        BlackBox.noteImportant("要用相机（" + where + "）：现在用不了（主界面不在前、前台服务是后台起的），"
+                + "先拉起主界面，等它起来再开相机");
     }
 
-    /** 静默拉起主界面：不是人点开的（这一趟的录像选择不清），起来闪一下就退后台。还活着就挪到前面。 */
-    private static void launchMainSilently(Context context) {
-        boolean alive = MainActivity.getInstance() != null;
+    /**
+     * 把主界面带到前面一会儿：不是人点开的（这一趟的录像选择不清），照常显示，带着提示倒数 3 秒，没人碰就退回后台
+     * （{@link #EXTRA_RETURNS}）。还活着就挪到前面。
+     */
+    private static void launchMainBriefly(Context context) {
+        boolean alive = mainScreenAlive();
         Intent main = new Intent(context, MainActivity.class);
         main.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_ANIMATION
                 | (alive ? Intent.FLAG_ACTIVITY_SINGLE_TOP : 0));
-        main.putExtra("auto_start_from_boot", true);
+        main.putExtra(EXTRA_RETURNS, true);
         main.putExtra(EXTRA_SILENT, true);
         context.startActivity(main);
+    }
+
+    /**
+     * 主界面还活着、能挪到前面：建了，而且没在关。停车那一下关掉的（{@code screen.Parked}）到销毁完之前还查得到，
+     * 那一个挪不回来 —— 系统会另起一个，照「重新起一个」带上记号。
+     */
+    private static boolean mainScreenAlive() {
+        MainActivity main = MainActivity.getInstance();
+        return main != null && !main.isFinishing();
     }
 
     private static void restoreNow(Context context, String why) {
         if (UserExit.isExited(context)) {
             return;
         }
-        boolean dark = com.kooo.evcam.screen.ScreenState.dark();
-        // 进程是在屏幕亮着时被拉起来的：亮屏事件早过了，该接回的界面在这里接
-        if (!dark) {
-            bringBackUiAfterScreenOn(context);
+        if (com.kooo.evcam.screen.ScreenState.dark()) {
+            // 人不在车上（车自己醒来、进程被拉起来、还没有人的证据）：什么都不恢复（项目所有者 2026-11-21）。
+            // 人回来了走亮屏那一条（ScreenState.wentLit），那里再叫到这里
+            BlackBox.count("restore-skipped-dark");
+            return;
         }
+        // 进程是在屏幕亮着时被拉起来的：亮屏事件早过了，该接回的界面在这里接
+        bringBackUiAfterScreenOn(context);
         AppConfig config = new AppConfig(context);
         if (!config.isAutoStartOnBoot()) {
             BlackBox.count("restore-skipped-switch-off");
             return;
         }
-        long now = SystemClock.elapsedRealtime();
-        if (WHY_ROUTINE.equals(why)) {
-            if (now - lastRoutineAtMs < ROUTINE_INTERVAL_MS) {
-                return;
-            }
-            lastRoutineAtMs = now;
-        }
-
+        CameraKeeper keeper = CameraKeeper.get(context);
+        // 前台服务该在而不在的（进程是被周期任务带回来的：人不在车上时没人起它）先起：没有它，后台起不了悬浮窗的服务
+        keeper.ensureForegroundService("restore " + why);
         StringBuilder did = new StringBuilder();
         if (OverlayCoordinator.canShowOverlay(context)) {
             // 按设置起悬浮按钮、后视镜和盲区画面；已经在的不会重复。它们自己知道屏幕黑着就不接相机
@@ -194,11 +207,10 @@ public final class Recovery {
 
         // 录像：被结束之前在录、在等接回、或因熄屏停下等亮屏接的（「这一趟要录」落着盘），和这一趟还没看过的启动自动录制，
         // 都交给相机管家判（黑着接不接、用不了相机时拉不拉主界面也是它）
-        CameraKeeper keeper = CameraKeeper.get(context);
         keeper.appRestored(why);
 
         String summary = did.length() == 0 ? "nothing" : did.toString();
-        // 每次都记的话，例行那一条五分钟一行；只有做的事变了，才值一行
+        // 只有做的事变了，才值一行
         if (!summary.equals(lastSummary)) {
             lastSummary = summary;
             BlackBox.noteImportant("恢复（" + why + "）：" + summary + "；录像 " + keeper.describe()

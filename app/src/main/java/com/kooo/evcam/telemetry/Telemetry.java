@@ -44,8 +44,8 @@ import java.util.List;
  *       熄屏判断在安卓亮屏时也叫一次（{@link #retryLinkIfFailed}）；这台车机根本没有这套接口（{@link CarLink#UNAVAILABLE}）不再试。</li>
  *   <li>要「此刻」的读数（安卓刚亮屏，记着的可能是睡前的）：{@link #reconcileNow} 立刻读一遍、立刻发布，
  *       回调排在监听者那一批后面。</li>
- *   <li>写只给灵动贴的动作（驾驶模式 2026-10-30，其他车控动作 2026-11-04，项目所有者）：{@link #carAccess} 拿到车辆接口的读写，
- *       写什么、什么时候不写、读回怎么算在 {@code button.CarMoves}；别处一个号都不写。</li>
+ *   <li>写只给灵动贴的动作（驾驶模式 2026-10-30，其他车控动作 2026-11-04，项目所有者）和地点与自动化（{@code automation}，ui-spec §十八）：
+ *       {@link #carAccess} 拿到车辆接口的读写，写什么、什么时候不写、读回怎么算在 {@code button.CarMoves}；别处一个号都不写。</li>
  * </ul>
  *
  * <p>车辆接口的结果每变一次往黑匣子记一行「车辆信号连接：…」（连接经过的细节在括号里）；
@@ -141,8 +141,69 @@ public final class Telemetry {
     }
 
     /**
+     * 停车 / 人回来了（{@code screen.Parked} 叫，主线程；项目所有者 2026-11-21：人不在车上不取资源）。停车：车辆信号降到只够判人
+     * 回没回来 —— 对账只读那几项（{@link Signal#readWhileParked}），浮点传感器、定位、后视镜上的灯停掉；登记着的人不用动
+     * （在录的信息条、自动锁定还登记着）。人回来：照登记的开回来，离散的当场全读一遍。重复叫无害。
+     */
+    public void setParked(boolean on) {
+        EcarxSource c;
+        LocationSource stoppedLocation = null;
+        MirrorLampSource stoppedLamps = null;
+        MirrorLampSource startedLamps = null;
+        synchronized (lock) {
+            TelemetryUsers.Change change = on ? users.park() : users.unpark();
+            c = car;
+            if (c != null) {
+                c.parked(on);
+            }
+            if (change == TelemetryUsers.Change.FLOATS_OFF) {
+                if (c != null) {
+                    c.floats(false);
+                }
+                stoppedLocation = location;
+                location = null;
+            } else if (change == TelemetryUsers.Change.FLOATS_ON && c != null && app != null) {
+                c.floats(true);
+                location = new LocationSource(this);
+                location.start(app);
+            }
+            if (on) {
+                stoppedLamps = lampSource;
+                lampSource = null;
+                if (stoppedLamps != null) {
+                    putLamps(MirrorLamps.UNKNOWN);
+                    lampsNoted = null;
+                }
+            } else if (lampSource == null && !lampUsers.isEmpty() && app != null) {
+                startedLamps = new MirrorLampSource(this, app);
+                lampSource = startedLamps;
+                lampsNoted = null;
+            }
+        }
+        if (stoppedLocation != null) {
+            stoppedLocation.stop();
+        }
+        if (stoppedLamps != null) {
+            stoppedLamps.stop();
+            notifyLampListeners(MirrorLamps.UNKNOWN);
+        }
+        if (startedLamps != null) {
+            startedLamps.start();
+        }
+        AppLog.i(TAG, on ? "车辆信号：停车，只读判人回来的那几项，浮点传感器、定位、后视镜灯停了"
+                : "车辆信号：人回来了，照登记的恢复");
+        if (!on && c != null) {
+            // 停车时没读的那些离散信号：当场全读一遍
+            c.reconcileNow(false, NOTHING);
+        }
+    }
+
+    private static final Runnable NOTHING = () -> {
+    };
+
+    /**
      * 完整登记：我要用车辆信号，连浮点传感器和定位。第一个完整用户把浮点和定位开起来（核心在跑就不重连、快照不清）；
-     * 重复登记无害。
+     * 重复登记无害。停车着（{@link #setParked}）先记着，人回来再开。
      */
     public void acquire(Context context, String who) {
         synchronized (lock) {
@@ -370,6 +431,11 @@ public final class Telemetry {
             if (!lampUsers.add(who) || lampUsers.size() > 1) {
                 return;
             }
+            if (users.parked()) {
+                // 停车着：先记着，人回来再读（setParked）
+                app = context.getApplicationContext();
+                return;
+            }
             started = new MirrorLampSource(this, context);
             lampSource = started;
             putLamps(MirrorLamps.UNKNOWN);
@@ -491,6 +557,7 @@ public final class Telemetry {
         fastReadings = FastReadings.empty();
         clearPushed();
         car = new EcarxSource(this, floats);
+        car.parked(users.parked());
         car.fast(fastReads.plan());
         car.start(app);
     }
@@ -516,6 +583,7 @@ public final class Telemetry {
             fastReadings = FastReadings.empty();
             clearPushed();
             car = new EcarxSource(this, users.full());
+            car.parked(users.parked());
             car.fast(fastReads.plan());
             car.start(app);
         }
@@ -729,8 +797,8 @@ public final class Telemetry {
     }
 
     /**
-     * 车辆接口的读写（{@link CarAccess}）：只有灵动贴的动作用（驾驶模式和其他车控动作，项目所有者 2026-10-30、11-04）。
-     * 车辆接口没连上、断了是 null。拿到的那一份同步等车机回话：别在主线程上用（{@code button.CarMoves} 有自己的线程）。
+     * 车辆接口的读写（{@link CarAccess}）：只有 {@code button.CarMoves} 用（灵动贴的动作，项目所有者 2026-10-30、11-04；
+     * 地点与自动化，ui-spec §十八）。车辆接口没连上、断了是 null。拿到的那一份同步等车机回话：别在主线程上用（{@code button.CarMoves} 有自己的线程）。
      */
     public CarAccess carAccess() {
         EcarxSource c;

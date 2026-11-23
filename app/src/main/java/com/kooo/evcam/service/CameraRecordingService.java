@@ -41,7 +41,7 @@ public class CameraRecordingService extends Service {
             stopSelf();
             return START_NOT_STICKY;
         }
-        return com.kooo.evcam.CameraForegroundService.stickiness(this);
+        return START_NOT_STICKY;
     }
 
     @Override

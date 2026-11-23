@@ -317,7 +317,7 @@
     <string name="set_floating_appearance_value">%1$d dp · %2$d%%</string>
     <string name="dlg_floating_reset_title">Reset floating button?</string>
     <string name="set_auto_start_title">Start on boot</string>
-    <string name="set_auto_start_summary">Keeps the app running in the background. After the head unit restarts or the system closes the app, restarts it and restores the features that were on. When off, it isn\'t restarted.</string>
+    <string name="set_auto_start_summary">After the head unit restarts or the system closes the app, restarts it; the features that were on come back when you get in. When off, it isn\'t restarted.</string>
     <string name="set_auto_record_title">Record on launch</string>
     <string name="set_auto_record_summary">Starts recording when the app opens and resumes a recording stopped by screen-off when the screen turns on; never restarts one you stopped</string>
     <!-- Screen-off recording was switched off on 2026-11-02 and removed from the developer options; restore these with it -->
@@ -516,6 +516,7 @@
     <string name="lang_zh">中文</string>
     <string name="lang_en">English</string>
     <string name="lang_ms">Bahasa Melayu</string>
+    <string name="lang_ar">العربية</string>
 
     <!-- Enumerated setting options -->
     <string name="opt_mode_auto">Automatic (recommended)</string>
@@ -571,7 +572,6 @@
 
     <!-- Main interface -->
     <string name="about_title">About &amp; credits</string>
-    <string name="accessibility_service_description">Used by Start on boot to help keep the app running.\n\nIt does not read or control anything on screen and collects no data.</string>
     <string name="zeekr_composite_not_found">No surround composite stream found. This head unit may not be supported.</string>
     <string name="msg_no_camera_available">No camera available</string>
     <string name="zeekr_lane_front">Front</string>
@@ -668,8 +668,11 @@
     <string name="reason_timeout">connection timed out</string>
     <string name="reason_no_space">not enough storage space</string>
     <string name="reason_file_not_found">file not found</string>
-    <string name="msg_screen_off_stopped">Recording stopped after the screen turned off</string>
-    <string name="msg_screen_off_background">Screen off for 15 seconds. Moved to the background.</string>
+    <plurals name="return_notice_text">
+        <item quantity="one">The app is back in the foreground and running normally. It returns to the background in %d second.</item>
+        <item quantity="other">The app is back in the foreground and running normally. It returns to the background in %d seconds.</item>
+    </plurals>
+    <string name="return_notice_stay">Tap the screen to stay</string>
     <string name="msg_stats_on">Recording status readout on</string>
     <string name="msg_stats_off">Recording status readout off</string>
     <string name="msg_need_overlay_adjust">The overlay permission is required to open the adjustment window</string>
@@ -1172,8 +1175,6 @@
     <string name="dev_perm_all_files_why">Used to read and write files on USB drives</string>
     <string name="dev_perm_overlay">Overlay</string>
     <string name="dev_perm_overlay_why">Used by Super mirror, Blind spot view, the floating button and the image adjustment window</string>
-    <string name="dev_perm_accessibility">Accessibility service</string>
-    <string name="dev_perm_accessibility_why">Used by Start on boot</string>
     <string name="dev_perm_usage_access">Usage access</string>
     <string name="dev_perm_usage_access_why">Used to log apps that may be using a camera</string>
     <string name="dev_perm_battery">Ignore battery optimisation</string>
@@ -1335,13 +1336,13 @@
     <!-- Sentry alerts (bottom of Settings → Recording) -->
     <string name="set_group_sentry_alerts">Sentry alerts</string>
     <string name="set_sentry_alerts_mode_title">Phone subscription</string>
-    <string name="set_sentry_alerts_mode_summary">Sends an alert to the phone when the hazard lights flash or the lights come on by themselves once Sentry Mode has been armed for 30 seconds. Alerts are sent directly, not through the developer\'s servers.</string>
+    <string name="set_sentry_alerts_mode_summary">Sends an alert to the phone when Sentry Mode is triggered (warning or alarm). Requires Keep recording when the screen goes off and recording to be running when you lock the car. Alerts are sent directly, not through the developer\'s servers.</string>
     <string name="opt_sentry_alerts_ntfy">ntfy</string>
     <string name="opt_sentry_alerts_telegram">Telegram</string>
     <string name="set_sentry_alerts_last">Last alert: %1$s</string>
     <string name="set_sentry_alerts_last_failed">Last alert failed: %1$s</string>
     <string name="set_sentry_alerts_picture_title">Include a picture</string>
-    <string name="set_sentry_alerts_picture_summary">Adds a surround view picture of up to 100 KB to each alert. Requires Keep recording when the screen goes off and recording to be running when you lock the car.</string>
+    <string name="set_sentry_alerts_picture_summary">Adds a surround view picture of up to 100 KB to each alert.</string>
     <string name="set_ntfy_topic_title">ntfy topic</string>
     <string name="set_ntfy_topic_value">Ends in %1$s</string>
     <string name="set_ntfy_topic_summary">Tap to show a QR code, then scan it with the ntfy app on the phone to subscribe</string>
@@ -1363,12 +1364,150 @@
     <string name="msg_sentry_alerts_test_sent">Test alert sent</string>
     <string name="msg_sentry_alerts_test_failed">Test alert failed: %1$s</string>
     <string name="sentry_alert_title">Sentry alert</string>
-    <string name="sentry_alert_hazard">Hazard lights on · %1$s</string>
-    <string name="sentry_alert_lamps">Lights on · %1$s</string>
+    <string name="sentry_alert_alert">Sentry warning · %1$s</string>
+    <string name="sentry_alert_alarm">Sentry alarm · %1$s</string>
     <string name="sentry_alert_test">Test alert · %1$s</string>
     <string name="sentry_alerts_reason_unreachable">can\'t reach the server</string>
     <string name="sentry_alerts_reason_timeout">connection timed out</string>
     <string name="sentry_alerts_reason_refused">the server refused it (HTTP %1$d)</string>
     <string name="sentry_alerts_qr_failed">Couldn\'t create the QR code</string>
     <string name="msg_ntfy_server_address_only">Enter only the server address, for example ntfy.sh</string>
+    <!-- 地点与自动化（ui-spec §十六、§十八） -->
+    <string name="set_section_automation">Places and automation</string>
+    <string name="auto_group_rules">Automation</string>
+    <string name="auto_add">Add automation</string>
+    <string name="auto_add_summary">Start from a common one, or pick When and Then yourself</string>
+    <string name="auto_template_reverse">Turn off low-speed emergency braking when reversing</string>
+    <string name="auto_template_reverse_desc">When shifted to R, turn off low-speed emergency braking; restore it when leaving R</string>
+    <string name="auto_template_get_in">Set things when you get in</string>
+    <string name="auto_template_get_in_desc">When you get in, set the chosen items to fixed values</string>
+    <string name="auto_template_blank">Blank</string>
+    <string name="auto_template_blank_desc">Pick When and Then yourself</string>
+    <string name="auto_label_name">Name</string>
+    <string name="auto_label_when">When</string>
+    <string name="auto_label_and">And</string>
+    <string name="auto_label_then">Then</string>
+    <string name="auto_add_condition">Add condition</string>
+    <string name="auto_add_change">Add action</string>
+    <string name="auto_restore">Restore when it ends</string>
+    <string name="auto_restore_summary">%1$s, set the changed settings back to what they were</string>
+    <string name="auto_restore_summary_safety">%1$s, set the changed settings back to what they were. Required when a safety feature is turned off</string>
+    <string name="auto_delete_title">Delete this automation?</string>
+    <string name="auto_delete_msg">Once deleted, it no longer runs.</string>
+    <string name="auto_remove_condition">Delete this condition</string>
+    <string name="auto_remove_change">Delete this action</string>
+    <string name="auto_setting_sentry">Sentry Mode</string>
+    <string name="auto_setting_drive_mode">Drive mode</string>
+    <string name="auto_setting_circulation">Air circulation</string>
+    <string name="auto_setting_rear_climate">Rear climate</string>
+    <string name="auto_setting_hill_descent">Hill descent control</string>
+    <string name="auto_setting_low_speed_braking">Low-speed emergency braking</string>
+    <string name="auto_setting_front_climate">Climate</string>
+    <string name="auto_value_on">On</string>
+    <string name="auto_value_off">Off</string>
+    <string name="auto_value_comfort">Comfort</string>
+    <string name="auto_value_standard">Standard</string>
+    <string name="auto_value_sport">Sport</string>
+    <string name="auto_value_auto">Auto</string>
+    <string name="auto_value_outer">Fresh air</string>
+    <string name="auto_value_inner">Recirculation</string>
+    <string name="auto_trigger_get_in">You get in</string>
+    <string name="auto_trigger_gear">Shifted to %1$s</string>
+    <string name="auto_trigger_state_switch">%1$s turns %2$s</string>
+    <string name="auto_trigger_state_value">%1$s changes to %2$s</string>
+    <string name="auto_when">When: %1$s</string>
+    <string name="auto_end_gear">When leaving %1$s</string>
+    <string name="auto_end_state_switch">When %1$s turns %2$s</string>
+    <string name="auto_end_state_value">When %1$s is no longer %2$s</string>
+    <string name="auto_restore_short">%1$s, restore</string>
+    <string name="auto_cond_gear">In %1$s</string>
+    <string name="auto_cond_battery_at_least">Battery at least %1$d%%</string>
+    <string name="auto_cond_battery_below">Battery below %1$d%%</string>
+    <string name="auto_cond_time">%1$s–%2$s</string>
+    <string name="auto_cond_state_switch">%1$s is %2$s</string>
+    <string name="auto_cond_state_value">%1$s is %2$s</string>
+    <string name="auto_days_every">Every day</string>
+    <string name="auto_days_weekdays">Mon–Fri</string>
+    <string name="auto_days_weekend">Sat, Sun</string>
+    <string-array name="auto_day_names">
+        <item>Mon</item>
+        <item>Tue</item>
+        <item>Wed</item>
+        <item>Thu</item>
+        <item>Fri</item>
+        <item>Sat</item>
+        <item>Sun</item>
+    </string-array>
+    <string name="auto_list_sep">", "</string>
+    <string name="auto_summary_sep">" · "</string>
+    <string name="auto_change">%1$s: %2$s</string>
+    <string name="auto_pick_when_get_in_desc">Once someone is confirmed in the car and the car is on</string>
+    <string name="auto_pick_when_gear">Gear</string>
+    <string name="auto_pick_when_gear_desc">Shifted to P, R, D or N</string>
+    <string name="auto_pick_state">Vehicle status</string>
+    <string name="auto_pick_when_state_desc">A setting changes to a value, such as Climate turning on or Drive mode changing to Sport</string>
+    <string name="auto_pick_and_gear_desc">Gear is P, R, D or N</string>
+    <string name="auto_pick_battery">Battery</string>
+    <string name="auto_pick_battery_desc">Battery at least or below a percentage</string>
+    <string name="auto_pick_time">Time of day</string>
+    <string name="auto_pick_time_desc">A time range each day; it can cross midnight</string>
+    <string name="auto_pick_days">Days of the week</string>
+    <string name="auto_pick_days_desc">Which days of the week</string>
+    <string name="auto_pick_and_state_desc">A setting is a certain value</string>
+    <string name="auto_pick_battery_at_least">Battery at least…</string>
+    <string name="auto_pick_battery_below">Battery below…</string>
+    <string name="auto_pick_time_from">Start time</string>
+    <string name="auto_pick_time_to">End time</string>
+    <string name="auto_pick_get_in_unavailable">%1$s (not with You get in: nothing is restored when you leave)</string>
+    <string name="auto_pick_get_in_blocked">You get in (not while an action turns off a safety feature)</string>
+    <string name="auto_pick_then_drive_desc">Drive mode, hill descent control, low-speed emergency braking</string>
+    <string name="auto_pick_then_climate_desc">Air circulation, rear climate</string>
+    <string name="auto_pick_then_scenes_desc">Sentry Mode</string>
+
+    <!-- 地点与自动化：地点（ui-spec §十六「地点」） -->
+    <string name="auto_group_places">Places</string>
+    <string name="auto_place_here">Current place: %1$s</string>
+    <string name="auto_place_no_fix">No location</string>
+    <string name="auto_place_elsewhere">Elsewhere</string>
+    <string name="auto_place_unsure">Not sure</string>
+    <string name="auto_place_deleted">Deleted place</string>
+    <string name="auto_place_default_name">Place %1$d</string>
+    <string name="auto_place_summary">Radius %1$d m · %2$s</string>
+    <string name="auto_place_used">Automations using it: %1$d</string>
+    <string name="auto_place_unused">Not used in any automation</string>
+    <string name="auto_place_add">Add place</string>
+    <string name="auto_place_add_summary">Centered on your current location, up to %1$d</string>
+    <string name="auto_place_full">Up to %1$d places</string>
+    <string name="auto_place_center">Coordinates</string>
+    <string name="auto_place_center_hint">Latitude, longitude</string>
+    <string name="auto_place_center_note">Latitude first, then longitude, separated by a comma</string>
+    <string name="auto_place_use_fix">Use current location</string>
+    <string name="auto_place_from_fix">Centered on your current location; you can edit the coordinates</string>
+    <string name="auto_place_no_fix_add">No location yet: enter the coordinates (latitude first, then longitude, separated by a comma)</string>
+    <string name="auto_place_radius">Radius</string>
+    <string name="auto_place_meters">%1$d m</string>
+    <string name="auto_place_custom">Custom</string>
+    <string name="auto_place_radius_custom_value">Custom: %1$d m</string>
+    <string name="auto_place_radius_range">%1$d–%2$d m</string>
+    <string name="auto_place_delete_title">Delete this place?</string>
+    <string name="auto_place_delete_msg">No automation uses it.</string>
+    <string name="auto_place_delete_msg_used">Automations using it: %1$d. It is removed from their conditions; those that rely only on it are turned off.</string>
+    <string name="auto_trigger_arrive">Arriving at %1$s</string>
+    <string name="auto_trigger_leave">Leaving %1$s</string>
+    <string name="auto_end_arrive">When leaving %1$s</string>
+    <string name="auto_cond_in_places">At %1$s</string>
+    <string name="auto_cond_not_in_places">Not at %1$s</string>
+    <string name="auto_pick_place">Place</string>
+    <string name="auto_pick_when_place_desc">Arriving at or leaving a place</string>
+    <string name="auto_pick_and_place_desc">At or not at some places</string>
+    <string name="auto_pick_place_none">Place (add a place under Places first)</string>
+    <string name="auto_pick_in">At…</string>
+    <string name="auto_pick_not_in">Not at…</string>
+    <string name="auto_pick_in_title">At one of these places</string>
+    <string name="auto_pick_not_in_title">Not at any of these places</string>
+    <string name="auto_pick_safety_blocked">%1$s (not while an action turns off a safety feature)</string>
+    <string name="auto_pick_leave_unavailable">%1$s (not with Leaving a place: nothing is restored after you leave)</string>
+    <string name="auto_template_away">Turn on Sentry Mode when parked away from your places</string>
+    <string name="auto_template_away_desc">When shifted to P and not at any of your places, turn on Sentry Mode</string>
+    <string name="auto_template_away_unavailable">Turn on Sentry Mode when parked away from your places (add a place under Places first)</string>
 </resources>

@@ -5,7 +5,6 @@
     -->
     <string name="app_name">极氪即刻</string>
     <string name="app_name_full">极氪即刻（车机版）</string>
-    <string name="accessibility_service_description">用于「开机自启动」，帮助应用在后台持续运行。\n\n本服务不读取、不操作任何界面内容，也不收集任何信息。</string>
 
     <!-- 极氪合成流模式 -->
     <string name="zeekr_lane_front">前</string>
@@ -339,7 +338,7 @@
     <string name="set_floating_appearance_value">%1$d dp · %2$d%%</string>
     <string name="dlg_floating_reset_title">重置悬浮按钮？</string>
     <string name="set_auto_start_title">开机自启动</string>
-    <string name="set_auto_start_summary">保持应用在后台运行。车机重启或应用被系统关闭后自动重新启动，并恢复已开启的功能。关闭后不再自动启动。</string>
+    <string name="set_auto_start_summary">车机重启或应用被系统关闭后自动重新启动，上车时恢复已开启的功能。关闭后不再自动启动。</string>
     <string name="set_auto_record_title">启动自动录制</string>
     <string name="set_auto_record_summary">应用启动时自动开始录制，因熄屏停止的录制在亮屏后自动恢复；手动停止后不再自动开始</string>
     <!-- 熄屏录制 2026-11-02 停用，开发者选项里那一行拿掉了；要恢复时放回下面几条 -->
@@ -540,6 +539,7 @@
     <string name="lang_zh">中文</string>
     <string name="lang_en">English</string>
     <string name="lang_ms">Bahasa Melayu</string>
+    <string name="lang_ar">العربية</string>
 
     <!-- 设置里的枚举选项 -->
     <string name="opt_mode_auto">自动（推荐）</string>
@@ -678,8 +678,10 @@
     <string name="reason_timeout">连接超时</string>
     <string name="reason_no_space">存储空间不足</string>
     <string name="reason_file_not_found">文件不存在</string>
-    <string name="msg_screen_off_stopped">熄屏后已停止录制</string>
-    <string name="msg_screen_off_background">熄屏 15 秒，已转入后台</string>
+    <plurals name="return_notice_text">
+        <item quantity="other">应用已回到前台并正常运行，%d 秒后自动返回后台</item>
+    </plurals>
+    <string name="return_notice_stay">点击屏幕可留在此页</string>
     <string name="msg_stats_on">录制状态显示已开启</string>
     <string name="msg_stats_off">录制状态显示已关闭</string>
     <string name="msg_need_overlay_adjust">需要悬浮窗权限才能打开调节窗口</string>
@@ -1169,8 +1171,6 @@
     <string name="dev_perm_all_files_why">用于读写 U 盘上的文件</string>
     <string name="dev_perm_overlay">悬浮窗权限</string>
     <string name="dev_perm_overlay_why">用于超级镜子、盲区画面、悬浮按钮和画面调节窗口</string>
-    <string name="dev_perm_accessibility">无障碍服务</string>
-    <string name="dev_perm_accessibility_why">用于开机自启动</string>
     <string name="dev_perm_usage_access">使用情况访问</string>
     <string name="dev_perm_usage_access_why">用于记录可能占用摄像头的应用</string>
     <string name="dev_perm_battery">忽略电池优化</string>
@@ -1327,13 +1327,13 @@
     <!-- 哨兵提醒（设置 → 录制 最下面一组；项目所有者 2026-11-17 / 11-18 批准，ui-text-style §9） -->
     <string name="set_group_sentry_alerts">哨兵提醒</string>
     <string name="set_sentry_alerts_mode_title">手机订阅模式</string>
-    <string name="set_sentry_alerts_mode_summary">哨兵模式布防满 30 秒后，车辆闪烁双闪或车灯自行亮起，推送一条提醒到手机。提醒直接发送，不经过开发者的服务器。</string>
+    <string name="set_sentry_alerts_mode_summary">哨兵模式被触发（警戒或报警）时，推送一条提醒到手机。需开启「熄屏持续录制」，且锁车时正在录制。提醒直接发送，不经过开发者的服务器。</string>
     <string name="opt_sentry_alerts_ntfy">ntfy</string>
     <string name="opt_sentry_alerts_telegram">Telegram</string>
     <string name="set_sentry_alerts_last">上次提醒：%1$s</string>
     <string name="set_sentry_alerts_last_failed">上次提醒发送失败：%1$s</string>
     <string name="set_sentry_alerts_picture_title">附带画面</string>
-    <string name="set_sentry_alerts_picture_summary">每条提醒附一张环视拼图，大小不超过 100 KB。需开启「熄屏持续录制」，且锁车时正在录制。</string>
+    <string name="set_sentry_alerts_picture_summary">每条提醒附一张环视拼图，大小不超过 100 KB。</string>
     <string name="set_ntfy_topic_title">ntfy 话题</string>
     <string name="set_ntfy_topic_value">尾号 %1$s</string>
     <string name="set_ntfy_topic_summary">点击显示二维码，用手机上的 ntfy 应用扫码订阅</string>
@@ -1356,8 +1356,8 @@
     <string name="msg_sentry_alerts_test_failed">测试提醒发送失败：%1$s</string>
     <!-- 手机上收到的那一条：标题、正文（时刻是「11-17 21:05」） -->
     <string name="sentry_alert_title">哨兵提醒</string>
-    <string name="sentry_alert_hazard">双闪亮起 · %1$s</string>
-    <string name="sentry_alert_lamps">车灯亮起 · %1$s</string>
+    <string name="sentry_alert_alert">哨兵警戒 · %1$s</string>
+    <string name="sentry_alert_alarm">哨兵报警 · %1$s</string>
     <!-- 写代码时多出来的，待项目所有者确认（ui-text-style §9）：「发送测试」发出的那一条、发送失败的原因 -->
     <string name="sentry_alert_test">测试提醒 · %1$s</string>
     <string name="sentry_alerts_reason_unreachable">无法连接服务器</string>
@@ -1365,4 +1365,158 @@
     <string name="sentry_alerts_reason_refused">服务器拒绝（HTTP %1$d）</string>
     <string name="sentry_alerts_qr_failed">无法生成二维码</string>
     <string name="msg_ntfy_server_address_only">只填服务器地址，如 ntfy.sh</string>
+    <!-- 地点与自动化（ui-spec §十六、§十八）。项目所有者 2026-11-20 定名、定模型；原厂设置的名字照车上原厂界面逐字写 -->
+    <string name="set_section_automation">地点与自动化</string>
+    <string name="auto_group_rules">自动化</string>
+
+    <!-- 添加自动化 -->
+    <string name="auto_add">添加自动化</string>
+    <string name="auto_add_summary">从常用的开始，或自己选「当」和「就」</string>
+    <string name="auto_template_reverse">倒车时关闭低速紧急制动</string>
+    <string name="auto_template_reverse_desc">当挂入 R 挡，就关闭低速紧急制动；离开 R 挡时恢复</string>
+    <string name="auto_template_get_in">上车时恢复设置</string>
+    <string name="auto_template_get_in_desc">当上车，就把选中的几项设为固定的值</string>
+    <string name="auto_template_blank">空白</string>
+    <string name="auto_template_blank_desc">自己选「当」和「就」</string>
+
+    <!-- 展开以后每一行的标签 -->
+    <string name="auto_label_name">名称</string>
+    <string name="auto_label_when">当</string>
+    <string name="auto_label_and">而且</string>
+    <string name="auto_label_then">就</string>
+    <string name="auto_add_condition">添加条件</string>
+    <string name="auto_add_change">添加动作</string>
+    <string name="auto_restore">结束时恢复</string>
+    <string name="auto_restore_summary">%1$s，把改过的设置恢复成原来的值</string>
+    <string name="auto_restore_summary_safety">%1$s，把改过的设置恢复成原来的值；关闭安全功能时必须开启</string>
+
+    <!-- 删除 -->
+    <string name="auto_delete_title">删除这条自动化？</string>
+    <string name="auto_delete_msg">删除后它不再运行。</string>
+    <string name="auto_remove_condition">删除这个条件</string>
+    <string name="auto_remove_change">删除这个动作</string>
+
+    <!-- 设置和值（原厂名字） -->
+    <string name="auto_setting_sentry">哨兵模式</string>
+    <string name="auto_setting_drive_mode">驾驶模式</string>
+    <string name="auto_setting_circulation">循环模式</string>
+    <string name="auto_setting_rear_climate">二排空调</string>
+    <string name="auto_setting_hill_descent">陡坡缓降</string>
+    <string name="auto_setting_low_speed_braking">低速紧急制动</string>
+    <string name="auto_setting_front_climate">空调</string>
+    <string name="auto_value_on">开启</string>
+    <string name="auto_value_off">关闭</string>
+    <string name="auto_value_comfort">舒适</string>
+    <string name="auto_value_standard">标准</string>
+    <string name="auto_value_sport">运动</string>
+    <string name="auto_value_auto">自动</string>
+    <string name="auto_value_outer">外循环</string>
+    <string name="auto_value_inner">内循环</string>
+
+    <!-- 当（触发）：行里写的、一行说明里写的（带「时」）、结束时（恢复那一句） -->
+    <string name="auto_trigger_get_in">上车</string>
+    <string name="auto_trigger_gear">挂入 %1$s 挡</string>
+    <string name="auto_trigger_state_switch">%1$s%2$s</string>
+    <string name="auto_trigger_state_value">%1$s变为%2$s</string>
+    <string name="auto_when">%1$s时</string>
+    <string name="auto_end_gear">离开 %1$s 挡时</string>
+    <string name="auto_end_state_switch">%1$s%2$s时</string>
+    <string name="auto_end_state_value">%1$s不再是%2$s时</string>
+    <string name="auto_restore_short">%1$s恢复</string>
+
+    <!-- 而且（条件） -->
+    <string name="auto_cond_gear">在 %1$s 挡</string>
+    <string name="auto_cond_battery_at_least">电量不低于 %1$d%%</string>
+    <string name="auto_cond_battery_below">电量低于 %1$d%%</string>
+    <string name="auto_cond_time">%1$s–%2$s</string>
+    <string name="auto_cond_state_switch">%1$s%2$s</string>
+    <string name="auto_cond_state_value">%1$s是%2$s</string>
+    <string name="auto_days_every">每天</string>
+    <string name="auto_days_weekdays">周一至周五</string>
+    <string name="auto_days_weekend">周六、周日</string>
+    <string-array name="auto_day_names">
+        <item>周一</item>
+        <item>周二</item>
+        <item>周三</item>
+        <item>周四</item>
+        <item>周五</item>
+        <item>周六</item>
+        <item>周日</item>
+    </string-array>
+    <string name="auto_list_sep">、</string>
+    <string name="auto_summary_sep">" · "</string>
+
+    <!-- 就（动作） -->
+    <string name="auto_change">%1$s：%2$s</string>
+
+    <!-- 选择框 -->
+    <string name="auto_pick_when_get_in_desc">有了人在车上的证据、车通电时</string>
+    <string name="auto_pick_when_gear">挡位</string>
+    <string name="auto_pick_when_gear_desc">挂入 P、R、D、N 挡</string>
+    <string name="auto_pick_state">车辆状态</string>
+    <string name="auto_pick_when_state_desc">某项设置变为某个值，比如空调开启、驾驶模式变为运动</string>
+    <string name="auto_pick_and_gear_desc">挡位是 P、R、D、N</string>
+    <string name="auto_pick_battery">电量</string>
+    <string name="auto_pick_battery_desc">电量不低于或低于某个百分比</string>
+    <string name="auto_pick_time">时间段</string>
+    <string name="auto_pick_time_desc">每天的某一段时间，可以跨午夜</string>
+    <string name="auto_pick_days">星期</string>
+    <string name="auto_pick_days_desc">一周里的哪几天</string>
+    <string name="auto_pick_and_state_desc">某项设置是某个值</string>
+    <string name="auto_pick_battery_at_least">电量不低于…</string>
+    <string name="auto_pick_battery_below">电量低于…</string>
+    <string name="auto_pick_time_from">开始时间</string>
+    <string name="auto_pick_time_to">结束时间</string>
+    <string name="auto_pick_get_in_unavailable">%1$s（当「上车」时不能选：人下车时不恢复）</string>
+    <string name="auto_pick_get_in_blocked">上车（有关闭安全功能的动作时不能选）</string>
+    <string name="auto_pick_then_drive_desc">驾驶模式、陡坡缓降、低速紧急制动</string>
+    <string name="auto_pick_then_climate_desc">循环模式、二排空调</string>
+    <string name="auto_pick_then_scenes_desc">哨兵模式</string>
+
+    <!-- 地点与自动化：地点（ui-spec §十六「地点」，2026-11-23 草稿，等项目所有者批） -->
+    <string name="auto_group_places">地点</string>
+    <string name="auto_place_here">所在地点：%1$s</string>
+    <string name="auto_place_no_fix">暂无定位</string>
+    <string name="auto_place_elsewhere">其他地方</string>
+    <string name="auto_place_unsure">不确定</string>
+    <string name="auto_place_deleted">已删除的地点</string>
+    <string name="auto_place_default_name">地点 %1$d</string>
+    <string name="auto_place_summary">半径 %1$d m · %2$s</string>
+    <string name="auto_place_used">用在 %1$d 条自动化里</string>
+    <string name="auto_place_unused">没有用在自动化里</string>
+    <string name="auto_place_add">添加地点</string>
+    <string name="auto_place_add_summary">以当前定位为中心添加，最多 %1$d 个</string>
+    <string name="auto_place_full">最多 %1$d 个地点</string>
+    <string name="auto_place_center">坐标</string>
+    <string name="auto_place_center_hint">纬度, 经度</string>
+    <string name="auto_place_center_note">纬度在前、经度在后，用逗号隔开</string>
+    <string name="auto_place_use_fix">使用当前定位</string>
+    <string name="auto_place_from_fix">以当前定位为中心，坐标可以手动修改</string>
+    <string name="auto_place_no_fix_add">暂无定位，请手动填写坐标（纬度在前、经度在后，用逗号隔开）</string>
+    <string name="auto_place_radius">半径</string>
+    <string name="auto_place_meters">%1$d m</string>
+    <string name="auto_place_custom">自定义</string>
+    <string name="auto_place_radius_custom_value">自定义：%1$d m</string>
+    <string name="auto_place_radius_range">%1$d–%2$d m</string>
+    <string name="auto_place_delete_title">删除这个地点？</string>
+    <string name="auto_place_delete_msg">没有自动化用到它。</string>
+    <string name="auto_place_delete_msg_used">有 %1$d 条自动化用到它：条件里去掉这个地点，只靠它的那几条会关掉。</string>
+    <string name="auto_trigger_arrive">到达%1$s</string>
+    <string name="auto_trigger_leave">离开%1$s</string>
+    <string name="auto_end_arrive">离开%1$s时</string>
+    <string name="auto_cond_in_places">在%1$s</string>
+    <string name="auto_cond_not_in_places">不在%1$s</string>
+    <string name="auto_pick_place">地点</string>
+    <string name="auto_pick_when_place_desc">到达或离开某个地点</string>
+    <string name="auto_pick_and_place_desc">在或不在某几个地点</string>
+    <string name="auto_pick_place_none">地点（先在下面的「地点」里添加）</string>
+    <string name="auto_pick_in">在…</string>
+    <string name="auto_pick_not_in">不在…</string>
+    <string name="auto_pick_in_title">在这些地点之一</string>
+    <string name="auto_pick_not_in_title">不在这些地点</string>
+    <string name="auto_pick_safety_blocked">%1$s（有关闭安全功能的动作时不能选）</string>
+    <string name="auto_pick_leave_unavailable">%1$s（当「离开」某个地点时不能选：离开以后不恢复）</string>
+    <string name="auto_template_away">停在常用地点以外时开启哨兵模式</string>
+    <string name="auto_template_away_desc">当挂入 P 挡，而且不在任何一个地点，就开启哨兵模式</string>
+    <string name="auto_template_away_unavailable">停在常用地点以外时开启哨兵模式（先在下面的「地点」里添加地点）</string>
 </resources>

@@ -163,6 +163,7 @@ public class RecordingFloatingService extends Service {
         super.onCreate();
         com.kooo.evcam.blackbox.BlackBox.attach(this, "Service:RecordingFloatingService");
         com.kooo.evcam.blackbox.BlackBox.noteImportant("后台服务 RecordingFloatingService onCreate");
+        running = true;
         AppLog.d(TAG, "录制悬浮服务创建");
 
         mainHandler = new Handler(Looper.getMainLooper());
@@ -272,8 +273,8 @@ public class RecordingFloatingService extends Service {
                 placeFloatingWindow();
             }
         }
-        // 被杀了要不要重启：跟着「开机自启动」开关（规格 §6）。悬浮按钮由 Recovery 按设置恢复，不用自己粘着
-        return com.kooo.evcam.CameraForegroundService.stickiness(this);
+        // 不粘着（保活只留周期任务，规格 §6）：被系统停了不回来，人回来时照设置起（Parked、Recovery）
+        return START_NOT_STICKY;
     }
 
     @Nullable
@@ -285,6 +286,7 @@ public class RecordingFloatingService extends Service {
     @Override
     public void onDestroy() {
         com.kooo.evcam.blackbox.BlackBox.noteImportant("RecordingFloatingService onDestroy");
+        running = false;
         super.onDestroy();
         hideFloatingWindow();
 
@@ -311,6 +313,12 @@ public class RecordingFloatingService extends Service {
      * 进程里只有一个主界面，记在这里；它不在了（进程被杀后只恢复了服务）就是不在前台。
      */
     private static volatile boolean mainScreenInFront;
+    /** 服务在跑（停车时停掉的，人回来要起：{@code OverlayCoordinator.stopForParking}）。 */
+    private static volatile boolean running;
+
+    public static boolean isRunning() {
+        return running;
+    }
 
     /** @return 变了没有；变了的话调用方再发一次 {@link #ACTION_SHOW}，让按钮照新的状态摆 */
     public static boolean setMainScreenInFront(boolean inFront) {
@@ -444,7 +452,8 @@ public class RecordingFloatingService extends Service {
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
                 PixelFormat.TRANSLUCENT);
 
-        layoutParams.gravity = Gravity.TOP | Gravity.START;
+        // 照屏幕上的实际位置摆：从右往左的语言里也不镜像（ui-spec §十七）
+        layoutParams.gravity = Gravity.TOP | Gravity.LEFT;
         // 出现和收起：淡入淡出（ui-spec §十四），不放装饰动效时不放
         layoutParams.windowAnimations = com.kooo.evcam.ui.MotionPolicy.overlayWindowAnimations(this);
 
@@ -524,6 +533,7 @@ public class RecordingFloatingService extends Service {
 
         // 添加到窗口
         try {
+            floatingContainer.setLayoutDirection(android.view.View.LAYOUT_DIRECTION_LTR);
             windowManager.addView(floatingContainer, layoutParams);
             // 在不在录、什么样子只问相机管家（和前台通知同一个答案），之后的变化它会广播过来。
             // 以前靠主界面隔 500 ms 推它自己记的状态：主界面刚重建、还没对上时推的是「没在录」，

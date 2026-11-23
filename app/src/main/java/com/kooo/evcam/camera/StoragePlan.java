@@ -38,7 +38,8 @@ import java.util.regex.Pattern;
  * <h3>只认自己的文件</h3>
  *
  * <p>U 盘上可能有用户自己的东西。以前的清理「不筛选格式」，目录里有什么删什么；
- * 这里只认本应用写出来的分段文件名（{@code yyyyMMdd_HHmmss_<那一路>.mp4}）。</p>
+ * 这里只认本应用写出来的分段文件名（{@code yyyyMMdd_HHmmss_<那一路>.mp4}）。以前的版本在阿拉伯语等语言下
+ * 写过 ٠–٩ 的数字，也认，按名字里的时刻和新名字排在一起（{@link SharedSegmentName#asciiDigits}）。</p>
  *
  * <p>纯 Java，不碰 Android，方便直接跑单元测试。</p>
  */
@@ -50,8 +51,9 @@ public final class StoragePlan {
     /** 还没写完过一个分段、量不出大小时，按这个估。 */
     public static final long DEFAULT_SEGMENT_BYTES = 1024L * 1024 * 1024;
 
-    private static final Pattern OWN_CLIP = Pattern.compile("^\\d{8}_\\d{6}_[a-z0-9]+\\.mp4$");
-    private static final Pattern OWN_PHOTO = Pattern.compile("^\\d{8}_\\d{6}_[a-z0-9]+\\.jpe?g$");
+    /** 时刻那一段认任何写法的数字（{@code \p{Nd}}）：车机上和单元测试里认法一样（JVM 的 {@code \d} 只认 0–9）。 */
+    private static final Pattern OWN_CLIP = Pattern.compile("^\\p{Nd}{8}_\\p{Nd}{6}_[a-z0-9]+\\.mp4$");
+    private static final Pattern OWN_PHOTO = Pattern.compile("^\\p{Nd}{8}_\\p{Nd}{6}_[a-z0-9]+\\.jpe?g$");
 
     private StoragePlan() {
     }
@@ -66,9 +68,9 @@ public final class StoragePlan {
         return name != null && OWN_PHOTO.matcher(name).matches();
     }
 
-    /** 分组键：文件名开头的时间戳。同一分段里几路相机的文件共用它，字典序就是时间序。 */
+    /** 分组键：文件名开头的时间戳，数字换成 0–9。同一分段里几路相机的文件共用它，字典序就是时间序。 */
     public static String groupOf(String name) {
-        return name != null && name.length() >= 15 ? name.substring(0, 15) : "";
+        return name != null && name.length() >= 15 ? SharedSegmentName.asciiDigits(name.substring(0, 15)) : "";
     }
 
     /** 文件是哪一路的（文件名最后一个下划线之后）：改名前后的两种叫法算同一路（{@link CameraSlots#canonical}）。 */
@@ -77,7 +79,7 @@ public final class StoragePlan {
         return slot == null ? "" : CameraSlots.canonical(slot);
     }
 
-    /** 每一路的文件，各自从新到旧（名字开头是时刻，字典序就是时间序）。 */
+    /** 每一路的文件，各自从新到旧（名字开头是时刻，数字换成 0–9 以后字典序就是时间序）。 */
     private static Map<String, List<Clip>> newestFirstBySlot(List<Clip> clips) {
         Map<String, List<Clip>> bySlot = new LinkedHashMap<>();
         for (Clip clip : clips) {
@@ -90,7 +92,8 @@ public final class StoragePlan {
             list.add(clip);
         }
         for (List<Clip> list : bySlot.values()) {
-            Collections.sort(list, (a, b) -> b.name.compareTo(a.name));
+            Collections.sort(list, (a, b) ->
+                    SharedSegmentName.asciiDigits(b.name).compareTo(SharedSegmentName.asciiDigits(a.name)));
         }
         return bySlot;
     }

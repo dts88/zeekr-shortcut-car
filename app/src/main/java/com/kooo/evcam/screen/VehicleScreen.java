@@ -12,7 +12,7 @@ import com.kooo.evcam.telemetry.Signal;
 import java.util.Locale;
 
 /**
- * 车辆信号说中控屏黑没黑（设计 v3 §1.2，项目所有者 2026-10-12 D1；2026-10-27 亮要有证据）。纯函数，{@code VehicleScreenTest} 直接调。
+ * 车辆读数说人在不在车上、中控屏黑没黑（项目所有者 2026-10-12 D1；2026-11-21 亮要有人的证据）。纯函数，{@code VehicleScreenTest} 直接调。
  *
  * <h3>为什么要它</h3>
  *
@@ -22,7 +22,7 @@ import java.util.Locale;
  *
  * <ul>
  *   <li>黑：屏幕电源事件（{@link Signal#SCREEN_POWER_EVENT}）0 → 1，点火 ON → ACC，同一毫秒；</li>
- *   <li>亮：开车门，点火 ACC → ON 先到，屏幕电源事件 1 → 0 晚 40–100 ms —— 两项「且」起来，第一下就判成亮；</li>
+ *   <li>亮：开车门，点火 ACC → ON 先到，屏幕电源事件 1 → 0 晚 40–100 ms；</li>
  *   <li>之后点火 ACC → 0x00200102（名字不知道，多半是 OFF，只按原值记），屏幕电源事件一直是 1。</li>
  * </ul>
  *
@@ -31,13 +31,13 @@ import java.util.Locale;
  * <ul>
  *   <li>屏幕电源事件：1 黑、0 亮，别的（255 读不到、占位）不知道（解码在 {@link Signal}）；</li>
  *   <li>点火「ACC 或更低」= 原值在 [{@link #IGNITION_LOW_MIN}, {@link Signal#IGNITION_ACC}] 里（白名单，项目所有者定的读法）；
- *       ON、DRIVING 是高；别的原值、读不到都算不知道 —— 没见过的码（比如启动中）不拿来判黑；</li>
- *   <li>两项都知道：黑 = 事件是 1 且点火低；只知道一项就看那一项；都不知道：null（只看安卓，D1）；</li>
- *   <li><b>亮要有证据</b>（项目所有者 2026-10-27）：已经黑着、或者还没有车辆的判断（进程刚起来、车辆接口刚连上、
- *       读不到的时限过了，{@link ScreenTransitions#litNeedsEvidence}）时，点火低就是黑，不管事件说什么 —— 车没通电时屏幕亮了
- *       照熄屏算（远程开空调、远程看车那一类：10-24 15:43:58 亮了整 60 秒，点火一直 ACC）；点火不知道、事件说亮：说不上来（null，
- *       {@link ScreenTransitions} 照上一次的判断算一会儿，过了只看安卓）。黑着时结束黑的是车通电了（点火 ON、DRIVING）。
- *       只有车辆判过亮的那一段（人在车里，一直没黑过）点火掉到 ACC、事件还是 0，才照上面两项「且」算亮着。</li>
+ *       ON、DRIVING 是高；别的原值、读不到都算不知道 —— 没见过的码（比如启动中）不拿来判；</li>
+ *   <li><b>亮着时</b>（人在车上，{@link #whileLit}）：两项都知道，黑 = 事件是 1 且点火低；只知道一项就看那一项；都不知道：null
+ *       （{@link ScreenTransitions} 照亮着算一阵）。人在车里、点火掉到 ACC、事件还是 0：还亮着；</li>
+ *   <li><b>黑着时</b>（{@link #becomesLit}，项目所有者 2026-11-21：更保守，人拉开车门才算在）：车通电了（点火 ON、DRIVING），
+ *       而且刚拉开过车门、刚碰过应用、或者驾驶座此刻有人，才亮；车辆读不到，只认刚碰过应用（点火读不到而事件是 1 的不算：车说屏幕黑着）；
+ *       车没通电就是黑 —— 屏幕亮了也不算
+ *       （远程开空调、远程看车那一类：10-24 15:43:58 亮了整 60 秒，点火一直 ACC）。车自己通电不算人回来。</li>
  * </ul>
  *
  * <p>黑匣子里两项的写法（{@link #eventText}、{@link #ignitionText}）和车辆信号那几行（{@code DarkScreenProbes}）一样：
@@ -70,24 +70,13 @@ public final class VehicleScreen {
     }
 
     /**
-     * 车辆说屏幕黑没黑：TRUE 黑，FALSE 亮，null 说不上来。
+     * 亮着时（人在车上）车辆说屏幕黑没黑：TRUE 黑，FALSE 亮，null 说不上来。
      *
      * @param screenPowerEvent 屏幕电源事件解码后的值（{@link Signal#SCREEN_POWER_EVENT}：TRUE = 1，FALSE = 0，null 读不到）
      * @param ignition         点火的原值（{@link Signal#IGNITION}），null 读不到
-     * @param litNeedsEvidence 亮要有证据：判之前已经黑着、或者还没有车辆的判断（{@link ScreenTransitions#litNeedsEvidence}）
      */
-    public static Boolean verdict(Boolean screenPowerEvent, Integer ignition, boolean litNeedsEvidence) {
+    public static Boolean whileLit(Boolean screenPowerEvent, Integer ignition) {
         Boolean low = ignitionLow(ignition);
-        if (litNeedsEvidence) {
-            if (Boolean.TRUE.equals(low)) {
-                // 车没通电：黑，屏幕电源事件说什么都一样
-                return Boolean.TRUE;
-            }
-            if (low == null && Boolean.FALSE.equals(screenPowerEvent)) {
-                // 屏幕亮了，车通没通电不知道：说不上来
-                return null;
-            }
-        }
         if (screenPowerEvent != null && low != null) {
             return screenPowerEvent && low;
         }
@@ -98,7 +87,28 @@ public final class VehicleScreen {
     }
 
     /**
-     * 屏幕亮了、车没通电：事件是 0，点火「ACC 或更低」。黑着时这样还是黑（{@link #verdict}），黑匣子里记一行。
+     * 黑着时算不算人回来了（项目所有者 2026-11-21）：车通电了（点火 ON、DRIVING），而且刚拉开过车门、刚碰过应用，
+     * 或者驾驶座此刻有人（同日加：行驶中进程重启、人坐在车里不开车门就启动，不用再碰一下应用）；
+     * 点火读不到（车辆接口没连着也是），只认刚碰过应用 —— 屏幕电源事件说熄着的不算：车说屏幕黑着，照它亮了下一眼
+     * （{@link #whileLit}）就又黑，来回折腾；车没通电不算。
+     *
+     * @param screenPowerEvent 屏幕电源事件，TRUE = 熄，null 读不到
+     * @param ignition         点火的原值，null 读不到
+     * @param door             刚拉开过车门
+     * @param touch            刚碰过应用
+     * @param seat             驾驶座此刻有人（主驾座椅读到有人；读不到、车辆接口没连着是 false）
+     */
+    public static boolean becomesLit(Boolean screenPowerEvent, Integer ignition, boolean door, boolean touch,
+                                     boolean seat) {
+        Boolean low = ignitionLow(ignition);
+        if (Boolean.FALSE.equals(low)) {
+            return door || touch || seat;
+        }
+        return low == null && touch && !Boolean.TRUE.equals(screenPowerEvent);
+    }
+
+    /**
+     * 屏幕亮了、车没通电：事件是 0，点火「ACC 或更低」。黑着时这样还是黑（{@link #becomesLit}），黑匣子里记一行。
      */
     static boolean unpoweredLit(Boolean screenPowerEvent, Integer ignition) {
         return Boolean.FALSE.equals(screenPowerEvent) && Boolean.TRUE.equals(ignitionLow(ignition));

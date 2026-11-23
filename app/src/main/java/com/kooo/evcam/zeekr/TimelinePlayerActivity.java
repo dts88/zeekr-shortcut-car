@@ -81,6 +81,19 @@ import java.util.Map;
  */
 public class TimelinePlayerActivity extends AppCompatActivity {
 
+    /** 人碰了界面（触摸、按键）：人在车上的证据（{@code ScreenState.touched}：只认真的触摸和按键）。 */
+    @Override
+    public boolean dispatchTouchEvent(android.view.MotionEvent event) {
+        com.kooo.evcam.screen.ScreenState.touched(event, "ui");
+        return super.dispatchTouchEvent(event);
+    }
+
+    @Override
+    public boolean dispatchKeyEvent(android.view.KeyEvent event) {
+        com.kooo.evcam.screen.ScreenState.keyed(event, "ui");
+        return super.dispatchKeyEvent(event);
+    }
+
     private static final String TAG = "TimelinePlayer";
     /** 进度刷新、几路对齐的间隔。 */
     private static final long TICK_MS = 500L;

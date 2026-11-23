@@ -317,7 +317,7 @@
     <string name="set_floating_appearance_value">%1$d dp · %2$d%%</string>
     <string name="dlg_floating_reset_title">Set semula butang terapung?</string>
     <string name="set_auto_start_title">Mula semasa but</string>
-    <string name="set_auto_start_summary">Memastikan apl terus berjalan di latar belakang. Selepas unit kepala dimulakan semula atau sistem menutup apl, memulakannya semula dan memulihkan ciri yang dihidupkan. Jika dimatikan, apl tidak dimulakan semula.</string>
+    <string name="set_auto_start_summary">Selepas unit kepala dimulakan semula atau sistem menutup apl, memulakannya semula; ciri yang dihidupkan dipulihkan apabila anda masuk ke dalam kenderaan. Jika dimatikan, apl tidak dimulakan semula.</string>
     <string name="set_auto_record_title">Rakam semasa dibuka</string>
     <string name="set_auto_record_summary">Mula merakam apabila apl dibuka, dan menyambung rakaman yang berhenti kerana skrin padam apabila skrin hidup semula; rakaman yang anda hentikan tidak dimulakan semula</string>
     <!-- Screen-off recording was switched off on 2026-11-02 and removed from the developer options; restore these with it -->
@@ -516,6 +516,7 @@
     <string name="lang_zh">中文</string>
     <string name="lang_en">English</string>
     <string name="lang_ms">Bahasa Melayu</string>
+    <string name="lang_ar">العربية</string>
 
     <!-- Pilihan tetapan -->
     <string name="opt_mode_auto">Automatik (disyorkan)</string>
@@ -571,7 +572,6 @@
 
     <!-- Antara muka utama -->
     <string name="about_title">Perihal &amp; penghargaan</string>
-    <string name="accessibility_service_description">Digunakan oleh Mula semasa but untuk membantu apl terus berjalan.\n\nIa tidak membaca atau mengawal apa-apa pada skrin dan tidak mengumpul data.</string>
     <string name="zeekr_composite_not_found">Tiada strim komposit sekeliling ditemui. Unit kepala ini mungkin tidak disokong.</string>
     <string name="msg_no_camera_available">Tiada kamera tersedia</string>
     <string name="zeekr_lane_front">Depan</string>
@@ -663,8 +663,10 @@
     <string name="reason_timeout">sambungan tamat masa</string>
     <string name="reason_no_space">ruang storan tidak cukup</string>
     <string name="reason_file_not_found">fail tidak ditemui</string>
-    <string name="msg_screen_off_stopped">Rakaman dihentikan selepas skrin padam</string>
-    <string name="msg_screen_off_background">Skrin padam selama 15 saat. Dialihkan ke latar belakang.</string>
+    <plurals name="return_notice_text">
+        <item quantity="other">Apl kembali ke latar depan dan berjalan seperti biasa. Apl akan kembali ke latar belakang dalam %d saat.</item>
+    </plurals>
+    <string name="return_notice_stay">Ketik skrin untuk kekal di sini</string>
     <string name="msg_stats_on">Paparan status rakaman dihidupkan</string>
     <string name="msg_stats_off">Paparan status rakaman dimatikan</string>
     <string name="msg_need_overlay_adjust">Kebenaran paparan di atas apl lain diperlukan untuk membuka tetingkap pelarasan</string>
@@ -1153,8 +1155,6 @@
     <string name="dev_perm_all_files_why">Digunakan untuk membaca dan menulis fail pada pemacu USB</string>
     <string name="dev_perm_overlay">Paparan di atas apl lain</string>
     <string name="dev_perm_overlay_why">Digunakan oleh Cermin super, Paparan titik buta, butang terapung dan tetingkap pelarasan imej</string>
-    <string name="dev_perm_accessibility">Perkhidmatan kebolehcapaian</string>
-    <string name="dev_perm_accessibility_why">Digunakan oleh Mula semasa but</string>
     <string name="dev_perm_usage_access">Akses penggunaan</string>
     <string name="dev_perm_usage_access_why">Digunakan untuk merekod apl yang mungkin menggunakan kamera</string>
     <string name="dev_perm_battery">Abaikan pengoptimuman bateri</string>
@@ -1311,13 +1311,13 @@
     <!-- Amaran Sentry (bahagian bawah Tetapan → Rakaman) -->
     <string name="set_group_sentry_alerts">Amaran Sentry</string>
     <string name="set_sentry_alerts_mode_title">Langganan telefon</string>
-    <string name="set_sentry_alerts_mode_summary">Menghantar amaran ke telefon apabila lampu kecemasan berkelip atau lampu menyala sendiri selepas Mod Sentry bersiaga selama 30 saat. Amaran dihantar terus, tidak melalui pelayan pembangun.</string>
+    <string name="set_sentry_alerts_mode_summary">Menghantar amaran ke telefon apabila Mod Sentry dicetuskan (amaran atau penggera). Memerlukan Terus merakam apabila skrin padam dan rakaman berjalan semasa kereta dikunci. Amaran dihantar terus, tidak melalui pelayan pembangun.</string>
     <string name="opt_sentry_alerts_ntfy">ntfy</string>
     <string name="opt_sentry_alerts_telegram">Telegram</string>
     <string name="set_sentry_alerts_last">Amaran terakhir: %1$s</string>
     <string name="set_sentry_alerts_last_failed">Amaran terakhir gagal: %1$s</string>
     <string name="set_sentry_alerts_picture_title">Sertakan gambar</string>
-    <string name="set_sentry_alerts_picture_summary">Menambah gambar paparan sekeliling hingga 100 KB pada setiap amaran. Memerlukan Terus merakam apabila skrin padam dan rakaman berjalan semasa kereta dikunci.</string>
+    <string name="set_sentry_alerts_picture_summary">Menambah gambar paparan sekeliling hingga 100 KB pada setiap amaran.</string>
     <string name="set_ntfy_topic_title">Topik ntfy</string>
     <string name="set_ntfy_topic_value">Berakhir dengan %1$s</string>
     <string name="set_ntfy_topic_summary">Ketik untuk memaparkan kod QR, kemudian imbas dengan apl ntfy pada telefon untuk melanggan</string>
@@ -1339,12 +1339,150 @@
     <string name="msg_sentry_alerts_test_sent">Amaran ujian dihantar</string>
     <string name="msg_sentry_alerts_test_failed">Amaran ujian gagal: %1$s</string>
     <string name="sentry_alert_title">Amaran Sentry</string>
-    <string name="sentry_alert_hazard">Lampu kecemasan menyala · %1$s</string>
-    <string name="sentry_alert_lamps">Lampu menyala · %1$s</string>
+    <string name="sentry_alert_alert">Sentry berwaspada · %1$s</string>
+    <string name="sentry_alert_alarm">Penggera Sentry · %1$s</string>
     <string name="sentry_alert_test">Amaran ujian · %1$s</string>
     <string name="sentry_alerts_reason_unreachable">tidak dapat menghubungi pelayan</string>
     <string name="sentry_alerts_reason_timeout">sambungan tamat masa</string>
     <string name="sentry_alerts_reason_refused">pelayan menolaknya (HTTP %1$d)</string>
     <string name="sentry_alerts_qr_failed">Tidak dapat mencipta kod QR</string>
     <string name="msg_ntfy_server_address_only">Masukkan alamat pelayan sahaja, contohnya ntfy.sh</string>
+    <!-- 地点与自动化（ui-spec §十六、§十八） -->
+    <string name="set_section_automation">Tempat dan automasi</string>
+    <string name="auto_group_rules">Automasi</string>
+    <string name="auto_add">Tambah automasi</string>
+    <string name="auto_add_summary">Mulakan daripada yang biasa, atau pilih Apabila dan Maka sendiri</string>
+    <string name="auto_template_reverse">Matikan brek kecemasan kelajuan rendah semasa mengundur</string>
+    <string name="auto_template_reverse_desc">Apabila masuk gear R, matikan brek kecemasan kelajuan rendah; pulihkan apabila keluar dari R</string>
+    <string name="auto_template_get_in">Tetapkan apabila masuk kereta</string>
+    <string name="auto_template_get_in_desc">Apabila anda masuk kereta, item yang dipilih ditetapkan kepada nilai tetap</string>
+    <string name="auto_template_blank">Kosong</string>
+    <string name="auto_template_blank_desc">Pilih Apabila dan Maka sendiri</string>
+    <string name="auto_label_name">Nama</string>
+    <string name="auto_label_when">Apabila</string>
+    <string name="auto_label_and">Dan</string>
+    <string name="auto_label_then">Maka</string>
+    <string name="auto_add_condition">Tambah syarat</string>
+    <string name="auto_add_change">Tambah tindakan</string>
+    <string name="auto_restore">Pulihkan apabila tamat</string>
+    <string name="auto_restore_summary">%1$s, tetapan yang diubah dipulihkan kepada nilai asal</string>
+    <string name="auto_restore_summary_safety">%1$s, tetapan yang diubah dipulihkan kepada nilai asal. Wajib apabila ciri keselamatan dimatikan</string>
+    <string name="auto_delete_title">Padam automasi ini?</string>
+    <string name="auto_delete_msg">Selepas dipadam, ia tidak lagi berjalan.</string>
+    <string name="auto_remove_condition">Padam syarat ini</string>
+    <string name="auto_remove_change">Padam tindakan ini</string>
+    <string name="auto_setting_sentry">Mod Sentry</string>
+    <string name="auto_setting_drive_mode">Mod pemanduan</string>
+    <string name="auto_setting_circulation">Peredaran udara</string>
+    <string name="auto_setting_rear_climate">Penyaman udara baris kedua</string>
+    <string name="auto_setting_hill_descent">Kawalan menuruni bukit</string>
+    <string name="auto_setting_low_speed_braking">Brek kecemasan kelajuan rendah</string>
+    <string name="auto_setting_front_climate">Penyaman udara</string>
+    <string name="auto_value_on">Hidup</string>
+    <string name="auto_value_off">Mati</string>
+    <string name="auto_value_comfort">Selesa</string>
+    <string name="auto_value_standard">Piawai</string>
+    <string name="auto_value_sport">Sukan</string>
+    <string name="auto_value_auto">Auto</string>
+    <string name="auto_value_outer">Udara luar</string>
+    <string name="auto_value_inner">Edaran semula</string>
+    <string name="auto_trigger_get_in">Anda masuk kereta</string>
+    <string name="auto_trigger_gear">Masuk gear %1$s</string>
+    <string name="auto_trigger_state_switch">%1$s bertukar %2$s</string>
+    <string name="auto_trigger_state_value">%1$s bertukar kepada %2$s</string>
+    <string name="auto_when">Apabila: %1$s</string>
+    <string name="auto_end_gear">Apabila keluar dari gear %1$s</string>
+    <string name="auto_end_state_switch">Apabila %1$s bertukar %2$s</string>
+    <string name="auto_end_state_value">Apabila %1$s bukan lagi %2$s</string>
+    <string name="auto_restore_short">%1$s, pulihkan</string>
+    <string name="auto_cond_gear">Dalam gear %1$s</string>
+    <string name="auto_cond_battery_at_least">Bateri sekurang-kurangnya %1$d%%</string>
+    <string name="auto_cond_battery_below">Bateri di bawah %1$d%%</string>
+    <string name="auto_cond_time">%1$s–%2$s</string>
+    <string name="auto_cond_state_switch">%1$s %2$s</string>
+    <string name="auto_cond_state_value">%1$s ialah %2$s</string>
+    <string name="auto_days_every">Setiap hari</string>
+    <string name="auto_days_weekdays">Isnin–Jumaat</string>
+    <string name="auto_days_weekend">Sabtu, Ahad</string>
+    <string-array name="auto_day_names">
+        <item>Isn</item>
+        <item>Sel</item>
+        <item>Rab</item>
+        <item>Kha</item>
+        <item>Jum</item>
+        <item>Sab</item>
+        <item>Ahd</item>
+    </string-array>
+    <string name="auto_list_sep">", "</string>
+    <string name="auto_summary_sep">" · "</string>
+    <string name="auto_change">%1$s: %2$s</string>
+    <string name="auto_pick_when_get_in_desc">Apabila ada bukti seseorang di dalam kereta dan kereta dihidupkan</string>
+    <string name="auto_pick_when_gear">Gear</string>
+    <string name="auto_pick_when_gear_desc">Masuk gear P, R, D atau N</string>
+    <string name="auto_pick_state">Status kenderaan</string>
+    <string name="auto_pick_when_state_desc">Satu tetapan bertukar kepada nilai tertentu, contohnya penyaman udara hidup atau mod pemanduan bertukar kepada Sukan</string>
+    <string name="auto_pick_and_gear_desc">Gear ialah P, R, D atau N</string>
+    <string name="auto_pick_battery">Bateri</string>
+    <string name="auto_pick_battery_desc">Bateri sekurang-kurangnya atau di bawah peratusan tertentu</string>
+    <string name="auto_pick_time">Waktu</string>
+    <string name="auto_pick_time_desc">Satu tempoh setiap hari, boleh melepasi tengah malam</string>
+    <string name="auto_pick_days">Hari dalam minggu</string>
+    <string name="auto_pick_days_desc">Hari yang mana dalam seminggu</string>
+    <string name="auto_pick_and_state_desc">Satu tetapan ialah nilai tertentu</string>
+    <string name="auto_pick_battery_at_least">Bateri sekurang-kurangnya…</string>
+    <string name="auto_pick_battery_below">Bateri di bawah…</string>
+    <string name="auto_pick_time_from">Masa mula</string>
+    <string name="auto_pick_time_to">Masa tamat</string>
+    <string name="auto_pick_get_in_unavailable">%1$s (tidak boleh dengan Anda masuk kereta: tiada apa dipulihkan apabila anda keluar)</string>
+    <string name="auto_pick_get_in_blocked">Anda masuk kereta (tidak boleh apabila ada tindakan yang mematikan ciri keselamatan)</string>
+    <string name="auto_pick_then_drive_desc">Mod pemanduan, kawalan menuruni bukit, brek kecemasan kelajuan rendah</string>
+    <string name="auto_pick_then_climate_desc">Peredaran udara, penyaman udara baris kedua</string>
+    <string name="auto_pick_then_scenes_desc">Mod Sentry</string>
+
+    <!-- 地点与自动化：地点（ui-spec §十六「地点」） -->
+    <string name="auto_group_places">Tempat</string>
+    <string name="auto_place_here">Tempat semasa: %1$s</string>
+    <string name="auto_place_no_fix">Tiada lokasi</string>
+    <string name="auto_place_elsewhere">Tempat lain</string>
+    <string name="auto_place_unsure">Tidak pasti</string>
+    <string name="auto_place_deleted">Tempat yang dipadam</string>
+    <string name="auto_place_default_name">Tempat %1$d</string>
+    <string name="auto_place_summary">Jejari %1$d m · %2$s</string>
+    <string name="auto_place_used">Automasi yang menggunakannya: %1$d</string>
+    <string name="auto_place_unused">Tidak digunakan dalam automasi</string>
+    <string name="auto_place_add">Tambah tempat</string>
+    <string name="auto_place_add_summary">Berpusat pada lokasi semasa, maksimum %1$d</string>
+    <string name="auto_place_full">Maksimum %1$d tempat</string>
+    <string name="auto_place_center">Koordinat</string>
+    <string name="auto_place_center_hint">Latitud, longitud</string>
+    <string name="auto_place_center_note">Latitud dahulu, kemudian longitud, dipisahkan dengan koma</string>
+    <string name="auto_place_use_fix">Guna lokasi semasa</string>
+    <string name="auto_place_from_fix">Berpusat pada lokasi semasa; koordinat boleh diubah</string>
+    <string name="auto_place_no_fix_add">Tiada lokasi lagi: masukkan koordinat (latitud dahulu, kemudian longitud, dipisahkan dengan koma)</string>
+    <string name="auto_place_radius">Jejari</string>
+    <string name="auto_place_meters">%1$d m</string>
+    <string name="auto_place_custom">Tersuai</string>
+    <string name="auto_place_radius_custom_value">Tersuai: %1$d m</string>
+    <string name="auto_place_radius_range">%1$d–%2$d m</string>
+    <string name="auto_place_delete_title">Padam tempat ini?</string>
+    <string name="auto_place_delete_msg">Tiada automasi yang menggunakannya.</string>
+    <string name="auto_place_delete_msg_used">Automasi yang menggunakannya: %1$d. Tempat ini dibuang daripada syaratnya; yang hanya bergantung padanya akan dimatikan.</string>
+    <string name="auto_trigger_arrive">Tiba di %1$s</string>
+    <string name="auto_trigger_leave">Meninggalkan %1$s</string>
+    <string name="auto_end_arrive">Apabila meninggalkan %1$s</string>
+    <string name="auto_cond_in_places">Di %1$s</string>
+    <string name="auto_cond_not_in_places">Bukan di %1$s</string>
+    <string name="auto_pick_place">Tempat</string>
+    <string name="auto_pick_when_place_desc">Tiba di atau meninggalkan sesuatu tempat</string>
+    <string name="auto_pick_and_place_desc">Di atau bukan di beberapa tempat</string>
+    <string name="auto_pick_place_none">Tempat (tambah tempat di bawah Tempat dahulu)</string>
+    <string name="auto_pick_in">Di…</string>
+    <string name="auto_pick_not_in">Bukan di…</string>
+    <string name="auto_pick_in_title">Di salah satu tempat ini</string>
+    <string name="auto_pick_not_in_title">Bukan di mana-mana tempat ini</string>
+    <string name="auto_pick_safety_blocked">%1$s (tidak boleh apabila ada tindakan yang mematikan ciri keselamatan)</string>
+    <string name="auto_pick_leave_unavailable">%1$s (tidak boleh dengan Meninggalkan tempat: tiada apa dipulihkan selepas anda pergi)</string>
+    <string name="auto_template_away">Hidupkan Mod Sentry apabila diletak di luar tempat anda</string>
+    <string name="auto_template_away_desc">Apabila masuk gear P dan bukan di mana-mana tempat anda, hidupkan Mod Sentry</string>
+    <string name="auto_template_away_unavailable">Hidupkan Mod Sentry apabila diletak di luar tempat anda (tambah tempat di bawah Tempat dahulu)</string>
 </resources>

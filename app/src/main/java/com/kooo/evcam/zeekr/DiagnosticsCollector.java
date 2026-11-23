@@ -253,8 +253,11 @@ public final class DiagnosticsCollector {
     private static void appendCameraAvailability(StringBuilder sb, Context context) {
         sb.append("## 2.3.1 相机可用性（相机服务视角）").append('\n');
         if (!com.kooo.evcam.camera.CameraAvailabilityWatch.heardAnything()) {
-            sb.append("没收到过可用性回调（前台服务没起来，或者容器没转这条接口）").append('\n');
+            sb.append("没收到过可用性回调（还没挂上过，或者容器没转这条接口）").append('\n');
         } else {
+            if (!com.kooo.evcam.camera.CameraAvailabilityWatch.listening()) {
+                sb.append("  此刻没挂着（停车着、相机都关了、没人要；用的时候再挂上，那时从头记）").append('\n');
+            }
             for (java.util.Map.Entry<String, long[]> e
                     : com.kooo.evcam.camera.CameraAvailabilityWatch.snapshot().entrySet()) {
                 long[] v = e.getValue();
@@ -1016,12 +1019,19 @@ public final class DiagnosticsCollector {
                     .append(n.dark && n.darkForMs >= 0 ? "，" + clock(wallNow - n.darkForMs) + " 起" : "")
                     .append('\n');
             sb.append("屏幕此刻: ").append(n.known ? "知道"
-                    : n.wakePending ? "不知道 —— 安卓刚亮，在等醒来那一遍车辆信号（等到之前只按安卓熄屏算）"
-                    : "不知道 —— 进程刚起来，在等第一份车辆判断（恢复、接回录像排着等）").append('\n');
-            sb.append("车辆判断（判断用着的）: ").append(verdictText(n.vehicle)).append('\n');
+                    : n.wakePending ? "不知道 —— 安卓刚亮，在等醒来那一遍车辆信号（等到之前照黑着算）"
+                    : "不知道 —— 进程刚起来，在等第一份车辆读数（照黑着算，排着的事等知道了再看）").append('\n');
+            sb.append("人在不在车上（判断用着的）: ").append(n.vehicle == null ? "这台车机没有车辆接口，只看安卓"
+                    : n.vehicle ? "不在（黑）" : "在（亮）").append('\n');
             sb.append("  screen_power_event=").append(eventText(n.screenPowerEvent))
                     .append("，点火=").append(ignitionText(n.ignition))
-                    .append(" → 此刻读数判下来: ").append(verdictText(VehicleScreen.verdict(n.screenPowerEvent, n.ignition, n.litNeedsEvidence)))
+                    .append(" → 亮着时照这两项判: ").append(verdictText(VehicleScreen.whileLit(n.screenPowerEvent, n.ignition)))
+                    .append('\n');
+            sb.append("  有人的证据: 车门").append(n.doorAgoMs < 0 ? "没读到开过" : " " + duration(n.doorAgoMs) + "前开着"
+                    + (n.doorWhich == null ? "" : "（" + n.doorWhich + "）"))
+                    .append("，碰应用").append(n.touchAgoMs < 0 ? "没有" : " " + duration(n.touchAgoMs) + "前")
+                    .append("，驾驶座").append(n.seat == null ? "读不到" : n.seat ? "有人" : "没人")
+                    .append(n.litNeedsEvidence ? "（黑着：车通电了、又有其中一样才亮；车辆读不到只认碰过应用）" : "")
                     .append('\n');
             sb.append("  车辆接口: ").append(linkText(n.carLink)).append('\n');
             sb.append("安卓: 可交互=").append(n.interactive ? "是" : "否")
@@ -1031,8 +1041,15 @@ public final class DiagnosticsCollector {
                     : n.androidOffForMs < 0 ? "安卓熄屏着，起点不明（进程起来时就熄屏着）"
                     : clock(wallNow - n.androidOffForMs) + " 起，" + duration(n.androidOffForMs) + "前"
                     + (n.wakePending ? "；安卓刚又亮了，在等车辆信号" : "")).append('\n');
-            sb.append("说明: 熄屏 = 安卓熄屏，或者车辆说黑（screen_power_event=1 且点火 ACC 或更低；")
-                    .append("只读得到一项看那一项，都读不到只看安卓）。时刻是墙上时钟，多久前含深睡").append('\n');
+            long parkedMs = com.kooo.evcam.screen.Parked.forMs();
+            sb.append("停车（相机以外的也放开：悬浮窗、蓝牙，车辆信号只读那几项）: ")
+                    .append(!com.kooo.evcam.screen.Parked.is() ? "没有"
+                            : parkedMs < 0 ? "是，进程起来时就停着" : "是，" + duration(parkedMs) + "前起")
+                    .append(com.kooo.evcam.screen.Parked.overlaysOwed() ? "；悬浮窗欠着，人回来照设置起" : "")
+                    .append('\n');
+            sb.append("说明: 熄屏 = 人不在车上。亮着时：安卓熄屏，或者车辆说黑（screen_power_event=1 且点火 ACC 或更低；")
+                    .append("只读得到一项看那一项），才熄屏。黑着时：车通电了，而且刚拉开过车门、刚碰过应用或者驾驶座有人，才亮屏；")
+                    .append("车辆读不到只认碰过应用。时刻是墙上时钟，多久前含深睡").append('\n');
         } catch (RuntimeException e) {
             sb.append("!! 读取失败: ").append(e).append('\n');
         }
@@ -1084,18 +1101,19 @@ public final class DiagnosticsCollector {
      * @param darkForMs {@link ScreenState.Now#darkForMs}：-1 是不知道什么时候黑的
      */
     public static String darkText(ScreenState.Source source, long darkForMs) {
-        String who = source == ScreenState.Source.ANDROID ? "安卓熄屏" : source == null ? "?" : "车辆信号";
+        String who = source == ScreenState.Source.ANDROID ? "安卓熄屏"
+                : source == ScreenState.Source.LOST ? "车辆信号一直读不到，按人不在算"
+                : source == ScreenState.Source.VEHICLE_READ ? "没有人在车上的证据"
+                : source == null ? "?" : "车辆信号";
         if (darkForMs < 0) {
             return who + "，进程起来时就黑着，起点不明";
         }
-        // 读到时已经黑着（进程刚起来、或者之前读不到）：记下的是读到的那一刻，不是黑的那一刻
-        return who + "，" + duration(darkForMs) + "前"
-                + (source == ScreenState.Source.VEHICLE_READ ? "读到时已经黑着，起点不明" : "起");
+        return who + "，" + duration(darkForMs) + "前起";
     }
 
-    /** 车辆的判断：黑 / 亮 / 说不上来（只看安卓）。 */
+    /** 车辆的判断：黑 / 亮 / 说不上来。 */
     static String verdictText(Boolean verdict) {
-        return verdict == null ? "说不上来（只看安卓）" : verdict ? "黑" : "亮";
+        return verdict == null ? "说不上来" : verdict ? "黑" : "亮";
     }
 
     /** 屏幕电源事件：原值和意思，「1（黑）」「0（亮）」；读不到（255、没读过）是「读不到」。 */
@@ -1124,17 +1142,17 @@ public final class DiagnosticsCollector {
     /** 车辆接口此刻的结果。 */
     static String linkText(Telemetry.CarLink link) {
         if (link == null) {
-            return "没人登记（核心还没登记，熄屏只看安卓）";
+            return "没人登记（核心还没登记）";
         }
         switch (link) {
             case CONNECTED:
                 return "接上了";
             case CONNECTING:
-                return "在连（熄屏先只看安卓）";
+                return "在连（连上之前照读不到算：黑着的还黑着）";
             case UNAVAILABLE:
                 return "这台车机没有这套接口（熄屏只看安卓，不再试）";
             default:
-                return "连不上（熄屏只看安卓；每 " + (Telemetry.RETRY_MS / 60_000L) + " 分钟、安卓亮屏时再试）";
+                return "连不上（照读不到算：黑着时只认碰过应用；每 " + (Telemetry.RETRY_MS / 60_000L) + " 分钟、安卓亮屏时再试）";
         }
     }
 
@@ -1232,12 +1250,21 @@ public final class DiagnosticsCollector {
                 ? "已解锁" : "未解锁").append('\n');
         sb.append("  用户退出后暂停自启动=").append(com.kooo.evcam.UserExit.isExited(context)
                 ? "是（等手动打开或真正开机）" : "否").append('\n');
+        sb.append("  连着崩溃=").append(com.kooo.evcam.recovery.CrashHold.count(context))
+                .append(" 次（一次接一次的运行都是崩溃结束的才算；满 2 次不再自动回来，照用户退出处理）").append('\n');
         sb.append('\n').append("全部设置的原始值（app_config）:").append('\n');
         try {
             java.util.Map<String, ?> all = context
                     .getSharedPreferences("app_config", Context.MODE_PRIVATE).getAll();
             for (java.util.Map.Entry<String, ?> e : new java.util.TreeMap<>(all).entrySet()) {
                 String value = String.valueOf(e.getValue());
+                if ("automation_rules".equals(e.getKey())) {
+                    // 地点与自动化的规则里有用户起的名字：只写多长（ui-spec §十八）
+                    value = "（" + value.length() + " 字，内容不导出）";
+                } else if ("automation_places".equals(e.getKey())) {
+                    // 地点有名称和坐标：只写有几个
+                    value = "（" + com.kooo.evcam.automation.PlaceStore.parse(value).size() + " 个地点，内容不导出）";
+                }
                 if (value.length() > 80) {
                     value = value.substring(0, 80) + "…（" + value.length() + " 字）";
                 }
@@ -1395,8 +1422,8 @@ public final class DiagnosticsCollector {
                 return "不听（蓝牙关着）";
             case NO_PERMISSION:
                 return "不听（没有扫描权限）";
-            case ASLEEP:
-                return "不听（车机要睡，蓝牙放开了）";
+            case PARKED:
+                return "不听（停车：人不在车上，蓝牙放开了）";
             case SETTLING:
                 return "先等着（车机刚醒）";
             case CONNECTING:

@@ -83,6 +83,19 @@ import java.util.Set;
  */
 public class PhotoPlaybackActivity extends AppCompatActivity {
 
+    /** 人碰了界面（触摸、按键）：人在车上的证据（{@code ScreenState.touched}：只认真的触摸和按键）。 */
+    @Override
+    public boolean dispatchTouchEvent(android.view.MotionEvent event) {
+        com.kooo.evcam.screen.ScreenState.touched(event, "ui");
+        return super.dispatchTouchEvent(event);
+    }
+
+    @Override
+    public boolean dispatchKeyEvent(android.view.KeyEvent event) {
+        com.kooo.evcam.screen.ScreenState.keyed(event, "ui");
+        return super.dispatchKeyEvent(event);
+    }
+
     // UI 组件
     private RecyclerView photoList;
     private TextView emptyText;
@@ -777,7 +790,8 @@ public class PhotoPlaybackActivity extends AppCompatActivity {
         Collections.sort(allGroups, (g1, g2) -> g2.getCaptureTime().compareTo(g1.getCaptureTime()));
 
         // 第二步：按日期分组
-        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+        // 分组用的键，不上界面：数字固定 0–9
+        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
         Map<String, DateSection<PhotoGroup>> dateSectionMap = new LinkedHashMap<>();
         
         for (PhotoGroup group : allGroups) {

@@ -18,10 +18,12 @@
           ① 标题区：和主界面同一套 —— 64dp 高，菜单在左上，界面名紧跟着，
           本界面的动作靠右。按钮都是矢量图标或灰底块，不再用 ☰ ⌂ 这类字符。
         -->
+        <!-- ① 标题区不镜像：菜单 / 返回键永远在左上，标题紧跟着（ui-spec §十七） -->
         <LinearLayout
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="@dimen/title_bar_height"
+            android:layoutDirection="ltr"
             android:orientation="horizontal"
             android:paddingStart="10dp"
             android:paddingEnd="16dp"
@@ -47,6 +49,7 @@
 
             <TextView
                 android:id="@+id/current_datetime"
+                android:textAlignment="viewStart"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
@@ -95,8 +98,9 @@
                     android:visibility="gone" />
             </FrameLayout>
 
-            <!-- 右侧：预览区（占据剩余空间） -->
+            <!-- 右侧：预览区（占据剩余空间）。画面照车上的方位摆，从右往左的语言里也不镜像（ui-spec §十七） -->
             <LinearLayout
+                android:layoutDirection="ltr"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
                 android:layout_weight="1"

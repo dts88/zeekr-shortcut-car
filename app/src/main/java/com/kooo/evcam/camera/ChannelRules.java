@@ -87,6 +87,28 @@ public final class ChannelRules {
      */
     public static final long QUIET_MS = CameraTaken.QUIET_MS;
 
+    /**
+     * 车机睡醒以后，留给它重新初始化相机的时间。车机从睡眠里醒来会把相机重新初始化一遍，那几秒里开相机会撞上。
+     * 上传过的诊断里 2026-09-26～11-21 的 82 次睡醒：醒来 0.5–1.2 秒后相机被拿走，2.3–3.3 秒后回来，最长 3.38 秒；
+     * 每次睡醒都有，没睡醒的时候没有过。留得比量到的最长的多一截。
+     */
+    public static final long WAKE_REINIT_MS = 5_000L;
+
+    /**
+     * 车机睡醒以后多久才开、改输出、救（项目所有者 2026-11-21）：{@link #WAKE_REINIT_MS} 加同样的安静 {@link #QUIET_MS}。
+     * 以前靠一直挂着的相机服务通知听见它「没了又回来」，再等安静；通知改成用的时候才挂以后
+     * （CameraAvailabilityWatch），停车着那几声听不到，改看车机醒来本身 —— 系统的深睡计时变多了
+     * （{@code ChannelScheduler.noticeWake}），从调度发现睡醒的那一轮起算（比真正醒来晚 0–2 秒）。
+     *
+     * <p>可以晚，不能早（项目所有者 2026-11-21：可能系统还没把相机初始化完；不着急，最迟主驾坐下以后才开也可以）。
+     * 这一条管的是重新初始化还没开始的那一小段（醒来后最晚 2.3 秒才开始，那之前相机看着是空的）；车机别的动作 ——
+     * 醒来约 7.6 秒后把后座舱放回相机列表 —— 靠听：挂着就听得到，新挂上的听满 {@link #QUIET_MS} 才开（{@link #quietLeft}）。
+     * 同一批记录里主驾最快在醒来后 7.5 秒坐下（中位 14 秒），最快 14.5 秒挂出 P 挡。</p>
+     *
+     * <p>只管关着的那一路（{@link #quietLeft}）：睡过这一觉还开着的没被动过。挂上以后它再动相机，照样听得到、照样等安静。</p>
+     */
+    public static final long WAKE_SETTLE_MS = WAKE_REINIT_MS + QUIET_MS;
+
     /** 被拿着的一路有人要时，多久问一次相机服务它空没空（只问，不开；§二.7）。数在 {@link CameraTaken#ASK_EVERY_MS}。 */
     public static final long ASK_EVERY_MS = CameraTaken.ASK_EVERY_MS;
 
@@ -507,6 +529,13 @@ public final class ChannelRules {
         boolean heardAnything;
         /** 上一次<b>别人引起的</b>变化（CameraAvailabilityWatch.lastOthersChangeAt）；0 = 没有过。 */
         long lastOthersChangeAt;
+        /** 车机上一次睡醒的那一刻（{@code ChannelScheduler.noticeWake}：系统的深睡计时变多了）；0 = 这个进程里没见过。 */
+        long headUnitWokeAt;
+        /**
+         * 相机服务的通知这一次是什么时候挂上的（{@code ChannelScheduler.tendCameraService} 新挂上的那一轮）；0 = 没挂着，
+         * 或者不是调度挂的。挂上之前别人动没动过相机听不到，安静从这一刻起才数得出来（{@link ChannelRules#quietLeft}）。
+         */
+        long listenedSince;
         /** 「车机要睡」从什么时候起（熄屏那张表判成现在停）；0 = 没有。亮屏时清。 */
         long sleepSince;
         /** 「退出」从什么时候起；0 = 没有。 */
@@ -638,6 +667,13 @@ public final class ChannelRules {
         JUDGING,
         /** 相机服务 3 秒内报过别人引起的变化。 */
         QUIET,
+        /**
+         * 相机服务的通知挂上还不到 {@link ChannelRules#QUIET_MS}：挂上之前的听不到，听满了才算安静
+         * （项目所有者 2026-11-21：可以晚，不能早）。
+         */
+        UNHEARD,
+        /** 车机刚睡醒，还不到 {@link ChannelRules#WAKE_SETTLE_MS}：等它把相机重新初始化完（项目所有者 2026-11-21）。 */
+        WOKE,
         /** 开之前等这一路的录像输出（最多 2 秒）。 */
         RECORD_OUTPUT,
         /**
@@ -1445,11 +1481,11 @@ public final class ChannelRules {
     /**
      * 这一下是不是这一趟看「启动自动录制」的那一下（规格 §3.2：启动时自动开一次）：应用启动（主界面打开、开机自启动把应用带回来）、
      * 屏幕亮着、这一趟还没看过 —— 看过（开关开着就开、关着就不开）、人开过或者停过就不再看（人按了停止之后切个日夜模式，不该看见它又录上了；
-     * 开关是这一趟中途打开的，下一趟才自动开）。屏幕黑着不看，等亮屏（不为中间不明原因的启动去试着录，项目所有者 2026-10-27）。
-     * 亮屏本身不是启动：只接「这一趟要录」。
+     * 开关是这一趟中途打开的，下一趟才自动开）。屏幕黑着不看，那一眼欠着、亮屏以后的第一眼补上（{@link #startLookOwed}；
+     * 不为中间不明原因的启动去试着录，项目所有者 2026-10-27）。亮屏本身不是启动：没欠着的只接「这一趟要录」。
      *
      * @param usedThisTrip 这一趟里看过、人开过或者停过
-     * @param appStarting  这一下是应用启动
+     * @param appStarting  这一下是应用启动，或者之前启动的那一眼欠着
      * @param dark         屏幕黑着
      */
     public static boolean autoStartMoment(boolean usedThisTrip, boolean appStarting, boolean dark) {
@@ -1457,17 +1493,56 @@ public final class ChannelRules {
     }
 
     /**
-     * 前台服务该不该开着（规格 §3.5，3b 起只有相机管家照它起停）：没退出，而且开机自启动开着、在录、或者「这一趟要录」
-     * （被打断等接回、因熄屏停下等亮屏接 —— 接回时相机是从后台开的，后台拿着相机安卓要求有前台服务）。
+     * 应用启动的那一下屏幕黑着、这一趟还没看过启动自动录制：那一眼欠着，亮屏以后的第一眼补上（{@link #autoStartMoment}）。
+     * 开机自启动开着的，亮屏那一下的恢复本来就算一次启动；关着的只有这一条 —— 人在车没通电时点开了主界面，后来车通电了。
+     * 看过了、人开过或者停过、屏幕亮了（这一眼已经看了）就不欠了。
      *
-     * @param exited       用户退出了
+     * @param usedThisTrip 这一趟里看过、人开过或者停过
+     * @param appStarting  这一下是应用启动，或者之前欠着
+     * @param dark         屏幕黑着
+     */
+    public static boolean startLookOwed(boolean usedThisTrip, boolean appStarting, boolean dark) {
+        return !usedThisTrip && appStarting && dark;
+    }
+
+    /**
+     * 前台服务该不该开着（规格 §3.5，3b 起只有相机管家照它起停）。没退出，而且：
+     *
+     * <ul>
+     *   <li>在录：要（后台拿着相机安卓要求有前台服务）；</li>
+     *   <li>停车着（人不在车上，{@code screen.Parked}；项目所有者 2026-11-21「停掉」）：不要 —— 应用停车时车机随时可以收走。
+     *       只有一种留着：「这一趟要录」立着、熄屏中哨兵模式变成开还能把录像接上（{@link #sentryCanStartWhileParked}）——
+     *       那一下相机是从后台开的，停掉再起的前台服务用不了相机；</li>
+     *   <li>人在车上：开机自启动开着，或者「这一趟要录」立着（被打断等接回：接回时相机是从后台开的）。</li>
+     * </ul>
+     *
+     * @param exited          用户退出了
      * @param autoStartOnBoot 「开机自启动」开着
-     * @param recording    在录（开录中、在录）
-     * @param wanted       「这一趟要录」立着
+     * @param recording       在录（开录中、在录）
+     * @param wanted          「这一趟要录」立着
+     * @param parked          停车着
+     * @param sentryCanStart  停车着，熄屏中哨兵模式变成开还能把录像接上
      */
     public static boolean foregroundServiceNeeded(boolean exited, boolean autoStartOnBoot, boolean recording,
-                                                  boolean wanted) {
-        return !exited && (autoStartOnBoot || recording || wanted);
+                                                  boolean wanted, boolean parked, boolean sentryCanStart) {
+        if (exited) {
+            return false;
+        }
+        if (recording) {
+            return true;
+        }
+        if (parked) {
+            return wanted && sentryCanStart;
+        }
+        return autoStartOnBoot || wanted;
+    }
+
+    /**
+     * 停车着，熄屏中哨兵模式变成开还能不能把录像接上（{@link #startsInDark} 最后那一条）：熄屏持续录制开着、计划里有环视，
+     * 而且车机还没睡过 —— 车机睡过以后前台服务停掉了（车自己醒来不为它留着），之后才开的哨兵要到人回来才接着录。
+     */
+    public static boolean sentryCanStartWhileParked(boolean keepWhenDark, boolean surroundPlanned, boolean headUnitSlept) {
+        return keepWhenDark && surroundPlanned && !headUnitSlept;
     }
 
     // ================================================================= 熄屏时的录像（相机管家，项目所有者 2026-11-02）
@@ -2717,8 +2792,7 @@ public final class ChannelRules {
         if (judgingKey != null) {
             return Decision.waitFor(Why.JUDGING, judgingKey, Math.max(0, judgingLeft));
         }
-        long quietLeft = w.lastOthersChangeAt == 0 ? 0 : QUIET_MS - (now - w.lastOthersChangeAt);
-        boolean quiet = quietLeft <= 0;
+        // 安静不安静一路一路问（quietLeft）：相机服务 3 秒内报过别人引起的变化，谁都要等；车机刚睡醒，只有关着的那一路要等
         boolean usable = usable(w);
 
         // 摘死输出
@@ -2726,8 +2800,9 @@ public final class ChannelRules {
             if (!hasDead(lane) || !reconfigurable(lane) || !shouldOpen(w, lane)) {
                 continue;
             }
-            if (!quiet) {
-                return Decision.waitFor(Why.QUIET, lane.key, quietLeft).about(Move.APPLY);
+            long quietLeft = quietLeft(w, lane);
+            if (quietLeft > 0) {
+                return Decision.waitFor(quietWhy(w, lane), lane.key, quietLeft).about(Move.APPLY);
             }
             return apply(w, lane, Why.DEAD);
         }
@@ -2751,8 +2826,9 @@ public final class ChannelRules {
                 break;
             }
             // 走到这里能用相机：「先不开」的没有（deferredKey 还是 null），也照样标上「看过了」
-            if (!quiet) {
-                return withDeferred(Decision.waitFor(Why.QUIET, lane.key, quietLeft).about(Move.OPEN), deferredKey);
+            long quietLeft = quietLeft(w, lane);
+            if (quietLeft > 0) {
+                return withDeferred(Decision.waitFor(quietWhy(w, lane), lane.key, quietLeft).about(Move.OPEN), deferredKey);
             }
             long recordLeft = recordOutputLeft(w, lane);
             if (recordLeft > 0) {
@@ -2768,8 +2844,9 @@ public final class ChannelRules {
             if (why == null) {
                 continue;
             }
-            if (!quiet) {
-                return withDeferred(Decision.waitFor(Why.QUIET, lane.key, quietLeft).about(Move.APPLY), deferredKey);
+            long quietLeft = quietLeft(w, lane);
+            if (quietLeft > 0) {
+                return withDeferred(Decision.waitFor(quietWhy(w, lane), lane.key, quietLeft).about(Move.APPLY), deferredKey);
             }
             return withDeferred(apply(w, lane, why), deferredKey);
         }
@@ -2791,11 +2868,12 @@ public final class ChannelRules {
                 }
                 continue;
             }
-            if (!quiet) {
+            long quietLeft = quietLeft(w, lane);
+            if (quietLeft > 0) {
                 if (lane.ladder.gaveUp()) {
                     continue;
                 }
-                Decision waiting = Decision.waitFor(Why.QUIET, lane.key, quietLeft).about(Move.RESCUE);
+                Decision waiting = Decision.waitFor(quietWhy(w, lane), lane.key, quietLeft).about(Move.RESCUE);
                 waiting.events.addAll(ladderEvents);
                 return withDeferred(waiting, deferredKey);
             }
@@ -2821,6 +2899,45 @@ public final class ChannelRules {
         Decision idle = Decision.idle();
         idle.events.addAll(ladderEvents);
         return withDeferred(idle, deferredKey);
+    }
+
+    /**
+     * 这一路还要等多久才算安静（开、改输出、救之前；不用等是 0 或负数）。三样，都要等的等晚到点的那一个：
+     *
+     * <ul>
+     *   <li>相机服务 {@link #QUIET_MS} 内报过别人引起的变化，哪一路都要等；</li>
+     *   <li>相机服务的通知挂上还不到 {@link #QUIET_MS}（{@link World#listenedSince}），哪一路都要等：通知是用的时候才挂的，
+     *       挂上之前别人动没动过相机听不到，没听着的那一段不能算安静（项目所有者 2026-11-21：可以晚，不能早）。
+     *       挂上之前的变化都不晚于挂上那一刻，所以哪一次都不比一直挂着的时候早；</li>
+     *   <li>车机刚睡醒（{@link #WAKE_SETTLE_MS}）只管关着的那一路 —— 它醒来重新初始化的是没开着的相机，
+     *       睡过这一觉还开着的没被动过（被动了相机自己会报丢失）。</li>
+     * </ul>
+     */
+    static long quietLeft(World w, Lane lane) {
+        return Math.max(Math.max(othersLeft(w), unheardLeft(w)), wokeLeft(w, lane));
+    }
+
+    /** 等安静的那一行写哪个原因：还要等的几样里晚到点的那一个；一样晚的，车机睡醒先于刚挂上，刚挂上先于相机服务报的。 */
+    static Why quietWhy(World w, Lane lane) {
+        long others = othersLeft(w);
+        long unheard = unheardLeft(w);
+        long woke = wokeLeft(w, lane);
+        if (woke > 0 && woke >= others && woke >= unheard) {
+            return Why.WOKE;
+        }
+        return unheard > 0 && unheard >= others ? Why.UNHEARD : Why.QUIET;
+    }
+
+    private static long othersLeft(World w) {
+        return w.lastOthersChangeAt == 0 ? 0 : QUIET_MS - (w.now - w.lastOthersChangeAt);
+    }
+
+    private static long unheardLeft(World w) {
+        return w.listenedSince == 0 ? 0 : QUIET_MS - (w.now - w.listenedSince);
+    }
+
+    private static long wokeLeft(World w, Lane lane) {
+        return w.headUnitWokeAt == 0 || lane.device != Device.CLOSED ? 0 : WAKE_SETTLE_MS - (w.now - w.headUnitWokeAt);
     }
 
     /**

@@ -7,7 +7,10 @@
 
 package com.kooo.evcam.screens;
 
+import android.content.Context;
+import android.content.res.Configuration;
 import android.os.Bundle;
+import android.os.LocaleList;
 import android.view.View;
 import android.widget.FrameLayout;
 
@@ -15,9 +18,27 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.FragmentActivity;
 
 import com.kooo.evcam.R;
+import com.kooo.evcam.settings.Languages;
 
 /** 截图用的空壳：应用的主题，一个铺满的容器，要画哪个界面就把它放进来。 */
 public class ShotActivity extends FragmentActivity {
+
+    /**
+     * 应用里，界面的语言由 appcompat 照 {@link Languages} 给的标签套上（阿拉伯语带 nu-latn，数字写 0–9）；
+     * 这个空壳不经过 appcompat，只照数字那一条自己套一遍（{@link Languages#digits0to9}）。中文、英文、马来文、希伯来文
+     * 本来就写 0–9，不动。「系统语言没有翻译时用英文」那一条不套：从右往左那组借希伯来语排版，文字退回中文。
+     */
+    @Override
+    protected void attachBaseContext(Context base) {
+        Configuration config = base.getResources().getConfiguration();
+        String tags = Languages.digits0to9(config.getLocales().get(0));
+        if (!tags.isEmpty()) {
+            Configuration override = new Configuration(config);
+            override.setLocales(LocaleList.forLanguageTags(tags));
+            base = base.createConfigurationContext(override);
+        }
+        super.attachBaseContext(base);
+    }
 
     /** 容器的 id。 */
     public int container;

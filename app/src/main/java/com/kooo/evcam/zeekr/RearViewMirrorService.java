@@ -99,6 +99,11 @@ public class RearViewMirrorService extends Service {
         context.stopService(new Intent(context, RearViewMirrorService.class));
     }
 
+    /** 服务在跑（停车时停掉的，人回来要起：{@code OverlayCoordinator.stopForParking}）。 */
+    public static boolean isRunning() {
+        return instance != null;
+    }
+
     /** Redraw the existing window after the label setting changes; no camera restart. */
     public static void refreshCameraLabel() {
         RearViewMirrorService svc = instance;
@@ -280,8 +285,8 @@ public class RearViewMirrorService extends Service {
             return START_NOT_STICKY;
         }
         showMirror();
-        // 被杀了要不要重启：跟着「开机自启动」开关（规格 §6）。悬浮窗本身由 Recovery 按设置恢复，不用自己粘着
-        return com.kooo.evcam.CameraForegroundService.stickiness(this);
+        // 不粘着（保活只留周期任务，规格 §6）：被系统停了不回来，人回来时照设置起（Parked、Recovery）
+        return START_NOT_STICKY;
     }
 
     private void showMirror() {

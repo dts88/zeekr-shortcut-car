@@ -9,6 +9,7 @@ package com.kooo.evcam.settings;
 
 import android.content.Context;
 import android.content.res.Configuration;
+import android.content.res.Resources;
 import android.os.LocaleList;
 
 import androidx.appcompat.app.AppCompatDelegate;
@@ -16,8 +17,12 @@ import androidx.core.os.LocaleListCompat;
 
 import com.kooo.evcam.AppLog;
 
+import java.text.DecimalFormatSymbols;
+import java.util.IllformedLocaleException;
+import java.util.Locale;
+
 /**
- * 界面语言：跟随系统 / 中文 / English / Bahasa Melayu。
+ * 界面语言：跟随系统 / 中文 / English / Bahasa Melayu / العربية。
  *
  * <h3>用系统自己的「按应用设定语言」</h3>
  *
@@ -31,6 +36,18 @@ import com.kooo.evcam.AppLog;
  *
  * <p>车机本来是什么语言，这个应用就该是什么语言 —— 这是不需要任何人做决定的默认。
  * 其余几档留给「系统语言和使用者的偏好不一致」的情况。</p>
+ *
+ * <h3>系统语言没有翻译时用英文</h3>
+ *
+ * <p>跟随系统而系统语言不是中文、英文、马来文、阿拉伯文时，交给系统的是英文（项目所有者 2026-11-19）：
+ * 不指定的话，系统会落到默认资源（{@code values/}，中文）。系统语言一变就重新算，同下面的数字。</p>
+ *
+ * <h3>界面数字一律 0–9</h3>
+ *
+ * <p>阿拉伯语默认写 ٠–٩，界面数字一律 0–9（项目所有者 2026-11-18，ui-text-style §4）。只在这里管：
+ * 交给系统的语言标签带上 {@code nu-latn}（数字用 0–9）。选了阿拉伯语是 {@code ar-u-nu-latn}；跟随系统、
+ * 而系统语言写的不是 0–9（阿拉伯语的车机）时，用系统语言加 {@code nu-latn}，系统语言一变就重新算
+ * （{@code ZeekrShortcutApp#onConfigurationChanged}）。资源里的 {@code %d}、代码里不带 Locale 的格式化都照它。</p>
  */
 public final class Languages {
 
@@ -44,6 +61,8 @@ public final class Languages {
     public static final String ENGLISH = "en";
     /** 马来语。 */
     public static final String MALAY = "ms";
+    /** 阿拉伯语：从右往左（ui-spec §十七），数字 0–9。 */
+    public static final String ARABIC = "ar";
 
     private Languages() {
     }
@@ -66,8 +85,57 @@ public final class Languages {
         if (MALAY.equals(mode)) {
             return "ms";
         }
+        if (ARABIC.equals(mode)) {
+            return "ar-u-nu-latn";
+        }
         // 包括 auto 和任何不认识的值：不指定，交回给系统
         return "";
+    }
+
+    /**
+     * 实际交给系统的语言标签：选了某种语言就是 {@link #tagsFor(String)}；跟随系统时，系统语言没有翻译的是英文，
+     * 有翻译的见 {@link #digits0to9(Locale)}。纯函数，可以单独测。
+     */
+    public static String tagsFor(String mode, Locale system) {
+        String tags = tagsFor(mode);
+        if (!tags.isEmpty() || system == null) {
+            return tags;
+        }
+        return translated(system) ? digits0to9(system) : tagsFor(ENGLISH);
+    }
+
+    /** 有没有这个语言的翻译：{@code values/} 是中文，另有 {@code values-en}、{@code values-ms}、{@code values-ar}（同 locales_config）。 */
+    static boolean translated(Locale locale) {
+        switch (locale.getLanguage()) {
+            case CHINESE:
+            case ENGLISH:
+            case MALAY:
+            case ARABIC:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * 照系统语言、数字写 0–9 的标签：系统语言本来写 0–9 的是空（真正跟随），不写的是系统语言加 {@code nu-latn}。
+     * 截图测试的空壳也照它套（{@code ShotActivity}）。
+     */
+    public static String digits0to9(Locale system) {
+        if (writesDigits0to9(system)) {
+            return "";
+        }
+        try {
+            return new Locale.Builder().setLocale(system)
+                    .setUnicodeLocaleKeyword("nu", "latn").build().toLanguageTag();
+        } catch (IllformedLocaleException e) {
+            return "";
+        }
+    }
+
+    /** 这个语言写数字是不是 0–9。 */
+    static boolean writesDigits0to9(Locale locale) {
+        return DecimalFormatSymbols.getInstance(locale).getZeroDigit() == '0';
     }
 
     /**
@@ -86,9 +154,15 @@ public final class Languages {
         return app.createConfigurationContext(config);
     }
 
-    /** 把设置里的选择真正应用到界面上。 */
+    /**
+     * 把设置里的选择真正应用到界面上：应用启动时、改设置时、系统语言变了时调。
+     *
+     * <p>进程的默认语言（代码里不带 Locale 的格式化用它）也设成同一份：界面打开时 appcompat 本来就这么设，
+     * 这里先设好，开机只起了服务、还没打开界面时也一样。</p>
+     */
     public static void apply(String mode) {
-        String tags = tagsFor(mode);
+        LocaleList system = Resources.getSystem().getConfiguration().getLocales();
+        String tags = tagsFor(mode, system.isEmpty() ? null : system.get(0));
         try {
             AppCompatDelegate.setApplicationLocales(tags.isEmpty()
                     ? LocaleListCompat.getEmptyLocaleList()
@@ -97,6 +171,10 @@ public final class Languages {
         } catch (Throwable t) {
             // 语言没切成不该让应用起不来
             AppLog.w(TAG, "设置界面语言失败: " + t);
+        }
+        LocaleList defaults = tags.isEmpty() ? system : LocaleList.forLanguageTags(tags);
+        if (!defaults.isEmpty()) {
+            LocaleList.setDefault(defaults);
         }
     }
 }

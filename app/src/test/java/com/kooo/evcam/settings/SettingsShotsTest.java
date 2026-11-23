@@ -38,7 +38,7 @@ public class SettingsShotsTest {
 
     private static final String[] SECTIONS = {
             "screen_recording", "screen_storage", "screen_rearview", "screen_side_view", "screen_floating",
-            "screen_general", "screen_update",
+            "screen_automation", "screen_general", "screen_update",
     };
 
     @Test
@@ -49,6 +49,35 @@ public class SettingsShotsTest {
     @Test
     public void everySectionByDayInEnglish() {
         shoot(Shots.DAY_EN, "day-en");
+    }
+
+    /**
+     * 从右往左的语言：设置这类文字界面跟着镜像 —— 左栏到了右边（行尾的 › 翻过来看图）；
+     * ① 标题区不镜像，菜单键还在左上、标题紧跟着（项目所有者 2026-11-19；ui-spec §十七）。
+     */
+    @Test
+    public void everySectionRightToLeft() {
+        rightToLeft(shoot(Shots.DAY_RTL, "day-rtl"));
+    }
+
+    /** 阿拉伯语：同上，文字是阿拉伯文、数字 0–9。 */
+    @Test
+    public void everySectionInArabic() {
+        rightToLeft(shoot(Shots.DAY_AR, "day-ar"));
+    }
+
+    private static void rightToLeft(ShotActivity activity) {
+        int[] headers = new int[2];
+        int[] detail = new int[2];
+        activity.findViewById(R.id.settings_headers).getLocationInWindow(headers);
+        activity.findViewById(R.id.settings_detail).getLocationInWindow(detail);
+        assertTrue("左栏到了右边：" + headers[0] + " / " + detail[0], headers[0] > detail[0]);
+        int[] nav = new int[2];
+        int[] title = new int[2];
+        activity.findViewById(R.id.settings_nav).getLocationInWindow(nav);
+        activity.findViewById(R.id.settings_title).getLocationInWindow(title);
+        assertTrue("菜单键在左上：" + nav[0], nav[0] < headers[0] / 4);
+        assertTrue("标题紧跟在菜单键右边：" + nav[0] + " / " + title[0], nav[0] < title[0]);
     }
 
     @Test
@@ -98,6 +127,12 @@ public class SettingsShotsTest {
     @Test
     public void knobRowsInEnglish() {
         knobRows(Shots.DAY_EN, "-en");
+    }
+
+    /** 从右往左：展开的行尾箭头照样朝上、收着的朝下（ValueActionPreference.chevronRotation）。 */
+    @Test
+    public void knobRowsInArabic() {
+        knobRows(Shots.DAY_AR, "-ar");
     }
 
     private void knobRows(String qualifiers, String suffix) {
@@ -351,6 +386,92 @@ public class SettingsShotsTest {
     }
 
     /**
+     * 测试环境里没有外置存储目录，系统查「所有文件访问权限」的那一句会抛（{@code Environment.isExternalStorageManager}
+     * 取第一个外置目录）：这里照「没给」答。
+     */
+    @org.robolectric.annotation.Implements(android.os.Environment.class)
+    public static class NoAllFilesAccess extends org.robolectric.shadows.ShadowEnvironment {
+        @org.robolectric.annotation.Implementation
+        protected static boolean isExternalStorageManager() {
+            return false;
+        }
+    }
+
+    /**
+     * 开发者选项 → 权限设置：「忽略电池优化」灰着、点不动（项目所有者 2026-11-21「变灰」）—— 停车时应用交给车机处置，
+     * 不再带人去给这一条；名字和状态那一行照旧。别的几条不变：没给的能点。
+     */
+    @Test
+    @Config(shadows = NoAllFilesAccess.class)
+    public void batteryOptimisationRowIsGreyedOut() {
+        permissionsPage(Shots.DAY, "day");
+    }
+
+    @Test
+    @Config(shadows = NoAllFilesAccess.class)
+    public void batteryOptimisationRowIsGreyedOutByNight() {
+        permissionsPage(Shots.NIGHT, "night");
+    }
+
+    @Test
+    @Config(shadows = NoAllFilesAccess.class)
+    public void batteryOptimisationRowIsGreyedOutInEnglish() {
+        permissionsPage(Shots.DAY_EN, "day-en");
+    }
+
+    private void permissionsPage(String qualifiers, String tag) {
+        RuntimeEnvironment.setQualifiers(qualifiers);
+        ShotActivity activity = Robolectric.buildActivity(ShotActivity.class).setup().get();
+        Shots.stillFrames(activity);
+        SettingsShellFragment shell = new SettingsShellFragment();
+        activity.getSupportFragmentManager().beginTransaction().replace(activity.container, shell).commitNow();
+        Shots.settle();
+        shell.openDetail(new PermissionsPreferenceFragment(), activity.getString(R.string.dev_permissions_title));
+        Shots.settle();
+        PermissionsPreferenceFragment page = (PermissionsPreferenceFragment)
+                shell.getChildFragmentManager().findFragmentById(R.id.settings_detail);
+        assertNotNull(page);
+
+        Preference battery = permissionRow(page, activity.getString(R.string.dev_perm_battery));
+        assertNotNull("少了「忽略电池优化」那一行", battery);
+        assertFalse("灰着", battery.isEnabled());
+        assertFalse("点不动", battery.isSelectable());
+        org.junit.Assert.assertNull("不带人去系统设置", battery.getOnPreferenceClickListener());
+        assertEquals("状态那一行照旧", activity.getString(R.string.dev_perm_not_granted,
+                activity.getString(R.string.dev_perm_battery_why)), String.valueOf(battery.getSummary()));
+        Preference overlay = permissionRow(page, activity.getString(R.string.dev_perm_overlay));
+        assertNotNull(overlay);
+        assertTrue("别的没给的照旧能点", overlay.isEnabled() && overlay.isSelectable());
+        assertNotNull(overlay.getOnPreferenceClickListener());
+        // 回到前台重建过的行也是别的设置页那种卡片：能点的行尾 ›，点不动的（灰着的、已给的）没有
+        assertEquals(R.layout.pref_row_nav, overlay.getLayoutResource());
+        assertEquals(R.layout.pref_row_info, battery.getLayoutResource());
+
+        // 这一页回到前台时把各行拿掉重建一遍（授权是去系统设置里点的），新的一行是淡入的：先排一遍，等淡入放完再画。
+        // 那一行在最下面，滚到它
+        Shots.save(activity, "settings-permissions-" + tag);
+        page.scrollToPreference(battery);
+        org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(600));
+        File file = Shots.save(activity, "settings-permissions-" + tag);
+        assertTrue(file + " 是空的", file.length() > 10_000);
+    }
+
+    /** 权限设置页的行没有 key，照名字找。 */
+    private static Preference permissionRow(PermissionsPreferenceFragment page, String title) {
+        androidx.preference.PreferenceScreen screen = page.getPreferenceScreen();
+        for (int i = 0; i < screen.getPreferenceCount(); i++) {
+            androidx.preference.PreferenceGroup group = (androidx.preference.PreferenceGroup) screen.getPreference(i);
+            for (int j = 0; j < group.getPreferenceCount(); j++) {
+                Preference row = group.getPreference(j);
+                if (title.equals(String.valueOf(row.getTitle()))) {
+                    return row;
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
      * 「录制」最下面的「哨兵提醒」一组（项目所有者 2026-11-17 / 11-18）：「关闭」时只有一行；选 ntfy 时附带画面、话题、服务器，
      * 说明下面一行写上一次提醒；Telegram 那一段置灰、点不动。截图里的话题是这里现生成的随机名，二维码也是它。
      */
@@ -496,7 +617,7 @@ public class SettingsShotsTest {
         assertEquals("screen_recording", shell.currentSection());
     }
 
-    private void shoot(String qualifiers, String tag) {
+    private ShotActivity shoot(String qualifiers, String tag) {
         RuntimeEnvironment.setQualifiers(qualifiers);
         ShotActivity activity = Robolectric.buildActivity(ShotActivity.class).setup().get();
         Shots.stillFrames(activity);
@@ -508,5 +629,6 @@ public class SettingsShotsTest {
             File file = Shots.save(activity, "settings-" + section.substring("screen_".length()) + "-" + tag);
             assertTrue(file + " 是空的", file.length() > 10_000);
         }
+        return activity;
     }
 }

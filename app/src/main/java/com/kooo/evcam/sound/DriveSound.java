@@ -87,6 +87,12 @@ public final class DriveSound {
     /** 上一个声音线程自己出错停下的时刻（elapsedRealtime）；0 = 没有。 */
     private long failedAtMs;
 
+    /**
+     * 人在车上（熄屏判断亮着）：车自己通电、进程刚起来还没有人的证据时，不快读、不出声（项目所有者 2026-11-21：人不在车上不取资源）。
+     * 主线程写（{@link #update}），声音线程每块读。
+     */
+    private volatile boolean present;
+
     // ---- 设置（主线程、声音线程都会刷新，读的人拿到的总是完整的一项）
     private volatile boolean enabled;
     /** 「标准模式下播放」（项目所有者 2026-10-24，默认关）：开着时标准模式也出声。 */
@@ -154,6 +160,18 @@ public final class DriveSound {
         app = context.getApplicationContext();
         config = new AppConfig(app);
         Telemetry.get().addListener(listener);
+        // 人回来、人走了那一下车辆读数不一定变：照熄屏判断再定一次
+        com.kooo.evcam.screen.ScreenState.addListener(new com.kooo.evcam.screen.ScreenState.Listener() {
+            @Override
+            public void onScreenOff() {
+                update();
+            }
+
+            @Override
+            public void onScreenOn() {
+                update();
+            }
+        });
         update();
     }
 
@@ -163,10 +181,11 @@ public final class DriveSound {
             return;
         }
         readSettings();
+        present = !com.kooo.evcam.screen.ScreenState.dark();
         Telemetry telemetry = Telemetry.get();
         Readings r = telemetry.readings();
-        // 这里只看「快读不快读、转不转」，车速、油门给个新鲜的占位（是否过期由声音线程每块判）
-        DriveSoundRules.Why why = DriveSoundRules.decide(enabled, telemetry.carLinkConnected(),
+        // 这里只看「快读不快读、转不转」，车速、油门给个新鲜的占位（是否过期由声音线程每块判）。人不在车上照开关关着算
+        DriveSoundRules.Why why = DriveSoundRules.decide(enabled && present, telemetry.carLinkConnected(),
                 r.code(Signal.IGNITION), r.text(Signal.GEAR), r.code(Signal.DRIVE_MODE), standardMode, 0f, 0f, 0L, false);
         if (why.armed != armed) {
             armed = why.armed;
@@ -254,9 +273,9 @@ public final class DriveSound {
         DriveSound s = INSTANCE;
         StringBuilder sb = new StringBuilder();
         sb.append(String.format(Locale.US,
-                "  enabled=%s standard=%s style=%s view=%s speakers=%s exterior=%s %+.0f dB volume=%.0f dB rpm=%s gearbox=%s "
+                "  enabled=%s present=%s standard=%s style=%s view=%s speakers=%s exterior=%s %+.0f dB volume=%.0f dB rpm=%s gearbox=%s "
                         + "armed=%s fastUsers=%s%n",
-                s.enabled, s.standardMode, s.style.key, s.cabinView ? "cabin" : "outside", s.outputMode, s.exteriorRoute, s.exteriorDb, s.userDb,
+                s.enabled, s.present, s.standardMode, s.style.key, s.cabinView ? "cabin" : "outside", s.outputMode, s.exteriorRoute, s.exteriorDb, s.userDb,
                 s.rpmMode, s.gearbox, s.armed, Telemetry.get().fastUsers()));
         FastReadings fast = Telemetry.get().fast();
         long now = SystemClock.elapsedRealtime();
@@ -638,7 +657,7 @@ public final class DriveSound {
                 }
                 Readings r = telemetry.readings();
                 String gearText = r.text(Signal.GEAR);
-                DriveSoundRules.Why asked = DriveSoundRules.decide(enabled, link, r.code(Signal.IGNITION), gearText,
+                DriveSoundRules.Why asked = DriveSoundRules.decide(enabled && present, link, r.code(Signal.IGNITION), gearText,
                         r.code(Signal.DRIVE_MODE), standardMode, inputs.speed(), inputs.throttle(), fast.ageMs(now), inCall);
                 DriveSoundRules.Why w = stopping ? DriveSoundRules.Why.OFF : asked;
                 why = w;

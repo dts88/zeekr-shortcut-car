@@ -24,6 +24,7 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.kooo.evcam.AppLog;
 import com.kooo.evcam.R;
 import com.kooo.evcam.StorageHelper;
+import com.kooo.evcam.camera.SharedSegmentName;
 import com.kooo.evcam.camera.StoragePlan;
 import com.kooo.evcam.ui.CamDialogs;
 
@@ -101,10 +102,12 @@ public final class Mp4RepairFlow {
                     }
                 }
             }
-            Collections.sort(broken, Comparator.comparing(File::getName));
+            // 按名字里的时刻排：数字换成 0–9 再比（以前的版本起过 ٠–٩ 的名字）
+            Comparator<File> byTime = Comparator.comparing(f -> SharedSegmentName.asciiDigits(f.getName()));
+            Collections.sort(broken, byTime);
             for (List<File> list : healthy.values()) {
                 // 最近的那个当参考：参数和坏文件最接近
-                Collections.sort(list, Comparator.comparing(File::getName).reversed());
+                Collections.sort(list, byTime.reversed());
             }
             final int scanned = total;
             AppLog.i(TAG, "扫描 " + scanned + " 个片段，没封口的 " + broken.size() + " 个");

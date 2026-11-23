@@ -23,6 +23,25 @@ import java.util.Set;
  */
 public class SignalDecodeTest {
 
+    /**
+     * 停车时（人不在车上）对账还读的只有这几项：判人回没回来的（屏幕电源事件、点火、四扇侧门、主驾座椅）和相机管家熄屏时看的
+     * （哨兵模式、挡位）。
+     * 都得是车辆接口上的离散信号 —— 浮点的按另一条节拍读，停车时整条停掉。
+     */
+    @Test
+    public void onlyAFewSignalsAreReadWhileParked() {
+        java.util.Set<Signal> read = java.util.EnumSet.noneOf(Signal.class);
+        for (Signal s : Signal.values()) {
+            if (s.readWhileParked()) {
+                read.add(s);
+                assertTrue(s + " 要能对账读到", s.viaCarInterface() && !s.isFloat());
+            }
+        }
+        assertEquals(java.util.EnumSet.of(Signal.SCREEN_POWER_EVENT, Signal.IGNITION, Signal.DOOR_DRIVER,
+                Signal.DOOR_PASSENGER, Signal.DOOR_REAR_LEFT, Signal.DOOR_REAR_RIGHT, Signal.SEAT_DRIVER, Signal.SENTRY_MODE,
+                Signal.GEAR), read);
+    }
+
     @Test
     public void integerPlaceholdersAreUnknown() {
         assertNull(Signal.intOrNull(255));

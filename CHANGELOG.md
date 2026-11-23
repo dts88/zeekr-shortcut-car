@@ -11,6 +11,83 @@ commit message, not here.
 
 Nothing yet.
 
+## [4.15.0-alpha] - 2026-11-23
+
+- Places and automation: add up to 10 places, centered on the current location or on typed coordinates, with a radius of 200 to 1000 m or a custom one. Rules can start on arriving at or leaving a place, and check whether the car is at or away from some places. New common rule: turn on Sentry Mode when parked away from your places. Place names and coordinates stay in the settings and are not written to diagnostics.
+
+## [4.14.0-alpha] - 2026-11-23
+
+- New settings section Places and automation: add rules of the form when / and / then. When: you get in, a gear, or a vehicle setting changing; and: gear, battery, time of day, days of the week, a vehicle setting; then: drive mode, hill descent control, low-speed emergency braking, air circulation, rear climate, Sentry Mode. Rules run only while someone is in the car; places come later. Built on Calvin Bui's restore-at-start work.
+- In Arabic, the arrow on rows that open in place points up when open and down when closed.
+
+## [4.13.10-alpha] - 2026-11-22
+
+- Diagnostics mark a car moved by remote control with nobody inside, and log every door, the trunk and the frunk.
+
+## [4.13.9-beta] - 2026-11-22
+
+**Do not update App Lab to 1.0.0.26 or later: you would lose the ability to sideload apps.**
+
+Improved stability and efficiency.
+
+## [4.13.8-alpha] - 2026-11-22
+
+- Developer options → Permissions uses the same card rows as the other settings pages.
+
+## [4.13.7-alpha] - 2026-11-22
+
+- The notice shown when the app brings the main screen to the front counts down from 5 seconds, up from 3.
+- Diagnostics name the door that showed someone is back, no longer report a camera as released in the dark right after someone gets back, and keep one saved warning per kind per minute.
+
+## [4.13.6-alpha] - 2026-11-21
+
+- Cameras open only after the camera availability notification has been listened to for 3 seconds: getting back in, or opening the app after it was closed, the picture and the recording come about 3 seconds later.
+
+## [4.13.5-alpha] - 2026-11-21
+
+- After the head unit wakes from sleep, cameras open no earlier than 8 seconds later, up from 6.
+
+## [4.13.4-alpha] - 2026-11-21
+
+- The camera availability notification is registered only while cameras are in use: dropped once parked with every camera closed, registered again when someone gets back in.
+- After the head unit wakes from sleep, cameras open no earlier than 6 seconds later.
+
+## [4.13.3-alpha] - 2026-11-21
+
+- About 40 seconds after everyone has left, the app's own screens (main screen, playback, diagnostics) are closed, not just moved to the back. A main screen that was in front is opened again when someone gets back in.
+- No messages are shown after the screen has gone dark.
+
+## [4.13.2-alpha] - 2026-11-21
+
+- Developer options → Permissions: Ignore battery optimisation is greyed out; the app no longer asks for it.
+
+## [4.13.1-alpha] - 2026-11-21
+
+- Getting back in with a recording, Super mirror or Blind spot view on: the main screen now shows normally with a notice and a 3-second countdown instead of appearing for about a second. Tap the screen to keep it in front; untouched, it returns to the background.
+- Only a touch or a key press on the app's screens counts as someone touching the app, not another screen opening over it.
+- Start on boot: the description no longer says it keeps the app running in the background.
+
+## [4.13.0-alpha] - 2026-11-21
+
+- Someone counts as being in the car only with the car powered and a side door just opened, the driver's seat occupied, or the app just touched. The head unit waking by itself restores nothing.
+- About 40 seconds after everyone has left: the floating button, Super mirror and Blind spot view close, the smart buttons and X knobs stop listening, most car signals are no longer read, and the background service stops unless a recording continues. All of it returns when someone gets back in.
+- Getting back in with a recording, Super mirror or Blind spot view on: the main screen shows for about a second so the cameras can be used.
+- Start on boot: only the periodic task brings the app back, within about 15 minutes or when the head unit wakes. After an update or after exiting the app, open it once.
+- After two crashes in a row the app waits to be opened.
+- Developer options → Permissions: the Accessibility service row is removed.
+- Places & automation: groundwork only, no settings yet; built on Calvin Bui's restore-at-start work.
+
+## [4.12.1-alpha] - 2026-11-19
+
+- Temperature up / down, and the X knob's temperature and air direction: the climate is switched on first only when the car reports it off.
+
+## [4.12.0-alpha] - 2026-11-19
+
+- Arabic (العربية) in Settings → General → Language and in first-run setup; numbers stay 0–9.
+- Right to left: menu and back keys stay top left and the drawer opens from the left; the main screen, playback, Super mirror, Blind spot view and the floating button keep their layout.
+- Recordings and photos: file names and the time drawn into them always use 0–9; names an earlier version wrote with other digits still sort by time.
+- About: Fabbbrrr added to the contributors.
+
 ## [4.11.0-alpha] - 2026-11-17
 
 - Super mirror: fisheye correction uses the method chosen in Settings → General → Fisheye correction; up to 180° with Wide or Full circle.

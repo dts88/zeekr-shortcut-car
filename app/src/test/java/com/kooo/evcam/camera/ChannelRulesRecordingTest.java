@@ -166,17 +166,68 @@ public class ChannelRulesRecordingTest {
     /** 前台服务（规格 §3.5）：开机自启动开着、在录、或者「这一趟要录」（等接回、等亮屏接）时开着；都不是、或者退出了就停。 */
     @Test
     public void theForegroundServiceStaysForBootRecordingOrAWantedRecording() {
-        assertTrue("开机自启动开着", ChannelRules.foregroundServiceNeeded(false, true, false, false));
-        assertTrue("在录", ChannelRules.foregroundServiceNeeded(false, false, true, false));
-        assertTrue("这一趟要录：接回时相机从后台开", ChannelRules.foregroundServiceNeeded(false, false, false, true));
-        assertFalse("都不是", ChannelRules.foregroundServiceNeeded(false, false, false, false));
-        assertFalse("退出了", ChannelRules.foregroundServiceNeeded(true, true, true, true));
+        assertTrue("开机自启动开着", ChannelRules.foregroundServiceNeeded(false, true, false, false, false, false));
+        assertTrue("在录", ChannelRules.foregroundServiceNeeded(false, false, true, false, false, false));
+        assertTrue("这一趟要录：接回时相机从后台开", ChannelRules.foregroundServiceNeeded(false, false, false, true, false, false));
+        assertFalse("都不是", ChannelRules.foregroundServiceNeeded(false, false, false, false, false, false));
+        assertFalse("退出了", ChannelRules.foregroundServiceNeeded(true, true, true, true, false, false));
+    }
+
+    /**
+     * 停车着（人不在车上，项目所有者 2026-11-21「停掉」）：开机自启动开着也不留；在录（熄屏持续录制接着录环视）照留；
+     * 「这一趟要录」立着的只在熄屏中哨兵模式变成开还接得上录像时留。
+     */
+    @Test
+    public void theForegroundServiceStopsWhileParkedUnlessItRecords() {
+        assertFalse("开机自启动开着、停车着：停", ChannelRules.foregroundServiceNeeded(false, true, false, false, true, false));
+        assertFalse("没立着「这一趟要录」：哨兵开了也没有要接的", ChannelRules.foregroundServiceNeeded(false, true, false, false, true, true));
+        assertTrue("在录：留", ChannelRules.foregroundServiceNeeded(false, true, true, true, true, false));
+        assertTrue("这一趟要录、哨兵变成开还接得上：留", ChannelRules.foregroundServiceNeeded(false, false, false, true, true, true));
+        assertFalse("这一趟要录、接不上了：停，人回来再接", ChannelRules.foregroundServiceNeeded(false, true, false, true, true, false));
+        assertFalse("退出了", ChannelRules.foregroundServiceNeeded(true, true, true, true, true, true));
+        assertFalse("开机自启动关着、没立着「这一趟要录」：哨兵开了也没有要接的",
+                ChannelRules.foregroundServiceNeeded(false, false, false, false, true, true));
+    }
+
+    /** 没停车时「哨兵变成开还接不接得上」不管用：照人在车上的规矩。 */
+    @Test
+    public void theSentryFactOnlyMattersWhileParked() {
+        assertTrue(ChannelRules.foregroundServiceNeeded(false, true, false, false, false, true));
+        assertTrue(ChannelRules.foregroundServiceNeeded(false, false, false, true, false, false));
+        assertFalse(ChannelRules.foregroundServiceNeeded(false, false, false, false, false, true));
+    }
+
+    /** 熄屏中哨兵模式变成开还接得上录像：熄屏持续录制开着、计划里有环视、车机还没睡过。 */
+    @Test
+    public void aSentryRiseCanStartOnlyUntilTheHeadUnitHasSlept() {
+        assertTrue(ChannelRules.sentryCanStartWhileParked(true, true, false));
+        assertFalse("车机睡过：前台服务不为它留着", ChannelRules.sentryCanStartWhileParked(true, true, true));
+        assertFalse("熄屏持续录制关着", ChannelRules.sentryCanStartWhileParked(false, true, false));
+        assertFalse("计划里没有环视", ChannelRules.sentryCanStartWhileParked(true, false, false));
     }
 
     /** 屏幕黑着不看，等亮屏（不为中间不明原因的启动去试着录，项目所有者 2026-10-27）。 */
     @Test
     public void aStartInTheDarkWaitsForTheScreen() {
         assertFalse(ChannelRules.autoStartMoment(false, true, true));
+    }
+
+    /**
+     * 启动的那一下屏幕黑着：那一眼欠着，亮屏以后的第一眼补上（开机自启动关着的没有别的路 —— 人在车没通电时点开主界面，后来车通电了）。
+     * 照相机管家的用法走一遍：欠着的并进「这一下是启动」。
+     */
+    @Test
+    public void aStartInTheDarkIsOwedUntilTheScreenIsLit() {
+        boolean owed = ChannelRules.startLookOwed(false, true, true);
+        assertTrue("黑着时启动：欠着", owed);
+        assertTrue("还黑着再看一眼（不是启动）：还欠着", ChannelRules.startLookOwed(false, owed, true));
+        assertTrue("亮屏那一眼不是启动，欠着的补上", ChannelRules.autoStartMoment(false, owed, false));
+        assertFalse("亮了、看过了：不欠了", ChannelRules.startLookOwed(false, owed, false));
+
+        assertFalse("亮着时启动：当场看，不欠", ChannelRules.startLookOwed(false, true, false));
+        assertFalse("不是启动、也没欠着：不欠", ChannelRules.startLookOwed(false, false, true));
+        assertFalse("这一趟看过、人开过或停过：不欠", ChannelRules.startLookOwed(true, true, true));
+        assertFalse("欠着的时候人停过：不补", ChannelRules.autoStartMoment(true, true, false));
     }
 
     // ------------------------------------------------------------------ 熄屏后的帧率（项目所有者 2026-11-04）

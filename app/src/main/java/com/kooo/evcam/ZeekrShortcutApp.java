@@ -35,8 +35,12 @@ public class ZeekrShortcutApp extends Application {
         super.onCreate();
         com.kooo.evcam.settings.DeveloperMode.init(this);
         lastConfig = new Configuration(getResources().getConfiguration());
-        // 黑匣子尽早接上。ContentProvider 比这里还早，那边也会接一次，谁先谁算
+        // 黑匣子尽早接上
         com.kooo.evcam.blackbox.BlackBox.attach(this, "Application");
+        // 崩溃处理器在这里装（没有主界面的进程崩了也留日志、也记进连着崩溃里）
+        AppLog.installCrashHandler(this);
+        // 连着崩溃两次：照用户退出处理（周期任务取消、下面装上的都照「退出了」什么都不做），等人自己点开（规格 §6）
+        com.kooo.evcam.recovery.CrashHold.atProcessStart(this);
         // 前座舱只用一次（暂时的规矩）：上一次运行带着前座舱、没等到离车就结束了的，这次启动不带它 —— 赶在主界面摆布局、建管线之前
         com.kooo.evcam.camera.FrontCabinOneShot.settleAtStart(this);
         // U 盘挂上、卸下、异常掉线进黑匣子（2026-09-26 录像盘掉线，系统那边发生了什么一行都没记下）
@@ -44,6 +48,10 @@ public class ZeekrShortcutApp extends Application {
         // 熄屏判断活在进程上：熄屏 / 亮屏广播在这里注册、车辆信号的核心在这里登记（屏幕真黑了看车辆信号，熄屏 v3），
         // 主界面在不在都一样（规格 §3.3）。这里不会当场判出熄屏：车辆信号在自己的线程上连、读到了才排到主线程，下面的相机管家先起来
         com.kooo.evcam.screen.ScreenState.install(this);
+        // 开着的界面记着（停车时关掉，下一行）：在任何界面建出来之前装上
+        com.kooo.evcam.screen.OpenScreens.install(this);
+        // 停车（人不在车上，相机以外的也放开）：紧跟熄屏判断装上 —— 进程起来时没有人的证据，从停车起；下面的灵动贴照它决定扫不扫
+        com.kooo.evcam.screen.Parked.install(this);
         // 通道调度（唯一动相机的地方）进程里只有一个：在这里最先装上，不换、不停（第 2 步；建管线、相机管家也各自先装一次，装过了什么都不做）。
         // 登记表、相机服务、亮熄屏、车辆信号叫醒它的监听跟着它挂一次 —— 车辆信号的核心上面刚登记好。这里不进相机服务（开始听相机服务的可用性
         // 还是在建管线、起前台服务时）
@@ -54,6 +62,8 @@ public class ZeekrShortcutApp extends Application {
         com.kooo.evcam.button.SmartButtons.install(this);
         // 哨兵提醒（试验性）：开着、配好了就在车辆信号的核心上听双闪、车灯；关着、用户退出了的什么都不做
         com.kooo.evcam.alarm.SentryAlerts.install(this);
+        // 地点与自动化（ui-spec §十八）：听上面装好的熄屏判断的亮屏、熄屏和车辆信号；一条规则都没开时不读车
+        com.kooo.evcam.automation.Automations.install(this);
         // 相机管家（要相机做什么都向它请求）在这里起来：「这一趟」的录像选择从盘上读回来（规格 §2.5：进程被杀又拉回来时还在）；
         // 车机真正开机是新的一趟
         com.kooo.evcam.camera.CameraKeeper keeper = com.kooo.evcam.camera.CameraKeeper.get(this);
@@ -82,6 +92,10 @@ public class ZeekrShortcutApp extends Application {
         lastConfig = new Configuration(newConfig);
         if (old != null) {
             com.kooo.evcam.blackbox.BlackBox.noteImportant("配置变化：" + describeChange(old, newConfig));
+        }
+        // 系统语言变了：跟随系统时要跟上，数字照旧 0–9（Languages）
+        if (old == null || !old.getLocales().equals(newConfig.getLocales())) {
+            Languages.apply(new AppConfig(this).getLanguageMode());
         }
     }
 
@@ -121,5 +135,7 @@ public class ZeekrShortcutApp extends Application {
         super.onTrimMemory(level);
         // 系统在催内存。卡顿报告带着日志尾巴，内存紧张和卡住是不是同时发生，一看便知
         AppLog.w("App", "onTrimMemory level " + level);
+        // 停车着（人不在车上）：不在眼前的界面关掉（规格 §3.3「停车」，项目所有者 2026-11-21）。人在车上时不动
+        com.kooo.evcam.screen.Parked.memoryTight(level);
     }
 }

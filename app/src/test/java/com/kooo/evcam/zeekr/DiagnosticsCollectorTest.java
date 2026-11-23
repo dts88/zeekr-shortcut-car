@@ -29,9 +29,11 @@ public class DiagnosticsCollectorTest {
     public void theDarkPeriodSaysWhoJudgedItAndSinceWhen() {
         assertEquals("车辆信号，12 分 3 秒前起", DiagnosticsCollector.darkText(ScreenState.Source.VEHICLE, 723_400L));
         assertEquals("安卓熄屏，31 秒前起", DiagnosticsCollector.darkText(ScreenState.Source.ANDROID, 31_000L));
-        assertEquals("读到时已经黑着：记下的是读到的那一刻",
-                "车辆信号，5 秒前读到时已经黑着，起点不明",
-                DiagnosticsCollector.darkText(ScreenState.Source.VEHICLE_READ, 5_400L));
+        assertEquals("进程起来时还没有人在车上的证据",
+                "没有人在车上的证据，进程起来时就黑着，起点不明",
+                DiagnosticsCollector.darkText(ScreenState.Source.VEHICLE_READ, -1L));
+        assertEquals("车辆信号一直读不到，按人不在算，40 秒前起",
+                DiagnosticsCollector.darkText(ScreenState.Source.LOST, 40_000L));
         assertEquals("进程起来时就黑着：不知道从什么时候起",
                 "安卓熄屏，进程起来时就黑着，起点不明", DiagnosticsCollector.darkText(ScreenState.Source.ANDROID, -1L));
         assertEquals("哨兵模式开着停车那一夜", "车辆信号，2 小时 5 分前起",
@@ -57,7 +59,7 @@ public class DiagnosticsCollectorTest {
     public void verdictSentryAndDurations() {
         assertEquals("黑", DiagnosticsCollector.verdictText(Boolean.TRUE));
         assertEquals("亮", DiagnosticsCollector.verdictText(Boolean.FALSE));
-        assertEquals("说不上来（只看安卓）", DiagnosticsCollector.verdictText(null));
+        assertEquals("说不上来", DiagnosticsCollector.verdictText(null));
         assertEquals("关（0）", DiagnosticsCollector.sentryText(0));
         assertEquals("开（1）", DiagnosticsCollector.sentryText(1));
         assertEquals("布防（2）", DiagnosticsCollector.sentryText(2));

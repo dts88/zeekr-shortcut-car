@@ -319,7 +319,7 @@ public class SetupFragment extends Fragment implements StorageState.Listener {
 
     // ------------------------------------------------------------------ 每一步的内容
 
-    /** 语言：四样一列，选了马上生效（语言真变了，系统重建界面，回到这一步）。 */
+    /** 语言：一样一行，选了马上生效（语言真变了，系统重建界面，回到这一步）。 */
     private void language() {
         SettingSpec spec = SettingsRegistry.LANGUAGE;
         String current = spec.sanitize(config.getLanguageMode());
@@ -330,6 +330,8 @@ public class SetupFragment extends Fragment implements StorageState.Listener {
         for (int i = 0; i < values.length; i++) {
             String value = values[i];
             View card = choice(list, spec.label(requireContext(), value), null, null);
+            // 语言名各用各的文字写：对齐跟着界面方向，不跟着名字本身（从右往左时 English 也靠右）
+            ((TextView) card.findViewById(R.id.setup_choice_title)).setTextAlignment(View.TEXT_ALIGNMENT_VIEW_START);
             card.setActivated(value.equals(current));
             card.setOnClickListener(v -> {
                 for (View other : cards) {
@@ -350,6 +352,8 @@ public class SetupFragment extends Fragment implements StorageState.Listener {
     private void side() {
         LinearLayout pair = new LinearLayout(requireContext());
         pair.setOrientation(LinearLayout.HORIZONTAL);
+        // 左侧那块在左、右侧那块在右：照实际方位摆，从右往左的语言里也不镜像（ui-spec §十七）
+        pair.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
         String[] sides = {"left", "right"};
         int[] names = {R.string.opt_rail_left, R.string.opt_rail_right};
         int[] notes = {R.string.setup_side_lhd, R.string.setup_side_rhd};

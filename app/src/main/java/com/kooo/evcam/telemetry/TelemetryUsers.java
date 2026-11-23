@@ -28,6 +28,11 @@ import java.util.Set;
  * </ul>
  *
  * <p>来源在有人用的时候跑：核心在，或者有完整用户。没有核心时（只有测试、或者进程起来之前）规则一样：最后一个人走了全停。</p>
+ *
+ * <h3>停车（2026-11-21，人不在车上不取资源）</h3>
+ *
+ * <p>停车着（{@link #park}，{@code screen.Parked}）：完整用户照登记、照注销，浮点和定位先不开（在录的信息条、自动锁定还登记着，
+ * 可是人不在车上，车速、位置用不着）；人回来（{@link #unpark}）还有完整用户就开回来。只在核心登记着时算数。</p>
  */
 final class TelemetryUsers {
 
@@ -47,6 +52,7 @@ final class TelemetryUsers {
     }
 
     private boolean core;
+    private boolean parked;
     private final Set<String> full = new LinkedHashSet<>();
 
     /** 核心登记；第二次无害。 */
@@ -65,6 +71,10 @@ final class TelemetryUsers {
         if (!full.add(who) || !first) {
             return Change.NONE;
         }
+        if (core && parked) {
+            // 停车着：先记着，人回来再开
+            return Change.NONE;
+        }
         return core ? Change.FLOATS_ON : Change.START_FULL;
     }
 
@@ -73,12 +83,38 @@ final class TelemetryUsers {
         if (!full.remove(who) || !full.isEmpty()) {
             return Change.NONE;
         }
+        if (core && parked) {
+            // 停车着：浮点和定位本来就停着
+            return Change.NONE;
+        }
         return core ? Change.FLOATS_OFF : Change.STOP;
     }
 
-    /** 浮点传感器和定位该不该开：有完整用户。 */
+    /** 停车：有完整用户的话浮点和定位停掉（他们还登记着）；重复叫无害。 */
+    Change park() {
+        if (parked) {
+            return Change.NONE;
+        }
+        parked = true;
+        return core && !full.isEmpty() ? Change.FLOATS_OFF : Change.NONE;
+    }
+
+    /** 人回来了：还有完整用户的话浮点和定位开回来；重复叫无害。 */
+    Change unpark() {
+        if (!parked) {
+            return Change.NONE;
+        }
+        parked = false;
+        return core && !full.isEmpty() ? Change.FLOATS_ON : Change.NONE;
+    }
+
+    /** 浮点传感器和定位该不该开：有完整用户，而且没停车。 */
     boolean full() {
-        return !full.isEmpty();
+        return !full.isEmpty() && !(core && parked);
+    }
+
+    boolean parked() {
+        return parked;
     }
 
     boolean core() {

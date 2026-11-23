@@ -197,6 +197,9 @@ final class EcarxSource {
     /** 显示里有保持的信号到点再算的那一次（{@link #apply}）：和 {@link #publish} 分开，立刻发布时不把它撤掉。 */
     private final Runnable holdPublish = this::publishNow;
 
+    /** 停车着（{@link #parked(boolean)}）。 */
+    private volatile boolean parked;
+
     /** 这一遍读是谁触发的：黑匣子那一行据此标出来（{@link #writeProbeChanges}）。 */
     private enum Pass {
         /** 一个回调 */
@@ -295,6 +298,14 @@ final class EcarxSource {
 
     Telemetry.CarLink link() {
         return link;
+    }
+
+    /**
+     * 停车（{@link Telemetry#setParked}，哪个线程都能叫）：从下一遍对账起只读 {@link Signal#readWhileParked} 的那几项。
+     * 人回来时 {@link Telemetry} 接着要一遍当场的（{@link #reconcileNow}），那一遍全读。
+     */
+    void parked(boolean on) {
+        parked = on;
     }
 
     /** 连接经过的细节（英文）：日志、黑匣子、诊断报告用。 */
@@ -516,7 +527,7 @@ final class EcarxSource {
             Method queryConfig = carInfo == null ? null : findMethod(carInfo, "queryCarConfig", int.class);
             access = new Access(function, getFunctionValue, getFunctionValueZoned, setFunctionValue, setFunctionValueZoned,
                     isFunctionSupportedZoned, getCustomizeZoned, setCustomizeZoned, sensor, getSensorLatestValue,
-                    carInfo, queryConfig);
+                    getSensorEvent, carInfo, queryConfig);
             status = String.format(Locale.US,
                     "connected in %d ms; function=%s zoned=%s sensorEvent=%s sensorValue=%s; driver %s; %s",
                     SystemClock.elapsedRealtime() - start, getFunctionValue != null, getFunctionValueZoned != null,
@@ -1137,9 +1148,11 @@ final class EcarxSource {
      * @return 读到了至少一个值（占位值 255 也算读到：车回话了）；一个都没读到说明读的路断了
      */
     private boolean readPass(Pass pass) {
+        // 停车着（人不在车上）：只读判人回没回来、相机管家熄屏时看的那几项，记录用的那几个号也不读；订阅都还在
+        boolean few = parked;
         int answered = 0;
         for (Signal s : Signal.values()) {
-            if (s.viaCarInterface() && !s.isFloat()) {
+            if (s.viaCarInterface() && !s.isFloat() && (!few || s.readWhileParked())) {
                 Object raw = read(s);
                 if (raw != null) {
                     answered++;
@@ -1147,7 +1160,9 @@ final class EcarxSource {
                 apply(s, raw);
             }
         }
-        answered += reconcileProbes(pass);
+        if (!few) {
+            answered += reconcileProbes(pass);
+        }
         return answered > 0;
     }
 
@@ -1455,12 +1470,13 @@ final class EcarxSource {
         private final Method setFloatZoned;
         private final Object sensor;
         private final Method sensorValue;
+        private final Method sensorEvent;
         private final Object carInfo;
         private final Method queryConfig;
 
         Access(Object function, Method get, Method getZoned, Method set, Method setZoned, Method supportedZoned,
-               Method getFloatZoned, Method setFloatZoned, Object sensor, Method sensorValue, Object carInfo,
-               Method queryConfig) {
+               Method getFloatZoned, Method setFloatZoned, Object sensor, Method sensorValue, Method sensorEvent,
+               Object carInfo, Method queryConfig) {
             this.function = function;
             this.get = get;
             this.getZoned = getZoned;
@@ -1471,6 +1487,7 @@ final class EcarxSource {
             this.setFloatZoned = setFloatZoned;
             this.sensor = sensor;
             this.sensorValue = sensorValue;
+            this.sensorEvent = sensorEvent;
             this.carInfo = carInfo;
             this.queryConfig = queryConfig;
         }
@@ -1544,6 +1561,11 @@ final class EcarxSource {
             } catch (Throwable t) {
                 return null;
             }
+        }
+
+        @Override
+        public Integer sensorEvent(int type) {
+            return number(sensorEvent, sensor, type);
         }
 
         private static Integer number(Method m, Object target, Object... args) {

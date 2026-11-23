@@ -143,6 +143,11 @@ public class SideViewService extends Service {
         context.stopService(new Intent(context, SideViewService.class));
     }
 
+    /** 服务在跑（停车时停掉的，人回来要起：{@code OverlayCoordinator.stopForParking}）。 */
+    public static boolean isRunning() {
+        return instance != null;
+    }
+
     /** 开发者选项里改了标定角度：正在挂着的窗口照新的画。 */
     public static void applyAim() {
         SideViewService svc = instance;
@@ -235,8 +240,8 @@ public class SideViewService extends Service {
                 startListening();
             }
         });
-        // 被杀了要不要重启：跟着「开机自启动」开关（规格 §6），同超级镜子
-        return com.kooo.evcam.CameraForegroundService.stickiness(this);
+        // 不粘着（保活只留周期任务，规格 §6），同超级镜子
+        return START_NOT_STICKY;
     }
 
     // ================================================================= 车辆信号

@@ -73,6 +73,9 @@ public class PermissionsPreferenceFragment extends PreferenceFragmentCompat {
         if (screen != null && getContext() != null) {
             screen.removeAll();
             build(screen, getContext());
+            // 重建的行在同一帧里套上行样式（PreferenceRows：交给列表之前、或者加完行的同一帧里调）。以前漏了：
+            // 这一页每次显示都走到这里，看到的永远是 androidx 默认的样子，不是别的设置页那种灰底卡片
+            PreferenceRows.apply(screen);
         }
     }
 
@@ -103,14 +106,14 @@ public class PermissionsPreferenceFragment extends PreferenceFragmentCompat {
         }
         add(advanced, context, R.string.dev_perm_overlay, R.string.dev_perm_overlay_why,
                 WakeUpHelper.hasOverlayPermission(context), this::requestOverlay);
-        add(advanced, context, R.string.dev_perm_accessibility, R.string.dev_perm_accessibility_why,
-                isAccessibilityEnabled(context), this::openAccessibilitySettings);
         // 开发者选项「记录可能占用摄像头的应用」要它；查法和那边是同一个
         add(advanced, context, R.string.dev_perm_usage_access, R.string.dev_perm_usage_access_why,
                 com.kooo.evcam.camera.CameraHolderSuspects.hasUsageAccess(context),
                 this::openUsageAccessSettings);
+        // 忽略电池优化：项目所有者 2026-11-21 定「变灰」—— 停车时应用交给车机处置（要睡就睡、要关就关），不再带人去给
+        // 这一条。状态照旧查、照旧写，整行灰着、点不动；系统那边已经给过的，应用自己撤不掉（ui-spec「开发者选项」）
         add(advanced, context, R.string.dev_perm_battery, R.string.dev_perm_battery_why,
-                isIgnoringBatteryOptimizations(context), this::requestIgnoreBattery);
+                isIgnoringBatteryOptimizations(context), null);
     }
 
     // ------------------------------------------------------------------ 构造条目
@@ -127,15 +130,19 @@ public class PermissionsPreferenceFragment extends PreferenceFragmentCompat {
      *
      * <p>已授权的那条<b>不可点</b>：点了也只是又跳一次系统设置，
      * 给一个什么都不会发生的按钮不如不给。</p>
+     *
+     * @param onGrant 没给时点这一行做什么；null = 应用不再去要的那一条：整行灰着、点不动，状态照旧写
      */
     private void add(PreferenceCategory parent, Context context, @StringRes int title,
-                     @StringRes int why, boolean granted, Runnable onGrant) {
+                     @StringRes int why, boolean granted, @Nullable Runnable onGrant) {
         Preference preference = new Preference(context);
         preference.setTitle(title);
         preference.setSummary(granted ? context.getString(R.string.dev_perm_granted)
                 : context.getString(R.string.dev_perm_not_granted, context.getString(why)));
-        preference.setSelectable(!granted);
-        if (!granted) {
+        boolean canGrant = !granted && onGrant != null;
+        preference.setSelectable(canGrant);
+        preference.setEnabled(onGrant != null);
+        if (canGrant) {
             preference.setOnPreferenceClickListener(p -> {
                 onGrant.run();
                 return true;
@@ -157,16 +164,6 @@ public class PermissionsPreferenceFragment extends PreferenceFragmentCompat {
                     || hasPermission(context, Manifest.permission.READ_EXTERNAL_STORAGE);
         }
         return hasPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE);
-    }
-
-    private boolean isAccessibilityEnabled(Context context) {
-        try {
-            String enabled = Settings.Secure.getString(context.getContentResolver(),
-                    Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
-            return enabled != null && enabled.contains(context.getPackageName());
-        } catch (Throwable t) {
-            return false;
-        }
     }
 
     private boolean isIgnoringBatteryOptimizations(Context context) {
@@ -198,10 +195,6 @@ public class PermissionsPreferenceFragment extends PreferenceFragmentCompat {
         }
     }
 
-    private void openAccessibilitySettings() {
-        launch(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
-    }
-
     /** 车机上未必有「使用情况访问」那一页：打不开就退到本应用的详情页。 */
     private void openUsageAccessSettings() {
         try {
@@ -210,10 +203,6 @@ public class PermissionsPreferenceFragment extends PreferenceFragmentCompat {
             AppLog.w("PermissionsPreference", "打不开使用情况访问设置页，改开应用详情: " + t);
             openAppSettings();
         }
-    }
-
-    private void requestIgnoreBattery() {
-        launch(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS));
     }
 
     /** 车机上未必装着对应的系统设置页，跳不过去就说一声，别崩。 */

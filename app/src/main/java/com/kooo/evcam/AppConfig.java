@@ -76,6 +76,8 @@ public class AppConfig {
     private static final String KEY_FOOTAGE_AUDIO = "footage_audio";               // 环视录像带声音（设置 → 录制，默认开）
     private static final String KEY_DRIVE_SOUND = "drive_sound";                   // 模拟声浪（设置 → 系统，试验性）
     private static final String KEY_DRIVE_SOUND_STANDARD = "drive_sound_standard"; // 模拟声浪：标准模式下播放（默认关）
+    private static final String KEY_AUTOMATION_PLACES = "automation_places";  // 地点与自动化的地点（JSON，automation.PlaceStore）
+    private static final String KEY_AUTOMATION_RULES = "automation_rules";  // 地点与自动化的规则（JSON，automation.RuleStore）
     private static final String KEY_GPU_FISHEYE_PREVIEW = "gpu_fisheye_preview";  // 预览鱼眼校正走 GPU 逐像素（开发者选项）
     private static final String KEY_GPU_FISHEYE_VIDEO = "gpu_fisheye_video";      // 视频回看鱼眼校正走 GPU 逐像素（开发者选项）
     private static final String KEY_PLAYBACK_READ_DURATIONS = "playback_read_durations";  // 录像回放逐个读取片段时长（开发者选项）
@@ -278,9 +280,8 @@ public class AppConfig {
 
     /**
      * 开机自启动（规格 §2.5、§6）：App 不在了要不要自己回来。一个开关管两件事 ——
-     * 保活（WorkManager 任务、广播拉起、每分钟的 TIME_TICK、ContentProvider 起前台服务、
-     * 系统对 START_STICKY 服务的重启）让进程尽量活着、被杀了拉回来；回来之后 {@code Recovery}
-     * 按设置恢复悬浮按钮、超级镜子、盲区画面和自动录制。关 = 被杀了不回来、也不恢复。默认开。
+     * 保活（只剩 WorkManager 的周期任务，项目所有者 2026-11-21）把被关掉的进程带回来；回来之后、人在车上时 {@code Recovery}
+     * 按设置恢复悬浮按钮、超级镜子、盲区画面和自动录制。关 = 被关了不回来、也不恢复。默认开。
      */
     public boolean isAutoStartOnBoot() {
         mergeAutoStartSwitches();
@@ -332,9 +333,9 @@ public class AppConfig {
     /**
      * 主界面是不是<b>因为熄屏</b>才退到后台的。
      *
-     * <p>熄屏 15 秒后主界面会把自己退到后台（见 MainActivity 的 {@code scheduleBackgroundTask}）。
-     * 既然是我们自己退下去的，亮屏时就该自己回来 —— 在这之前只退不回，人上车看到的是车机桌面，得自己再点一次图标。
-     * 熄屏那一刻主界面在前就记（2.11 阶段 6）：车辆信号读不到时熄屏就是车机下电，几秒后就可能结束进程，等不到 15 秒。
+     * <p>人下车约 40 秒后（停车，{@code screen.Parked}）应用把开着的界面都关掉；2026-11-21 以前是熄屏 15 秒后主界面自己退到后台。
+     * 既然是我们自己让它下去的，亮屏时就该自己回来 —— 在这之前只退不回，人上车看到的是车机桌面，得自己再点一次图标。
+     * 熄屏那一刻主界面在前就记（2.11 阶段 6）：车辆信号读不到时熄屏就是车机下电，几秒后就可能结束进程，等不到停车那一下。
      * 熄屏 v3 起熄屏是屏幕真黑了：车主下车那一下就记，开车门亮屏时主界面就接回来（规格 §3.3）。</p>
      *
      * <p>存在配置里而不是内存字段里：退到后台之后这个界面很可能撑不到亮屏那一刻，
@@ -1242,6 +1243,46 @@ public class AppConfig {
 
     public void setDriveSoundExteriorVolume(String db) {
         writeEnum(SettingsRegistry.DRIVE_SOUND_EXTERIOR_VOLUME, db);
+    }
+
+    /**
+     * 地点与自动化的规则（ui-spec §十八）：{@code automation.RuleStore} 存取的 JSON，空字符串是一条都没有。
+     * 进设置备份；诊断报告里只写有几个字，不写内容（里面有用户起的名字）。
+     */
+    public String getAutomationRules() {
+        return prefs.getString(KEY_AUTOMATION_RULES, "");
+    }
+
+    public void setAutomationRules(String json) {
+        prefs.edit().putString(KEY_AUTOMATION_RULES, json == null ? "" : json).apply();
+    }
+
+    /** 规则一变（设置页存了、设置备份导入了）就叫 {@code action}（主线程）。拿住返回值，同 {@link #onFisheyeChanged}。 */
+    public SharedPreferences.OnSharedPreferenceChangeListener onAutomationRulesChanged(Runnable action) {
+        return onChanged(action, KEY_AUTOMATION_RULES);
+    }
+
+    /**
+     * 地点与自动化的地点（ui-spec §十六「地点」）：{@code automation.PlaceStore} 存取的 JSON，空字符串是一个都没有。
+     * 进设置备份；诊断报告里不写内容（有名称和坐标）。
+     */
+    public String getAutomationPlaces() {
+        return prefs.getString(KEY_AUTOMATION_PLACES, "");
+    }
+
+    public void setAutomationPlaces(String json) {
+        prefs.edit().putString(KEY_AUTOMATION_PLACES, json == null ? "" : json).apply();
+    }
+
+    /** 地点、规则一起存（删一个地点时用到它的规则跟着改）：一次写进去，听的人不会看到只改了一半。 */
+    public void setAutomationPlacesAndRules(String places, String rules) {
+        prefs.edit().putString(KEY_AUTOMATION_PLACES, places == null ? "" : places)
+                .putString(KEY_AUTOMATION_RULES, rules == null ? "" : rules).apply();
+    }
+
+    /** 地点一变就叫 {@code action}（主线程）。拿住返回值。 */
+    public SharedPreferences.OnSharedPreferenceChangeListener onAutomationPlacesChanged(Runnable action) {
+        return onChanged(action, KEY_AUTOMATION_PLACES);
     }
 
     /**

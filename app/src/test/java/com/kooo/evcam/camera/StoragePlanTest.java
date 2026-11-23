@@ -58,6 +58,46 @@ public class StoragePlanTest {
         assertFalse(StoragePlan.isOwnPhoto("IMG_0001.jpg"));
     }
 
+    /**
+     * 以前的版本在阿拉伯语等语言下起过 ٠–٩ 的名字，更新以后新起的名字是 0–9（项目所有者 2026-11-18）。
+     * 混在一起时照名字里的时刻排：先删旧的；正在写的（新名字）还是它那一路最新的，不删。
+     */
+    @Test
+    public void oldNamesWithOtherDigitsSortByTheirTime() {
+        String old1 = arabicDigits("20261117_083000");
+        String old2 = arabicDigits("20261117_084000");
+        assertTrue("以前起的名字也是自己的", StoragePlan.isOwnClip(old1 + "_front.mp4"));
+        assertTrue(StoragePlan.isOwnPhoto(old1 + "_front.jpg"));
+        assertEquals("20261117_083000", StoragePlan.groupOf(old1 + "_front.mp4"));
+
+        List<StoragePlan.Clip> clips = new ArrayList<>();
+        clips.addAll(group(old1, GB));
+        clips.addAll(group(old2, GB));
+        clips.addAll(group("20261118_090000", GB));
+        clips.addAll(group("20261118_091000", GB));
+        assertEquals("每一路最新的是新起的名字",
+                new HashSet<>(Arrays.asList("20261118_091000_front.mp4", "20261118_091000_back.mp4")),
+                StoragePlan.newestOfEachSlot(clips));
+
+        // 用了 8 GB，上限 8 GB、下一段 2 GB：要腾 2 GB，正好最旧的一组
+        StoragePlan.Decision decision = StoragePlan.decide(clips, 8 * GB, 50 * GB, 2 * GB);
+        assertEquals(StoragePlan.Verdict.DELETE, decision.verdict);
+        assertEquals("先删最旧的那一组（以前的名字），新录的不动",
+                Arrays.asList(old1 + "_front.mp4", old1 + "_back.mp4"), decision.toDelete);
+    }
+
+    /** 0–9 换成阿拉伯语默认写的 ٠–٩：以前的版本在这个语言下起的名字就是这样。 */
+    private static String arabicDigits(String ascii) {
+        StringBuilder out = new StringBuilder(ascii);
+        for (int i = 0; i < out.length(); i++) {
+            char c = out.charAt(i);
+            if (c >= '0' && c <= '9') {
+                out.setCharAt(i, (char) ('\u0660' + (c - '0')));
+            }
+        }
+        return out.toString();
+    }
+
     // ---------------------------------------------------------------- 不限制：一个都不删
 
     @Test
