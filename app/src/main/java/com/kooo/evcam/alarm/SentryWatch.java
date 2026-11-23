@@ -8,128 +8,72 @@
 
 package com.kooo.evcam.alarm;
 
-import com.kooo.evcam.alarm.policy.ArmDelay;
-
 /**
- * 「哨兵模式布防满 30 秒后，车辆闪烁双闪或车灯自行亮起」怎么从读数里认出来 —— 纯逻辑，不碰 Android
- * （{@code SentryWatchTest}）。读法照 Fab 的提醒（PR #211）。
+ * 「哨兵模式被触发」怎么从读数里认出来 —— 纯逻辑，不碰 Android（{@code SentryWatchTest}）。项目所有者 2026-11-23：
+ * 用哨兵被触发做触发，不比较录像画面。
+ *
+ * <p>哨兵模式的读数（{@code telemetry.Signal#SENTRY_MODE}）是哨兵应用自己写的状态：0 关、1 开启（待机）、2 已布防、
+ * 3 警戒、4 报警（Lab 读车机代码得到；3、4 还没在车上见过，黑匣子记下每一次变化，上车核对）。车在锁车后约 90 秒自己从
+ * 「开启」变成「已布防」，解锁回「开启」，挂 D 回「关闭」。</p>
  *
  * <ul>
- *   <li><b>布防 = 锁着、哨兵模式开着</b>：哨兵模式的读数是「已布防」（{@link #SENTRY_ARMED}）。车在锁车后约 90 秒自己从「开启」
- *       变过来，解锁那一下回「开启」，挂 D 回「关闭」（{@code telemetry.Signal#SENTRY_MODE}）。锁车以后车辆接口可能读不到
- *       （读成 null）：那时照上一次真读到的算 —— 不然「锁着、哨兵开着」这个最该提醒的时候反而永远不提醒。</li>
- *   <li><b>布防满 30 秒</b>：从布防的那一刻起算（{@link ArmDelay}）。进程起来时已经布防着的，不知道布防了多久，照常提醒。</li>
- *   <li><b>双闪</b>：转向指示状态变成「双闪」（{@link #INDICATOR_HAZARD}），和锁定影像的双闪自动锁定同一个读法。</li>
- *   <li><b>车灯自行亮起</b>：日间行车灯、前后位置灯、近光灯里有一盏从不亮变成亮。</li>
- *   <li>只认「变亮」的那一下：一直亮着的不算新的一下。读不到（null）不算熄灭，照上一次真读到的算；
- *       进程起来后头一次读到就亮着的算亮起（不知道之前是不是灭的，宁可报）。</li>
+ *   <li><b>被触发</b>：读数从别的值变成警戒或报警的那一下（警戒升到报警也算一下）。一直停在警戒、报警不算新的一下。</li>
+ *   <li><b>布防着</b>：已布防、警戒、报警都算（被触发以后车还在看着）。</li>
+ *   <li>读不到（null）照上一次真读到的算 —— 锁车以后车辆接口可能读不到；读不到不算变化。进程起来后头一次读到就是警戒、报警的，
+ *       不知道是不是刚变的，宁可报。</li>
  * </ul>
  *
- * How "Sentry Mode armed for 30 seconds, then the hazard lights flash or the lights come on
- * by themselves" is recognised from readings. Pure logic. Armed (the Sentry Mode reading
- * {@link #SENTRY_ARMED}) means locked with Sentry Mode on; a missing reading keeps the last real one.
- * The 30 seconds count from arming ({@link ArmDelay}). Only a light coming on counts, never one that stays
- * on; a missing reading is not "off".
+ * How "Sentry Mode was triggered" is recognised: the Sentry Mode reading (0 off, 1 on, 2 armed, 3 alert,
+ * 4 alarm) changing into 3 or 4. Armed means 2, 3 or 4. A missing reading keeps the last real one.
  */
 public final class SentryWatch {
 
     /** 哨兵模式「已布防」。Sentry Mode "armed". */
     public static final int SENTRY_ARMED = 2;
+    /** 哨兵模式「警戒」。Sentry Mode "alert". */
+    public static final int SENTRY_ALERT = 3;
+    /** 哨兵模式「报警」。Sentry Mode "alarm". */
+    public static final int SENTRY_ALARM = 4;
 
-    /** 转向指示状态「双闪」。Turn indicator "hazard". */
-    public static final int INDICATOR_HAZARD = 3;
-
-    /** 亮起的是什么。What came on. */
+    /** 被触发成了哪一种。Which kind of trigger. */
     public enum Trigger {
-        /** 双闪。Hazard lights. */
-        HAZARD,
-        /** 车灯自行亮起。Lights on by themselves. */
-        LAMPS
+        /** 警戒。Alert. */
+        ALERT,
+        /** 报警。Alarm. */
+        ALARM
     }
 
-    /** 读不到时照这个：最近一次真读到的哨兵模式。The last real Sentry Mode reading. */
+    /** 最近一次真读到的哨兵模式；还没读到 null。The last real Sentry Mode reading. */
     private Integer sentry;
-    /** 这一次布防从什么时候起（单调时钟）；-1：没布防，或者进程起来时已经布防着（不知道多久）。 */
-    private long armedAtMs = -1;
-    private Boolean hazard;
-    private final Boolean[] lamps = new Boolean[4];
 
     /** 重新开始看：之前读到的都不算（提醒刚打开）。Start over: nothing seen before counts. */
     public void reset() {
         sentry = null;
-        armedAtMs = -1;
-        hazard = null;
-        for (int i = 0; i < lamps.length; i++) {
-            lamps[i] = null;
-        }
     }
 
     /**
      * 喂一份读数。
      *
-     * @param nowMs 单调时钟（{@code SystemClock.elapsedRealtime}）
-     * @return 这一份里新亮起的（双闪优先）；没有就 null。布防没有、满没满 30 秒由调用方问 {@link #armed}、{@link #waitMs}
+     * @return 这一份里新被触发的那一种；没有就 null
      */
-    public Trigger update(Integer sentryReading, Integer indicator, Boolean drl, Boolean frontPosition,
-                          Boolean rearPosition, Boolean lowBeam, long nowMs) {
-        boolean first = sentry == null;
-        boolean wasArmed = armed();
-        if (sentryReading != null) {
-            sentry = sentryReading;
+    public Trigger update(Integer sentryReading) {
+        if (sentryReading == null || sentryReading.equals(sentry)) {
+            return null;
         }
-        if (!armed()) {
-            armedAtMs = -1;
-        } else if (!wasArmed) {
-            // 进程起来以后头一次读到就已经布防着：不知道布防了多久
-            armedAtMs = first ? -1 : nowMs;
+        sentry = sentryReading;
+        if (sentryReading == SENTRY_ALERT) {
+            return Trigger.ALERT;
         }
-
-        boolean hazardRose = false;
-        if (indicator != null) {
-            boolean on = indicator == INDICATOR_HAZARD;
-            hazardRose = on && !Boolean.TRUE.equals(hazard);
-            hazard = on;
-        }
-
-        boolean lampsWereOn = anyLampOn();
-        keep(0, drl);
-        keep(1, frontPosition);
-        keep(2, rearPosition);
-        keep(3, lowBeam);
-        boolean lampsRose = anyLampOn() && !lampsWereOn;
-
-        if (hazardRose) {
-            return Trigger.HAZARD;
-        }
-        return lampsRose ? Trigger.LAMPS : null;
+        return sentryReading == SENTRY_ALARM ? Trigger.ALARM : null;
     }
 
-    /** 此刻布防着（锁着、哨兵模式开着）。Armed right now: locked with Sentry Mode on. */
+    /** 最近一次真读到的哨兵模式（黑匣子记变化用）；还没读到 null。 */
+    public Integer reading() {
+        return sentry;
+    }
+
+    /** 此刻布防着：已布防、警戒、报警。Armed right now: armed, alert or alarm. */
     public boolean armed() {
-        return sentry != null && sentry == SENTRY_ARMED;
-    }
-
-    /**
-     * 布防满 30 秒还差多久（毫秒）；满了、或者不知道布防了多久是 0。没布防时没有意义（先问 {@link #armed}）。
-     *
-     * How long until the car has been armed for 30 seconds; 0 once it has, or when the arming time is unknown.
-     */
-    public long waitMs(long nowMs) {
-        return ArmDelay.remainingMs(armedAtMs < 0 ? -1 : nowMs - armedAtMs);
-    }
-
-    private void keep(int index, Boolean reading) {
-        if (reading != null) {
-            lamps[index] = reading;
-        }
-    }
-
-    private boolean anyLampOn() {
-        for (Boolean lamp : lamps) {
-            if (Boolean.TRUE.equals(lamp)) {
-                return true;
-            }
-        }
-        return false;
+        return sentry != null && (sentry == SENTRY_ARMED || sentry == SENTRY_ALERT || sentry == SENTRY_ALARM);
     }
 }

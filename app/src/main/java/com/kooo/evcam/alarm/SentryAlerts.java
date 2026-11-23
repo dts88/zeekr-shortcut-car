@@ -41,19 +41,26 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * 哨兵提醒（「设置 → 录制 → 哨兵提醒」，试验性）：哨兵模式布防满 30 秒后，车辆闪烁双闪或车灯自行亮起，推送一条提醒到手机。
- * 设计和逻辑来自 Fab（Fabbbrrr）的 PR #211，这里照他的逻辑只留单向的 ntfy（NOTICE.md §8）。
+ * 哨兵提醒（「设置 → 录制 → 哨兵提醒」，试验性）：哨兵模式被触发（警戒或报警）时，推送一条提醒到手机。
+ * 设计和逻辑来自 Fabbbrrr 的 PR #211，这里照他的逻辑只留单向的 ntfy（NOTICE.md §8）。
+ *
+ * <h3>只在哨兵录像时运作（项目所有者 2026-11-23）</h3>
+ *
+ * <p>停车以后应用照新规矩放开一切、不为自己醒来取资源（lifecycle-spec §3.3）；唯一的例外是这里：哨兵模式开着、「熄屏持续录制」
+ * 正在录（{@link #recordingInDark}）—— 这时应用本来就照车主同意的方式在跑，相机开着。不在录就不发、不拍；这里不登记任何东西、
+ * 不开相机、不加唤醒锁、不读任何东西回来。</p>
  *
  * <h3>框架</h3>
  *
  * <ul>
  *   <li><b>看不看</b>（{@link #update}）：「手机订阅模式」不是「关闭」、话题和同意都有（{@link AlertStore#ready}）、用户没退出，
- *       就在 {@link Telemetry} 上听读数；车辆信号的核心进程活着一直在读（熄屏判断登记的），这里只挂一个监听，不另外登记。</li>
- *   <li><b>认</b>（{@link SentryWatch}）：布防满 30 秒，双闪或车灯从不亮变亮。</li>
- *   <li><b>限</b>（{@link AlertPolicy}）：两条之间至少 60 秒、一小时最多 6 条、发失败后 5 分钟不发。亮起时只看能不能发，
- *       再看一眼还布防着才占名额 —— 车主回来解锁时闪的那一下不占。</li>
- *   <li><b>再看一眼</b>：亮起之后等 {@link #CONFIRM_MS} 再看一次还布防不布防 —— 解锁那一下车也会闪灯，
- *       哨兵读数回到「开启」和闪灯的读数谁先到没核实过；车主回来了就不发，也不拍。</li>
+ *       就在 {@link Telemetry} 上挂一个监听；读数由别人登记的车辆信号核心读（哨兵录像时相机管家看着哨兵），这里不另外登记。</li>
+ *   <li><b>认</b>（{@link SentryWatch}）：哨兵读数变成警戒或报警的那一下（车上原生的「哨兵被触发」，不比较录像画面）。
+ *       哨兵读数的每一次变化都记进黑匣子（警戒、报警还没在车上见过）。</li>
+ *   <li><b>限</b>（{@link AlertPolicy}）：两条之间至少 60 秒、一小时最多 6 条、发失败后 5 分钟不发。被触发时只看能不能发，
+ *       再看一眼还布防着才占名额。</li>
+ *   <li><b>再看一眼</b>：被触发之后等 {@link #CONFIRM_MS} 再看一次还布防着没有 —— 车主走近车时哨兵也可能警戒，
+ *       跟着就解锁（读数回到「开启」）：车主回来了就不发，也不拍。</li>
  *   <li><b>拍</b>：「附带画面」开着就向相机管家要一张（{@link CameraKeeper#takePhoto}，和拍照键同一条路，开不开相机、拍哪几路
  *       都是管家的规矩 —— 熄屏时它不为拍照开相机，那就没有图）。拿环视那一张，掰直（跟着屏幕上的鱼眼校正）、打上时间、
  *       压到 100 KB 以内（{@link AlertPicture}）；拍不到、压不进的只发文字。那张照片也照常存在 U 盘上。</li>
@@ -63,8 +70,8 @@ import java.util.concurrent.Executors;
  *
  * <p>话题、服务器不写黑匣子、不写日志（{@link AlertStore}）；黑匣子只记亮起、发没发、为什么没发。</p>
  *
- * Sentry alerts: when Sentry Mode has been armed for 30 seconds and the hazard lights flash
- * or the lights come on by themselves, push one alert to the phone. Designed by Fab (Fabbbrrr) in PR #211;
+ * Sentry alerts: when Sentry Mode is triggered (alert or alarm), push one alert to the phone, but only while
+ * Sentry Mode is on and Keep recording when the screen is off is recording. Designed by Fabbbrrr in PR #211;
  * this keeps his logic for one-way ntfy only. It listens on {@link Telemetry} while set up, recognises the
  * moment with {@link SentryWatch}, rate-limits with {@link AlertPolicy}, asks the camera keeper for a photo
  * when a picture is wanted, checks once more that the car is still armed, then builds the picture and sends
@@ -75,10 +82,10 @@ public final class SentryAlerts implements Telemetry.Listener {
     private static final String TAG = "SentryAlerts";
 
     /**
-     * 亮起之后等多久再看一眼还布防不布防（解锁时车也闪灯：两个读数谁先到没核实过）。看过了才拍照、发送。
+     * 被触发之后等多久再看一眼还布防着没有（车主走近时哨兵也可能警戒，跟着就解锁）。看过了才拍照、发送。
      *
-     * How long after a light comes on to look again whether the car is still armed (unlocking flashes the
-     * lights too, and which reading arrives first is not verified). Only then the photo and the send.
+     * How long after the trigger to look again whether the car is still armed (the owner walking up may
+     * trigger an alert right before unlocking). Only then the photo and the send.
      */
     static final long CONFIRM_MS = 2_000L;
 
@@ -142,7 +149,8 @@ public final class SentryAlerts implements Telemetry.Listener {
         if (want) {
             watch.reset();
             telemetry.addListener(this);
-            BlackBox.note("哨兵提醒：开始看双闪、车灯（" + store.service() + (store.picture() ? "，附带画面" : "") + "）");
+            BlackBox.note("哨兵提醒：开始看哨兵（" + store.service() + (store.picture() ? "，附带画面" : "")
+                    + "；只在熄屏持续录制正在录时发）");
             // 此刻的读数算头一份（车辆信号的核心一直在读）
             onReadingsChanged(telemetry.readings());
         } else {
@@ -160,16 +168,19 @@ public final class SentryAlerts implements Telemetry.Listener {
             return;
         }
         long now = SystemClock.elapsedRealtime();
-        SentryWatch.Trigger trigger = watch.update(readings.code(Signal.SENTRY_MODE), readings.code(Signal.INDICATOR),
-                readings.bool(Signal.DRL), readings.bool(Signal.FRONT_POSITION_LAMP),
-                readings.bool(Signal.REAR_POSITION_LAMP), readings.bool(Signal.LOW_BEAM), now);
-        if (trigger == null || !watch.armed()) {
-            return;   // 开车、停着没锁时的双闪、车灯不算，也不记
+        Integer before = watch.reading();
+        SentryWatch.Trigger trigger = watch.update(readings.code(Signal.SENTRY_MODE));
+        Integer after = watch.reading();
+        if (after != null && !after.equals(before)) {
+            // 每一次变化都记：警戒、报警还没在车上见过，上车核对靠这几行
+            BlackBox.note("哨兵提醒：哨兵读数 " + (before == null ? "?" : before) + " → " + after);
         }
-        long waitMs = watch.waitMs(now);
-        if (waitMs > 0) {
-            BlackBox.note("哨兵提醒：" + (trigger == SentryWatch.Trigger.HAZARD ? "双闪亮起" : "车灯亮起")
-                    + "，布防不满 30 秒（还差 " + (waitMs + 999) / 1000 + " 秒），不发");
+        if (trigger == null) {
+            return;
+        }
+        boolean alarm = trigger == SentryWatch.Trigger.ALARM;
+        if (!recordingInDark()) {
+            BlackBox.note("哨兵提醒：" + (alarm ? "哨兵报警" : "哨兵警戒") + "，熄屏持续录制没在录，不发");
             return;
         }
         policy.setParked(true);
@@ -177,12 +188,24 @@ public final class SentryAlerts implements Telemetry.Listener {
         // 这里只看能不能发；名额等再看一眼、确认还布防着再占（confirmed）
         AlertPolicy.Decision decision = policy.decide(now);
         if (decision != AlertPolicy.Decision.ALLOW) {
-            BlackBox.note("哨兵提醒：" + (trigger == SentryWatch.Trigger.HAZARD ? "双闪亮起" : "车灯亮起")
-                    + "，不发（" + decision + "）");
+            BlackBox.note("哨兵提醒：" + (alarm ? "哨兵报警" : "哨兵警戒") + "，不发（" + decision + "）");
             return;
         }
         new Firing(trigger, System.currentTimeMillis()).start();
     }
+
+    /**
+     * 熄屏持续录制正在录：设置开着、相机管家说在录（项目所有者 2026-11-23：哨兵提醒只在这时运作）。哨兵开没开看读数，在调用方。
+     */
+    private boolean recordingInDark() {
+        try {
+            return new AppConfig(app).isScreenOffKeepRecording() && CameraKeeper.get(app).isRecording();
+        } catch (RuntimeException e) {
+            AppLog.w(TAG, "recording state unavailable: " + e);
+            return false;
+        }
+    }
+
 
     // ================================================================= 拍、再看一眼、发
 
@@ -208,8 +231,8 @@ public final class SentryAlerts implements Telemetry.Listener {
         }
 
         void start() {
-            BlackBox.noteImportant("哨兵提醒：" + (trigger == SentryWatch.Trigger.HAZARD ? "双闪亮起" : "车灯亮起")
-                    + "，" + CONFIRM_MS / 1000 + " 秒后再看一眼还布防不布防");
+            BlackBox.noteImportant("哨兵提醒：" + (trigger == SentryWatch.Trigger.ALARM ? "哨兵报警" : "哨兵警戒") + "，"
+                    + CONFIRM_MS / 1000 + " 秒后再看一眼还布防不布防");
             main.postDelayed(this::confirmed, CONFIRM_MS);
         }
 
@@ -221,6 +244,10 @@ public final class SentryAlerts implements Telemetry.Listener {
             }
             if (!watch.armed()) {
                 BlackBox.note("哨兵提醒：哨兵已不在布防（车解锁了），不发");
+                return;
+            }
+            if (!recordingInDark()) {
+                BlackBox.note("哨兵提醒：熄屏持续录制已不在录，不发");
                 return;
             }
             // 到这里才占名额：2 秒里先亮起的那一条占了，后面的就是冷却
@@ -287,8 +314,8 @@ public final class SentryAlerts implements Telemetry.Listener {
             AlertChannel channel = store.channel();
             Context text = Languages.localized(app);
             String title = text.getString(R.string.sentry_alert_title);
-            String body = text.getString(trigger == SentryWatch.Trigger.HAZARD
-                    ? R.string.sentry_alert_hazard : R.string.sentry_alert_lamps, moment(atMs));
+            String body = text.getString(trigger == SentryWatch.Trigger.ALARM
+                    ? R.string.sentry_alert_alarm : R.string.sentry_alert_alert, moment(atMs));
             File photo = surround;
             AppConfig config = new AppConfig(app);
             boolean straighten = config.isFisheyeCorrection();

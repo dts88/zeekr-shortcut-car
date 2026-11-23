@@ -1504,4 +1504,44 @@
     <string name="auto_template_away">تشغيل وضع الحراسة عند الوقوف خارج أماكنك</string>
     <string name="auto_template_away_desc">عند التبديل إلى P وعدم الوجود في أي من أماكنك، يُشغَّل وضع الحراسة</string>
     <string name="auto_template_away_unavailable">تشغيل وضع الحراسة عند الوقوف خارج أماكنك (أضف مكانًا في «الأماكن» أولًا)</string>
+
+    <!-- 哨兵提醒（设置 → 录制 最下面一组；设计 Fabbbrrr，PR #211）；等 issue 250 的审校 -->
+    <string name="set_group_sentry_alerts">تنبيهات الحراسة</string>
+    <string name="set_sentry_alerts_mode_title">الاشتراك عبر الهاتف</string>
+    <string name="set_sentry_alerts_mode_summary">يرسل تنبيهًا إلى الهاتف عند تفعيل وضع الحراسة (تحذير أو إنذار). يتطلب تشغيل «متابعة التسجيل عند انطفاء الشاشة» وأن يكون التسجيل جاريًا عند قفل السيارة. تُرسل التنبيهات مباشرة، دون المرور بخوادم المطوّر.</string>
+    <string name="opt_sentry_alerts_ntfy">ntfy</string>
+    <string name="opt_sentry_alerts_telegram">Telegram</string>
+    <string name="set_sentry_alerts_last">آخر تنبيه: %1$s</string>
+    <string name="set_sentry_alerts_last_failed">فشل إرسال آخر تنبيه: %1$s</string>
+    <string name="set_sentry_alerts_picture_title">إرفاق صورة</string>
+    <string name="set_sentry_alerts_picture_summary">تُرفق بكل تنبيه صورة للرؤية المحيطة بحجم لا يتجاوز 100 كيلوبايت.</string>
+    <string name="set_ntfy_topic_title">موضوع ntfy</string>
+    <string name="set_ntfy_topic_value">ينتهي بـ %1$s</string>
+    <string name="set_ntfy_topic_summary">اضغط لعرض رمز QR، ثم امسحه بتطبيق ntfy على الهاتف للاشتراك</string>
+    <string name="set_ntfy_server_title">خادم ntfy</string>
+    <string name="set_ntfy_server_summary">يجب أن يكون https. امسح رمز QR مجددًا بعد تغييره.</string>
+    <string name="msg_ntfy_server_https_only">يجب أن يكون https</string>
+    <string name="dlg_sentry_alerts_risk_title">تشغيل تنبيهات الحراسة؟</string>
+    <string name="dlg_sentry_alerts_risk_body">تُرسل التنبيهات والصور إلى خادم ntfy عام، ويمكن لأي شخص يعرف اسم الموضوع رؤيتها. اسم الموضوع عشوائي ومحفوظ على هذا الجهاز فقط؛ لا تشارك رمز QR أو لقطات الشاشة. إذا تسرّب، يمكنك تغيير الموضوع في أي وقت.</string>
+    <string name="sentry_alerts_action_turn_on">تشغيل</string>
+    <string name="dlg_ntfy_subscribe_title">الاشتراك عبر الهاتف</string>
+    <string name="dlg_ntfy_subscribe_steps">ثبّت تطبيق ntfy على الهاتف وامسح رمز QR للاشتراك.</string>
+    <string name="dlg_ntfy_subscribe_tail">الموضوع ينتهي بـ %1$s</string>
+    <string name="sentry_alerts_action_rotate">تغيير الموضوع</string>
+    <string name="sentry_alerts_action_done">تم</string>
+    <string name="sentry_alerts_action_test">إرسال تجربة</string>
+    <string name="dlg_ntfy_rotate_title">تغيير الموضوع؟</string>
+    <string name="dlg_ntfy_rotate_body">لن يستقبل الموضوع القديم تنبيهات بعد الآن، وسيحتاج الهاتف إلى مسح رمز QR الجديد. الموضوع الجديد عام أيضًا؛ لا تشارك رمز QR أو لقطات الشاشة.</string>
+    <string name="sentry_alerts_action_rotate_confirm">تغيير</string>
+    <string name="msg_sentry_alerts_test_sent">تم إرسال تنبيه تجريبي</string>
+    <string name="msg_sentry_alerts_test_failed">فشل إرسال التنبيه التجريبي: %1$s</string>
+    <string name="sentry_alert_title">تنبيه الحراسة</string>
+    <string name="sentry_alert_alert">تحذير الحراسة · %1$s</string>
+    <string name="sentry_alert_alarm">إنذار الحراسة · %1$s</string>
+    <string name="sentry_alert_test">تنبيه تجريبي · %1$s</string>
+    <string name="sentry_alerts_reason_unreachable">تعذّر الاتصال بالخادم</string>
+    <string name="sentry_alerts_reason_timeout">انتهت مهلة الاتصال</string>
+    <string name="sentry_alerts_reason_refused">رفض الخادم (HTTP %1$d)</string>
+    <string name="sentry_alerts_qr_failed">تعذّر إنشاء رمز QR</string>
+    <string name="msg_ntfy_server_address_only">أدخل عنوان الخادم فقط، مثل ntfy.sh</string>
 </resources>
