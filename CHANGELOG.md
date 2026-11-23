@@ -11,6 +11,11 @@ commit message, not here.
 
 Nothing yet.
 
+## [4.14.0-alpha] - 2026-11-23
+
+- New settings section Places and automation: add rules of the form when / and / then. When: you get in, a gear, or a vehicle setting changing; and: gear, battery, time of day, days of the week, a vehicle setting; then: drive mode, hill descent control, low-speed emergency braking, air circulation, rear climate, Sentry Mode. Rules run only while someone is in the car; places come later. Built on Calvin Bui's restore-at-start work.
+- In Arabic, the arrow on rows that open in place points up when open and down when closed.
+
 ## [4.13.10-alpha] - 2026-11-22
 
 - Diagnostics mark a car moved by remote control with nobody inside, and log every door, the trunk and the frunk.
