@@ -739,15 +739,7 @@
   strings.xml 里 `auto_group_places`、`auto_place_*`、`auto_trigger_arrive`、`auto_trigger_leave`、`auto_end_arrive`、
   `auto_cond_in_places`、`auto_cond_not_in_places`、`auto_pick_place*`、`auto_pick_in*`、`auto_pick_not_in*`、
   `auto_pick_safety_blocked`、`auto_pick_leave_unavailable`、`auto_template_away*`，中文、英文、马来文（阿拉伯文照写，等审校）。
-- vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
-- 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
-
-### 待项目所有者确认
-
-下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
-可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
-
-- 2026-11-23 项目所有者定触发用「哨兵被触发」（警戒或报警），只在「熄屏持续录制」正在录时运作；跟着改的（草稿，四种语言都上了）：
+- 2026-11-23 批准（项目所有者定触发用「哨兵被触发」—— 警戒或报警，只在「熄屏持续录制」正在录时运作；跟着改的这几句项目所有者：「同意」；阿拉伯文照写，等审校）：
   set_sentry_alerts_mode_summary「哨兵模式被触发（警戒或报警）时，推送一条提醒到手机。需开启「熄屏持续录制」，且锁车时正在录制。提醒直接发送，不经过开发者的服务器。」/
   Sends an alert to the phone when Sentry Mode is triggered (warning or alarm). Requires Keep recording when the screen goes off and recording to be running when you lock the car. Alerts are sent directly, not through the developer's servers. /
   Menghantar amaran ke telefon apabila Mod Sentry dicetuskan (amaran atau penggera). Memerlukan Terus merakam apabila skrin padam dan rakaman berjalan semasa kereta dikunci. Amaran dihantar terus, tidak melalui pelayan pembangun.
@@ -756,6 +748,14 @@
   手机上收到的正文：sentry_alert_alert「哨兵警戒 · %1$s」/ Sentry warning · %1$s / Sentry berwaspada · %1$s，
   sentry_alert_alarm「哨兵报警 · %1$s」/ Sentry alarm · %1$s / Penggera Sentry · %1$s（替换原来的「双闪亮起」「车灯亮起」）；
   about_privacy_body 哨兵提醒那一条的触发半句（中文、英文两份）。
+- vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
+- 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
+
+### 待项目所有者确认
+
+下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
+可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
+
 - 阿拉伯文全部（values-ar，2026-11-19 草稿：先定术语表和写法，再分块翻译、统一核对）。等母语使用者审校（issue 250 的 mina5500）；改的时候照本规范改，词改了连同 §10 的阿拉伯文一列一起改。
 
 ---
