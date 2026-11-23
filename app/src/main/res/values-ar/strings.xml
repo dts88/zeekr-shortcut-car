@@ -1365,4 +1365,96 @@
     <!-- <string name="set_screen_off_wake_title">الحد الأقصى لمدة منع السكون (ساعات)</string> -->
     <!-- <string name="set_screen_off_wake_value">حتى %1$s س</string> -->
     <!-- <string name="msg_enter_positive_number">يُرجى إدخال رقم أكبر من 0</string> -->
+
+    <!-- 地点与自动化（ui-spec §十六、§十八）；等 issue 250 的审校 -->
+    <string name="set_section_automation">الأماكن والأتمتة</string>
+    <string name="auto_group_rules">الأتمتة</string>
+    <string name="auto_add">إضافة أتمتة</string>
+    <string name="auto_add_summary">ابدأ من أتمتة شائعة، أو اختر «عندما» و«عندها» بنفسك</string>
+    <string name="auto_template_reverse">إيقاف الكبح الطارئ منخفض السرعة عند الرجوع للخلف</string>
+    <string name="auto_template_reverse_desc">عند التبديل إلى R، يُوقف الكبح الطارئ منخفض السرعة؛ ويُستعاد عند مغادرة R</string>
+    <string name="auto_template_get_in">ضبط الإعدادات عند الركوب</string>
+    <string name="auto_template_get_in_desc">عند الركوب، تُضبط العناصر المختارة على قيم ثابتة</string>
+    <string name="auto_template_blank">فارغ</string>
+    <string name="auto_template_blank_desc">اختر «عندما» و«عندها» بنفسك</string>
+    <string name="auto_label_name">الاسم</string>
+    <string name="auto_label_when">عندما</string>
+    <string name="auto_label_and">و</string>
+    <string name="auto_label_then">عندها</string>
+    <string name="auto_add_condition">إضافة شرط</string>
+    <string name="auto_add_change">إضافة إجراء</string>
+    <string name="auto_restore">الاستعادة عند الانتهاء</string>
+    <string name="auto_restore_summary">%1$s، تُعاد الإعدادات التي تغيّرت إلى قيمها السابقة</string>
+    <string name="auto_restore_summary_safety">%1$s، تُعاد الإعدادات التي تغيّرت إلى قيمها السابقة. مطلوب عند إيقاف ميزة أمان</string>
+    <string name="auto_delete_title">حذف هذه الأتمتة؟</string>
+    <string name="auto_delete_msg">بعد الحذف لن تعمل بعد الآن.</string>
+    <string name="auto_remove_condition">حذف هذا الشرط</string>
+    <string name="auto_remove_change">حذف هذا الإجراء</string>
+    <string name="auto_setting_sentry">وضع الحراسة</string>
+    <string name="auto_setting_drive_mode">وضع القيادة</string>
+    <string name="auto_setting_circulation">دوران الهواء</string>
+    <string name="auto_setting_rear_climate">تكييف الصف الثاني</string>
+    <string name="auto_setting_hill_descent">التحكم في النزول على المنحدرات</string>
+    <string name="auto_setting_low_speed_braking">الكبح الطارئ منخفض السرعة</string>
+    <string name="auto_setting_front_climate">التكييف</string>
+    <string name="auto_value_on">تشغيل</string>
+    <string name="auto_value_off">إيقاف</string>
+    <string name="auto_value_comfort">مريح</string>
+    <string name="auto_value_standard">قياسي</string>
+    <string name="auto_value_sport">رياضي</string>
+    <string name="auto_value_auto">تلقائي</string>
+    <string name="auto_value_outer">دوران خارجي</string>
+    <string name="auto_value_inner">دوران داخلي</string>
+    <string name="auto_trigger_get_in">الركوب</string>
+    <string name="auto_trigger_gear">التبديل إلى %1$s</string>
+    <string name="auto_trigger_state_switch">%1$s: %2$s</string>
+    <string name="auto_trigger_state_value">تغيّر %1$s إلى %2$s</string>
+    <string name="auto_when">عند: %1$s</string>
+    <string name="auto_end_gear">عند مغادرة %1$s</string>
+    <string name="auto_end_state_switch">عندما يصبح %1$s: %2$s</string>
+    <string name="auto_end_state_value">عندما لا يعود %1$s %2$s</string>
+    <string name="auto_restore_short">%1$s، الاستعادة</string>
+    <string name="auto_cond_gear">على %1$s</string>
+    <string name="auto_cond_battery_at_least">البطارية %1$d%% على الأقل</string>
+    <string name="auto_cond_battery_below">البطارية أقل من %1$d%%</string>
+    <string name="auto_cond_time">%1$s–%2$s</string>
+    <string name="auto_cond_state_switch">%1$s: %2$s</string>
+    <string name="auto_cond_state_value">%1$s: %2$s</string>
+    <string name="auto_days_every">كل يوم</string>
+    <string name="auto_days_weekdays">الاثنين–الجمعة</string>
+    <string name="auto_days_weekend">السبت، الأحد</string>
+    <string-array name="auto_day_names">
+        <item>الاثنين</item>
+        <item>الثلاثاء</item>
+        <item>الأربعاء</item>
+        <item>الخميس</item>
+        <item>الجمعة</item>
+        <item>السبت</item>
+        <item>الأحد</item>
+    </string-array>
+    <string name="auto_list_sep">"، "</string>
+    <string name="auto_summary_sep">" · "</string>
+    <string name="auto_change">%1$s: %2$s</string>
+    <string name="auto_pick_when_get_in_desc">عند تأكيد وجود شخص في السيارة وتشغيل السيارة</string>
+    <string name="auto_pick_when_gear">ناقل الحركة</string>
+    <string name="auto_pick_when_gear_desc">التبديل إلى P أو R أو D أو N</string>
+    <string name="auto_pick_state">حالة المركبة</string>
+    <string name="auto_pick_when_state_desc">يتغيّر إعداد إلى قيمة معيّنة، مثل تشغيل التكييف أو تغيّر وضع القيادة إلى رياضي</string>
+    <string name="auto_pick_and_gear_desc">ناقل الحركة على P أو R أو D أو N</string>
+    <string name="auto_pick_battery">البطارية</string>
+    <string name="auto_pick_battery_desc">البطارية لا تقل عن نسبة معيّنة أو أقل منها</string>
+    <string name="auto_pick_time">فترة زمنية</string>
+    <string name="auto_pick_time_desc">فترة من اليوم كل يوم، ويمكن أن تمتد بعد منتصف الليل</string>
+    <string name="auto_pick_days">أيام الأسبوع</string>
+    <string name="auto_pick_days_desc">أي أيام من الأسبوع</string>
+    <string name="auto_pick_and_state_desc">إعداد على قيمة معيّنة</string>
+    <string name="auto_pick_battery_at_least">البطارية على الأقل…</string>
+    <string name="auto_pick_battery_below">البطارية أقل من…</string>
+    <string name="auto_pick_time_from">وقت البدء</string>
+    <string name="auto_pick_time_to">وقت الانتهاء</string>
+    <string name="auto_pick_get_in_unavailable">%1$s (غير متاح مع «الركوب»: لا تتم الاستعادة عند النزول)</string>
+    <string name="auto_pick_get_in_blocked">الركوب (غير متاح عند وجود إجراء يوقف ميزة أمان)</string>
+    <string name="auto_pick_then_drive_desc">وضع القيادة، التحكم في النزول على المنحدرات، الكبح الطارئ منخفض السرعة</string>
+    <string name="auto_pick_then_climate_desc">دوران الهواء، تكييف الصف الثاني</string>
+    <string name="auto_pick_then_scenes_desc">وضع الحراسة</string>
 </resources>

@@ -1307,4 +1307,96 @@
     <string name="setup_record_note">Boleh ditukar dalam Tetapan → Rakaman</string>
     <string name="setup_features_note">Hidupkan yang diperlukan. Boleh ditukar dalam Tetapan → Cermin super, Tetapan → Paparan titik buta dan Tetapan → Butang</string>
     <string name="setup_done_title">Persediaan selesai</string>
+
+    <!-- 地点与自动化（ui-spec §十六、§十八） -->
+    <string name="set_section_automation">Tempat dan automasi</string>
+    <string name="auto_group_rules">Automasi</string>
+    <string name="auto_add">Tambah automasi</string>
+    <string name="auto_add_summary">Mulakan daripada yang biasa, atau pilih Apabila dan Maka sendiri</string>
+    <string name="auto_template_reverse">Matikan brek kecemasan kelajuan rendah semasa mengundur</string>
+    <string name="auto_template_reverse_desc">Apabila masuk gear R, matikan brek kecemasan kelajuan rendah; pulihkan apabila keluar dari R</string>
+    <string name="auto_template_get_in">Tetapkan apabila masuk kereta</string>
+    <string name="auto_template_get_in_desc">Apabila anda masuk kereta, item yang dipilih ditetapkan kepada nilai tetap</string>
+    <string name="auto_template_blank">Kosong</string>
+    <string name="auto_template_blank_desc">Pilih Apabila dan Maka sendiri</string>
+    <string name="auto_label_name">Nama</string>
+    <string name="auto_label_when">Apabila</string>
+    <string name="auto_label_and">Dan</string>
+    <string name="auto_label_then">Maka</string>
+    <string name="auto_add_condition">Tambah syarat</string>
+    <string name="auto_add_change">Tambah tindakan</string>
+    <string name="auto_restore">Pulihkan apabila tamat</string>
+    <string name="auto_restore_summary">%1$s, tetapan yang diubah dipulihkan kepada nilai asal</string>
+    <string name="auto_restore_summary_safety">%1$s, tetapan yang diubah dipulihkan kepada nilai asal. Wajib apabila ciri keselamatan dimatikan</string>
+    <string name="auto_delete_title">Padam automasi ini?</string>
+    <string name="auto_delete_msg">Selepas dipadam, ia tidak lagi berjalan.</string>
+    <string name="auto_remove_condition">Padam syarat ini</string>
+    <string name="auto_remove_change">Padam tindakan ini</string>
+    <string name="auto_setting_sentry">Mod Sentry</string>
+    <string name="auto_setting_drive_mode">Mod pemanduan</string>
+    <string name="auto_setting_circulation">Peredaran udara</string>
+    <string name="auto_setting_rear_climate">Penyaman udara baris kedua</string>
+    <string name="auto_setting_hill_descent">Kawalan menuruni bukit</string>
+    <string name="auto_setting_low_speed_braking">Brek kecemasan kelajuan rendah</string>
+    <string name="auto_setting_front_climate">Penyaman udara</string>
+    <string name="auto_value_on">Hidup</string>
+    <string name="auto_value_off">Mati</string>
+    <string name="auto_value_comfort">Selesa</string>
+    <string name="auto_value_standard">Piawai</string>
+    <string name="auto_value_sport">Sukan</string>
+    <string name="auto_value_auto">Auto</string>
+    <string name="auto_value_outer">Udara luar</string>
+    <string name="auto_value_inner">Edaran semula</string>
+    <string name="auto_trigger_get_in">Anda masuk kereta</string>
+    <string name="auto_trigger_gear">Masuk gear %1$s</string>
+    <string name="auto_trigger_state_switch">%1$s bertukar %2$s</string>
+    <string name="auto_trigger_state_value">%1$s bertukar kepada %2$s</string>
+    <string name="auto_when">Apabila: %1$s</string>
+    <string name="auto_end_gear">Apabila keluar dari gear %1$s</string>
+    <string name="auto_end_state_switch">Apabila %1$s bertukar %2$s</string>
+    <string name="auto_end_state_value">Apabila %1$s bukan lagi %2$s</string>
+    <string name="auto_restore_short">%1$s, pulihkan</string>
+    <string name="auto_cond_gear">Dalam gear %1$s</string>
+    <string name="auto_cond_battery_at_least">Bateri sekurang-kurangnya %1$d%%</string>
+    <string name="auto_cond_battery_below">Bateri di bawah %1$d%%</string>
+    <string name="auto_cond_time">%1$s–%2$s</string>
+    <string name="auto_cond_state_switch">%1$s %2$s</string>
+    <string name="auto_cond_state_value">%1$s ialah %2$s</string>
+    <string name="auto_days_every">Setiap hari</string>
+    <string name="auto_days_weekdays">Isnin–Jumaat</string>
+    <string name="auto_days_weekend">Sabtu, Ahad</string>
+    <string-array name="auto_day_names">
+        <item>Isn</item>
+        <item>Sel</item>
+        <item>Rab</item>
+        <item>Kha</item>
+        <item>Jum</item>
+        <item>Sab</item>
+        <item>Ahd</item>
+    </string-array>
+    <string name="auto_list_sep">", "</string>
+    <string name="auto_summary_sep">" · "</string>
+    <string name="auto_change">%1$s: %2$s</string>
+    <string name="auto_pick_when_get_in_desc">Apabila ada bukti seseorang di dalam kereta dan kereta dihidupkan</string>
+    <string name="auto_pick_when_gear">Gear</string>
+    <string name="auto_pick_when_gear_desc">Masuk gear P, R, D atau N</string>
+    <string name="auto_pick_state">Status kenderaan</string>
+    <string name="auto_pick_when_state_desc">Satu tetapan bertukar kepada nilai tertentu, contohnya penyaman udara hidup atau mod pemanduan bertukar kepada Sukan</string>
+    <string name="auto_pick_and_gear_desc">Gear ialah P, R, D atau N</string>
+    <string name="auto_pick_battery">Bateri</string>
+    <string name="auto_pick_battery_desc">Bateri sekurang-kurangnya atau di bawah peratusan tertentu</string>
+    <string name="auto_pick_time">Waktu</string>
+    <string name="auto_pick_time_desc">Satu tempoh setiap hari, boleh melepasi tengah malam</string>
+    <string name="auto_pick_days">Hari dalam minggu</string>
+    <string name="auto_pick_days_desc">Hari yang mana dalam seminggu</string>
+    <string name="auto_pick_and_state_desc">Satu tetapan ialah nilai tertentu</string>
+    <string name="auto_pick_battery_at_least">Bateri sekurang-kurangnya…</string>
+    <string name="auto_pick_battery_below">Bateri di bawah…</string>
+    <string name="auto_pick_time_from">Masa mula</string>
+    <string name="auto_pick_time_to">Masa tamat</string>
+    <string name="auto_pick_get_in_unavailable">%1$s (tidak boleh dengan Anda masuk kereta: tiada apa dipulihkan apabila anda keluar)</string>
+    <string name="auto_pick_get_in_blocked">Anda masuk kereta (tidak boleh apabila ada tindakan yang mematikan ciri keselamatan)</string>
+    <string name="auto_pick_then_drive_desc">Mod pemanduan, kawalan menuruni bukit, brek kecemasan kelajuan rendah</string>
+    <string name="auto_pick_then_climate_desc">Peredaran udara, penyaman udara baris kedua</string>
+    <string name="auto_pick_then_scenes_desc">Mod Sentry</string>
 </resources>

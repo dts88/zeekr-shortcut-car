@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  设置行：开关加行内展开加一个按钮（SwitchActionPreference，ui-spec §三、§十六）—— 地点与自动化的每一条自动化。
+
+  行首的开关管这一条开不开（开关那一块从行的左边缘到开关右边都算点开关）；点这一行其余的地方展开、收起；
+  行尾隔一道竖线是按钮（删除）。别的照 pref_row_value_action。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="8dp"
+    android:background="@drawable/bg_pref_row"
+    android:baselineAligned="false"
+    android:gravity="center_vertical"
+    android:minHeight="72dp"
+    android:orientation="horizontal"
+    android:paddingStart="@dimen/pref_row_padding_start"
+    android:paddingEnd="14dp">
+
+    <FrameLayout
+        android:id="@android:id/widget_frame"
+        android:layout_width="@dimen/pref_switch_width"
+        android:layout_height="match_parent"
+        android:layout_marginEnd="@dimen/pref_switch_gap">
+
+        <include
+            layout="@layout/pref_widget_switch"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center" />
+    </FrameLayout>
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:paddingTop="14dp"
+        android:paddingBottom="14dp">
+
+        <TextView
+            android:id="@android:id/title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="2"
+            android:textColor="@color/pref_title"
+            android:textAppearance="@style/TextAppearance.Cam.Body" />
+
+        <TextView
+            android:id="@android:id/summary"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:maxLines="4"
+            android:textColor="@color/pref_summary"
+            android:textAppearance="@style/TextAppearance.Cam.Micro" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/pref_value"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:ellipsize="end"
+        android:gravity="end"
+        android:maxWidth="420dp"
+        android:maxLines="2"
+        android:textColor="@color/pref_summary"
+        android:textAppearance="@style/TextAppearance.Cam.Caption"
+        android:visibility="gone" />
+
+    <ImageView
+        android:id="@+id/pref_chevron"
+        android:layout_width="26dp"
+        android:layout_height="26dp"
+        android:layout_marginStart="8dp"
+        android:importantForAccessibility="no"
+        android:src="@drawable/ic_chevron_right"
+        android:tint="@color/text_tertiary" />
+
+    <View
+        android:layout_width="1dp"
+        android:layout_height="40dp"
+        android:layout_marginStart="14dp"
+        android:background="@color/line" />
+
+    <TextView
+        android:id="@+id/pref_action"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="14dp"
+        android:background="@drawable/bg_pref_row_action"
+        android:gravity="center"
+        android:minWidth="88dp"
+        android:minHeight="52dp"
+        android:paddingStart="20dp"
+        android:paddingEnd="20dp"
+        android:textColor="@color/pref_title"
+        android:textAppearance="@style/TextAppearance.Cam.Caption"
+        android:visibility="gone" />
+</LinearLayout>

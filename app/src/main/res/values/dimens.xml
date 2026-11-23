@@ -50,4 +50,6 @@
     <dimen name="pref_switch_width">60dp</dimen>
     <dimen name="pref_switch_gap">18dp</dimen>
     <dimen name="pref_text_start">98dp</dimen>
+    <!-- 地点与自动化展开以后那几行的标签宽（名称、当、而且、就，同一个宽度；ui-spec §十六） -->
+    <dimen name="pref_clause_label_width">120dp</dimen>
 </resources>

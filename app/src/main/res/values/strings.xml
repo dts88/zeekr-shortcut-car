@@ -1323,4 +1323,112 @@
     <string name="setup_record_note">以下各项可在「设置 → 录制」中修改</string>
     <string name="setup_features_note">按需开启，可在「设置 → 超级镜子」「设置 → 盲区画面」「设置 → 按键」中修改</string>
     <string name="setup_done_title">设置完成</string>
+
+    <!-- 地点与自动化（ui-spec §十六、§十八）。项目所有者 2026-11-20 定名、定模型；原厂设置的名字照车上原厂界面逐字写 -->
+    <string name="set_section_automation">地点与自动化</string>
+    <string name="auto_group_rules">自动化</string>
+
+    <!-- 添加自动化 -->
+    <string name="auto_add">添加自动化</string>
+    <string name="auto_add_summary">从常用的开始，或自己选「当」和「就」</string>
+    <string name="auto_template_reverse">倒车时关闭低速紧急制动</string>
+    <string name="auto_template_reverse_desc">当挂入 R 挡，就关闭低速紧急制动；离开 R 挡时恢复</string>
+    <string name="auto_template_get_in">上车时恢复设置</string>
+    <string name="auto_template_get_in_desc">当上车，就把选中的几项设为固定的值</string>
+    <string name="auto_template_blank">空白</string>
+    <string name="auto_template_blank_desc">自己选「当」和「就」</string>
+
+    <!-- 展开以后每一行的标签 -->
+    <string name="auto_label_name">名称</string>
+    <string name="auto_label_when">当</string>
+    <string name="auto_label_and">而且</string>
+    <string name="auto_label_then">就</string>
+    <string name="auto_add_condition">添加条件</string>
+    <string name="auto_add_change">添加动作</string>
+    <string name="auto_restore">结束时恢复</string>
+    <string name="auto_restore_summary">%1$s，把改过的设置恢复成原来的值</string>
+    <string name="auto_restore_summary_safety">%1$s，把改过的设置恢复成原来的值；关闭安全功能时必须开启</string>
+
+    <!-- 删除 -->
+    <string name="auto_delete_title">删除这条自动化？</string>
+    <string name="auto_delete_msg">删除后它不再运行。</string>
+    <string name="auto_remove_condition">删除这个条件</string>
+    <string name="auto_remove_change">删除这个动作</string>
+
+    <!-- 设置和值（原厂名字） -->
+    <string name="auto_setting_sentry">哨兵模式</string>
+    <string name="auto_setting_drive_mode">驾驶模式</string>
+    <string name="auto_setting_circulation">循环模式</string>
+    <string name="auto_setting_rear_climate">二排空调</string>
+    <string name="auto_setting_hill_descent">陡坡缓降</string>
+    <string name="auto_setting_low_speed_braking">低速紧急制动</string>
+    <string name="auto_setting_front_climate">空调</string>
+    <string name="auto_value_on">开启</string>
+    <string name="auto_value_off">关闭</string>
+    <string name="auto_value_comfort">舒适</string>
+    <string name="auto_value_standard">标准</string>
+    <string name="auto_value_sport">运动</string>
+    <string name="auto_value_auto">自动</string>
+    <string name="auto_value_outer">外循环</string>
+    <string name="auto_value_inner">内循环</string>
+
+    <!-- 当（触发）：行里写的、一行说明里写的（带「时」）、结束时（恢复那一句） -->
+    <string name="auto_trigger_get_in">上车</string>
+    <string name="auto_trigger_gear">挂入 %1$s 挡</string>
+    <string name="auto_trigger_state_switch">%1$s%2$s</string>
+    <string name="auto_trigger_state_value">%1$s变为%2$s</string>
+    <string name="auto_when">%1$s时</string>
+    <string name="auto_end_gear">离开 %1$s 挡时</string>
+    <string name="auto_end_state_switch">%1$s%2$s时</string>
+    <string name="auto_end_state_value">%1$s不再是%2$s时</string>
+    <string name="auto_restore_short">%1$s恢复</string>
+
+    <!-- 而且（条件） -->
+    <string name="auto_cond_gear">在 %1$s 挡</string>
+    <string name="auto_cond_battery_at_least">电量不低于 %1$d%%</string>
+    <string name="auto_cond_battery_below">电量低于 %1$d%%</string>
+    <string name="auto_cond_time">%1$s–%2$s</string>
+    <string name="auto_cond_state_switch">%1$s%2$s</string>
+    <string name="auto_cond_state_value">%1$s是%2$s</string>
+    <string name="auto_days_every">每天</string>
+    <string name="auto_days_weekdays">周一至周五</string>
+    <string name="auto_days_weekend">周六、周日</string>
+    <string-array name="auto_day_names">
+        <item>周一</item>
+        <item>周二</item>
+        <item>周三</item>
+        <item>周四</item>
+        <item>周五</item>
+        <item>周六</item>
+        <item>周日</item>
+    </string-array>
+    <string name="auto_list_sep">、</string>
+    <string name="auto_summary_sep">" · "</string>
+
+    <!-- 就（动作） -->
+    <string name="auto_change">%1$s：%2$s</string>
+
+    <!-- 选择框 -->
+    <string name="auto_pick_when_get_in_desc">有了人在车上的证据、车通电时</string>
+    <string name="auto_pick_when_gear">挡位</string>
+    <string name="auto_pick_when_gear_desc">挂入 P、R、D、N 挡</string>
+    <string name="auto_pick_state">车辆状态</string>
+    <string name="auto_pick_when_state_desc">某项设置变为某个值，比如空调开启、驾驶模式变为运动</string>
+    <string name="auto_pick_and_gear_desc">挡位是 P、R、D、N</string>
+    <string name="auto_pick_battery">电量</string>
+    <string name="auto_pick_battery_desc">电量不低于或低于某个百分比</string>
+    <string name="auto_pick_time">时间段</string>
+    <string name="auto_pick_time_desc">每天的某一段时间，可以跨午夜</string>
+    <string name="auto_pick_days">星期</string>
+    <string name="auto_pick_days_desc">一周里的哪几天</string>
+    <string name="auto_pick_and_state_desc">某项设置是某个值</string>
+    <string name="auto_pick_battery_at_least">电量不低于…</string>
+    <string name="auto_pick_battery_below">电量低于…</string>
+    <string name="auto_pick_time_from">开始时间</string>
+    <string name="auto_pick_time_to">结束时间</string>
+    <string name="auto_pick_get_in_unavailable">%1$s（当「上车」时不能选：人下车时不恢复）</string>
+    <string name="auto_pick_get_in_blocked">上车（有关闭安全功能的动作时不能选）</string>
+    <string name="auto_pick_then_drive_desc">驾驶模式、陡坡缓降、低速紧急制动</string>
+    <string name="auto_pick_then_climate_desc">循环模式、二排空调</string>
+    <string name="auto_pick_then_scenes_desc">哨兵模式</string>
 </resources>

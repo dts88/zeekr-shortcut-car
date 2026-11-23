@@ -198,6 +198,10 @@ public class SettingsHeadersFragment extends PreferenceFragmentCompat {
                         || !config.getAccessories(com.kooo.evcam.button.Accessory.KNOB).isEmpty()) ? 1 : 0);
                 return on == 0 ? getString(R.string.header_none_enabled) : getString(R.string.header_enabled_count, on);
             }
+            case "screen_automation": {
+                int on = AutomationRows.enabledCount(config);
+                return on == 0 ? getString(R.string.header_none_enabled) : getString(R.string.header_enabled_count, on);
+            }
             case "screen_update":
                 return com.kooo.evcam.update.UpdateFlow.currentVersion(context);
             default:
@@ -239,6 +243,8 @@ public class SettingsHeadersFragment extends PreferenceFragmentCompat {
                 return R.drawable.ic_side_view;
             case "screen_floating":
                 return R.drawable.ic_floating;
+            case "screen_automation":
+                return R.drawable.ic_place;
             case "screen_general":
                 return R.drawable.ic_settings;
             case "screen_developer":
