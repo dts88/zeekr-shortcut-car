@@ -722,6 +722,9 @@
 下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
 可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
 
+- 「地点与自动化」地点那一组和地点相关的文字（strings.xml 里 `auto_group_places`、`auto_place_*`、`auto_trigger_arrive`、
+  `auto_trigger_leave`、`auto_end_arrive`、`auto_cond_*_places`、`auto_pick_place*`、`auto_pick_in*`、`auto_pick_not_in*`、
+  `auto_pick_safety_blocked`、`auto_pick_leave_unavailable`、`auto_template_away*`，2026-11-23 草稿，ui-spec §十六）。
 - 阿拉伯文全部（values-ar，2026-11-19 草稿：先定术语表和写法，再分块翻译、统一核对）。等母语使用者审校（issue 250 的 mina5500）；改的时候照本规范改，词改了连同 §10 的阿拉伯文一列一起改。
 
 ---

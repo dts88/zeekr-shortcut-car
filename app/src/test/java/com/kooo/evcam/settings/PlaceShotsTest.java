@@ -137,7 +137,7 @@ public class PlaceShotsTest {
         assertEquals(-1, radius.getChosen());
         assertEquals(activity.getString(R.string.auto_place_radius_custom_value, 350), String.valueOf(radius.getSummary()));
         CardItemPreference center = section.findPreference("place_work/center");
-        assertEquals("⁦10.0500, 20.0200⁩", String.valueOf(center.getValue()));
+        assertEquals("\u206610.0500, 20.0200\u2069", String.valueOf(center.getValue()));
         section.scrollToPreference("place_work/radius");
         Shots.settle();
         File open = Shots.save(activity, "settings-automation-places-" + tag + "-open");

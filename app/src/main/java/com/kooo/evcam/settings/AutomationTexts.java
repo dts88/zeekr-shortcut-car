@@ -135,7 +135,7 @@ final class AutomationTexts {
 
     /** 行里显示的坐标：从右往左的语言里也是纬度在左（两头加从左往右的隔离符，不然逗号两边会对调）。 */
     static String centerShown(double lat, double lon) {
-        return "⁦" + center(lat, lon) + "⁩";
+        return "\u2066" + center(lat, lon) + "\u2069";
     }
 
     /** 读「纬度, 经度」（逗号、中文逗号、空格都行）；不在范围里、读不懂是 null。 */
