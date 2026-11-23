@@ -101,6 +101,10 @@ public final class VehicleState {
     public final Float odometerKm;
     public final Double latitude;
     public final Double longitude;
+    /** 这一次定位报的精度（米），没有 null（地点与自动化判在不在某个地点用，ui-spec §十八「在哪」）。 */
+    public final Float positionAccuracy;
+    /** 这一次定位的时刻（{@code SystemClock.elapsedRealtime}），没有 null。 */
+    public final Long positionAt;
     /** 这份快照用的读数（非开发者已滤掉没验证的）：信息条的文字格从这里取值。 */
     public final Readings readings;
 
@@ -137,6 +141,8 @@ public final class VehicleState {
         this.odometerKm = b.odometerKm;
         this.latitude = b.latitude;
         this.longitude = b.longitude;
+        this.positionAccuracy = b.positionAccuracy;
+        this.positionAt = b.positionAt;
         this.readings = b.readings;
     }
 
@@ -199,6 +205,8 @@ public final class VehicleState {
         private Float odometerKm;
         private Double latitude;
         private Double longitude;
+        private Float positionAccuracy;
+        private Long positionAt;
         private Readings readings;
 
         public Builder() {
@@ -237,6 +245,8 @@ public final class VehicleState {
             odometerKm = s.odometerKm;
             latitude = s.latitude;
             longitude = s.longitude;
+            positionAccuracy = s.positionAccuracy;
+            positionAt = s.positionAt;
             readings = s.readings;
         }
 
@@ -269,7 +279,17 @@ public final class VehicleState {
         public Builder sentry(Integer v) { sentry = v; return this; }
         public Builder mirrorLamps(MirrorLamps v) { mirrorLamps = v == null ? MirrorLamps.UNKNOWN : v; return this; }
         public Builder odometerKm(Float v) { odometerKm = v; return this; }
-        public Builder position(Double lat, Double lon) { latitude = lat; longitude = lon; return this; }
+        /** 位置（精度、时刻清掉）。 */
+        public Builder position(Double lat, Double lon) { return position(lat, lon, null, null); }
+
+        /** 位置和这一次定位的精度（米）、时刻（{@code elapsedRealtime}）。 */
+        public Builder position(Double lat, Double lon, Float accuracy, Long at) {
+            latitude = lat;
+            longitude = lon;
+            positionAccuracy = lat == null ? null : accuracy;
+            positionAt = lat == null ? null : at;
+            return this;
+        }
 
         /** 改一扇门的那一位，其余位不动；之前不知道就从 0 起。 */
         public Builder door(int bit, boolean open) {

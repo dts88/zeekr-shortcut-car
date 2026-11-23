@@ -122,11 +122,15 @@ final class LocationSource implements LocationListener {
     public void onLocationChanged(@NonNull Location location) {
         final double lat = location.getLatitude();
         final double lon = location.getLongitude();
+        final Float accuracy = location.hasAccuracy() ? location.getAccuracy() : null;
+        // 定位的时刻换到 elapsedRealtime 那个钟上（getLastKnownLocation 交来的可能是很久以前的）
+        final long at = location.getElapsedRealtimeNanos() > 0L
+                ? location.getElapsedRealtimeNanos() / 1_000_000L : android.os.SystemClock.elapsedRealtime();
         final boolean hasSpeed = location.hasSpeed() && !telemetry.hasCarSpeed();
         final float kmh = location.getSpeed() * 3.6f;
         // 停了之后定位线程上还排着的那一次也会到这里：Telemetry 只收当前来源的写入，它被丢掉，清掉的位置不会被写回来
         telemetry.edit(this, b -> {
-            b.position(lat, lon);
+            b.position(lat, lon, accuracy, at);
             if (hasSpeed) {
                 b.speedKmh(kmh);
             }

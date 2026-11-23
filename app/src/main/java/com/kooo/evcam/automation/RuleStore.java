@@ -24,7 +24,7 @@ import java.util.List;
  * <pre>
  * [{"id":"…","name":"…","on":true,
  *   "when":{"kind":"gear","gear":"R"},
- *   "if":[{"kind":"battery_at_least","n":20}],
+ *   "if":[{"kind":"battery_at_least","n":20},{"kind":"not_in_places","places":["…"]}],
  *   "then":[{"setting":"low_speed_braking","value":"off"}],
  *   "restore":true}]
  * </pre>
@@ -130,6 +130,10 @@ public final class RuleStore {
                 return o.put("kind", "get_in");
             case GEAR:
                 return o.put("kind", "gear").put("gear", t.gear);
+            case ARRIVE:
+                return o.put("kind", "arrive").put("place", t.place);
+            case LEAVE:
+                return o.put("kind", "leave").put("place", t.place);
             default:
                 return o.put("kind", "state").put("setting", t.setting.key).put("value", t.value);
         }
@@ -146,6 +150,10 @@ public final class RuleStore {
                 return Trigger.gear(o.optString("gear"));
             case "state":
                 return Trigger.state(Setting.of(o.optString("setting")), o.optString("value"));
+            case "arrive":
+                return Trigger.arrive(o.optString("place", null));
+            case "leave":
+                return Trigger.leave(o.optString("place", null));
             default:
                 return null;
         }
@@ -164,6 +172,10 @@ public final class RuleStore {
                 return o.put("kind", "state_is").put("setting", c.setting.key).put("value", c.value);
             case TIME_BETWEEN:
                 return o.put("kind", "time_between").put("from", c.from).put("to", c.to);
+            case IN_PLACES:
+                return o.put("kind", "in_places").put("places", new JSONArray(c.places));
+            case NOT_IN_PLACES:
+                return o.put("kind", "not_in_places").put("places", new JSONArray(c.places));
             default:
                 return o.put("kind", "weekdays").put("days", c.days);
         }
@@ -186,8 +198,27 @@ public final class RuleStore {
                 return o.has("from") && o.has("to") ? Condition.timeBetween(o.optInt("from", -1), o.optInt("to", -1)) : null;
             case "weekdays":
                 return Condition.weekdays(o.optInt("days", 0));
+            case "in_places":
+                return Condition.inPlaces(strings(o.optJSONArray("places")));
+            case "not_in_places":
+                return Condition.notInPlaces(strings(o.optJSONArray("places")));
             default:
                 return null;
         }
+    }
+
+    private static List<String> strings(JSONArray array) {
+        if (array == null) {
+            return null;
+        }
+        List<String> out = new ArrayList<>();
+        for (int i = 0; i < array.length(); i++) {
+            String s = array.optString(i, null);
+            if (s == null || s.isEmpty()) {
+                return null;
+            }
+            out.add(s);
+        }
+        return out;
     }
 }

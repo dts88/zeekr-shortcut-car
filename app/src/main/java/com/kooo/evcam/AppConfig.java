@@ -76,6 +76,7 @@ public class AppConfig {
     private static final String KEY_FOOTAGE_AUDIO = "footage_audio";               // 环视录像带声音（设置 → 录制，默认开）
     private static final String KEY_DRIVE_SOUND = "drive_sound";                   // 模拟声浪（设置 → 系统，试验性）
     private static final String KEY_DRIVE_SOUND_STANDARD = "drive_sound_standard"; // 模拟声浪：标准模式下播放（默认关）
+    private static final String KEY_AUTOMATION_PLACES = "automation_places";  // 地点与自动化的地点（JSON，automation.PlaceStore）
     private static final String KEY_AUTOMATION_RULES = "automation_rules";  // 地点与自动化的规则（JSON，automation.RuleStore）
     private static final String KEY_GPU_FISHEYE_PREVIEW = "gpu_fisheye_preview";  // 预览鱼眼校正走 GPU 逐像素（开发者选项）
     private static final String KEY_GPU_FISHEYE_VIDEO = "gpu_fisheye_video";      // 视频回看鱼眼校正走 GPU 逐像素（开发者选项）
@@ -1259,6 +1260,29 @@ public class AppConfig {
     /** 规则一变（设置页存了、设置备份导入了）就叫 {@code action}（主线程）。拿住返回值，同 {@link #onFisheyeChanged}。 */
     public SharedPreferences.OnSharedPreferenceChangeListener onAutomationRulesChanged(Runnable action) {
         return onChanged(action, KEY_AUTOMATION_RULES);
+    }
+
+    /**
+     * 地点与自动化的地点（ui-spec §十六「地点」）：{@code automation.PlaceStore} 存取的 JSON，空字符串是一个都没有。
+     * 进设置备份；诊断报告里不写内容（有名称和坐标）。
+     */
+    public String getAutomationPlaces() {
+        return prefs.getString(KEY_AUTOMATION_PLACES, "");
+    }
+
+    public void setAutomationPlaces(String json) {
+        prefs.edit().putString(KEY_AUTOMATION_PLACES, json == null ? "" : json).apply();
+    }
+
+    /** 地点、规则一起存（删一个地点时用到它的规则跟着改）：一次写进去，听的人不会看到只改了一半。 */
+    public void setAutomationPlacesAndRules(String places, String rules) {
+        prefs.edit().putString(KEY_AUTOMATION_PLACES, places == null ? "" : places)
+                .putString(KEY_AUTOMATION_RULES, rules == null ? "" : rules).apply();
+    }
+
+    /** 地点一变就叫 {@code action}（主线程）。拿住返回值。 */
+    public SharedPreferences.OnSharedPreferenceChangeListener onAutomationPlacesChanged(Runnable action) {
+        return onChanged(action, KEY_AUTOMATION_PLACES);
     }
 
     /**

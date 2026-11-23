@@ -1259,8 +1259,11 @@ public final class DiagnosticsCollector {
             for (java.util.Map.Entry<String, ?> e : new java.util.TreeMap<>(all).entrySet()) {
                 String value = String.valueOf(e.getValue());
                 if ("automation_rules".equals(e.getKey())) {
-                    // 地点与自动化的规则里有用户起的名字（以后还有地点的坐标）：只写多长（ui-spec §十八）
+                    // 地点与自动化的规则里有用户起的名字：只写多长（ui-spec §十八）
                     value = "（" + value.length() + " 字，内容不导出）";
+                } else if ("automation_places".equals(e.getKey())) {
+                    // 地点有名称和坐标：只写有几个
+                    value = "（" + com.kooo.evcam.automation.PlaceStore.parse(value).size() + " 个地点，内容不导出）";
                 }
                 if (value.length() > 80) {
                     value = value.substring(0, 80) + "…（" + value.length() + " 字）";

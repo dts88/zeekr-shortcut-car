@@ -62,6 +62,35 @@ public class RuleStoreTest {
         assertEquals(2, back.get(2).changes.size());
     }
 
+    @Test
+    public void placeRulesSurviveARoundTrip() {
+        Rule away = new Rule("p", null, true, Trigger.gear("P"),
+                Collections.singletonList(Condition.notInPlaces(Arrays.asList("home", "work"))),
+                Collections.singletonList(Change.of(Setting.SENTRY, "on")), false);
+        Rule arrive = new Rule("q", null, true, Trigger.arrive("home"),
+                Collections.singletonList(Condition.inPlaces(Collections.singletonList("work"))),
+                Collections.singletonList(Change.of(Setting.LOW_SPEED_BRAKING, "off")), true);
+        Rule leave = new Rule("r", null, true, Trigger.leave("work"), Collections.emptyList(),
+                Collections.singletonList(Change.of(Setting.DRIVE_MODE, "sport")), false);
+        List<Rule> back = RuleStore.parse(RuleStore.format(Arrays.asList(away, arrive, leave)));
+        assertEquals(3, back.size());
+        assertEquals(Arrays.asList("home", "work"), back.get(0).conditions.get(0).places);
+        assertEquals(Condition.Kind.NOT_IN_PLACES, back.get(0).conditions.get(0).kind);
+        assertEquals(Trigger.arrive("home"), back.get(1).trigger);
+        assertEquals(Condition.Kind.IN_PLACES, back.get(1).conditions.get(0).kind);
+        assertEquals(Trigger.leave("work"), back.get(2).trigger);
+        assertTrue(back.get(1).usesPlace("work"));
+        assertFalse(back.get(2).usesPlace("home"));
+
+        String json = "["
+                + "{\"id\":\"empty\",\"on\":true,\"when\":{\"kind\":\"gear\",\"gear\":\"P\"},"
+                + "\"if\":[{\"kind\":\"in_places\",\"places\":[]}],\"then\":[{\"setting\":\"sentry\",\"value\":\"on\"}]},"
+                + "{\"id\":\"no-place\",\"on\":true,\"when\":{\"kind\":\"arrive\"},\"then\":[{\"setting\":\"sentry\",\"value\":\"on\"}]},"
+                + "{\"id\":\"safety-leave\",\"on\":true,\"when\":{\"kind\":\"leave\",\"place\":\"home\"},"
+                + "\"then\":[{\"setting\":\"low_speed_braking\",\"value\":\"off\"}]}]";
+        assertTrue("地点条件一个地点都没有、到达没有地点、关安全功能配离开：整条不要", RuleStore.parse(json).isEmpty());
+    }
+
     /** 读不懂的那一条整条不要：少了一个条件的规则会在不该做的时候做。 */
     @Test
     public void unreadableRulesAreDroppedWhole() {

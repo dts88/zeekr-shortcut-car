@@ -28,6 +28,8 @@ import java.util.Calendar;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -50,6 +52,9 @@ import java.util.function.Predicate;
  *   <li>某项设置变为某个值：有开着的规则要看的那几样，亮屏、车通电时每秒读一次（{@link RunRules#WATCH_MS}），
  *       连着两次读到才算（{@link Steady}）；确认过的值存在 {@link #STATE} 里，进程没了回来也认得出变化
  *       （Calvin：空调关着时下车，回来打开空调照样恢复）。自动化写的值不算（{@link RunRules#OWN_WRITE_MS}，不连锁）。</li>
+ *   <li>到达、离开某个地点：有开着的规则要地点时，亮屏后跟着定位判在不在每个地点（{@link Whereabouts}，误差算上
+ *       {@link PositionTrack}）；亮屏后第一次判出来的只当起点，之后从外到里是到达、从里到外是离开。判不清的不变。
+ *       熄屏时忘掉，下一次亮屏重新起点。黑匣子写第几个地点，不写名字和坐标。</li>
  * </ul>
  *
  * <h3>只在人在车上时运作（项目所有者 2026-11-21、11-22）</h3>
@@ -125,8 +130,33 @@ public final class Automations {
 
         void setConfirmed(Setting setting, Integer value);
 
-        /** 要不要读电量（电量是浮点读数：要登记完整的车辆信号）。 */
-        void wantBattery(boolean want);
+        /** 要不要读电量、定位（电量是浮点读数、定位是另一路：要登记完整的车辆信号）。 */
+        void wantReadings(boolean want);
+
+        /** 存着的地点（照添加的先后）。 */
+        List<Place> places();
+
+        /** 此刻发布出来的位置和车速；没有的项是 null。 */
+        Position position();
+    }
+
+    /** 一次发布里的位置和车速（{@link World#position}）。 */
+    static final class Position {
+        final Double latitude;
+        final Double longitude;
+        /** 定位报的精度（米）。 */
+        final Float accuracy;
+        /** 定位的时刻（{@link World#now} 那个钟）。 */
+        final Long at;
+        final Float speedKmh;
+
+        Position(Double latitude, Double longitude, Float accuracy, Long at, Float speedKmh) {
+            this.latitude = latitude;
+            this.longitude = longitude;
+            this.accuracy = accuracy;
+            this.at = at;
+            this.speedKmh = speedKmh;
+        }
     }
 
     private static volatile Automations instance;
@@ -144,7 +174,12 @@ public final class Automations {
     private final Map<Setting, long[]> ownWrites = new EnumMap<>(Setting.class);
     /** 每秒读一次的那一圈：熄屏、重新开始时加一，排着的那一下对不上就不算。 */
     private int watchGen;
-    private boolean batteryWanted;
+    private boolean readingsWanted;
+    /** 有开着的规则要地点（{@link #watchTick} 照规则定）。 */
+    private boolean placesWanted;
+    private final PositionTrack track = new PositionTrack();
+    /** 每个地点这一趟判出来的：在 TRUE、不在 FALSE；还没判出来的不在里面。 */
+    private final Map<String, Boolean> placeIn = new HashMap<>();
 
     Automations(World world) {
         this.world = world;
@@ -193,7 +228,8 @@ public final class Automations {
         lit = false;
         watchGen++;
         world.setAwaitingNextDrive(true);
-        wantBattery(false);
+        wantReadings(false);
+        forgetPlaces();
         dropAll("熄屏了（人下车了）：不再写车，没做完的不做，等着恢复的不恢复");
     }
 
@@ -226,6 +262,7 @@ public final class Automations {
      * （项目所有者 2026-11-22）。
      */
     void readingsChanged() {
+        trackPlaces();
         String gear = world.gear();
         if (gear == null) {
             return;
@@ -273,11 +310,17 @@ public final class Automations {
         if (!anyEnabled(rules)) {
             // 一条开着的规则都没有：不读车，也不再排下一次；规则变了（rulesChanged）、下一次亮屏再看
             watches.clear();
-            wantBattery(false);
+            wantReadings(false);
+            forgetPlaces();
             return;
         }
         world.later(RunRules.WATCH_MS, () -> watchTick(gen));
-        wantBattery(needsBattery(rules));
+        boolean places = needsPlaces(rules);
+        if (!places) {
+            forgetPlaces();
+        }
+        placesWanted = places;
+        wantReadings(needsBattery(rules) || places);
         Set<Setting> wanted = watched(rules);
         watches.keySet().retainAll(wanted);
         if (wanted.isEmpty() || world.userExited() || !world.linkConnected() || !RunRules.powered(world.ignition())) {
@@ -383,11 +426,83 @@ public final class Automations {
         return false;
     }
 
-    private void wantBattery(boolean want) {
-        if (want != batteryWanted) {
-            batteryWanted = want;
-            world.wantBattery(want);
+    private static boolean needsPlaces(List<Rule> rules) {
+        for (Rule r : rules) {
+            if (r.enabled && r.needsPlace()) {
+                return true;
+            }
         }
+        return false;
+    }
+
+    private void wantReadings(boolean want) {
+        if (want != readingsWanted) {
+            readingsWanted = want;
+            world.wantReadings(want);
+        }
+    }
+
+    // ================================================================= 地点
+
+    /** 熄屏、没有规则要地点了：忘掉这一趟判出来的，下一次重新起点。 */
+    private void forgetPlaces() {
+        placesWanted = false;
+        placeIn.clear();
+        track.clear();
+    }
+
+    /** 车辆信号发布了一次：跟着定位判在不在每个地点，变了就是到达、离开（{@link Whereabouts#side}）。 */
+    private void trackPlaces() {
+        if (!lit || !placesWanted) {
+            return;
+        }
+        long now = world.now();
+        Position p = world.position();
+        track.update(p.latitude, p.longitude, p.accuracy, p.at, p.speedKmh, now);
+        if (!track.hasFix()) {
+            return;
+        }
+        double u = track.uncertainty(now);
+        List<Place> places = world.places();
+        Set<String> ids = new HashSet<>();
+        for (Place place : places) {
+            ids.add(place.id);
+        }
+        placeIn.keySet().retainAll(ids);
+        for (int i = 0; i < places.size(); i++) {
+            Place place = places.get(i);
+            Boolean was = placeIn.get(place.id);
+            Whereabouts.Side side = Whereabouts.side(place, track.latitude(), track.longitude(), u, was);
+            if (side == Whereabouts.Side.UNSURE) {
+                continue;
+            }
+            boolean in = side == Whereabouts.Side.IN;
+            if (was != null && was == in) {
+                continue;
+            }
+            placeIn.put(place.id, in);
+            String which = "自动化 地点 " + (i + 1) + "：";
+            if (was == null) {
+                world.note(which + (in ? "在里面" : "不在") + "（这一趟的起点，不算到达、离开；误差 " + Math.round(u) + " m）");
+                continue;
+            }
+            world.note(which + (in ? "到达" : "离开") + "（误差 " + Math.round(u) + " m）");
+            String id = place.id;
+            if (in) {
+                fire(Trigger.arrive(id));
+            } else {
+                endRuns(t -> t.kind == Trigger.Kind.ARRIVE && id.equals(t.place));
+                fire(Trigger.leave(id));
+            }
+        }
+    }
+
+    /** 条件里的「在不在这个地点」：这一趟判出来的；没有这个地点（删了）不在；还没判出来判不清。 */
+    private Boolean inPlace(String id) {
+        if (PlaceStore.indexOf(world.places(), id) < 0) {
+            return false;
+        }
+        return placeIn.get(id);
     }
 
     private void markOwn(Setting s, int code) {
@@ -557,6 +672,11 @@ public final class Automations {
             @Override
             public int weekday() {
                 return world.weekday();
+            }
+
+            @Override
+            public Boolean inPlace(String id) {
+                return Automations.this.inPlace(id);
             }
         };
         boolean unknown = false;
@@ -740,6 +860,8 @@ public final class Automations {
         private final SharedPreferences.OnSharedPreferenceChangeListener rulesListener;
         private String parsedJson;
         private List<Rule> parsed = Collections.emptyList();
+        private String parsedPlacesJson;
+        private List<Place> parsedPlaces = Collections.emptyList();
 
         SystemWorld(Context app) {
             this.app = app;
@@ -766,6 +888,23 @@ public final class Automations {
                 parsed = RuleStore.parse(json);
             }
             return parsed;
+        }
+
+        @Override
+        public List<Place> places() {
+            String json = config.getAutomationPlaces();
+            if (!json.equals(parsedPlacesJson)) {
+                parsedPlacesJson = json;
+                parsedPlaces = PlaceStore.parse(json);
+            }
+            return parsedPlaces;
+        }
+
+        @Override
+        public Position position() {
+            com.kooo.evcam.telemetry.VehicleState v = Telemetry.get().latest();
+            return v == null ? new Position(null, null, null, null, null)
+                    : new Position(v.latitude, v.longitude, v.positionAccuracy, v.positionAt, v.speedKmh);
         }
 
         @Override
@@ -866,7 +1005,7 @@ public final class Automations {
         }
 
         @Override
-        public void wantBattery(boolean want) {
+        public void wantReadings(boolean want) {
             if (want) {
                 Telemetry.get().acquire(app, "automation");
             } else {

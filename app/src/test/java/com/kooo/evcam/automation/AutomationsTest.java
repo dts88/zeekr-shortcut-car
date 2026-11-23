@@ -55,7 +55,20 @@ public class AutomationsTest {
         final List<String> notes = new ArrayList<>();
         boolean awaiting;
         final Map<Setting, Integer> confirmed = new EnumMap<>(Setting.class);
-        boolean batteryWanted;
+        boolean readingsWanted;
+        final List<Place> places = new ArrayList<>();
+        Double lat;
+        Double lon;
+        Float accuracy = 10f;
+        Long fixAt;
+        Float speed = 0f;
+
+        /** 一次新的定位（此刻定的）。 */
+        void at(double latitude, double longitude) {
+            lat = latitude;
+            lon = longitude;
+            fixAt = now;
+        }
 
         /** 往前走 {@code ms}，到点的事照先后做。 */
         void run(long ms) {
@@ -203,8 +216,18 @@ public class AutomationsTest {
         }
 
         @Override
-        public void wantBattery(boolean want) {
-            batteryWanted = want;
+        public void wantReadings(boolean want) {
+            readingsWanted = want;
+        }
+
+        @Override
+        public List<Place> places() {
+            return places;
+        }
+
+        @Override
+        public Automations.Position position() {
+            return new Automations.Position(lat, lon, accuracy, fixAt, speed);
         }
     }
 
@@ -426,7 +449,7 @@ public class AutomationsTest {
         a.screenWentLit();
         w.run(10_000);
         assertTrue(w.confirmed.isEmpty());
-        assertFalse(w.batteryWanted);
+        assertFalse(w.readingsWanted);
     }
 
     /** 自动化写的值不算车辆状态的变化：不连锁；人改的照样算。 */
@@ -649,6 +672,11 @@ public class AutomationsTest {
             public int weekday() {
                 return w.weekday;
             }
+
+            @Override
+            public Boolean inPlace(String id) {
+                return null;
+            }
         };
         w.minute = 23 * 60;
         assertTrue(night.holds(facts));
@@ -671,9 +699,9 @@ public class AutomationsTest {
         Automations a = new Automations(w);
         a.screenWentLit();
         w.run(2_000);
-        assertTrue(w.batteryWanted);
+        assertTrue(w.readingsWanted);
         a.screenWentDark();
-        assertFalse(w.batteryWanted);
+        assertFalse(w.readingsWanted);
     }
 
     // ================================================================= 等能用（Calvin：陡坡缓降）
@@ -726,6 +754,174 @@ public class AutomationsTest {
         w.run(5_000);
         assertEquals(Arrays.asList("drive_mode=comfort", "drive_mode=sport"), w.writes);
         assertEquals(Signal.DRIVE_MODE_SPORT, (int) w.car.get(Setting.DRIVE_MODE));
+    }
+
+    // ================================================================= 地点
+
+    /** 地点「家」：中心 (10, 20)，半径 200 m（余量 25 m）。纬度差 0.001° 约 111 m。 */
+    private static final Place HOME = Place.of("home", "家", 10d, 20d, 200);
+    private static final double INSIDE = 10.0005;   // 约 56 m
+    private static final double EDGE = 10.0019;     // 约 211 m：误差 10 m 时判不清
+    private static final double OUTSIDE = 10.0100;  // 约 1.1 km
+
+    private FakeWorld placeWorld(Rule rule) {
+        FakeWorld w = new FakeWorld();
+        w.places.add(HOME);
+        w.rules.add(rule);
+        return w;
+    }
+
+    /** 亮屏后第一次判出来的只当起点；之后从外到里是到达，从里到外是离开，到达那几次跟着结束、恢复。 */
+    @Test
+    public void arrivingAndLeavingAPlace() {
+        FakeWorld w = placeWorld(rule(Trigger.arrive("home"), Collections.emptyList(), true,
+                Change.of(Setting.REAR_CLIMATE, "on")));
+        w.car.put(Setting.REAR_CLIMATE, 0);
+        Automations a = new Automations(w);
+        a.screenWentLit();
+        w.run(1_000);
+        assertTrue("要地点：登记完整的车辆信号（定位）", w.readingsWanted);
+        w.at(OUTSIDE, 20d);
+        a.readingsChanged();
+        assertTrue(w.noted("地点 1：不在（这一趟的起点"));
+        w.run(1_000);
+        assertTrue(w.writes.isEmpty());
+
+        w.at(INSIDE, 20d);
+        a.readingsChanged();
+        w.run(2_000);
+        assertTrue(w.noted("地点 1：到达"));
+        assertEquals(Collections.singletonList("rear_climate=on"), w.writes);
+
+        w.at(EDGE, 20d);
+        a.readingsChanged();
+        w.run(1_000);
+        assertTrue("在边上（没出 r + m）还算在", w.restores.isEmpty());
+
+        w.at(OUTSIDE, 20d);
+        a.readingsChanged();
+        w.run(1_000);
+        assertTrue(w.noted("地点 1：离开"));
+        assertEquals("离开时恢复", Collections.singletonList("rear_climate=off"), w.restores);
+        assertFalse("黑匣子不写地点名", w.noted("家"));
+    }
+
+    @Test
+    public void startingInsideIsNotAnArrival() {
+        FakeWorld w = placeWorld(rule(Trigger.arrive("home"), Change.of(Setting.REAR_CLIMATE, "on")));
+        w.car.put(Setting.REAR_CLIMATE, 0);
+        Automations a = new Automations(w);
+        a.screenWentLit();
+        w.run(1_000);
+        w.at(INSIDE, 20d);
+        a.readingsChanged();
+        w.run(5_000);
+        assertTrue(w.noted("地点 1：在里面（这一趟的起点"));
+        assertTrue(w.writes.isEmpty());
+    }
+
+    /** 判不清（误差大、在边上）不变：不当成到达，也不当成离开。 */
+    @Test
+    public void anUnsureFixChangesNothing() {
+        FakeWorld w = placeWorld(rule(Trigger.leave("home"), Change.of(Setting.SENTRY, "on")));
+        w.car.put(Setting.SENTRY, 0);
+        Automations a = new Automations(w);
+        a.screenWentLit();
+        w.run(1_000);
+        w.at(INSIDE, 20d);
+        a.readingsChanged();
+        w.accuracy = 5_000f;
+        w.at(OUTSIDE, 20d);
+        a.readingsChanged();
+        w.run(2_000);
+        assertTrue("误差 5 km：判不清，不算离开", w.writes.isEmpty());
+        w.accuracy = 10f;
+        w.at(OUTSIDE, 20d);
+        a.readingsChanged();
+        w.run(2_000);
+        assertEquals(Collections.singletonList("sentry=on"), w.writes);
+    }
+
+    /** 熄屏忘掉这一趟判出来的：下一次亮屏在外面，是新的起点，不算离开。 */
+    @Test
+    public void darkForgetsWhereWeWere() {
+        FakeWorld w = placeWorld(rule(Trigger.leave("home"), Change.of(Setting.SENTRY, "on")));
+        w.car.put(Setting.SENTRY, 0);
+        Automations a = new Automations(w);
+        a.screenWentLit();
+        w.run(1_000);
+        w.at(INSIDE, 20d);
+        a.readingsChanged();
+        a.screenWentDark();
+        assertFalse(w.readingsWanted);
+        w.at(OUTSIDE, 20d);
+        a.readingsChanged();
+        a.screenWentLit();
+        w.run(1_000);
+        a.readingsChanged();
+        w.run(5_000);
+        assertTrue(w.writes.isEmpty());
+    }
+
+    /** 「停在常用地点以外就开启哨兵模式」：挂入 P 挡 + 不在家。在家不开；判不清等，一直判不清算了。 */
+    @Test
+    public void notInPlacesCondition() {
+        FakeWorld w = placeWorld(rule(Trigger.gear("P"),
+                Collections.singletonList(Condition.notInPlaces(Collections.singletonList("home"))), false,
+                Change.of(Setting.SENTRY, "on")));
+        w.car.put(Setting.SENTRY, 0);
+        w.gear = "D";
+        Automations a = new Automations(w);
+        a.screenWentLit();
+        w.run(1_000);
+        w.at(INSIDE, 20d);
+        a.readingsChanged();
+        w.gear = "P";
+        a.readingsChanged();
+        w.run(2_000);
+        assertTrue("在家：不开", w.writes.isEmpty());
+        assertTrue(w.noted("不成立"));
+
+        w.gear = "D";
+        a.readingsChanged();
+        w.at(OUTSIDE, 20d);
+        a.readingsChanged();
+        w.gear = "P";
+        a.readingsChanged();
+        w.run(2_000);
+        assertEquals(Collections.singletonList("sentry=on"), w.writes);
+    }
+
+    @Test
+    public void aPlaceConditionWaitsForAFix() {
+        FakeWorld w = placeWorld(rule(Trigger.gear("P"),
+                Collections.singletonList(Condition.inPlaces(Collections.singletonList("home"))), false,
+                Change.of(Setting.SENTRY, "on")));
+        w.car.put(Setting.SENTRY, 0);
+        w.gear = "D";
+        Automations a = new Automations(w);
+        a.screenWentLit();
+        w.run(1_000);
+        a.readingsChanged();
+        w.gear = "P";
+        a.readingsChanged();
+        w.run(3_000);
+        assertTrue("还没有定位：等", w.writes.isEmpty());
+        assertFalse(w.noted("没做"));
+        w.at(INSIDE, 20d);
+        a.readingsChanged();
+        w.run(1_000);
+        assertEquals(Collections.singletonList("sentry=on"), w.writes);
+    }
+
+    /** 关掉安全功能的动作配「离开某个地点」（不会结束、恢复不了）：整条不跑。 */
+    @Test
+    public void aSafetyOffRuleNeedsATriggerThatEnds() {
+        assertFalse(rule(Trigger.leave("home"), Change.of(Setting.LOW_SPEED_BRAKING, "off")).complete());
+        assertFalse(rule(Trigger.getIn(), Change.of(Setting.LOW_SPEED_BRAKING, "off")).complete());
+        assertTrue(rule(Trigger.arrive("home"), Change.of(Setting.LOW_SPEED_BRAKING, "off")).complete());
+        assertFalse("离开没有结束：勾了恢复也不恢复",
+                rule(Trigger.leave("home"), Collections.emptyList(), true, Change.of(Setting.SENTRY, "on")).restores());
     }
 
     /** 黑匣子写第几条、什么触发；不写名字。 */
