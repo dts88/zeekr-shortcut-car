@@ -54,6 +54,8 @@ final class AutomationPickers {
                 Setting.DRIVE_MODE, Setting.HILL_DESCENT, Setting.LOW_SPEED_BRAKING),
         CLIMATE(R.string.smart_button_group_climate, R.string.auto_pick_then_climate_desc,
                 Setting.CIRCULATION, Setting.REAR_CLIMATE),
+        /** 车身：尾门开启上限（一段整数，点了直接弹拖动条）。 */
+        BODY(R.string.smart_button_group_body, R.string.auto_pick_then_body_desc, Setting.TAILGATE_LIMIT),
         SCENES(R.string.smart_button_group_scenes, R.string.auto_pick_then_scenes_desc, Setting.SENTRY);
 
         final int label;
@@ -265,44 +267,59 @@ final class AutomationPickers {
                 : current.kind == Condition.Kind.NOT_IN_PLACES ? 1 : -1;
         list(c, c.getString(R.string.auto_pick_place), items, at, which -> {
             boolean in = which == 0;
-            String[] names = new String[places.size()];
-            boolean[] on = new boolean[places.size()];
-            for (int i = 0; i < places.size(); i++) {
-                names[i] = AutomationTexts.placeName(c, places.get(i), i);
-                // 改已有的照它勾；新加的「不在」默认全勾（停在所有常用地点以外），「在」都不勾
-                on[i] = current != null && at >= 0 ? current.places.contains(places.get(i).id) : !in;
-            }
-            // 一个都没勾时「保存」点不了
-            androidx.appcompat.app.AlertDialog[] shown = new androidx.appcompat.app.AlertDialog[1];
-            Runnable sync = () -> {
-                boolean any = false;
-                for (boolean b : on) {
-                    any |= b;
+            // 改已有的照它勾；新加的「不在」默认全勾（停在所有常用地点以外），「在」都不勾
+            List<String> preset = new ArrayList<>();
+            for (Place p : places) {
+                if (current != null && at >= 0 ? current.places.contains(p.id) : !in) {
+                    preset.add(p.id);
                 }
-                CamDialogs.enable(shown[0], androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE, any);
-            };
-            shown[0] = CamDialogs.show(
-                    new MaterialAlertDialogBuilder(c, R.style.Theme_Cam_MaterialAlertDialog)
-                            .setTitle(in ? R.string.auto_pick_in_title : R.string.auto_pick_not_in_title)
-                            .setMultiChoiceItems(names, on, (d, i, checked) -> {
-                                on[i] = checked;
-                                sync.run();
-                            })
-                            .setPositiveButton(R.string.action_save, (d, w) -> {
-                                List<String> ids = new ArrayList<>();
-                                for (int i = 0; i < places.size(); i++) {
-                                    if (on[i]) {
-                                        ids.add(places.get(i).id);
-                                    }
-                                }
-                                Condition k = in ? Condition.inPlaces(ids) : Condition.notInPlaces(ids);
-                                if (k != null) {
-                                    onPick.accept(k);
-                                }
-                            })
-                            .setNegativeButton(R.string.action_cancel, null));
-            sync.run();
+            }
+            pickPlaceIds(c, places, in, preset, ids -> {
+                Condition k = in ? Condition.inPlaces(ids) : Condition.notInPlaces(ids);
+                if (k != null) {
+                    onPick.accept(k);
+                }
+            });
         });
+    }
+
+    /** 勾几个地点（{@code preset} 先勾着）；一个都没勾时「保存」点不了。 */
+    static void pickPlaceIds(Context c, List<Place> places, boolean in, List<String> preset,
+                             Consumer<List<String>> onPick) {
+        String[] names = new String[places.size()];
+        boolean[] on = new boolean[places.size()];
+        for (int i = 0; i < places.size(); i++) {
+            names[i] = AutomationTexts.placeName(c, places.get(i), i);
+            on[i] = preset.contains(places.get(i).id);
+        }
+        androidx.appcompat.app.AlertDialog[] shown = new androidx.appcompat.app.AlertDialog[1];
+        Runnable sync = () -> {
+            boolean any = false;
+            for (boolean b : on) {
+                any |= b;
+            }
+            CamDialogs.enable(shown[0], androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE, any);
+        };
+        shown[0] = CamDialogs.show(
+                new MaterialAlertDialogBuilder(c, R.style.Theme_Cam_MaterialAlertDialog)
+                        .setTitle(in ? R.string.auto_pick_in_title : R.string.auto_pick_not_in_title)
+                        .setMultiChoiceItems(names, on, (d, i, checked) -> {
+                            on[i] = checked;
+                            sync.run();
+                        })
+                        .setPositiveButton(R.string.action_save, (d, w) -> {
+                            List<String> ids = new ArrayList<>();
+                            for (int i = 0; i < places.size(); i++) {
+                                if (on[i]) {
+                                    ids.add(places.get(i).id);
+                                }
+                            }
+                            if (!ids.isEmpty()) {
+                                onPick.accept(ids);
+                            }
+                        })
+                        .setNegativeButton(R.string.action_cancel, null));
+        sync.run();
     }
 
     private static void pickGear(Context c, Condition current, Consumer<Condition> onPick) {
@@ -429,6 +446,10 @@ final class AutomationPickers {
                 return;
             }
             ChangeGroup group = all[which - base];
+            if (group.settings.length == 1 && group.settings[0].range()) {
+                pickRange(c, group.settings[0], current, onPick);
+                return;
+            }
             List<Change> changes = new ArrayList<>();
             List<Item> items = new ArrayList<>();
             int at = -1;
@@ -452,6 +473,30 @@ final class AutomationPickers {
                 }
             }
             list(c, c.getString(group.label), items, at, i -> onPick.accept(changes.get(i)));
+        });
+    }
+
+    /**
+     * 一段整数的那一样（尾门开启上限 50–95%）：拖动条，说明写什么时候调、调了车尾响两声、结束时不恢复。改已有的从它现在的值起，
+     * 新加的从 80% 起。
+     */
+    static void pickRange(Context c, Setting s, Change current, Consumer<Change> onPick) {
+        int start = 80;
+        if (current != null && current.setting == s) {
+            Integer code = s.code(current.value);
+            if (code != null) {
+                start = code;
+            }
+        }
+        start = Math.max(s.min(), Math.min(s.max(), start));
+        int[] chosen = {start};
+        SliderDialog.Slider slider = new SliderDialog.Slider(null, s.min(), s.max(), start, "%",
+                c.getString(R.string.auto_tailgate_note), true, false, v -> chosen[0] = v);
+        SliderDialog.show(c, AutomationTexts.settingName(c, s), Collections.singletonList(slider), () -> {
+            Change ch = Change.of(s, String.valueOf(chosen[0]));
+            if (ch != null) {
+                onPick.accept(ch);
+            }
         });
     }
 

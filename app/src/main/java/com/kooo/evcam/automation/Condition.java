@@ -84,7 +84,7 @@ public final class Condition {
 
     /** 某项设置是某个值；值不是它的是 null。 */
     public static Condition stateIs(Setting setting, String value) {
-        return setting != null && setting.code(value) != null
+        return setting != null && !setting.range() && setting.code(value) != null
                 ? new Condition(Kind.STATE_IS, null, 0, setting, value, 0, 0, 0) : null;
     }
 

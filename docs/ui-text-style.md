@@ -756,6 +756,14 @@
 下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
 可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
 
+- 2026-11-24 尾门开启上限（issue 155，ui-spec §十八；名字照车上原厂设置页「尾门开启上限」/ Tailgate opening limit）：
+  auto_setting_tailgate_limit「尾门开启上限」/ Tailgate opening limit / Had bukaan but belakang；auto_value_percent「70%」；
+  auto_pick_then_body_desc「尾门开启上限」（「就」里「车身」一组的小字）；
+  auto_tailgate_note（拖动条框里）「只在 P 挡、尾门关着时调整。调整时车厢后部会传来两声短促的提示音，表示尾门开启上限已调整。结束时不恢复。」；
+  auto_tailgate_beep（规则展开后「就」那一行下面的小字）「调整时车厢后部会传来两声短促的提示音，表示尾门开启上限已调整」
+  （提示音那半句是项目所有者 2026-11-24 的原话：「在调整尾门高度时，车厢后部会传来两声短促的提醒声，意为尾门高度已调整」）；
+  auto_template_tailgate「按地点设置尾门开启上限」、auto_template_tailgate_desc「当挂入 P 挡，而且在选中的地点，就把尾门开启上限设为选的值」、
+  auto_template_tailgate_unavailable「按地点设置尾门开启上限（先在下面的「地点」里添加地点）」。
 - 阿拉伯文全部（values-ar，2026-11-19 草稿：先定术语表和写法，再分块翻译、统一核对）。等母语使用者审校（issue 250 的 mina5500）；改的时候照本规范改，词改了连同 §10 的阿拉伯文一列一起改。
 
 ---

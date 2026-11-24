@@ -10,6 +10,7 @@ package com.kooo.evcam.automation;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import com.kooo.evcam.button.CarMoves;
@@ -922,6 +923,70 @@ public class AutomationsTest {
         assertTrue(rule(Trigger.arrive("home"), Change.of(Setting.LOW_SPEED_BRAKING, "off")).complete());
         assertFalse("离开没有结束：勾了恢复也不恢复",
                 rule(Trigger.leave("home"), Collections.emptyList(), true, Change.of(Setting.SENTRY, "on")).restores());
+    }
+
+    // ================================================================= 尾门开启上限（issue 155）
+
+    /** 每写一次车尾响两声：写不成也不再写（只写一次）。 */
+    @Test
+    public void tailgateLimitIsWrittenOnceEvenWhenItFails() {
+        FakeWorld w = new FakeWorld();
+        w.rules.add(rule(Trigger.gear("P"), Change.of(Setting.TAILGATE_LIMIT, "70")));
+        w.car.put(Setting.TAILGATE_LIMIT, 95);
+        w.result = CarMoves.Result.NO_CHANGE;
+        w.gear = "D";
+        Automations a = new Automations(w);
+        a.screenWentLit();
+        w.run(1_000);
+        a.readingsChanged();
+        w.gear = "P";
+        a.readingsChanged();
+        w.run(30_000);
+        assertEquals(Collections.singletonList("tailgate_limit=70"), w.writes);
+        assertTrue(w.noted("写了 1 次都没成"));
+    }
+
+    /** 结束时恢复：尾门开启上限不写回（又要响，离开 P 挡时写也没测过）；同一条里别的照样恢复。 */
+    @Test
+    public void tailgateLimitIsNotRestored() {
+        FakeWorld w = new FakeWorld();
+        w.rules.add(rule(Trigger.gear("P"), Collections.emptyList(), true,
+                Change.of(Setting.TAILGATE_LIMIT, "70"), Change.of(Setting.REAR_CLIMATE, "on")));
+        w.car.put(Setting.TAILGATE_LIMIT, 95);
+        w.car.put(Setting.REAR_CLIMATE, 0);
+        w.gear = "D";
+        Automations a = new Automations(w);
+        a.screenWentLit();
+        w.run(1_000);
+        a.readingsChanged();
+        w.gear = "P";
+        a.readingsChanged();
+        w.run(5_000);
+        assertEquals(Arrays.asList("tailgate_limit=70", "rear_climate=on"), w.writes);
+        w.gear = "D";
+        a.readingsChanged();
+        w.run(1_000);
+        assertEquals(Collections.singletonList("rear_climate=off"), w.restores);
+        assertTrue(w.noted("结束时不恢复"));
+    }
+
+    @Test
+    public void tailgateLimitIsARangeOfWholePercents() {
+        Setting s = Setting.TAILGATE_LIMIT;
+        assertTrue(s.range());
+        assertEquals(Integer.valueOf(70), s.code("70"));
+        assertEquals(Integer.valueOf(50), s.code("50"));
+        assertEquals(Integer.valueOf(95), s.code("95"));
+        assertNull(s.code("49"));
+        assertNull(s.code("96"));
+        assertNull(s.code("on"));
+        assertEquals("70", s.value(70));
+        assertNull(s.value(100));
+        assertEquals(0, s.valueNames().length);
+        assertNull("不能当车辆状态的触发", Trigger.state(s, "70"));
+        assertNull("也不能当条件", Condition.stateIs(s, "70"));
+        assertFalse(s.restorable());
+        assertTrue(s.parkOnly());
     }
 
     /** 黑匣子写第几条、什么触发；不写名字。 */

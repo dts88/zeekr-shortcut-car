@@ -231,8 +231,12 @@ public final class CarMoves {
      * {@link #CIRCULATION_INNER}。前排空调（{@link #FRONT_CLIMATE}）只读：空调开没开，车辆状态的触发用。
      */
     public enum Target {
-        SENTRY, DRIVE_MODE, CIRCULATION, REAR_CLIMATE, HILL_DESCENT, LOW_SPEED_BRAKING, FRONT_CLIMATE
+        SENTRY, DRIVE_MODE, CIRCULATION, REAR_CLIMATE, HILL_DESCENT, LOW_SPEED_BRAKING, TAILGATE_LIMIT, FRONT_CLIMATE
     }
+
+    /** 尾门开启上限能写的范围（%）：车机设置页的滑条两头（Lab 2026-11-24 车上看到）。范围外的不写。 */
+    public static final int TAILGATE_MIN = 50;
+    public static final int TAILGATE_MAX = 95;
 
     /** 自动化写一项的结果和写之前读到的值（{@link #before}，读不到 null；结束时恢复要它）。 */
     public static final class Outcome {
@@ -373,6 +377,12 @@ public final class CarMoves {
                 }
                 return v == 0 ? Integer.valueOf(0) : on != null && v.intValue() == on ? Integer.valueOf(1) : null;
             }
+            case TAILGATE_LIMIT: {
+                // 整数百分比（不带区域读；Lab 2026-11-24：设置那一组里另一个「回执」读数只在 2–6 之间变，不是百分比，不用）
+                Integer id = c.function("BCM_FUN_TAILGATE_PERC", "IBcm");
+                Integer v = id == null ? null : c.access.read(id);
+                return v != null && v >= 0 && v <= 100 ? v : null;
+            }
             default:
                 return null;
         }
@@ -394,6 +404,9 @@ public final class CarMoves {
      *   <li>二排空调：电源按排写（{@link CarNames#ROW_2}）；读回比写晚一两百毫秒，{@link Car#set} 等得到。前排空调只读，不写。</li>
      *   <li>陡坡缓降：车机说能用（active）才写，不带区域，0 关 1 开（Calvin 车上实测的写法）。</li>
      *   <li>低速紧急制动：不带区域写，开是车机的 PEB 那个值、关是 0（澳洲车主实测过 P 挡静止时写关闭）。</li>
+     *   <li>尾门开启上限：区域 0 写整数百分比（车机设置页自己的写法，Lab 2026-11-24 车上读写都通：P 挡、停着、尾门关着时写，
+     *       尾门不动，车尾响两声）。只在 {@link #TAILGATE_MIN}–{@link #TAILGATE_MAX} 之间写；尾门不是读到关着就不写
+     *       （开着时写会怎样没测过），说不要了（{@link Result#MOVING}），等它关上。新值 200–280 ms 后才读得到，读回等得到。</li>
      * </ul>
      */
     static Result set(Car c, Target target, int value, Integer before) {
@@ -448,6 +461,21 @@ public final class CarMoves {
                     return Result.UNAVAILABLE;
                 }
                 return c.setPlain(id, value == 1 ? on : 0);
+            }
+            case TAILGATE_LIMIT: {
+                Integer id = c.function("BCM_FUN_TAILGATE_PERC", "IBcm");
+                if (id == null || value < TAILGATE_MIN || value > TAILGATE_MAX) {
+                    return Result.UNAVAILABLE;
+                }
+                Integer trunk = c.read(Signal.DOOR_TRUNK.id, Signal.DOOR_TRUNK.zone);
+                if (trunk == null || trunk != 0) {
+                    c.note("tailgate " + (trunk == null ? "?" : "open") + ", limit not written");
+                    return Result.MOVING;
+                }
+                if (!c.write(id, 0, value)) {
+                    return Result.UNAVAILABLE;
+                }
+                return c.back(() -> c.access.read(id), value, before);
             }
             default:
                 c.note(target + " is read-only");

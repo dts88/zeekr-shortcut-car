@@ -165,8 +165,9 @@ public class AutomationShotsTest {
         add.getOnPreferenceClickListener().onPreferenceClick(add);
         Shots.settle();
         AlertDialog templates = (AlertDialog) ShadowDialog.getLatestDialog();
-        assertEquals("常用的三条 + 空白", 4, templates.getListView().getCount());
+        assertEquals("常用的四条 + 空白", 5, templates.getListView().getCount());
         assertFalse("没有地点：停在常用地点以外那一条灰着", templates.getListView().getAdapter().isEnabled(2));
+        assertFalse("没有地点：按地点设置尾门开启上限那一条灰着", templates.getListView().getAdapter().isEnabled(3));
         save(templates, "settings-automation-" + tag + "-add");
         // 选倒车那条：加在最后、开着、结束时恢复
         pick(templates, 0);

@@ -218,6 +218,39 @@ public class PlaceShotsTest {
         save(templates, "settings-automation-places-day-add-rule");
         templates.dismiss();
 
+        // 按地点设置尾门开启上限（issue 155）：勾地点 → 拖动条（50–95%，说明写只在 P 挡、尾门关着时调、车尾响两声）
+        click(section.findPreference(AutomationRows.ADD_KEY));
+        AlertDialog more = (AlertDialog) ShadowDialog.getLatestDialog();
+        assertTrue(more.getListView().getAdapter().isEnabled(3));
+        pick(more, 3);
+        AlertDialog where = (AlertDialog) ShadowDialog.getLatestDialog();
+        assertFalse("一个都没勾：保存点不了", where.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled());
+        pick(where, 0);
+        assertTrue(where.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled());
+        where.getButton(AlertDialog.BUTTON_POSITIVE).performClick();
+        Shots.settle();
+        AlertDialog tailgate = (AlertDialog) ShadowDialog.getLatestDialog();
+        save(tailgate, "settings-automation-places-day-tailgate");
+        tailgate.getButton(AlertDialog.BUTTON_POSITIVE).performClick();
+        Shots.settle();
+        List<Rule> withTailgate = RuleStore.parse(config.getAutomationRules());
+        Rule added = withTailgate.get(withTailgate.size() - 1);
+        assertEquals(Trigger.gear("P"), added.trigger);
+        assertEquals(Collections.singletonList("home"), added.conditions.get(0).places);
+        assertEquals("tailgate_limit=80", added.changes.get(0).describe());
+        assertFalse(added.restore);
+        assertNull("只有尾门开启上限（不恢复）：没有「结束时恢复」那一行",
+                section.findPreference("automation_rule_" + added.id + "/restore"));
+        assertEquals("「就」那一行下面写提示音", activity.getString(R.string.auto_tailgate_beep),
+                String.valueOf(section.findPreference("automation_rule_" + added.id + "/then0").getSummary()));
+        assertNull("别的动作没有小字", section.findPreference("automation_rule_p1/then0").getSummary());
+        assertTrue(String.valueOf(section.findPreference("automation_rule_" + added.id).getTitle())
+                .contains(activity.getString(R.string.auto_setting_tailgate_limit)));
+        section.scrollToPreference("automation_rule_" + added.id + "/then+");
+        Shots.settle();
+        File tailgateRule = Shots.save(activity, "settings-automation-places-day-tailgate-rule");
+        assertTrue(tailgateRule.length() > 10_000);
+
         // 删家：两条都用到它 —— 停在常用地点以外那一条还剩公司、照样开着；到达家那一条关掉
         rowView(section, section.findPreference("place_home")).findViewById(R.id.pref_action).performClick();
         Shots.settle();

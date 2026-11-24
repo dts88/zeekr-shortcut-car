@@ -1544,4 +1544,14 @@
     <string name="sentry_alerts_reason_refused">رفض الخادم (HTTP %1$d)</string>
     <string name="sentry_alerts_qr_failed">تعذّر إنشاء رمز QR</string>
     <string name="msg_ntfy_server_address_only">أدخل عنوان الخادم فقط، مثل ntfy.sh</string>
+
+    <!-- 地点与自动化：尾门开启上限（issue 155）；等 issue 250 的审校 -->
+    <string name="auto_setting_tailgate_limit">حد فتح الباب الخلفي</string>
+    <string name="auto_value_percent">%1$s%%</string>
+    <string name="auto_pick_then_body_desc">حد فتح الباب الخلفي</string>
+    <string name="auto_tailgate_note">يُغيَّر فقط في وضع P والباب الخلفي مغلق. عند التغيير يصدر صوتان قصيران من مؤخرة المقصورة للإشارة إلى أن حد فتح الباب الخلفي قد عُدِّل. لا تتم استعادته عند انتهاء القاعدة.</string>
+    <string name="auto_template_tailgate">ضبط حد فتح الباب الخلفي حسب المكان</string>
+    <string name="auto_template_tailgate_desc">عند التبديل إلى P في أحد الأماكن المختارة، يُضبط حد فتح الباب الخلفي على القيمة المختارة</string>
+    <string name="auto_template_tailgate_unavailable">ضبط حد فتح الباب الخلفي حسب المكان (أضف مكانًا في «الأماكن» أولًا)</string>
+    <string name="auto_tailgate_beep">صوتان قصيران من مؤخرة المقصورة يعنيان أن حد فتح الباب الخلفي قد عُدِّل</string>
 </resources>

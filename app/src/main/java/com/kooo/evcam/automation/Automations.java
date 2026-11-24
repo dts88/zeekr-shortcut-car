@@ -700,7 +700,7 @@ public final class Automations {
         // 能用：连着两次都说能（1）；连着两次说不能（0）不算
         boolean available = step.available.confirmed() && Integer.valueOf(1).equals(step.available.value);
         switch (RunRules.decide(since, ready, s.parkOnly(), gear, s.waitsUntilAvailable(), available,
-                now - step.lastAskAt, step.writes, now - step.lastWriteAt)) {
+                now - step.lastAskAt, step.writes, now - step.lastWriteAt, s.maxWrites())) {
             case WAIT:
                 return;
             case ASK:
@@ -767,7 +767,7 @@ public final class Automations {
             }
             return;
         }
-        if (!run.ended && step.writes >= RunRules.MAX_WRITES) {
+        if (!run.ended && step.writes >= step.change.setting.maxWrites()) {
             finish(run, step, Status.FAILED, "写了 " + step.writes + " 次都没成");
         }
     }
@@ -832,6 +832,10 @@ public final class Automations {
     /** 写回原来的值：原来的值读不到、本来就是它的不动；人不在车上（熄屏）不写。 */
     private void restore(Run run, Step step) {
         if (!run.rule.restores() || step.before == null) {
+            return;
+        }
+        if (!step.change.setting.restorable()) {
+            world.note("自动化 " + run.tag() + " " + step.change.describe() + "：这一样结束时不恢复（每写一次车尾响两声）");
             return;
         }
         if (!lit) {

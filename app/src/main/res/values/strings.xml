@@ -1519,4 +1519,14 @@
     <string name="auto_template_away">停在常用地点以外时开启哨兵模式</string>
     <string name="auto_template_away_desc">当挂入 P 挡，而且不在任何一个地点，就开启哨兵模式</string>
     <string name="auto_template_away_unavailable">停在常用地点以外时开启哨兵模式（先在下面的「地点」里添加地点）</string>
+
+    <!-- 地点与自动化：尾门开启上限（issue 155；名字照车上原厂设置页；2026-11-24 草稿，等项目所有者批） -->
+    <string name="auto_setting_tailgate_limit">尾门开启上限</string>
+    <string name="auto_value_percent">%1$s%%</string>
+    <string name="auto_pick_then_body_desc">尾门开启上限</string>
+    <string name="auto_tailgate_note">只在 P 挡、尾门关着时调整。调整时车厢后部会传来两声短促的提示音，表示尾门开启上限已调整。结束时不恢复。</string>
+    <string name="auto_template_tailgate">按地点设置尾门开启上限</string>
+    <string name="auto_template_tailgate_desc">当挂入 P 挡，而且在选中的地点，就把尾门开启上限设为选的值</string>
+    <string name="auto_template_tailgate_unavailable">按地点设置尾门开启上限（先在下面的「地点」里添加地点）</string>
+    <string name="auto_tailgate_beep">调整时车厢后部会传来两声短促的提示音，表示尾门开启上限已调整</string>
 </resources>

@@ -1485,4 +1485,14 @@
     <string name="auto_template_away">Hidupkan Mod Sentry apabila diletak di luar tempat anda</string>
     <string name="auto_template_away_desc">Apabila masuk gear P dan bukan di mana-mana tempat anda, hidupkan Mod Sentry</string>
     <string name="auto_template_away_unavailable">Hidupkan Mod Sentry apabila diletak di luar tempat anda (tambah tempat di bawah Tempat dahulu)</string>
+
+    <!-- 地点与自动化：尾门开启上限（issue 155） -->
+    <string name="auto_setting_tailgate_limit">Had bukaan but belakang</string>
+    <string name="auto_value_percent">%1$s%%</string>
+    <string name="auto_pick_then_body_desc">Had bukaan but belakang</string>
+    <string name="auto_tailgate_note">Diubah hanya dalam gear P dengan but belakang tertutup. Apabila ia berubah, dua bunyi pendek kedengaran dari bahagian belakang kabin untuk memberitahu had bukaan but belakang telah dilaraskan. Tidak dipulihkan apabila peraturan tamat.</string>
+    <string name="auto_template_tailgate">Tetapkan had bukaan but belakang mengikut tempat</string>
+    <string name="auto_template_tailgate_desc">Apabila masuk gear P di salah satu tempat yang dipilih, tetapkan had bukaan but belakang kepada nilai yang dipilih</string>
+    <string name="auto_template_tailgate_unavailable">Tetapkan had bukaan but belakang mengikut tempat (tambah tempat di bawah Tempat dahulu)</string>
+    <string name="auto_tailgate_beep">Dua bunyi pendek dari bahagian belakang kabin bermakna had bukaan but belakang telah dilaraskan</string>
 </resources>

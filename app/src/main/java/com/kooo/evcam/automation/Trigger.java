@@ -56,7 +56,8 @@ public final class Trigger {
 
     /** 某项设置变为某个值；值不是它的（{@link Setting#code}）是 null。 */
     public static Trigger state(Setting setting, String value) {
-        return setting != null && setting.code(value) != null ? new Trigger(Kind.STATE, null, setting, value, null) : null;
+        return setting != null && !setting.range() && setting.code(value) != null
+                ? new Trigger(Kind.STATE, null, setting, value, null) : null;
     }
 
     /** 到达某个地点；没有 id 的是 null。 */

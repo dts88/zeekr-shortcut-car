@@ -21,6 +21,7 @@ import org.junit.Test;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -75,6 +76,8 @@ public class CarMovesTest {
     private static final int DEFROST_FRONT = 0xCE00;
     private static final int HILL_DESCENT = 0xCF00;
     private static final int PEB = 0xD500;
+    /** 尾门开启上限（假的号）。 */
+    private static final int TAILGATE = 0xD600;
     /** 低速紧急制动开着时车机报的值（假的，真的从车机的常量里取）。 */
     private static final int PEB_ON = 0xD501;
     /** 挡位传感器事件的原值（{@link Signal#GEAR}）。 */
@@ -222,6 +225,7 @@ public class CarMovesTest {
             functions.put("IADAS.SETTING_FUNC_HDC_SWITCH", HILL_DESCENT);
             functions.put("IADAS.SETTING_FUNC_PEB_MODE", PEB);
             functions.put("IVehicle.PEB_MODE_PEB", PEB_ON);
+            functions.put("IBcm.BCM_FUN_TAILGATE_PERC", TAILGATE);
             functions.put("IAmbienceLight.SETTING_FUNC_AMBIENCE_LIGHT_MAINZONES_COLOR_SET", AMBIENT_MAIN);
             functions.put("IAmbienceLight.SETTING_FUNC_AMBIENCE_LIGHT_TOPZONES_COLOR_SET", AMBIENT_TOP);
         }
@@ -1229,6 +1233,52 @@ public class CarMovesTest {
         assertEquals(0, (int) CarMoves.value(car(car), CarMoves.Target.SENTRY));
         assertEquals(CarMoves.Result.DONE, run(car, automation(CarMoves.Target.SENTRY, 1)));
         assertEquals(SENTRY + "@" + ALL + "=1", car.writes.get(0));
+    }
+
+    /** 车机上区域 0 写尾门开启上限，不带区域读得到新值（Lab 2026-11-24 车上的样子）。 */
+    private static FakeCar tailgateCar(int limit, Integer trunk) {
+        FakeCar car = new FakeCar() {
+            @Override
+            public boolean write(int id, int zone, int value) {
+                boolean ok = super.write(id, zone, value);
+                if (ok && zone == 0) {
+                    values.put(String.valueOf(id), value);
+                }
+                return ok;
+            }
+        };
+        car.values.put(String.valueOf(TAILGATE), limit);
+        if (trunk != null) {
+            car.values.put(Signal.DOOR_TRUNK.id + "@" + Signal.DOOR_TRUNK.zone, trunk);
+        }
+        return car;
+    }
+
+    /** 尾门开启上限：整数百分比，区域 0 写、读回；一样就不写；50–95 以外不写；尾门不是读到关着就不写（等它关上）。 */
+    @Test
+    public void tailgateLimitIsWrittenInZoneZeroOnlyWithTheTailgateClosed() {
+        FakeCar car = tailgateCar(95, 0);
+        assertEquals(95, (int) CarMoves.value(car(car), CarMoves.Target.TAILGATE_LIMIT));
+        assertEquals(CarMoves.Result.DONE, run(car, automation(CarMoves.Target.TAILGATE_LIMIT, 70)));
+        assertEquals(Collections.singletonList(TAILGATE + "@0=70"), car.writes);
+        assertEquals(70, (int) CarMoves.value(car(car), CarMoves.Target.TAILGATE_LIMIT));
+
+        assertEquals("一样就不写（每写一次车尾响两声）", CarMoves.Result.DONE,
+                run(car, automation(CarMoves.Target.TAILGATE_LIMIT, 70)));
+        assertEquals(1, car.writes.size());
+
+        assertEquals(CarMoves.Result.UNAVAILABLE, run(car, automation(CarMoves.Target.TAILGATE_LIMIT, 96)));
+        assertEquals(CarMoves.Result.UNAVAILABLE, run(car, automation(CarMoves.Target.TAILGATE_LIMIT, 49)));
+        assertEquals("范围外的不写", 1, car.writes.size());
+
+        FakeCar open = tailgateCar(95, 1);
+        assertEquals("尾门开着：不写，等它关上", CarMoves.Result.MOVING,
+                run(open, automation(CarMoves.Target.TAILGATE_LIMIT, 70)));
+        assertTrue(open.writes.isEmpty());
+        FakeCar unknown = tailgateCar(95, null);
+        assertEquals("读不到尾门：不写", CarMoves.Result.MOVING,
+                run(unknown, automation(CarMoves.Target.TAILGATE_LIMIT, 70)));
+        assertTrue(unknown.writes.isEmpty());
     }
 
     /** 低速紧急制动：开是车机的那个值、关是 0，不带区域写；读到别的值不认识。 */
