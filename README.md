@@ -6,6 +6,12 @@ dash cam and shows them where they help while driving.
 **[Download](../../releases/latest)** · [Features (wiki)](../../wiki) · [Discussions](../../discussions) ·
 [中文说明](README.zh-CN.md) · [Credits](NOTICE.md)
 
+> [!IMPORTANT]
+> **App Lab 1.0.0.26 blocks sideloading.** Reportedly, the latest App Lab, 1.0.0.26, blocks installing any
+> third-party app, so the current sideload method no longer works. If your App Lab is still on an earlier
+> version, open the head unit's app store and turn off automatic app updates. We're still looking for a
+> sideload method that is simple and low-key. Thank you.
+
 ---
 
 ## What it is
