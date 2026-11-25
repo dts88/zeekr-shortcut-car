@@ -11,6 +11,10 @@ commit message, not here.
 
 Nothing yet.
 
+## [4.17.0-alpha] - 2026-11-25
+
+- Places and automation: new action Tailgate opening limit, 50 to 95% ([#155](https://github.com/dts88/zeekr-shortcut-car/issues/155)). Changed only in P with the tailgate closed, once per rule and not restored, because the car beeps twice at the rear each time it changes. New common rule: set the tailgate opening limit by place.
+
 ## [4.16.0-alpha] - 2026-11-23
 
 - **Sentry alerts over ntfy (experimental), designed by Fabbbrrr** ([#211](https://github.com/dts88/zeekr-shortcut-car/pull/211)): Settings → Recording → Sentry alerts. When Sentry Mode is triggered (warning or alarm) while Keep recording when the screen goes off is recording, one alert, with a compressed surround view picture if chosen, goes straight to your phone through ntfy, never through a developer's server. One-way: the car takes no commands. Many thanks to Fabbbrrr for the idea, the design and the code.
