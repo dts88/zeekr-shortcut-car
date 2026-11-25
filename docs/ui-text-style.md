@@ -748,6 +748,14 @@
   手机上收到的正文：sentry_alert_alert「哨兵警戒 · %1$s」/ Sentry warning · %1$s / Sentry berwaspada · %1$s，
   sentry_alert_alarm「哨兵报警 · %1$s」/ Sentry alarm · %1$s / Penggera Sentry · %1$s（替换原来的「双闪亮起」「车灯亮起」）；
   about_privacy_body 哨兵提醒那一条的触发半句（中文、英文两份）。
+- 2026-11-25 批准（项目所有者：「同意」；阿拉伯文照写，等审校）尾门开启上限（issue 155，ui-spec §十八；名字照车上原厂设置页「尾门开启上限」/ Tailgate opening limit）：
+  auto_setting_tailgate_limit「尾门开启上限」/ Tailgate opening limit / Had bukaan but belakang；auto_value_percent「70%」；
+  auto_pick_then_body_desc「尾门开启上限」（「就」里「车身」一组的小字）；
+  auto_tailgate_note（拖动条框里）「只在 P 挡、尾门关着时调整。调整时车厢后部会传来两声短促的提示音，表示尾门开启上限已调整。结束时不恢复。」；
+  auto_tailgate_beep（规则展开后「就」那一行下面的小字）「调整时车厢后部会传来两声短促的提示音，表示尾门开启上限已调整」
+  （提示音那半句是项目所有者 2026-11-24 的原话：「在调整尾门高度时，车厢后部会传来两声短促的提醒声，意为尾门高度已调整」）；
+  auto_template_tailgate「按地点设置尾门开启上限」、auto_template_tailgate_desc「当挂入 P 挡，而且在选中的地点，就把尾门开启上限设为选的值」、
+  auto_template_tailgate_unavailable「按地点设置尾门开启上限（先在下面的「地点」里添加地点）」。
 - vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
 - 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
 

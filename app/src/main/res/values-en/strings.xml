@@ -1510,4 +1510,14 @@
     <string name="auto_template_away">Turn on Sentry Mode when parked away from your places</string>
     <string name="auto_template_away_desc">When shifted to P and not at any of your places, turn on Sentry Mode</string>
     <string name="auto_template_away_unavailable">Turn on Sentry Mode when parked away from your places (add a place under Places first)</string>
+
+    <!-- 地点与自动化：尾门开启上限（issue 155） -->
+    <string name="auto_setting_tailgate_limit">Tailgate opening limit</string>
+    <string name="auto_value_percent">%1$s%%</string>
+    <string name="auto_pick_then_body_desc">Tailgate opening limit</string>
+    <string name="auto_tailgate_note">Changed only in P with the tailgate closed. When it changes, two short beeps come from the rear of the cabin to tell you the tailgate opening limit has been adjusted. Not restored when the rule ends.</string>
+    <string name="auto_template_tailgate">Set the tailgate opening limit by place</string>
+    <string name="auto_template_tailgate_desc">When shifted to P at one of the chosen places, set the tailgate opening limit to the chosen value</string>
+    <string name="auto_template_tailgate_unavailable">Set the tailgate opening limit by place (add a place under Places first)</string>
+    <string name="auto_tailgate_beep">Two short beeps from the rear of the cabin mean the tailgate opening limit has been adjusted</string>
 </resources>

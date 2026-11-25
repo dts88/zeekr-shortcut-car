@@ -71,7 +71,14 @@ final class RunRules {
      */
     static Step decide(long sinceStartMs, boolean ready, boolean parkOnly, String gear, boolean waitsAvailable,
                        boolean available, long sinceAskMs, int writes, long sinceLastWriteMs) {
-        if (writes >= MAX_WRITES) {
+        return decide(sinceStartMs, ready, parkOnly, gear, waitsAvailable, available, sinceAskMs, writes, sinceLastWriteMs,
+                MAX_WRITES);
+    }
+
+    /** 同上，最多写 {@code maxWrites} 次（只写一次的那几样是 1，{@code Setting#maxWrites}）。 */
+    static Step decide(long sinceStartMs, boolean ready, boolean parkOnly, String gear, boolean waitsAvailable,
+                       boolean available, long sinceAskMs, int writes, long sinceLastWriteMs, int maxWrites) {
+        if (writes >= maxWrites) {
             return Step.FAILED;
         }
         if (parkOnly && gear != null && !"P".equals(gear)) {

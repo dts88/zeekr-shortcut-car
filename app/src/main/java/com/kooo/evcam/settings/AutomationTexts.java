@@ -48,6 +48,8 @@ final class AutomationTexts {
                 return c.getString(R.string.auto_setting_hill_descent);
             case LOW_SPEED_BRAKING:
                 return c.getString(R.string.auto_setting_low_speed_braking);
+            case TAILGATE_LIMIT:
+                return c.getString(R.string.auto_setting_tailgate_limit);
             case FRONT_CLIMATE:
             default:
                 return c.getString(R.string.auto_setting_front_climate);
@@ -225,7 +227,9 @@ final class AutomationTexts {
 
     /** 「就」一行的内容：低速紧急制动：关闭。 */
     static String change(Context c, Change ch) {
-        return c.getString(R.string.auto_change, settingName(c, ch.setting), valueName(c, ch.value));
+        // 一段整数的（尾门开启上限）写成「70%」
+        String value = ch.setting.range() ? c.getString(R.string.auto_value_percent, ch.value) : valueName(c, ch.value);
+        return c.getString(R.string.auto_change, settingName(c, ch.setting), value);
     }
 
     /** 一天里的第几分钟写成 22:00。 */

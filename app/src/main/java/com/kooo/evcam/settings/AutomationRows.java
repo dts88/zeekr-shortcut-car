@@ -248,6 +248,10 @@ final class AutomationRows {
             Change ch = r.changes.get(i);
             ClauseItemPreference row = clause(c, base + "/then" + i, order++, i == 0 ? R.string.auto_label_then : 0,
                     AutomationTexts.change(c, ch));
+            if (ch.setting == Setting.TAILGATE_LIMIT) {
+                // 车主 2026-11-24：调整时车厢后部会传来两声短促的提示音，表示尾门开启上限已调整
+                row.setSummary(R.string.auto_tailgate_beep);
+            }
             row.setOnPreferenceClickListener(p -> {
                 AutomationPickers.pickChange(c, ch, r.trigger,
                         picked -> update(r.id, x -> with(x, x.trigger, x.conditions, replace(x.changes, index, picked),
@@ -269,7 +273,8 @@ final class AutomationRows {
         });
         rs.items.add(addChange);
 
-        if (AutomationTexts.ends(r.trigger)) {
+        // 只有不恢复的动作（尾门开启上限）时没有这一行
+        if (AutomationTexts.ends(r.trigger) && anyRestorable(r)) {
             CardItemPreference restore = new CardItemPreference(c);
             restore.setKey(base + "/restore");
             restore.setOrder(order++);
@@ -286,6 +291,15 @@ final class AutomationRows {
         rows.put(r.id, rs);
         show(r.id, rs);
         return order;
+    }
+
+    private static boolean anyRestorable(Rule r) {
+        for (Change ch : r.changes) {
+            if (ch.setting.restorable()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private ClauseItemPreference clause(Context c, String key, int order, int label, CharSequence text) {
@@ -406,6 +420,10 @@ final class AutomationRows {
                 ? new AutomationPickers.Item(c.getString(R.string.auto_template_away_unavailable), false)
                 : new AutomationPickers.Item(AutomationPickers.twoLines(c, c.getString(R.string.auto_template_away),
                 c.getString(R.string.auto_template_away_desc)), true));
+        items.add(places.isEmpty()
+                ? new AutomationPickers.Item(c.getString(R.string.auto_template_tailgate_unavailable), false)
+                : new AutomationPickers.Item(AutomationPickers.twoLines(c, c.getString(R.string.auto_template_tailgate),
+                c.getString(R.string.auto_template_tailgate_desc)), true));
         items.add(new AutomationPickers.Item(AutomationPickers.twoLines(c, c.getString(R.string.auto_template_blank),
                 c.getString(R.string.auto_template_blank_desc)), true));
         AutomationPickers.list(c, c.getString(R.string.auto_add), items, -1, which -> {
@@ -424,6 +442,13 @@ final class AutomationRows {
                 append(new Rule(newId(), "", true, Trigger.gear("P"),
                         Collections.singletonList(Condition.notInPlaces(ids)),
                         Collections.singletonList(Change.of(Setting.SENTRY, "on")), false));
+            } else if (which == 3) {
+                // 按地点设尾门开启上限（issue 155）：挂入 P 挡，而且在选中的地点，就把尾门开启上限设为选的值
+                AutomationPickers.pickPlaceIds(c, places, true, Collections.emptyList(),
+                        ids -> AutomationPickers.pickRange(c, Setting.TAILGATE_LIMIT, null,
+                                ch -> append(new Rule(newId(), "", true, Trigger.gear("P"),
+                                        Collections.singletonList(Condition.inPlaces(ids)),
+                                        Collections.singletonList(ch), false))));
             } else {
                 AutomationPickers.pickTrigger(c, null, false, t -> AutomationPickers.pickChange(c, null, t,
                         ch -> append(new Rule(newId(), "", true, t, Collections.emptyList(),

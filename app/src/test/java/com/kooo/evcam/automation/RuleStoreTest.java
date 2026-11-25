@@ -91,6 +91,19 @@ public class RuleStoreTest {
         assertTrue("地点条件一个地点都没有、到达没有地点、关安全功能配离开：整条不要", RuleStore.parse(json).isEmpty());
     }
 
+    @Test
+    public void tailgateLimitSurvivesARoundTrip() {
+        Rule home = new Rule("t", null, true, Trigger.gear("P"),
+                Collections.singletonList(Condition.inPlaces(Collections.singletonList("home"))),
+                Collections.singletonList(Change.of(Setting.TAILGATE_LIMIT, "70")), false);
+        List<Rule> back = RuleStore.parse(RuleStore.format(Collections.singletonList(home)));
+        assertEquals(1, back.size());
+        assertEquals("tailgate_limit=70", back.get(0).changes.get(0).describe());
+        String json = "[{\"id\":\"x\",\"on\":true,\"when\":{\"kind\":\"gear\",\"gear\":\"P\"},"
+                + "\"then\":[{\"setting\":\"tailgate_limit\",\"value\":\"100\"}]}]";
+        assertTrue("范围外的值整条不要", RuleStore.parse(json).isEmpty());
+    }
+
     /** 读不懂的那一条整条不要：少了一个条件的规则会在不该做的时候做。 */
     @Test
     public void unreadableRulesAreDroppedWhole() {

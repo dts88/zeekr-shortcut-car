@@ -4,6 +4,7 @@
 
   开关那一格空着（名字对齐那条竖线），标签在前（次要文字色，同一个宽度），内容在后（正文色），从上往下读是一句话；
   能点的行尾一个 ›。「添加条件」「添加动作」这一种标签空着，内容是加号带文字（energy_text）。卡片的形状照 CardItemPreference。
+  内容下面可以有一行小字（summary，次要文字色；空的不显示）：尾门开启上限那一个动作写调整时车尾会响两声。
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
@@ -34,20 +35,37 @@
         android:textColor="@color/pref_summary"
         android:textAppearance="@style/TextAppearance.Cam.Body" />
 
-    <TextView
-        android:id="@android:id/title"
+    <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:drawablePadding="8dp"
-        android:ellipsize="end"
-        android:gravity="center_vertical"
-        android:maxLines="3"
+        android:orientation="vertical"
         android:paddingTop="12dp"
-        android:paddingBottom="12dp"
-        android:textAlignment="viewStart"
-        android:textColor="@color/pref_title"
-        android:textAppearance="@style/TextAppearance.Cam.Body" />
+        android:paddingBottom="12dp">
+
+        <TextView
+            android:id="@android:id/title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:drawablePadding="8dp"
+            android:ellipsize="end"
+            android:gravity="center_vertical"
+            android:maxLines="3"
+            android:textAlignment="viewStart"
+            android:textColor="@color/pref_title"
+            android:textAppearance="@style/TextAppearance.Cam.Body" />
+
+        <TextView
+            android:id="@android:id/summary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:maxLines="4"
+            android:textAlignment="viewStart"
+            android:textColor="@color/pref_summary"
+            android:textAppearance="@style/TextAppearance.Cam.Micro"
+            android:visibility="gone" />
+    </LinearLayout>
 
     <ImageView
         android:id="@+id/pref_chevron"
