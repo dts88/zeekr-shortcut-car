@@ -70,8 +70,8 @@ public final class ShareCode {
     public static final String LETTERS = "ACEGLMPRTUVWX";
     /** 显示时几个一组（项目所有者 2026-11-27）。 */
     public static final int GROUP = 4;
-    /** 最短的码：1 E C01，再加长度位、两位校验。 */
-    static final int MIN_LENGTH = 8;
+    /** 最短的码：1 E C01，再加长度位、两位校验。打满这么多才验（输入框）。 */
+    public static final int MIN_LENGTH = 8;
     /** 一条能分享的规则最多用到几个地点（编号只有一位）。 */
     public static final int MAX_PLACES = 9;
 

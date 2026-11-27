@@ -23,6 +23,7 @@ import com.kooo.evcam.button.DeviceLabel;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.function.Function;
 
 /**
  * 地点与自动化页上的字（ui-spec §十六「地点与自动化」）：一条自动化那一行的名字和说明、展开以后每一行的内容、选择框里的每一项。
@@ -123,11 +124,16 @@ final class AutomationTexts {
 
     /** 几个地点的名字，用「、」连起来。 */
     static String placeNames(Context c, List<String> ids) {
-        List<String> names = new ArrayList<>();
+        return placeNames(c, ids, id -> placeName(c, id));
+    }
+
+    /** 同上，名字由 {@code names} 给（输入分享码时，码里的「地点 1」还没换成自己的地点）。 */
+    static String placeNames(Context c, List<String> ids, Function<String, String> names) {
+        List<String> out = new ArrayList<>();
         for (String id : ids) {
-            names.add(placeName(c, id));
+            out.add(names.apply(id));
         }
-        return String.join(c.getString(R.string.auto_list_sep), names);
+        return String.join(c.getString(R.string.auto_list_sep), out);
     }
 
     /** 坐标写成「纬度, 经度」，小数点后 4 位（约 10 m）。输入框里填的就是这个。 */
@@ -162,15 +168,20 @@ final class AutomationTexts {
 
     /** 「当」那一行的内容：上车、挂入 R 挡、到达家、空调开启、驾驶模式变为运动。 */
     static String trigger(Context c, Trigger t) {
+        return trigger(c, t, id -> placeName(c, id));
+    }
+
+    /** 同上，地点的名字由 {@code names} 给。 */
+    static String trigger(Context c, Trigger t, Function<String, String> names) {
         switch (t.kind) {
             case GET_IN:
                 return c.getString(R.string.auto_trigger_get_in);
             case GEAR:
                 return c.getString(R.string.auto_trigger_gear, t.gear);
             case ARRIVE:
-                return c.getString(R.string.auto_trigger_arrive, placeName(c, t.place));
+                return c.getString(R.string.auto_trigger_arrive, names.apply(t.place));
             case LEAVE:
-                return c.getString(R.string.auto_trigger_leave, placeName(c, t.place));
+                return c.getString(R.string.auto_trigger_leave, names.apply(t.place));
             case STATE:
             default:
                 return onOff(t.setting)
@@ -186,6 +197,11 @@ final class AutomationTexts {
 
     /** 结束的那一下：离开 R 挡时、离开家时、空调关闭时、驾驶模式不再是运动时；不会结束的是 null。 */
     static String end(Context c, Trigger t) {
+        return end(c, t, id -> placeName(c, id));
+    }
+
+    /** 同上，地点的名字由 {@code names} 给。 */
+    static String end(Context c, Trigger t, Function<String, String> names) {
         if (!ends(t)) {
             return null;
         }
@@ -193,7 +209,7 @@ final class AutomationTexts {
             return c.getString(R.string.auto_end_gear, t.gear);
         }
         if (t.kind == Trigger.Kind.ARRIVE) {
-            return c.getString(R.string.auto_end_arrive, placeName(c, t.place));
+            return c.getString(R.string.auto_end_arrive, names.apply(t.place));
         }
         return onOff(t.setting)
                 ? c.getString(R.string.auto_end_state_switch, settingName(c, t.setting), valueName(c, opposite(t.value)))
@@ -202,6 +218,11 @@ final class AutomationTexts {
 
     /** 「而且」一行的内容。 */
     static String condition(Context c, Condition k) {
+        return condition(c, k, id -> placeName(c, id));
+    }
+
+    /** 同上，地点的名字由 {@code names} 给。 */
+    static String condition(Context c, Condition k, Function<String, String> names) {
         switch (k.kind) {
             case GEAR_IS:
                 return c.getString(R.string.auto_cond_gear, k.gear);
@@ -214,9 +235,9 @@ final class AutomationTexts {
             case WEEKDAYS:
                 return days(c, k.days);
             case IN_PLACES:
-                return c.getString(R.string.auto_cond_in_places, placeNames(c, k.places));
+                return c.getString(R.string.auto_cond_in_places, placeNames(c, k.places, names));
             case NOT_IN_PLACES:
-                return c.getString(R.string.auto_cond_not_in_places, placeNames(c, k.places));
+                return c.getString(R.string.auto_cond_not_in_places, placeNames(c, k.places, names));
             case STATE_IS:
             default:
                 return onOff(k.setting)
