@@ -756,6 +756,14 @@
   （提示音那半句是项目所有者 2026-11-24 的原话：「在调整尾门高度时，车厢后部会传来两声短促的提醒声，意为尾门高度已调整」）；
   auto_template_tailgate「按地点设置尾门开启上限」、auto_template_tailgate_desc「当挂入 P 挡，而且在选中的地点，就把尾门开启上限设为选的值」、
   auto_template_tailgate_unavailable「按地点设置尾门开启上限（先在下面的「地点」里添加地点）」。
+- 2026-11-27 批准（项目所有者：「同意」；阿拉伯文照写，等审校）分享码（ui-spec §十八「分享码」）：
+  action_add「添加」；auto_share_label「分享码」；auto_share_title「分享这条自动化」；
+  auto_share_scan「用手机扫码，在 zeekr.autos 打开这一条。」；
+  auto_share_how「在另一台车上，到「添加自动化」里选「输入分享码」，输入这串码就能添加，用到的地点换成那台车自己的。」；
+  auto_share_too_many_places「不能分享：用到的地点超过 %1$d 个」；auto_share_place_conditions「不能分享：在、不在某些地点的条件各最多一个」；
+  auto_share_unsupported「不能分享」；auto_import「输入分享码」、auto_import_desc「添加别人分享的一条，地点换成自己的」；
+  auto_import_hint「例如 1EC1 2567」；auto_import_wrong「分享码不对」；auto_import_newer「要更新应用才能添加这一条」；
+  auto_import_places_missing「这一条用到 %1$d 个地点，先在下面的「地点」里添加」；auto_import_pick「选择地点」。
 - vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
 - 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
 
@@ -886,3 +894,4 @@
 | 设置分区与页面 | 4.0 起：录制、存储、超级镜子、盲区画面、按键、通用、更新与关于、开发者选项；页：详细参数、车辆信号、关于与致谢、初始设置（4.0 以前的「悬浮键与灵动贴」「界面」「系统」「检查更新」不再是页名） | Recording、Storage、Super mirror、Blind spot view、Buttons、General、Updates & about、Developer options（草稿） | Rakaman、Storan、Cermin super、Paparan titik buta、Butang、Umum、Kemas kini & perihal、Pilihan pembangun（草稿） | التسجيل، التخزين، المرآة الفائقة، رؤية النقطة العمياء، الأزرار، عام، التحديثات وحول التطبيق، خيارات المطوّرين؛ الصفحات: الإعدادات التفصيلية، إشارات السيارة، حول التطبيق وشكر وتقدير، الإعداد الأولي | 英文、马来文 4.0 全部做完后统一整理 |
 | 灵动贴 | 灵动贴（只有页名里和「悬浮键」连着写，别处的悬浮按钮照旧） | smart button | butang pintar | الزر الذكي (ج. الأزرار الذكية) | — |
 | 绑定（灵动贴） | 绑定：绑定灵动贴、已绑定 | pair：Pair smart button、paired | pasangkan：Pasangkan butang pintar、dipasangkan | الإقران: إقران زر ذكي، مقترن | 「连接」只指连上蓝牙的那一下（长按时）；不用「搜索」「登记」「配对」（2026-11-04 加，2026-11-05 项目所有者批准） |
+| 分享码 | 分享码（一串码就是一条自动化，显示时 4 个一组）；分享这条自动化、输入分享码 | share code：Share this automation、Enter share code | kod kongsi：Kongsi automasi ini、Masukkan kod kongsi | رمز المشاركة: مشاركة هذه الأتمتة، إدخال رمز المشاركة | 2026-11-27 加，项目所有者批准；不用「口令」「代码」「编码」 |

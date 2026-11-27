@@ -1496,7 +1496,7 @@
     <string name="auto_template_tailgate_unavailable">Tetapkan had bukaan but belakang mengikut tempat (tambah tempat di bawah Tempat dahulu)</string>
     <string name="auto_tailgate_beep">Dua bunyi pendek dari bahagian belakang kabin bermakna had bukaan but belakang telah dilaraskan</string>
 
-    <!-- Tempat & automasi: kod kongsi (ui-spec §18, draf 2026-11-27) -->
+    <!-- Tempat & automasi: kod kongsi (ui-spec §18; diluluskan 2026-11-27) -->
     <string name="action_add">Tambah</string>
     <string name="auto_share_label">Kod kongsi</string>
     <string name="auto_share_title">Kongsi automasi ini</string>

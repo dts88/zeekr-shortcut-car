@@ -1530,7 +1530,7 @@
     <string name="auto_template_tailgate_unavailable">按地点设置尾门开启上限（先在下面的「地点」里添加地点）</string>
     <string name="auto_tailgate_beep">调整时车厢后部会传来两声短促的提示音，表示尾门开启上限已调整</string>
 
-    <!-- 地点与自动化：分享码（ui-spec §十八「分享码」，2026-11-27 草稿，等项目所有者批） -->
+    <!-- 地点与自动化：分享码（ui-spec §十八「分享码」；项目所有者 2026-11-27 批） -->
     <string name="action_add">添加</string>
     <string name="auto_share_label">分享码</string>
     <string name="auto_share_title">分享这条自动化</string>

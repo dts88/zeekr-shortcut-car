@@ -1521,7 +1521,7 @@
     <string name="auto_template_tailgate_unavailable">Set the tailgate opening limit by place (add a place under Places first)</string>
     <string name="auto_tailgate_beep">Two short beeps from the rear of the cabin mean the tailgate opening limit has been adjusted</string>
 
-    <!-- Places & automation: share code (ui-spec §18, 2026-11-27 draft, awaiting approval) -->
+    <!-- Places & automation: share code (ui-spec §18; approved by the project owner 2026-11-27) -->
     <string name="action_add">Add</string>
     <string name="auto_share_label">Share code</string>
     <string name="auto_share_title">Share this automation</string>
