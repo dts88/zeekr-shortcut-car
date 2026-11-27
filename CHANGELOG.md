@@ -11,6 +11,10 @@ commit message, not here.
 
 Nothing yet.
 
+## [4.18.0-alpha] - 2026-11-27
+
+- Places and automation: share codes. An expanded rule ends with its share code; tap it for a QR code that opens the rule on zeekr.autos. Add automation → Enter share code adds a rule from a code, with your own places. Codes carry no names, coordinates or radii.
+
 ## [4.17.0-alpha] - 2026-11-25
 
 - Places and automation: new action Tailgate opening limit, 50 to 95% ([#155](https://github.com/dts88/zeekr-shortcut-car/issues/155)). Changed only in P with the tailgate closed, once per rule and not restored, because the car beeps twice at the rear each time it changes. New common rule: set the tailgate opening limit by place.
