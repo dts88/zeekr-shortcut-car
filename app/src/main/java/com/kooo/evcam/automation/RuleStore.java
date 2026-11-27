@@ -93,6 +93,12 @@ public final class RuleStore {
     }
 
     private static Rule rule(JSONObject o) {
+        Rule rule = read(o);
+        return rule != null && rule.complete() ? rule : null;
+    }
+
+    /** 照存的写法读一条，不管能不能跑（分享码的测试要把不完整的规则也读出来）；读不懂的是 null。 */
+    static Rule read(JSONObject o) {
         String id = o.optString("id", null);
         Trigger trigger = trigger(o.optJSONObject("when"));
         if (id == null || id.isEmpty() || trigger == null) {
@@ -118,9 +124,8 @@ public final class RuleStore {
             changes.add(c);
         }
         String name = o.isNull("name") ? null : o.optString("name", null);
-        Rule rule = new Rule(id, name, o.optBoolean("on", false), trigger, conditions, changes,
+        return new Rule(id, name, o.optBoolean("on", false), trigger, conditions, changes,
                 o.optBoolean("restore", false));
-        return rule.complete() ? rule : null;
     }
 
     private static JSONObject trigger(Trigger t) throws JSONException {
