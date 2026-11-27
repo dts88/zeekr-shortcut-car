@@ -1,0 +1,1725 @@
+{
+  "spec": "Zeekr Shortcut automation share code",
+  "version": 1,
+  "note": "验证期：可以随时改，改了重新生成本文件，应用和网站一起照改",
+  "letters": "ACEGLMPRTUVWX",
+  "display": {
+    "group": 4,
+    "separator": " ",
+    "note": "只是显示；码本身是不带空格的一整串"
+  },
+  "settings": [
+    {
+      "no": 0,
+      "key": "sentry",
+      "values": [
+        "off",
+        "on"
+      ]
+    },
+    {
+      "no": 1,
+      "key": "drive_mode",
+      "values": [
+        "comfort",
+        "standard",
+        "sport"
+      ]
+    },
+    {
+      "no": 2,
+      "key": "circulation",
+      "values": [
+        "auto",
+        "outer",
+        "inner"
+      ]
+    },
+    {
+      "no": 3,
+      "key": "rear_climate",
+      "values": [
+        "off",
+        "on"
+      ]
+    },
+    {
+      "no": 4,
+      "key": "hill_descent",
+      "values": [
+        "off",
+        "on"
+      ]
+    },
+    {
+      "no": 5,
+      "key": "tailgate_limit",
+      "min": 50,
+      "max": 95,
+      "noRestore": true
+    },
+    {
+      "no": 6,
+      "key": "low_speed_braking",
+      "values": [
+        "off",
+        "on"
+      ],
+      "safety": true
+    },
+    {
+      "no": 7,
+      "key": "front_climate",
+      "values": [
+        "off",
+        "on"
+      ],
+      "readOnly": true
+    }
+  ],
+  "gears": [
+    "P",
+    "R",
+    "N",
+    "D"
+  ],
+  "encode": [
+    {
+      "name": "到达地点，挡位是 P → 尾门开启上限 80%",
+      "rule": {
+        "when": {
+          "kind": "arrive",
+          "place": "place-7f3a"
+        },
+        "if": [
+          {
+            "kind": "gear_is",
+            "gear": "P"
+          }
+        ],
+        "then": [
+          {
+            "setting": "tailgate_limit",
+            "value": "80"
+          }
+        ],
+        "restore": false
+      },
+      "code": "1A1G0C580963",
+      "display": "1A1G 0C58 0963"
+    },
+    {
+      "name": "上车 → 驾驶模式：运动",
+      "rule": {
+        "when": {
+          "kind": "get_in"
+        },
+        "if": [],
+        "then": [
+          {
+            "setting": "drive_mode",
+            "value": "sport"
+          }
+        ],
+        "restore": false
+      },
+      "code": "1EC12567",
+      "display": "1EC1 2567"
+    },
+    {
+      "name": "挂入 D 挡，22:00–06:00 → 内循环，结束时恢复",
+      "rule": {
+        "when": {
+          "kind": "gear",
+          "gear": "D"
+        },
+        "if": [
+          {
+            "kind": "time_between",
+            "from": 1320,
+            "to": 360
+          }
+        ],
+        "then": [
+          {
+            "setting": "circulation",
+            "value": "inner"
+          }
+        ],
+        "restore": true
+      },
+      "code": "1G3T22000600C22R693",
+      "display": "1G3T 2200 0600 C22R 693"
+    },
+    {
+      "name": "离开地点，星期一至五 → 哨兵模式开启",
+      "rule": {
+        "when": {
+          "kind": "leave",
+          "place": "place-7f3a"
+        },
+        "if": [
+          {
+            "kind": "weekdays",
+            "days": 31
+          }
+        ],
+        "then": [
+          {
+            "setting": "sentry",
+            "value": "on"
+          }
+        ],
+        "restore": false
+      },
+      "code": "1L1W12345C01293",
+      "display": "1L1W 1234 5C01 293"
+    },
+    {
+      "name": "空调变为开启，电量低于 30% → 二排空调关闭，结束时恢复",
+      "rule": {
+        "when": {
+          "kind": "state",
+          "setting": "front_climate",
+          "value": "on"
+        },
+        "if": [
+          {
+            "kind": "battery_below",
+            "n": 30
+          }
+        ],
+        "then": [
+          {
+            "setting": "rear_climate",
+            "value": "off"
+          }
+        ],
+        "restore": true
+      },
+      "code": "1V71U030C30R283",
+      "display": "1V71 U030 C30R 283"
+    },
+    {
+      "name": "到达地点 → 低速紧急制动关闭（关安全功能，必须恢复，没勾也带 R）",
+      "rule": {
+        "when": {
+          "kind": "arrive",
+          "place": "place-7f3a"
+        },
+        "if": [],
+        "then": [
+          {
+            "setting": "low_speed_braking",
+            "value": "off"
+          }
+        ],
+        "restore": false
+      },
+      "code": "1A1C60R744",
+      "display": "1A1C 60R7 44"
+    },
+    {
+      "name": "上车，在地点甲或乙，不在地点丙 → 陡坡缓降开启、外循环",
+      "rule": {
+        "when": {
+          "kind": "get_in"
+        },
+        "if": [
+          {
+            "kind": "in_places",
+            "places": [
+              "place-02bd",
+              "place-7f3a"
+            ]
+          },
+          {
+            "kind": "not_in_places",
+            "places": [
+              "place-c91e"
+            ]
+          }
+        ],
+        "then": [
+          {
+            "setting": "hill_descent",
+            "value": "on"
+          },
+          {
+            "setting": "circulation",
+            "value": "outer"
+          }
+        ],
+        "restore": false
+      },
+      "code": "1EP12X3C2141292",
+      "display": "1EP1 2X3C 2141 292"
+    },
+    {
+      "name": "挂入 R 挡，电量不低于 100%，00:00–23:59 → 哨兵模式关闭（边界值）",
+      "rule": {
+        "when": {
+          "kind": "gear",
+          "gear": "R"
+        },
+        "if": [
+          {
+            "kind": "battery_at_least",
+            "n": 100
+          },
+          {
+            "kind": "time_between",
+            "from": 0,
+            "to": 1439
+          }
+        ],
+        "then": [
+          {
+            "setting": "sentry",
+            "value": "off"
+          }
+        ],
+        "restore": false
+      },
+      "code": "1G1M100T00002359C00987",
+      "display": "1G1M 100T 0000 2359 C009 87"
+    },
+    {
+      "name": "周末上车 → 驾驶模式：舒适",
+      "rule": {
+        "when": {
+          "kind": "get_in"
+        },
+        "if": [
+          {
+            "kind": "weekdays",
+            "days": 96
+          }
+        ],
+        "then": [
+          {
+            "setting": "drive_mode",
+            "value": "comfort"
+          }
+        ],
+        "restore": false
+      },
+      "code": "1EW67C10892",
+      "display": "1EW6 7C10 892"
+    },
+    {
+      "name": "到达地点甲，在地点甲或乙 → 二排空调开启（当里的地点总是 1）",
+      "rule": {
+        "when": {
+          "kind": "arrive",
+          "place": "place-02bd"
+        },
+        "if": [
+          {
+            "kind": "in_places",
+            "places": [
+              "place-7f3a",
+              "place-02bd"
+            ]
+          }
+        ],
+        "then": [
+          {
+            "setting": "rear_climate",
+            "value": "on"
+          }
+        ],
+        "restore": false
+      },
+      "code": "1A1P12C31909",
+      "display": "1A1P 12C3 1909"
+    },
+    {
+      "name": "哨兵模式变为开启 → 二排空调关闭（没勾恢复）",
+      "rule": {
+        "when": {
+          "kind": "state",
+          "setting": "sentry",
+          "value": "on"
+        },
+        "if": [],
+        "then": [
+          {
+            "setting": "rear_climate",
+            "value": "off"
+          }
+        ],
+        "restore": false
+      },
+      "code": "1V01C30766",
+      "display": "1V01 C307 66"
+    },
+    {
+      "name": "上车，07:00–10:00 而且 08:00–09:00 → 外循环（同一种条件可以有几个）",
+      "rule": {
+        "when": {
+          "kind": "get_in"
+        },
+        "if": [
+          {
+            "kind": "time_between",
+            "from": 420,
+            "to": 600
+          },
+          {
+            "kind": "time_between",
+            "from": 480,
+            "to": 540
+          }
+        ],
+        "then": [
+          {
+            "setting": "circulation",
+            "value": "outer"
+          }
+        ],
+        "restore": false
+      },
+      "code": "1ET07001000T08000900C21309",
+      "display": "1ET0 7001 000T 0800 0900 C213 09"
+    },
+    {
+      "name": "长一点的：到达地点，P 挡，电量不低于 20%，07:00–09:00，星期一至五，不在地点乙 → 舒适、外循环、二排空调开启、尾门 85%，结束时恢复",
+      "rule": {
+        "when": {
+          "kind": "arrive",
+          "place": "place-7f3a"
+        },
+        "if": [
+          {
+            "kind": "gear_is",
+            "gear": "P"
+          },
+          {
+            "kind": "battery_at_least",
+            "n": 20
+          },
+          {
+            "kind": "time_between",
+            "from": 420,
+            "to": 540
+          },
+          {
+            "kind": "weekdays",
+            "days": 31
+          },
+          {
+            "kind": "not_in_places",
+            "places": [
+              "place-02bd"
+            ]
+          }
+        ],
+        "then": [
+          {
+            "setting": "drive_mode",
+            "value": "comfort"
+          },
+          {
+            "setting": "circulation",
+            "value": "outer"
+          },
+          {
+            "setting": "rear_climate",
+            "value": "on"
+          },
+          {
+            "setting": "tailgate_limit",
+            "value": "85"
+          }
+        ],
+        "restore": true
+      },
+      "code": "1A1G0M020T07000900W12345X2C102131585R743",
+      "display": "1A1G 0M02 0T07 0009 00W1 2345 X2C1 0213 1585 R743"
+    }
+  ],
+  "sameCode": [
+    {
+      "name": "名字、开关、id、地点 id 都不进码",
+      "rules": [
+        {
+          "when": {
+            "kind": "arrive",
+            "place": "place-7f3a"
+          },
+          "if": [
+            {
+              "kind": "gear_is",
+              "gear": "P"
+            }
+          ],
+          "then": [
+            {
+              "setting": "tailgate_limit",
+              "value": "80"
+            }
+          ],
+          "restore": false
+        },
+        {
+          "when": {
+            "kind": "arrive",
+            "place": "x"
+          },
+          "if": [
+            {
+              "kind": "gear_is",
+              "gear": "P"
+            }
+          ],
+          "then": [
+            {
+              "setting": "tailgate_limit",
+              "value": "80"
+            }
+          ],
+          "restore": false,
+          "id": "r-9",
+          "name": "我家车库",
+          "on": false
+        }
+      ],
+      "code": "1A1G0C580963"
+    },
+    {
+      "name": "地点先后、地点 id、条件先后都不算区别",
+      "rules": [
+        {
+          "when": {
+            "kind": "get_in"
+          },
+          "if": [
+            {
+              "kind": "in_places",
+              "places": [
+                "place-02bd",
+                "place-7f3a"
+              ]
+            },
+            {
+              "kind": "not_in_places",
+              "places": [
+                "place-c91e"
+              ]
+            }
+          ],
+          "then": [
+            {
+              "setting": "hill_descent",
+              "value": "on"
+            },
+            {
+              "setting": "circulation",
+              "value": "outer"
+            }
+          ],
+          "restore": false
+        },
+        {
+          "when": {
+            "kind": "get_in"
+          },
+          "if": [
+            {
+              "kind": "not_in_places",
+              "places": [
+                "k"
+              ]
+            },
+            {
+              "kind": "in_places",
+              "places": [
+                "m",
+                "n"
+              ]
+            }
+          ],
+          "then": [
+            {
+              "setting": "hill_descent",
+              "value": "on"
+            },
+            {
+              "setting": "circulation",
+              "value": "outer"
+            }
+          ],
+          "restore": false
+        }
+      ],
+      "code": "1EP12X3C2141292"
+    },
+    {
+      "name": "动作先后不算区别",
+      "rules": [
+        {
+          "when": {
+            "kind": "get_in"
+          },
+          "if": [
+            {
+              "kind": "in_places",
+              "places": [
+                "place-02bd",
+                "place-7f3a"
+              ]
+            },
+            {
+              "kind": "not_in_places",
+              "places": [
+                "place-c91e"
+              ]
+            }
+          ],
+          "then": [
+            {
+              "setting": "hill_descent",
+              "value": "on"
+            },
+            {
+              "setting": "circulation",
+              "value": "outer"
+            }
+          ],
+          "restore": false
+        },
+        {
+          "when": {
+            "kind": "get_in"
+          },
+          "if": [
+            {
+              "kind": "in_places",
+              "places": [
+                "place-7f3a",
+                "place-02bd"
+              ]
+            },
+            {
+              "kind": "not_in_places",
+              "places": [
+                "place-c91e"
+              ]
+            }
+          ],
+          "then": [
+            {
+              "setting": "circulation",
+              "value": "outer"
+            },
+            {
+              "setting": "hill_descent",
+              "value": "on"
+            }
+          ],
+          "restore": false
+        }
+      ],
+      "code": "1EP12X3C2141292"
+    },
+    {
+      "name": "一模一样的条件只算一个",
+      "rules": [
+        {
+          "when": {
+            "kind": "arrive",
+            "place": "place-7f3a"
+          },
+          "if": [
+            {
+              "kind": "gear_is",
+              "gear": "P"
+            }
+          ],
+          "then": [
+            {
+              "setting": "tailgate_limit",
+              "value": "80"
+            }
+          ],
+          "restore": false
+        },
+        {
+          "when": {
+            "kind": "arrive",
+            "place": "place-7f3a"
+          },
+          "if": [
+            {
+              "kind": "gear_is",
+              "gear": "P"
+            },
+            {
+              "kind": "gear_is",
+              "gear": "P"
+            }
+          ],
+          "then": [
+            {
+              "setting": "tailgate_limit",
+              "value": "80"
+            }
+          ],
+          "restore": false
+        }
+      ],
+      "code": "1A1G0C580963"
+    },
+    {
+      "name": "只有尾门（不恢复）时勾不勾恢复一样",
+      "rules": [
+        {
+          "when": {
+            "kind": "arrive",
+            "place": "place-7f3a"
+          },
+          "if": [
+            {
+              "kind": "gear_is",
+              "gear": "P"
+            }
+          ],
+          "then": [
+            {
+              "setting": "tailgate_limit",
+              "value": "80"
+            }
+          ],
+          "restore": false
+        },
+        {
+          "when": {
+            "kind": "arrive",
+            "place": "place-7f3a"
+          },
+          "if": [
+            {
+              "kind": "gear_is",
+              "gear": "P"
+            }
+          ],
+          "then": [
+            {
+              "setting": "tailgate_limit",
+              "value": "80"
+            }
+          ],
+          "restore": true
+        }
+      ],
+      "code": "1A1G0C580963"
+    },
+    {
+      "name": "关安全功能的，勾不勾恢复一样（必须恢复）",
+      "rules": [
+        {
+          "when": {
+            "kind": "arrive",
+            "place": "place-7f3a"
+          },
+          "if": [],
+          "then": [
+            {
+              "setting": "low_speed_braking",
+              "value": "off"
+            }
+          ],
+          "restore": false
+        },
+        {
+          "when": {
+            "kind": "arrive",
+            "place": "place-02bd"
+          },
+          "if": [],
+          "then": [
+            {
+              "setting": "low_speed_braking",
+              "value": "off"
+            }
+          ],
+          "restore": true
+        }
+      ],
+      "code": "1A1C60R744"
+    },
+    {
+      "name": "同一项设置有几个动作的，只留最后一个",
+      "rules": [
+        {
+          "when": {
+            "kind": "leave",
+            "place": "place-7f3a"
+          },
+          "if": [
+            {
+              "kind": "weekdays",
+              "days": 31
+            }
+          ],
+          "then": [
+            {
+              "setting": "sentry",
+              "value": "on"
+            }
+          ],
+          "restore": false
+        },
+        {
+          "when": {
+            "kind": "leave",
+            "place": "place-7f3a"
+          },
+          "if": [
+            {
+              "kind": "weekdays",
+              "days": 31
+            }
+          ],
+          "then": [
+            {
+              "setting": "sentry",
+              "value": "off"
+            },
+            {
+              "setting": "sentry",
+              "value": "on"
+            }
+          ],
+          "restore": false
+        }
+      ],
+      "code": "1L1W12345C01293"
+    },
+    {
+      "name": "星期的写法只看低 7 位（同应用）",
+      "rules": [
+        {
+          "when": {
+            "kind": "leave",
+            "place": "place-7f3a"
+          },
+          "if": [
+            {
+              "kind": "weekdays",
+              "days": 31
+            }
+          ],
+          "then": [
+            {
+              "setting": "sentry",
+              "value": "on"
+            }
+          ],
+          "restore": false
+        },
+        {
+          "when": {
+            "kind": "leave",
+            "place": "place-7f3a"
+          },
+          "if": [
+            {
+              "kind": "weekdays",
+              "days": 159
+            }
+          ],
+          "then": [
+            {
+              "setting": "sentry",
+              "value": "on"
+            }
+          ],
+          "restore": false
+        }
+      ],
+      "code": "1L1W12345C01293"
+    }
+  ],
+  "decode": [
+    {
+      "name": "到达地点，挡位是 P → 尾门开启上限 80%",
+      "input": "1A1G0C580963",
+      "rule": {
+        "when": {
+          "kind": "arrive",
+          "place": "1"
+        },
+        "if": [
+          {
+            "kind": "gear_is",
+            "gear": "P"
+          }
+        ],
+        "then": [
+          {
+            "setting": "tailgate_limit",
+            "value": "80"
+          }
+        ],
+        "restore": false
+      }
+    },
+    {
+      "name": "上车 → 驾驶模式：运动",
+      "input": "1EC12567",
+      "rule": {
+        "when": {
+          "kind": "get_in"
+        },
+        "if": [],
+        "then": [
+          {
+            "setting": "drive_mode",
+            "value": "sport"
+          }
+        ],
+        "restore": false
+      }
+    },
+    {
+      "name": "挂入 D 挡，22:00–06:00 → 内循环，结束时恢复",
+      "input": "1G3T22000600C22R693",
+      "rule": {
+        "when": {
+          "kind": "gear",
+          "gear": "D"
+        },
+        "if": [
+          {
+            "kind": "time_between",
+            "from": 1320,
+            "to": 360
+          }
+        ],
+        "then": [
+          {
+            "setting": "circulation",
+            "value": "inner"
+          }
+        ],
+        "restore": true
+      }
+    },
+    {
+      "name": "离开地点，星期一至五 → 哨兵模式开启",
+      "input": "1L1W12345C01293",
+      "rule": {
+        "when": {
+          "kind": "leave",
+          "place": "1"
+        },
+        "if": [
+          {
+            "kind": "weekdays",
+            "days": 31
+          }
+        ],
+        "then": [
+          {
+            "setting": "sentry",
+            "value": "on"
+          }
+        ],
+        "restore": false
+      }
+    },
+    {
+      "name": "空调变为开启，电量低于 30% → 二排空调关闭，结束时恢复",
+      "input": "1V71U030C30R283",
+      "rule": {
+        "when": {
+          "kind": "state",
+          "setting": "front_climate",
+          "value": "on"
+        },
+        "if": [
+          {
+            "kind": "battery_below",
+            "n": 30
+          }
+        ],
+        "then": [
+          {
+            "setting": "rear_climate",
+            "value": "off"
+          }
+        ],
+        "restore": true
+      }
+    },
+    {
+      "name": "到达地点 → 低速紧急制动关闭（关安全功能，必须恢复，没勾也带 R）",
+      "input": "1A1C60R744",
+      "rule": {
+        "when": {
+          "kind": "arrive",
+          "place": "1"
+        },
+        "if": [],
+        "then": [
+          {
+            "setting": "low_speed_braking",
+            "value": "off"
+          }
+        ],
+        "restore": true
+      }
+    },
+    {
+      "name": "上车，在地点甲或乙，不在地点丙 → 陡坡缓降开启、外循环",
+      "input": "1EP12X3C2141292",
+      "rule": {
+        "when": {
+          "kind": "get_in"
+        },
+        "if": [
+          {
+            "kind": "in_places",
+            "places": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "kind": "not_in_places",
+            "places": [
+              "3"
+            ]
+          }
+        ],
+        "then": [
+          {
+            "setting": "circulation",
+            "value": "outer"
+          },
+          {
+            "setting": "hill_descent",
+            "value": "on"
+          }
+        ],
+        "restore": false
+      }
+    },
+    {
+      "name": "挂入 R 挡，电量不低于 100%，00:00–23:59 → 哨兵模式关闭（边界值）",
+      "input": "1G1M100T00002359C00987",
+      "rule": {
+        "when": {
+          "kind": "gear",
+          "gear": "R"
+        },
+        "if": [
+          {
+            "kind": "battery_at_least",
+            "n": 100
+          },
+          {
+            "kind": "time_between",
+            "from": 0,
+            "to": 1439
+          }
+        ],
+        "then": [
+          {
+            "setting": "sentry",
+            "value": "off"
+          }
+        ],
+        "restore": false
+      }
+    },
+    {
+      "name": "周末上车 → 驾驶模式：舒适",
+      "input": "1EW67C10892",
+      "rule": {
+        "when": {
+          "kind": "get_in"
+        },
+        "if": [
+          {
+            "kind": "weekdays",
+            "days": 96
+          }
+        ],
+        "then": [
+          {
+            "setting": "drive_mode",
+            "value": "comfort"
+          }
+        ],
+        "restore": false
+      }
+    },
+    {
+      "name": "到达地点甲，在地点甲或乙 → 二排空调开启（当里的地点总是 1）",
+      "input": "1A1P12C31909",
+      "rule": {
+        "when": {
+          "kind": "arrive",
+          "place": "1"
+        },
+        "if": [
+          {
+            "kind": "in_places",
+            "places": [
+              "1",
+              "2"
+            ]
+          }
+        ],
+        "then": [
+          {
+            "setting": "rear_climate",
+            "value": "on"
+          }
+        ],
+        "restore": false
+      }
+    },
+    {
+      "name": "哨兵模式变为开启 → 二排空调关闭（没勾恢复）",
+      "input": "1V01C30766",
+      "rule": {
+        "when": {
+          "kind": "state",
+          "setting": "sentry",
+          "value": "on"
+        },
+        "if": [],
+        "then": [
+          {
+            "setting": "rear_climate",
+            "value": "off"
+          }
+        ],
+        "restore": false
+      }
+    },
+    {
+      "name": "上车，07:00–10:00 而且 08:00–09:00 → 外循环（同一种条件可以有几个）",
+      "input": "1ET07001000T08000900C21309",
+      "rule": {
+        "when": {
+          "kind": "get_in"
+        },
+        "if": [
+          {
+            "kind": "time_between",
+            "from": 420,
+            "to": 600
+          },
+          {
+            "kind": "time_between",
+            "from": 480,
+            "to": 540
+          }
+        ],
+        "then": [
+          {
+            "setting": "circulation",
+            "value": "outer"
+          }
+        ],
+        "restore": false
+      }
+    },
+    {
+      "name": "长一点的：到达地点，P 挡，电量不低于 20%，07:00–09:00，星期一至五，不在地点乙 → 舒适、外循环、二排空调开启、尾门 85%，结束时恢复",
+      "input": "1A1G0M020T07000900W12345X2C102131585R743",
+      "rule": {
+        "when": {
+          "kind": "arrive",
+          "place": "1"
+        },
+        "if": [
+          {
+            "kind": "gear_is",
+            "gear": "P"
+          },
+          {
+            "kind": "battery_at_least",
+            "n": 20
+          },
+          {
+            "kind": "time_between",
+            "from": 420,
+            "to": 540
+          },
+          {
+            "kind": "weekdays",
+            "days": 31
+          },
+          {
+            "kind": "not_in_places",
+            "places": [
+              "2"
+            ]
+          }
+        ],
+        "then": [
+          {
+            "setting": "drive_mode",
+            "value": "comfort"
+          },
+          {
+            "setting": "circulation",
+            "value": "outer"
+          },
+          {
+            "setting": "rear_climate",
+            "value": "on"
+          },
+          {
+            "setting": "tailgate_limit",
+            "value": "85"
+          }
+        ],
+        "restore": true
+      }
+    },
+    {
+      "name": "照显示的样子打（4 个一组，空一格）",
+      "input": "1A1G 0M02 0T07 0009 00W1 2345 X2C1 0213 1585 R743",
+      "rule": {
+        "when": {
+          "kind": "arrive",
+          "place": "1"
+        },
+        "if": [
+          {
+            "kind": "gear_is",
+            "gear": "P"
+          },
+          {
+            "kind": "battery_at_least",
+            "n": 20
+          },
+          {
+            "kind": "time_between",
+            "from": 420,
+            "to": 540
+          },
+          {
+            "kind": "weekdays",
+            "days": 31
+          },
+          {
+            "kind": "not_in_places",
+            "places": [
+              "2"
+            ]
+          }
+        ],
+        "then": [
+          {
+            "setting": "drive_mode",
+            "value": "comfort"
+          },
+          {
+            "setting": "circulation",
+            "value": "outer"
+          },
+          {
+            "setting": "rear_climate",
+            "value": "on"
+          },
+          {
+            "setting": "tailgate_limit",
+            "value": "85"
+          }
+        ],
+        "restore": true
+      }
+    },
+    {
+      "name": "小写、空格、连字符都行",
+      "input": "1a1g - 0c58 0963",
+      "rule": {
+        "when": {
+          "kind": "arrive",
+          "place": "1"
+        },
+        "if": [
+          {
+            "kind": "gear_is",
+            "gear": "P"
+          }
+        ],
+        "then": [
+          {
+            "setting": "tailgate_limit",
+            "value": "80"
+          }
+        ],
+        "restore": false
+      }
+    },
+    {
+      "name": "O 当 0、I 当 1",
+      "input": "IAIGOC58O963",
+      "rule": {
+        "when": {
+          "kind": "arrive",
+          "place": "1"
+        },
+        "if": [
+          {
+            "kind": "gear_is",
+            "gear": "P"
+          }
+        ],
+        "then": [
+          {
+            "setting": "tailgate_limit",
+            "value": "80"
+          }
+        ],
+        "restore": false
+      }
+    },
+    {
+      "name": "全角字符",
+      "input": "１Ａ１Ｇ０Ｃ５８０９６３",
+      "rule": {
+        "when": {
+          "kind": "arrive",
+          "place": "1"
+        },
+        "if": [
+          {
+            "kind": "gear_is",
+            "gear": "P"
+          }
+        ],
+        "then": [
+          {
+            "setting": "tailgate_limit",
+            "value": "80"
+          }
+        ],
+        "restore": false
+      }
+    }
+  ],
+  "reject": [
+    {
+      "name": "校验位改了一位",
+      "input": "1A1G0C580960",
+      "error": "checksum"
+    },
+    {
+      "name": "内容改了一位（尾门 80 → 85）没重算校验",
+      "input": "1A1G0C585963",
+      "error": "checksum"
+    },
+    {
+      "name": "相邻两位对调",
+      "input": "A11G0C580963",
+      "error": "checksum"
+    },
+    {
+      "name": "少打一位（星期一至五少了星期四）",
+      "input": "1L1W1235C01293",
+      "error": "checksum"
+    },
+    {
+      "name": "多打一位",
+      "input": "1L1W123445C01293",
+      "error": "checksum"
+    },
+    {
+      "name": "长度位不对、两位校验却按它算对了",
+      "input": "1A1G0C580090",
+      "error": "checksum"
+    },
+    {
+      "name": "有不用的字母 B",
+      "input": "BA1G0C580963",
+      "error": "format"
+    },
+    {
+      "name": "有别的符号",
+      "input": "1A1#0C580963",
+      "error": "format"
+    },
+    {
+      "name": "太短",
+      "input": "1EC0",
+      "error": "format"
+    },
+    {
+      "name": "空的",
+      "input": "",
+      "error": "format"
+    },
+    {
+      "name": "版本 2",
+      "input": "2A1G0C580910",
+      "error": "version"
+    },
+    {
+      "name": "少了版本位",
+      "input": "A1G0C580822",
+      "error": "syntax"
+    },
+    {
+      "name": "没有动作（C）",
+      "input": "1A1G0588",
+      "error": "syntax"
+    },
+    {
+      "name": "R 在 C 前面",
+      "input": "1A1RC580831",
+      "error": "syntax"
+    },
+    {
+      "name": "两个 C",
+      "input": "1EC01C11835",
+      "error": "syntax"
+    },
+    {
+      "name": "第一个不是「当」",
+      "input": "1M020C01802",
+      "error": "syntax"
+    },
+    {
+      "name": "上车带了数字",
+      "input": "1E1C01639",
+      "error": "syntax"
+    },
+    {
+      "name": "C 里最后一个值缺一位",
+      "input": "1EC015663",
+      "error": "syntax"
+    },
+    {
+      "name": "挡位 4",
+      "input": "1G4C01637",
+      "error": "value"
+    },
+    {
+      "name": "尾门 96%",
+      "input": "1A1G0C596968",
+      "error": "value"
+    },
+    {
+      "name": "尾门开启上限当「是」",
+      "input": "1EV51C01860",
+      "error": "value"
+    },
+    {
+      "name": "空调当动作（只读）",
+      "input": "1EC71543",
+      "error": "value"
+    },
+    {
+      "name": "电量 101%",
+      "input": "1EM101C01927",
+      "error": "value"
+    },
+    {
+      "name": "时间 24:00",
+      "input": "1ET24000600C01450",
+      "error": "value"
+    },
+    {
+      "name": "时间段头尾一样",
+      "input": "1ET08000800C01428",
+      "error": "value"
+    },
+    {
+      "name": "星期 8",
+      "input": "1EW8C01775",
+      "error": "value"
+    },
+    {
+      "name": "地点 0",
+      "input": "1A0C01651",
+      "error": "value"
+    },
+    {
+      "name": "设置编号 9",
+      "input": "1EC91525",
+      "error": "value"
+    },
+    {
+      "name": "地点编号不连着（只有 2）",
+      "input": "1A2C01693",
+      "error": "places"
+    },
+    {
+      "name": "两个不一样的「在…」",
+      "input": "1EP1P12C01017",
+      "error": "places"
+    },
+    {
+      "name": "两个不一样的「不在…」",
+      "input": "1G0X1X2C01083",
+      "error": "places"
+    },
+    {
+      "name": "上车 → 低速紧急制动关闭",
+      "input": "1EC60582",
+      "error": "rule"
+    },
+    {
+      "name": "关安全功能却没有 R",
+      "input": "1A1C60648",
+      "error": "noncanonical"
+    },
+    {
+      "name": "上车不会结束，却带了 R",
+      "input": "1EC01R618",
+      "error": "noncanonical"
+    },
+    {
+      "name": "只有尾门（不恢复），却带了 R",
+      "input": "1A1G0C580R040",
+      "error": "noncanonical"
+    },
+    {
+      "name": "条件次序乱了",
+      "input": "1EX3P12C2141251",
+      "error": "noncanonical"
+    },
+    {
+      "name": "地点编号不是最小的那种（当里的地点应是 1）",
+      "input": "1A2P1C31868",
+      "error": "noncanonical"
+    },
+    {
+      "name": "地点集合没按升序",
+      "input": "1EP21C01822",
+      "error": "noncanonical"
+    },
+    {
+      "name": "星期没按升序",
+      "input": "1EW21C01875",
+      "error": "noncanonical"
+    },
+    {
+      "name": "同一个条件写了两遍",
+      "input": "1EG0G0C01946",
+      "error": "noncanonical"
+    },
+    {
+      "name": "动作没按设置编号排",
+      "input": "1EC3101735",
+      "error": "noncanonical"
+    },
+    {
+      "name": "同一项设置写了两个动作",
+      "input": "1EC0001712",
+      "error": "noncanonical"
+    }
+  ],
+  "encodeError": [
+    {
+      "name": "用到 10 个地点",
+      "rule": {
+        "when": {
+          "kind": "get_in"
+        },
+        "if": [
+          {
+            "kind": "in_places",
+            "places": [
+              "p0",
+              "p1",
+              "p2",
+              "p3",
+              "p4",
+              "p5",
+              "p6",
+              "p7",
+              "p8",
+              "p9"
+            ]
+          }
+        ],
+        "then": [
+          {
+            "setting": "sentry",
+            "value": "on"
+          }
+        ],
+        "restore": false
+      },
+      "error": "places"
+    },
+    {
+      "name": "上车 → 低速紧急制动关闭（触发不会结束，不能关掉安全功能）",
+      "rule": {
+        "when": {
+          "kind": "get_in"
+        },
+        "if": [],
+        "then": [
+          {
+            "setting": "low_speed_braking",
+            "value": "off"
+          }
+        ],
+        "restore": false
+      },
+      "error": "rule"
+    },
+    {
+      "name": "没有动作",
+      "rule": {
+        "when": {
+          "kind": "get_in"
+        },
+        "if": [],
+        "then": [],
+        "restore": false
+      },
+      "error": "rule"
+    },
+    {
+      "name": "空调当动作（只读）",
+      "rule": {
+        "when": {
+          "kind": "get_in"
+        },
+        "if": [],
+        "then": [
+          {
+            "setting": "front_climate",
+            "value": "on"
+          }
+        ],
+        "restore": false
+      },
+      "error": "value"
+    },
+    {
+      "name": "尾门开启上限当触发（一段整数不能当「变为」）",
+      "rule": {
+        "when": {
+          "kind": "state",
+          "setting": "tailgate_limit",
+          "value": "80"
+        },
+        "if": [],
+        "then": [
+          {
+            "setting": "sentry",
+            "value": "on"
+          }
+        ],
+        "restore": false
+      },
+      "error": "value"
+    },
+    {
+      "name": "尾门 96%",
+      "rule": {
+        "when": {
+          "kind": "get_in"
+        },
+        "if": [],
+        "then": [
+          {
+            "setting": "tailgate_limit",
+            "value": "96"
+          }
+        ],
+        "restore": false
+      },
+      "error": "value"
+    },
+    {
+      "name": "时间段头尾一样",
+      "rule": {
+        "when": {
+          "kind": "get_in"
+        },
+        "if": [
+          {
+            "kind": "time_between",
+            "from": 480,
+            "to": 480
+          }
+        ],
+        "then": [
+          {
+            "setting": "sentry",
+            "value": "on"
+          }
+        ],
+        "restore": false
+      },
+      "error": "value"
+    },
+    {
+      "name": "两个不一样的「在…」",
+      "rule": {
+        "when": {
+          "kind": "get_in"
+        },
+        "if": [
+          {
+            "kind": "in_places",
+            "places": [
+              "place-7f3a"
+            ]
+          },
+          {
+            "kind": "in_places",
+            "places": [
+              "place-7f3a",
+              "place-02bd"
+            ]
+          }
+        ],
+        "then": [
+          {
+            "setting": "sentry",
+            "value": "on"
+          }
+        ],
+        "restore": false
+      },
+      "error": "places"
+    },
+    {
+      "name": "两个不一样的「不在…」",
+      "rule": {
+        "when": {
+          "kind": "gear",
+          "gear": "P"
+        },
+        "if": [
+          {
+            "kind": "not_in_places",
+            "places": [
+              "place-7f3a"
+            ]
+          },
+          {
+            "kind": "not_in_places",
+            "places": [
+              "place-02bd"
+            ]
+          }
+        ],
+        "then": [
+          {
+            "setting": "sentry",
+            "value": "on"
+          }
+        ],
+        "restore": false
+      },
+      "error": "places"
+    }
+  ]
+}
