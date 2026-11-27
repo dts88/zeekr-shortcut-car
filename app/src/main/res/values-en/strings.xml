@@ -1520,4 +1520,24 @@
     <string name="auto_template_tailgate_desc">When shifted to P at one of the chosen places, set the tailgate opening limit to the chosen value</string>
     <string name="auto_template_tailgate_unavailable">Set the tailgate opening limit by place (add a place under Places first)</string>
     <string name="auto_tailgate_beep">Two short beeps from the rear of the cabin mean the tailgate opening limit has been adjusted</string>
+
+    <!-- Places & automation: share code (ui-spec §18; approved by the project owner 2026-11-27) -->
+    <string name="action_add">Add</string>
+    <string name="auto_share_label">Share code</string>
+    <string name="auto_share_title">Share this automation</string>
+    <string name="auto_share_scan">Scan with your phone to open it on zeekr.autos.</string>
+    <string name="auto_share_how">On another car, choose Enter share code under Add automation and type this code. The places become that car\'s own.</string>
+    <string name="auto_share_too_many_places">Can\'t be shared: uses more than %1$d places</string>
+    <string name="auto_share_place_conditions">Can\'t be shared: at most one in-place and one not-in-place condition</string>
+    <string name="auto_share_unsupported">Can\'t be shared</string>
+    <string name="auto_import">Enter share code</string>
+    <string name="auto_import_desc">Add one someone shared, with your own places</string>
+    <string name="auto_import_hint">For example 1EC1 2567</string>
+    <string name="auto_import_wrong">This share code is not valid</string>
+    <string name="auto_import_newer">Update the app to add this one</string>
+    <plurals name="auto_import_places_missing">
+        <item quantity="one">This one uses %1$d place. Add it under Places first</item>
+        <item quantity="other">This one uses %1$d places. Add them under Places first</item>
+    </plurals>
+    <string name="auto_import_pick">Choose a place</string>
 </resources>

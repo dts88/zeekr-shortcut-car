@@ -1554,4 +1554,28 @@
     <string name="auto_template_tailgate_desc">عند التبديل إلى P في أحد الأماكن المختارة، يُضبط حد فتح الباب الخلفي على القيمة المختارة</string>
     <string name="auto_template_tailgate_unavailable">ضبط حد فتح الباب الخلفي حسب المكان (أضف مكانًا في «الأماكن» أولًا)</string>
     <string name="auto_tailgate_beep">صوتان قصيران من مؤخرة المقصورة يعنيان أن حد فتح الباب الخلفي قد عُدِّل</string>
+
+    <!-- الأماكن والأتمتة: رمز المشاركة (ui-spec §18، مسودة 2026-11-27) -->
+    <string name="action_add">إضافة</string>
+    <string name="auto_share_label">رمز المشاركة</string>
+    <string name="auto_share_title">مشاركة هذه الأتمتة</string>
+    <string name="auto_share_scan">امسح الرمز بهاتفك لفتحها على zeekr.autos.</string>
+    <string name="auto_share_how">في سيارة أخرى، اختر «إدخال رمز المشاركة» من «إضافة أتمتة» واكتب هذا الرمز. تصبح الأماكن أماكن تلك السيارة.</string>
+    <string name="auto_share_too_many_places">لا يمكن مشاركتها: تستخدم أكثر من %1$d أماكن</string>
+    <string name="auto_share_place_conditions">لا يمكن مشاركتها: شرط واحد على الأكثر لكلٍّ من «في» و«ليس في» مكان</string>
+    <string name="auto_share_unsupported">لا يمكن مشاركتها</string>
+    <string name="auto_import">إدخال رمز المشاركة</string>
+    <string name="auto_import_desc">أضف أتمتة شاركها شخص آخر، بأماكنك أنت</string>
+    <string name="auto_import_hint">مثال: 1EC1 2567</string>
+    <string name="auto_import_wrong">رمز المشاركة غير صحيح</string>
+    <string name="auto_import_newer">حدّث التطبيق لإضافة هذه الأتمتة</string>
+    <plurals name="auto_import_places_missing">
+        <item quantity="zero">تستخدم هذه الأتمتة %1$d مكان. أضفها في «الأماكن» أولًا</item>
+        <item quantity="one">تستخدم هذه الأتمتة مكانًا واحدًا. أضفه في «الأماكن» أولًا</item>
+        <item quantity="two">تستخدم هذه الأتمتة مكانين. أضفهما في «الأماكن» أولًا</item>
+        <item quantity="few">تستخدم هذه الأتمتة %1$d أماكن. أضفها في «الأماكن» أولًا</item>
+        <item quantity="many">تستخدم هذه الأتمتة %1$d مكانًا. أضفها في «الأماكن» أولًا</item>
+        <item quantity="other">تستخدم هذه الأتمتة %1$d مكان. أضفها في «الأماكن» أولًا</item>
+    </plurals>
+    <string name="auto_import_pick">اختر مكانًا</string>
 </resources>

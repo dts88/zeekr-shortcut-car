@@ -1495,4 +1495,23 @@
     <string name="auto_template_tailgate_desc">Apabila masuk gear P di salah satu tempat yang dipilih, tetapkan had bukaan but belakang kepada nilai yang dipilih</string>
     <string name="auto_template_tailgate_unavailable">Tetapkan had bukaan but belakang mengikut tempat (tambah tempat di bawah Tempat dahulu)</string>
     <string name="auto_tailgate_beep">Dua bunyi pendek dari bahagian belakang kabin bermakna had bukaan but belakang telah dilaraskan</string>
+
+    <!-- Tempat & automasi: kod kongsi (ui-spec §18; diluluskan 2026-11-27) -->
+    <string name="action_add">Tambah</string>
+    <string name="auto_share_label">Kod kongsi</string>
+    <string name="auto_share_title">Kongsi automasi ini</string>
+    <string name="auto_share_scan">Imbas dengan telefon untuk membukanya di zeekr.autos.</string>
+    <string name="auto_share_how">Pada kereta lain, pilih Masukkan kod kongsi di bawah Tambah automasi dan taip kod ini. Tempatnya menjadi tempat kereta itu sendiri.</string>
+    <string name="auto_share_too_many_places">Tidak boleh dikongsi: menggunakan lebih daripada %1$d tempat</string>
+    <string name="auto_share_place_conditions">Tidak boleh dikongsi: paling banyak satu syarat di tempat dan satu syarat bukan di tempat</string>
+    <string name="auto_share_unsupported">Tidak boleh dikongsi</string>
+    <string name="auto_import">Masukkan kod kongsi</string>
+    <string name="auto_import_desc">Tambah automasi yang dikongsi orang lain, dengan tempat anda sendiri</string>
+    <string name="auto_import_hint">Contoh: 1EC1 2567</string>
+    <string name="auto_import_wrong">Kod kongsi ini tidak sah</string>
+    <string name="auto_import_newer">Kemas kini aplikasi untuk menambah yang ini</string>
+    <plurals name="auto_import_places_missing">
+        <item quantity="other">Yang ini menggunakan %1$d tempat. Tambahnya di bawah Tempat dahulu</item>
+    </plurals>
+    <string name="auto_import_pick">Pilih tempat</string>
 </resources>

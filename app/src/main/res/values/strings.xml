@@ -1529,4 +1529,23 @@
     <string name="auto_template_tailgate_desc">当挂入 P 挡，而且在选中的地点，就把尾门开启上限设为选的值</string>
     <string name="auto_template_tailgate_unavailable">按地点设置尾门开启上限（先在下面的「地点」里添加地点）</string>
     <string name="auto_tailgate_beep">调整时车厢后部会传来两声短促的提示音，表示尾门开启上限已调整</string>
+
+    <!-- 地点与自动化：分享码（ui-spec §十八「分享码」；项目所有者 2026-11-27 批） -->
+    <string name="action_add">添加</string>
+    <string name="auto_share_label">分享码</string>
+    <string name="auto_share_title">分享这条自动化</string>
+    <string name="auto_share_scan">用手机扫码，在 zeekr.autos 打开这一条。</string>
+    <string name="auto_share_how">在另一台车上，到「添加自动化」里选「输入分享码」，输入这串码就能添加，用到的地点换成那台车自己的。</string>
+    <string name="auto_share_too_many_places">不能分享：用到的地点超过 %1$d 个</string>
+    <string name="auto_share_place_conditions">不能分享：在、不在某些地点的条件各最多一个</string>
+    <string name="auto_share_unsupported">不能分享</string>
+    <string name="auto_import">输入分享码</string>
+    <string name="auto_import_desc">添加别人分享的一条，地点换成自己的</string>
+    <string name="auto_import_hint">例如 1EC1 2567</string>
+    <string name="auto_import_wrong">分享码不对</string>
+    <string name="auto_import_newer">要更新应用才能添加这一条</string>
+    <plurals name="auto_import_places_missing">
+        <item quantity="other">这一条用到 %1$d 个地点，先在下面的「地点」里添加</item>
+    </plurals>
+    <string name="auto_import_pick">选择地点</string>
 </resources>

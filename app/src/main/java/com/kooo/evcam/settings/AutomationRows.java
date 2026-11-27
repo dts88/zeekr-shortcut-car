@@ -287,6 +287,19 @@ final class AutomationRows {
             category.addPreference(restore);
             rs.items.add(restore);
         }
+
+        // 分享码（ui-spec §十八「分享码」）：这一条的码，点了弹二维码；不能分享的写为什么、灰着
+        ClauseItemPreference share = clause(c, base + "/share", order++, R.string.auto_share_label,
+                AutomationShare.rowText(c, r));
+        if (AutomationShare.code(r) != null) {
+            share.setOnPreferenceClickListener(p -> {
+                AutomationShare.showShare(c, r);
+                return true;
+            });
+        } else {
+            share.setEnabled(false);
+        }
+        rs.items.add(share);
         ((CardItemPreference) rs.items.get(rs.items.size() - 1)).setLast(true);
         rows.put(r.id, rs);
         show(r.id, rs);
@@ -404,7 +417,7 @@ final class AutomationRows {
 
     // ================================================================= 添加
 
-    /** 「添加自动化」：常用的几条和「空白」。新的一条加在最后、展开着、开着。 */
+    /** 「添加自动化」：常用的几条、「空白」和「输入分享码」。新的一条加在最后、展开着、开着。 */
     private void addRule() {
         Context c = fragment.getContext();
         if (c == null) {
@@ -426,6 +439,8 @@ final class AutomationRows {
                 c.getString(R.string.auto_template_tailgate_desc)), true));
         items.add(new AutomationPickers.Item(AutomationPickers.twoLines(c, c.getString(R.string.auto_template_blank),
                 c.getString(R.string.auto_template_blank_desc)), true));
+        items.add(new AutomationPickers.Item(AutomationPickers.twoLines(c, c.getString(R.string.auto_import),
+                c.getString(R.string.auto_import_desc)), true));
         AutomationPickers.list(c, c.getString(R.string.auto_add), items, -1, which -> {
             if (which == 0) {
                 append(new Rule(newId(), "", true, Trigger.gear("R"), Collections.emptyList(),
@@ -449,10 +464,13 @@ final class AutomationRows {
                                 ch -> append(new Rule(newId(), "", true, Trigger.gear("P"),
                                         Collections.singletonList(Condition.inPlaces(ids)),
                                         Collections.singletonList(ch), false))));
-            } else {
+            } else if (which == 4) {
                 AutomationPickers.pickTrigger(c, null, false, t -> AutomationPickers.pickChange(c, null, t,
                         ch -> append(new Rule(newId(), "", true, t, Collections.emptyList(),
                                 Collections.singletonList(ch), false)), null));
+            } else {
+                // 输入分享码（ui-spec §十八「分享码」）：地点换成自己的，同样加在最后、展开着、开着
+                AutomationShare.showImport(c, AutomationRows::newId, this::append);
             }
         });
     }
