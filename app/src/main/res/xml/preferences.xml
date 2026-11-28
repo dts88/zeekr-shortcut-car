@@ -273,6 +273,16 @@
             <com.kooo.evcam.settings.ValueActionPreference
                 android:key="pref_floating_appearance"
                 android:title="@string/set_group_appearance" />
+
+            <!--
+              悬浮按钮显示限速（开关加下一层；项目所有者 2026-11-28 加在开发者选项，同日实测后移到这里）：点这一行进
+              「限速数据」那一页（SpeedLimitDataFragment），行尾写装了哪几个。点了才下、只在 Wi-Fi 下下、校验通过才启用
+              （项目本地文档 speed-limits/spec.md）
+            -->
+            <com.kooo.evcam.settings.SwitchNavPreference
+                android:key="pref_speed_limit_on_button"
+                android:title="@string/set_speed_limit_title"
+                android:summary="@string/set_speed_limit_summary" />
         </PreferenceCategory>
 
         <!-- 灵动贴（试验性，组名旁带标签）：总开关；绑定的每一台一行（代码里加，AccessoryRows）；绑定灵动贴 -->
@@ -582,22 +592,6 @@
                 android:key="pref_drive_sound_exterior_route"
                 android:title="@string/dev_drive_sound_route_title"
                 android:summary="%s" />
-        </PreferenceCategory>
-
-        <!--
-          限速（项目所有者 2026-11-28，开发阶段）：开关在这里；「限速数据」是另一页（SpeedLimitDataFragment）：
-          点了才下、只在 Wi-Fi 下下、校验通过才启用（项目本地文档 speed-limits/spec.md）
-        -->
-        <PreferenceCategory android:title="@string/dev_group_speed_limit">
-
-            <SwitchPreferenceCompat
-                android:key="pref_speed_limit_on_button"
-                android:title="@string/dev_speed_limit_button_title"
-                android:summary="@string/dev_speed_limit_button_summary" />
-
-            <Preference
-                android:key="pref_speed_limit_data"
-                android:title="@string/dev_speed_limit_data_title" />
         </PreferenceCategory>
 
         <PreferenceCategory android:title="@string/set_group_files">

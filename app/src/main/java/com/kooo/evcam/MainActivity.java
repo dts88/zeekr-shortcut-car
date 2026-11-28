@@ -453,6 +453,9 @@ public class MainActivity extends AppCompatActivity implements com.kooo.evcam.se
         if (hasFocus && returnNotice != null) {
             returnNotice.start();
         }
+        if (hasFocus) {
+            maybeShowSpeedLimitNotice();
+        }
     }
     
     /**
@@ -1217,6 +1220,34 @@ public class MainActivity extends AppCompatActivity implements com.kooo.evcam.se
         }
     }
 
+    /** 限速的提示（{@link com.kooo.evcam.ui.SpeedLimitNotice}）：弹着的那一个；没弹过是 null。 */
+    private androidx.appcompat.app.AlertDialog speedLimitNotice;
+
+    /**
+     * 限速的提示（ui-spec §十五，项目所有者 2026-11-28）：装上这个版本后第一次在主界面时弹一次。等界面摆好再看一眼：
+     * 还在主界面（没开着设置这些）、窗口在前面、不是应用自己带到前面的（ui-spec §十九，这一趟不弹）才弹。
+     * 窗口拿到焦点、回到主界面时来问；该不该弹归 SpeedLimitNotice。
+     */
+    private void maybeShowSpeedLimitNotice() {
+        if (appConfig == null || !com.kooo.evcam.ui.SpeedLimitNotice.due(this, appConfig)) {
+            return;
+        }
+        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+            if (isFinishing() || isDestroyed() || !hasWindowFocus()
+                    || (speedLimitNotice != null && speedLimitNotice.isShowing())
+                    || (returnNotice != null && returnNotice.visiting())
+                    || fragmentContainer == null || fragmentContainer.getVisibility() == View.VISIBLE
+                    || !com.kooo.evcam.ui.SpeedLimitNotice.due(this, appConfig)) {
+                return;
+            }
+            speedLimitNotice = com.kooo.evcam.ui.SpeedLimitNotice.show(this, () -> openSettingsRow(
+                    "screen_floating", "pref_speed_limit_on_button", "pref_recording_floating"));
+        }, SPEED_LIMIT_NOTICE_DELAY_MS);
+    }
+
+    /** 限速的提示等主界面摆好再弹（预览起来、动作栏到位）。 */
+    private static final long SPEED_LIMIT_NOTICE_DELAY_MS = 800L;
+
     /** 初始设置：首次启动，或者「设置 → 通用 → 初始设置」再走一遍。 */
     public void showSetup() {
         AppLog.d(TAG, "进入初始设置");
@@ -1354,6 +1385,8 @@ public class MainActivity extends AppCompatActivity implements com.kooo.evcam.se
         drawer.closeIfOpen();
         showRecordingInterface();
         drawer.select(R.id.nav_recording);
+        // 刚走完初始设置、从设置回来：限速的提示该弹的这时弹（焦点没换过，onWindowFocusChanged 不来）
+        maybeShowSpeedLimitNotice();
     }
 
     /**
@@ -2691,6 +2724,10 @@ public class MainActivity extends AppCompatActivity implements com.kooo.evcam.se
         previewStall.detachAll();
         if (returnNotice != null) {
             returnNotice.drop();
+        }
+        // 限速的提示没点就被关掉：不算弹过，下次再弹（dismiss 不算返回键）
+        if (speedLimitNotice != null && speedLimitNotice.isShowing()) {
+            speedLimitNotice.dismiss();
         }
 
         // 相机管线属于应用，不属于主界面（大纲 §2 阶段 6，channel-logic §五）：主界面销毁不放它，相机关不关交给通道调度 ——

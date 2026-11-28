@@ -16,7 +16,6 @@ import android.content.Context;
 
 import androidx.appcompat.app.AlertDialog;
 import androidx.preference.Preference;
-import androidx.preference.SwitchPreferenceCompat;
 
 import com.kooo.evcam.AppConfig;
 import com.kooo.evcam.R;
@@ -49,7 +48,8 @@ import java.util.concurrent.AbstractExecutorService;
 import java.util.concurrent.TimeUnit;
 
 /**
- * 开发者选项的「限速」一组和「限速数据」那一页（项目所有者 2026-11-28，开发阶段）。不出网：看网络、取清单、下包都换成假的，
+ * 「设置 → 按键」的「悬浮按钮显示限速」和「限速数据」那一页（项目所有者 2026-11-28 加在开发者选项，同日实测后移到「按键」）。
+ * 不出网：看网络、取清单、下包都换成假的，
  * 后台线程换成当场跑的。装着的包是测试资源里那个（假造的路），只把包头的国家、日期改掉。
  */
 @RunWith(RobolectricTestRunner.class)
@@ -109,41 +109,93 @@ public class SpeedLimitShotsTest {
         unlocked.setBoolean(null, false);
     }
 
-    /** 开发者选项：「限速」一组两行，开关默认关；关着开发者选项时按关算。 */
+    /**
+     * 「设置 → 按键」悬浮按钮那一组最后一行「悬浮按钮显示限速」：开关加下一层，默认关，行尾写装了哪几个，点这一行进「限速数据」；
+     * 不归开发者选项管（没解锁也照存着的读）；悬浮按钮关着时收着。开发者选项里不再有这一组。
+     */
     @Test
-    public void developerRows() throws Exception {
+    public void keysRowByDay() throws Exception {
+        keysRow(Shots.DAY, "day");
+    }
+
+    @Test
+    public void keysRowInEnglish() throws Exception {
+        keysRow(Shots.DAY_EN, "day-en");
+    }
+
+    private void keysRow(String qualifiers, String tag) throws Exception {
         Context app = RuntimeEnvironment.getApplication();
-        // 先照存着的读一次（没解锁），再直接拨开：不然头一次用到时会照存着的值盖回去
+        AppConfig config = new AppConfig(app);
+        assertFalse("默认关", config.isSpeedLimitOnButton());
+        config.setRecordingFloatingEnabled(true);
+        install("SG", 20261128);
+        install("MY", 20261128);
+        RuntimeEnvironment.setQualifiers(qualifiers);
+        ShotActivity activity = Robolectric.buildActivity(ShotActivity.class).setup().get();
+        Shots.stillFrames(activity);
+        SettingsShellFragment shell = new SettingsShellFragment();
+        activity.getSupportFragmentManager().beginTransaction().replace(activity.container, shell).commitNow();
+        Shots.settle();
+        shell.showSection("screen_floating");
+        Shots.settle();
+        SettingsPreferenceFragment section = (SettingsPreferenceFragment)
+                shell.getChildFragmentManager().findFragmentById(R.id.settings_detail);
+        assertNotNull(section);
+        SwitchNavPreference row = section.findPreference("pref_speed_limit_on_button");
+        assertNotNull(row);
+        assertTrue("悬浮按钮开着时出现", row.isVisible());
+        assertFalse(row.isChecked());
+        assertEquals(SpeedLimitDataFragment.summary(activity), String.valueOf(row.getValue()));
+        assertTrue("装着两个，不是「未下载」", !activity.getString(R.string.set_speed_limit_data_none)
+                .equals(String.valueOf(row.getValue())));
+        File file = save(activity, "settings-keys-speed-limit-" + tag);
+        assertTrue(file + " 是空的", file.length() > 10_000);
+
+        assertTrue(row.callChangeListener(true));
+        assertTrue("不归开发者选项管：没解锁也照存着的读", new AppConfig(app).isSpeedLimitOnButton());
+
+        // 点这一行（开关以外的地方）进「限速数据」，开关不动
+        row.performClick();
+        Shots.settle();
+        assertTrue(shell.getChildFragmentManager().findFragmentById(R.id.settings_detail)
+                instanceof SpeedLimitDataFragment);
+        assertTrue(new AppConfig(app).isSpeedLimitOnButton());
+
+        // 开发者选项里不再有这一组
+        SettingsShellFragment dev = new SettingsShellFragment();
         DeveloperMode.init(app);
         java.lang.reflect.Field unlocked = DeveloperMode.class.getDeclaredField("unlocked");
         unlocked.setAccessible(true);
         unlocked.setBoolean(null, true);
-        assertFalse("默认关", new AppConfig(app).isSpeedLimitOnButton());
+        activity.getSupportFragmentManager().beginTransaction().replace(activity.container, dev).commitNow();
+        Shots.settle();
+        dev.showSection(SettingsShellFragment.DEVELOPER_SECTION);
+        Shots.settle();
+        SettingsPreferenceFragment developer = (SettingsPreferenceFragment)
+                dev.getChildFragmentManager().findFragmentById(R.id.settings_detail);
+        assertNotNull(developer);
+        assertTrue(developer.findPreference("pref_speed_limit_on_button") == null);
+        unlocked.setBoolean(null, false);
+    }
+
+    /** 悬浮按钮关着：那一行收着（同「点击」「长按」「外观」）。 */
+    @Test
+    public void keysRowHidesWithTheButton() throws Exception {
+        new AppConfig(RuntimeEnvironment.getApplication()).setRecordingFloatingEnabled(false);
         RuntimeEnvironment.setQualifiers(Shots.DAY);
         ShotActivity activity = Robolectric.buildActivity(ShotActivity.class).setup().get();
         Shots.stillFrames(activity);
         SettingsShellFragment shell = new SettingsShellFragment();
         activity.getSupportFragmentManager().beginTransaction().replace(activity.container, shell).commitNow();
         Shots.settle();
-        shell.showSection(SettingsShellFragment.DEVELOPER_SECTION);
+        shell.showSection("screen_floating");
         Shots.settle();
         SettingsPreferenceFragment section = (SettingsPreferenceFragment)
                 shell.getChildFragmentManager().findFragmentById(R.id.settings_detail);
         assertNotNull(section);
-        SwitchPreferenceCompat toggle = section.findPreference("pref_speed_limit_on_button");
-        Preference data = section.findPreference("pref_speed_limit_data");
-        assertNotNull(toggle);
-        assertNotNull(data);
-        assertFalse(toggle.isChecked());
-        assertEquals(activity.getString(R.string.dev_speed_limit_data_none), String.valueOf(data.getSummary()));
-        section.scrollToPreference("pref_speed_limit_data");
-        File file = save(activity, "settings-developer-speed-limit-day");
-        assertTrue(file + " 是空的", file.length() > 10_000);
-
-        assertTrue(toggle.callChangeListener(true));
-        assertTrue(new AppConfig(app).isSpeedLimitOnButton());
-        unlocked.setBoolean(null, false);
-        assertFalse("开发者选项关着时按关算", new AppConfig(app).isSpeedLimitOnButton());
+        Preference row = section.findPreference("pref_speed_limit_on_button");
+        assertNotNull(row);
+        assertFalse(row.isVisible());
     }
 
     @Test
@@ -280,7 +332,7 @@ public class SpeedLimitShotsTest {
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick();
         Shots.settle();
         assertEquals("删了就是没下的样子", 0, new LimitStore(activity).installed().size());
-        assertEquals(activity.getString(R.string.dev_speed_limit_data_none), SpeedLimitDataFragment.summary(activity));
+        assertEquals(activity.getString(R.string.set_speed_limit_data_none), SpeedLimitDataFragment.summary(activity));
     }
 
     // ------------------------------------------------------------------ 帮手
@@ -296,7 +348,7 @@ public class SpeedLimitShotsTest {
         SettingsShellFragment shell = new SettingsShellFragment();
         activity.getSupportFragmentManager().beginTransaction().replace(activity.container, shell).commitNow();
         Shots.settle();
-        shell.openDetail(new SpeedLimitDataFragment(), activity.getString(R.string.dev_speed_limit_data_title));
+        shell.openDetail(new SpeedLimitDataFragment(), activity.getString(R.string.set_speed_limit_data_title));
         Shots.settle();
         SpeedLimitDataFragment page = (SpeedLimitDataFragment)
                 shell.getChildFragmentManager().findFragmentById(R.id.settings_detail);

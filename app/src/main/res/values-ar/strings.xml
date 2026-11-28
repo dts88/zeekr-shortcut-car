@@ -529,6 +529,7 @@
     <string name="action_cancel">إلغاء</string>
     <string name="action_ok">موافق</string>
     <string name="action_got_it">حسنًا</string>
+    <string name="action_open_settings">فتح الإعدادات</string>
     <string name="info_checking_storage">جارٍ فحص التخزين…</string>
     <string name="opt_internal_storage">وحدة التخزين الداخلية</string>
     <string name="opt_internal_storage_locked">وحدة التخزين الداخلية (تتطلب تشغيل خيارات المطوّرين)</string>
@@ -1591,13 +1592,14 @@
         <item quantity="other">تستخدم هذه الأتمتة %1$d مكان. أضفها في «الأماكن» أولًا</item>
     </plurals>
     <string name="auto_import_pick">اختر مكانًا</string>
-    <!-- حدود السرعة (خيارات المطوّر، مرحلة التطوير، المالك 2026-11-28). مسودة بانتظار مراجعة متحدث أصلي -->
-    <string name="dev_group_speed_limit">حدود السرعة</string>
-    <string name="dev_speed_limit_button_title">عرض حد السرعة على الزر العائم</string>
-    <string name="dev_speed_limit_button_summary">يعرض حد السرعة للطريق الحالي في وسط الزر العائم، من بيانات حدود السرعة التي تم تنزيلها</string>
-    <string name="dev_speed_limit_data_title">بيانات حدود السرعة</string>
-    <string name="dev_speed_limit_data_none">لم يتم التنزيل</string>
-    <string name="dev_speed_limit_data_some">تم التنزيل: %1$s</string>
+    <!-- حدود السرعة (أضافها المالك إلى خيارات المطوّرين 2026-11-28، ونُقلت إلى الإعدادات ← الأزرار في اليوم نفسه بعد تجربتها في السيارة). مسودة بانتظار مراجعة متحدث أصلي -->
+    <string name="set_speed_limit_title">عرض حد السرعة على الزر العائم</string>
+    <string name="set_speed_limit_summary">يعرض حد السرعة للطريق الحالي في وسط الزر العائم، من بيانات حدود السرعة التي تم تنزيلها</string>
+    <string name="set_speed_limit_data_title">بيانات حدود السرعة</string>
+    <string name="set_speed_limit_data_none">لم يتم التنزيل</string>
+    <string name="set_speed_limit_data_some">تم التنزيل: %1$s</string>
+    <!-- إشعار حدود السرعة: يظهر مرة واحدة في الواجهة الرئيسية بعد تثبيت هذا الإصدار (ui-spec §15، المالك 2026-11-28). مسودة بانتظار موافقة المالك -->
+    <string name="notice_speed_limit_msg">يمكن للمستخدمين في سنغافورة وماليزيا وهونغ كونغ تنزيل بيانات حدود السرعة لعرض حد السرعة للطريق الحالي في وسط الزر العائم. يُرجى تنزيل البيانات وتشغيل الميزة من الإعدادات ← الأزرار ← عرض حد السرعة على الزر العائم. يُرجى من المستخدمين في البلدان والمناطق الأخرى الذين يحتاجون إلى بيانات حدود السرعة تقديم طلب في صفحة Issues على GitHub.\n\ngithub.com/dts88/zeekr-shortcut-car/issues</string>
     <string name="sl_network_title">الشبكة</string>
     <string name="sl_network_checking">جارٍ التحقق…</string>
     <string name="sl_network_wifi">Wi-Fi</string>

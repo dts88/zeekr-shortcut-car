@@ -766,6 +766,7 @@
   auto_import_places_missing「这一条用到 %1$d 个地点，先在下面的「地点」里添加」；auto_import_pick「选择地点」。
 - 2026-11-28 批准（项目所有者：「批准，继续」；阿拉伯文照写，等审校）限速（开发者选项，开发阶段；ui-spec §八、§十六「开发者选项」）：
   dev_group_speed_limit「限速」；dev_speed_limit_button_title「悬浮按钮显示限速」；dev_speed_limit_button_summary「按已下载的限速数据，在悬浮按钮中间显示所在道路的限速」；dev_speed_limit_data_title「限速数据」；dev_speed_limit_data_none「未下载」；dev_speed_limit_data_some「已下载：%1$s」；sl_network_title「网络」；sl_network_checking「正在检查…」；sl_network_wifi「Wi-Fi」；sl_network_mobile「移动网络，不下载」；sl_network_unconfirmed「未确认是不是 Wi-Fi」；sl_network_unknown「无法判断，不下载」；sl_network_confirm「当前网络是 Wi-Fi 吗？每个网络只需确认一次，以后连接这个网络时不再询问。」；sl_network_teach_wifi「当前网络算作 Wi-Fi。如果连接的是车辆的移动网络，请选「不是 Wi-Fi」，此后在这个网络下不下载。」；sl_network_teach_mobile「当前网络算作移动网络。如果已连接 Wi-Fi，请选「是 Wi-Fi」。」；sl_network_is_wifi「是 Wi-Fi」；sl_network_not_wifi「不是 Wi-Fi」；sl_group_countries「国家和地区」；sl_catalog_loading「正在获取列表…」；sl_catalog_failed「无法获取列表，请重试」；sl_catalog_offline「连接 Wi-Fi 后才能获取列表」；sl_catalog_unconfirmed「确认网络后才能获取列表」；sl_installed「已下载 · %1$s」；sl_update「有更新 · %1$s · %2$s」；sl_downloading「正在下载 %1$d%%」；sl_verifying「正在校验…」；sl_failed_download「无法下载，请重试」；sl_failed_verify「校验未通过，未启用」；sl_failed_not_wifi「未连接 Wi-Fi，未下载」；sl_action_update「更新」；sl_note「限速数据来自 OpenStreetMap（© OpenStreetMap 贡献者），按 ODbL 授权提供。点按后才下载，仅在 Wi-Fi 下下载，校验通过后启用。」。
+  同日实测后移到「设置 → 按键」（悬浮按钮那一组，开关加下一层）：dev_group_speed_limit 不用了；dev_speed_limit_button_title、dev_speed_limit_button_summary、dev_speed_limit_data_title、dev_speed_limit_data_none、dev_speed_limit_data_some 改名为 set_speed_limit_title、set_speed_limit_summary、set_speed_limit_data_title、set_speed_limit_data_none、set_speed_limit_data_some，文字不变。
 - 2026-11-28 批准（项目所有者：「没问题，很好，出alpha版本」；阿拉伯文照写，等审校）哨兵模式的警戒、报警（PR 294，第一步只读取、记录）：
   sentry_status_alert「哨兵模式：警戒」、sentry_status_alarm「哨兵模式：报警」；vi_v_alert「警戒」、vi_v_alarm「报警」。
 - 2026-11-28 批准（项目所有者：「可以的，放进来吧」；阿拉伯文照写，等审校）分享到 zeekr.autos（ui-spec §十八「分享码」，PR 293）：
@@ -778,6 +779,7 @@
 下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
 可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
 
+- 2026-11-28 草稿 限速的提示（ui-spec §十五，装上这个版本后第一次在主界面时弹一次）：标题用已批的 set_speed_limit_title「悬浮按钮显示限速」；notice_speed_limit_msg「新加坡、马来西亚、香港的用户可以下载限速数据，在悬浮按钮中间显示所在道路的限速。在「设置 → 按键 → 悬浮按钮显示限速」中下载数据并开启。其他国家和地区的用户如需限速数据，请到 GitHub 的 Issues 页面提交需求。↵↵github.com/dts88/zeekr-shortcut-car/issues」（↵ 是换行）；按钮 action_open_settings「打开设置」（同已批的 upd_go_settings）、action_got_it「知道了」。
 - 阿拉伯文全部（values-ar，2026-11-19 草稿：先定术语表和写法，再分块翻译、统一核对）。等母语使用者审校（issue 250 的 mina5500）；改的时候照本规范改，词改了连同 §10 的阿拉伯文一列一起改。
 
 ---
