@@ -771,6 +771,7 @@
   sentry_status_alert「哨兵模式：警戒」、sentry_status_alarm「哨兵模式：报警」；vi_v_alert「警戒」、vi_v_alarm「报警」。
 - 2026-11-28 批准（项目所有者：「可以的，放进来吧」；阿拉伯文照写，等审校）分享到 zeekr.autos（ui-spec §十八「分享码」，PR 293）：
   auto_share_site「分享到 zeekr.autos」；auto_share_site_note「点「分享到 zeekr.autos」后，应用只发送这串分享码（%1$d 个字符），连同建立加密连接约 6 KB 流量。不发送名称、地点、车辆或你的任何信息；zeekr.autos 只保存分享码和被分享的次数。」；auto_share_site_sending「正在分享…」；auto_share_site_done「已分享到 zeekr.autos」；auto_share_site_count「分享成功，当前热度 %1$d」；auto_share_site_failed「无法连接 zeekr.autos，请重试」；auto_share_site_too_often「分享过于频繁，请稍后重试」；auto_share_site_refused「zeekr.autos 未接受这串分享码」。
+- 2026-11-28 批准（项目所有者：「文字可以 继续」；阿拉伯文照写，等审校）限速的提示（ui-spec §十五，PR 295，装上这个版本后第一次在主界面时弹一次）：标题用已批的 set_speed_limit_title「悬浮按钮显示限速」；notice_speed_limit_msg「新加坡、马来西亚、香港的用户可以下载限速数据，在悬浮按钮中间显示所在道路的限速。在「设置 → 按键 → 悬浮按钮显示限速」中下载数据并开启。其他国家和地区的用户如需限速数据，请到 GitHub 的 Issues 页面提交需求。↵↵github.com/dts88/zeekr-shortcut-car/issues」（↵ 是换行）；按钮 action_open_settings「打开设置」（同已批的 upd_go_settings）、action_got_it「知道了」。
 - vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
 - 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
 
@@ -779,7 +780,6 @@
 下面这几条**不在**上面「不改」的单子里：照草稿上了三种语言，项目所有者还没看。
 可以照本规范改；项目所有者批了哪一条，就把它移回上面的单子。
 
-- 2026-11-28 草稿 限速的提示（ui-spec §十五，装上这个版本后第一次在主界面时弹一次）：标题用已批的 set_speed_limit_title「悬浮按钮显示限速」；notice_speed_limit_msg「新加坡、马来西亚、香港的用户可以下载限速数据，在悬浮按钮中间显示所在道路的限速。在「设置 → 按键 → 悬浮按钮显示限速」中下载数据并开启。其他国家和地区的用户如需限速数据，请到 GitHub 的 Issues 页面提交需求。↵↵github.com/dts88/zeekr-shortcut-car/issues」（↵ 是换行）；按钮 action_open_settings「打开设置」（同已批的 upd_go_settings）、action_got_it「知道了」。
 - 阿拉伯文全部（values-ar，2026-11-19 草稿：先定术语表和写法，再分块翻译、统一核对）。等母语使用者审校（issue 250 的 mina5500）；改的时候照本规范改，词改了连同 §10 的阿拉伯文一列一起改。
 
 ---

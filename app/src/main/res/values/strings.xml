@@ -1568,7 +1568,7 @@
     <string name="set_speed_limit_data_title">限速数据</string>
     <string name="set_speed_limit_data_none">未下载</string>
     <string name="set_speed_limit_data_some">已下载：%1$s</string>
-    <!-- 限速的提示：装上这个版本后第一次在主界面时弹一次（ui-spec §十五，项目所有者 2026-11-28）。草稿，待项目所有者批 -->
+    <!-- 限速的提示：装上这个版本后第一次在主界面时弹一次（ui-spec §十五，项目所有者 2026-11-28）。项目所有者 2026-11-28 批 -->
     <string name="notice_speed_limit_msg">新加坡、马来西亚、香港的用户可以下载限速数据，在悬浮按钮中间显示所在道路的限速。在「设置 → 按键 → 悬浮按钮显示限速」中下载数据并开启。其他国家和地区的用户如需限速数据，请到 GitHub 的 Issues 页面提交需求。\n\ngithub.com/dts88/zeekr-shortcut-car/issues</string>
     <string name="sl_network_title">网络</string>
     <string name="sl_network_checking">正在检查…</string>

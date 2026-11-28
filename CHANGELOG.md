@@ -11,6 +11,11 @@ commit message, not here.
 
 Nothing yet.
 
+## [4.22.0-alpha] - 2026-11-28
+
+- Speed limits: moved out of developer options to Settings → Buttons → Show speed limit on floating button; the row opens Speed limit data.
+- A one-time notice on the main screen: speed limit data for Singapore, Malaysia and Hong Kong, and where to ask for other countries.
+
 ## [4.21.0-alpha] - 2026-11-28
 
 - Automations: Share to zeekr.autos in the share dialog. It sends only the share code, about 6 KB including the secure connection; the site keeps only share codes and how many times each was shared. A code shared from this car shows as Shared.
