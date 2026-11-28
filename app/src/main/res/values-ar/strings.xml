@@ -1578,4 +1578,36 @@
         <item quantity="other">تستخدم هذه الأتمتة %1$d مكان. أضفها في «الأماكن» أولًا</item>
     </plurals>
     <string name="auto_import_pick">اختر مكانًا</string>
+    <!-- حدود السرعة (خيارات المطوّر، مرحلة التطوير، المالك 2026-11-28). مسودة بانتظار مراجعة متحدث أصلي -->
+    <string name="dev_group_speed_limit">حدود السرعة</string>
+    <string name="dev_speed_limit_button_title">عرض حد السرعة على الزر العائم</string>
+    <string name="dev_speed_limit_button_summary">يعرض حد السرعة للطريق الحالي في وسط الزر العائم، من بيانات حدود السرعة التي تم تنزيلها</string>
+    <string name="dev_speed_limit_data_title">بيانات حدود السرعة</string>
+    <string name="dev_speed_limit_data_none">لم يتم التنزيل</string>
+    <string name="dev_speed_limit_data_some">تم التنزيل: %1$s</string>
+    <string name="sl_network_title">الشبكة</string>
+    <string name="sl_network_checking">جارٍ التحقق…</string>
+    <string name="sl_network_wifi">Wi-Fi</string>
+    <string name="sl_network_mobile">بيانات الجوال، لا يتم التنزيل</string>
+    <string name="sl_network_unknown">تعذّر التحديد، لا يتم التنزيل</string>
+    <string name="sl_network_unconfirmed">لم يتم التأكيد بعد أنها شبكة Wi-Fi</string>
+    <string name="sl_network_teach_wifi">تُعدّ هذه الشبكة شبكة Wi-Fi. إذا كانت بيانات الجوال الخاصة بالسيارة، فاختر «ليست Wi-Fi» ولن يتم تنزيل أي شيء عليها.</string>
+    <string name="sl_network_teach_mobile">تُعدّ هذه الشبكة بيانات جوال. إذا كنت متصلاً بشبكة Wi-Fi، فاختر «Wi-Fi».</string>
+    <string name="sl_network_confirm">هل هذه الشبكة شبكة Wi-Fi؟ تكفي الإجابة مرة واحدة لكل شبكة.</string>
+    <string name="sl_network_is_wifi">Wi-Fi</string>
+    <string name="sl_network_not_wifi">ليست Wi-Fi</string>
+    <string name="sl_group_countries">البلدان والمناطق</string>
+    <string name="sl_catalog_loading">جارٍ جلب القائمة…</string>
+    <string name="sl_catalog_failed">تعذّر جلب القائمة. يُرجى إعادة المحاولة</string>
+    <string name="sl_catalog_offline">اتصل بشبكة Wi-Fi لجلب القائمة</string>
+    <string name="sl_catalog_unconfirmed">أكّد نوع الشبكة لجلب القائمة</string>
+    <string name="sl_installed">تم التنزيل · %1$s</string>
+    <string name="sl_update">يتوفر تحديث · %1$s · %2$s</string>
+    <string name="sl_downloading">جارٍ التنزيل %1$d%%</string>
+    <string name="sl_verifying">جارٍ التحقق من البيانات…</string>
+    <string name="sl_failed_download">تعذّر التنزيل. يُرجى إعادة المحاولة</string>
+    <string name="sl_failed_verify">فشل التحقق. لم يتم الاستخدام</string>
+    <string name="sl_failed_not_wifi">غير متصل بشبكة Wi-Fi. لم يتم التنزيل</string>
+    <string name="sl_action_update">تحديث</string>
+    <string name="sl_note">بيانات حدود السرعة من OpenStreetMap (© المساهمون في OpenStreetMap) بموجب ترخيص ODbL. يبدأ التنزيل فقط عند النقر، وعبر Wi-Fi فقط، ولا تُستخدم البيانات إلا بعد اجتياز التحقق.</string>
 </resources>

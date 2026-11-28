@@ -105,6 +105,8 @@ public final class VehicleState {
     public final Float positionAccuracy;
     /** 这一次定位的时刻（{@code SystemClock.elapsedRealtime}），没有 null。 */
     public final Long positionAt;
+    /** 这一次定位报的行进方向（度，正北 0、顺时针），定位没给 null（限速数据按方向分顺逆，speed-limits/spec.md）。 */
+    public final Float positionBearing;
     /** 这份快照用的读数（非开发者已滤掉没验证的）：信息条的文字格从这里取值。 */
     public final Readings readings;
 
@@ -143,6 +145,7 @@ public final class VehicleState {
         this.longitude = b.longitude;
         this.positionAccuracy = b.positionAccuracy;
         this.positionAt = b.positionAt;
+        this.positionBearing = b.positionBearing;
         this.readings = b.readings;
     }
 
@@ -207,6 +210,7 @@ public final class VehicleState {
         private Double longitude;
         private Float positionAccuracy;
         private Long positionAt;
+        private Float positionBearing;
         private Readings readings;
 
         public Builder() {
@@ -247,6 +251,7 @@ public final class VehicleState {
             longitude = s.longitude;
             positionAccuracy = s.positionAccuracy;
             positionAt = s.positionAt;
+            positionBearing = s.positionBearing;
             readings = s.readings;
         }
 
@@ -282,12 +287,18 @@ public final class VehicleState {
         /** 位置（精度、时刻清掉）。 */
         public Builder position(Double lat, Double lon) { return position(lat, lon, null, null); }
 
-        /** 位置和这一次定位的精度（米）、时刻（{@code elapsedRealtime}）。 */
+        /** 位置和这一次定位的精度（米）、时刻（{@code elapsedRealtime}）；方向清掉。 */
         public Builder position(Double lat, Double lon, Float accuracy, Long at) {
+            return position(lat, lon, accuracy, at, null);
+        }
+
+        /** 位置、精度（米）、时刻（{@code elapsedRealtime}）和行进方向（度，正北 0、顺时针；没有 null）。 */
+        public Builder position(Double lat, Double lon, Float accuracy, Long at, Float bearing) {
             latitude = lat;
             longitude = lon;
             positionAccuracy = lat == null ? null : accuracy;
             positionAt = lat == null ? null : at;
+            positionBearing = lat == null ? null : bearing;
             return this;
         }
 

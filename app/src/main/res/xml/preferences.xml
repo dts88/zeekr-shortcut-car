@@ -584,6 +584,22 @@
                 android:summary="%s" />
         </PreferenceCategory>
 
+        <!--
+          限速（项目所有者 2026-11-28，开发阶段）：开关在这里；「限速数据」是另一页（SpeedLimitDataFragment）：
+          点了才下、只在 Wi-Fi 下下、校验通过才启用（项目本地文档 speed-limits/spec.md）
+        -->
+        <PreferenceCategory android:title="@string/dev_group_speed_limit">
+
+            <SwitchPreferenceCompat
+                android:key="pref_speed_limit_on_button"
+                android:title="@string/dev_speed_limit_button_title"
+                android:summary="@string/dev_speed_limit_button_summary" />
+
+            <Preference
+                android:key="pref_speed_limit_data"
+                android:title="@string/dev_speed_limit_data_title" />
+        </PreferenceCategory>
+
         <PreferenceCategory android:title="@string/set_group_files">
 
             <!-- 录像回放分条的后备做法（项目所有者 2026-11-14）：默认照文件名和文件时间，开着时逐个打开读时长 -->

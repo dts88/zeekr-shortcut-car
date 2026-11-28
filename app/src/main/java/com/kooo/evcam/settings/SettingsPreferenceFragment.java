@@ -265,6 +265,11 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         if (placeRows != null) {
             placeRows.resume();
         }
+        // 「限速数据」那一页里可能下载、删除过
+        Preference speedLimitData = findPreference("pref_speed_limit_data");
+        if (speedLimitData != null && getContext() != null) {
+            speedLimitData.setSummary(SpeedLimitDataFragment.summary(getContext()));
+        }
     }
 
     @Override
@@ -2024,6 +2029,18 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
 
         bindSwitch("pref_playback_read_durations", appConfig.isPlaybackReadDurations(),
                 appConfig::setPlaybackReadDurations);
+
+        // 限速（开发阶段）：开关一改，按钮就地重读（开着就开始按限速数据匹配，关了就停、不再要定位）
+        bindSwitch("pref_speed_limit_on_button", appConfig.isSpeedLimitOnButton(), on -> {
+            appConfig.setSpeedLimitOnButton(on);
+            pushFloatingStyle();
+        });
+        Preference speedLimitData = findPreference("pref_speed_limit_data");
+        if (speedLimitData != null) {
+            speedLimitData.setSummary(SpeedLimitDataFragment.summary(requireContext()));
+        }
+        onClick("pref_speed_limit_data",
+                pref -> openFragment(new SpeedLimitDataFragment(), R.string.dev_speed_limit_data_title));
 
         onClick("pref_repair_mp4", pref -> {
             if (getActivity() == null) {

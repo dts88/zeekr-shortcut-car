@@ -27,8 +27,10 @@ import java.security.NoSuchAlgorithmException;
  * 发布页本身可不可信不在这里管。</p>
  *
  * <p>来源：wysie 的 PR #38；GPL-3.0。纯 Java，见 {@code DownloadIntegrityTest}。</p>
+ *
+ * <p>限速数据的下载（{@code speedlimit.LimitDownloads}）用同一套：只认 https、边收边算 sha256、大小和 sha256 对上清单。</p>
  */
-final class DownloadIntegrity {
+public final class DownloadIntegrity {
 
     private static final String SHA256_PREFIX = "sha256:";
 
@@ -36,7 +38,7 @@ final class DownloadIntegrity {
     }
 
     /** 检查一个链接（下载的、跳转去的）：只认 https、不带用户名密码；不合格抛 IOException。 */
-    static URL https(String value) throws IOException {
+    public static URL https(String value) throws IOException {
         URL url = new URL(value);
         if (!"https".equalsIgnoreCase(url.getProtocol()) || url.getUserInfo() != null) {
             throw new IOException("Update URLs must use HTTPS without credentials");
@@ -52,7 +54,7 @@ final class DownloadIntegrity {
         return digest.substring(SHA256_PREFIX.length());
     }
 
-    static MessageDigest sha256() {
+    public static MessageDigest sha256() {
         try {
             return MessageDigest.getInstance("SHA-256");
         } catch (NoSuchAlgorithmException impossible) {
@@ -61,10 +63,10 @@ final class DownloadIntegrity {
         }
     }
 
-    /** 收完之后对一遍：大小和 GitHub 说的一样、算出来的 sha256 和它给的一样；有一样不对抛 IOException。 */
-    static void verify(String expected, byte[] actual, long expectedSize, long actualSize) throws IOException {
+    /** 收完之后对一遍：大小和发布页（清单）说的一样、算出来的 sha256 和它给的一样；有一样不对抛 IOException。 */
+    public static void verify(String expected, byte[] actual, long expectedSize, long actualSize) throws IOException {
         if (expectedSize <= 0 || actualSize != expectedSize) {
-            throw new IOException("Downloaded APK size does not match GitHub asset");
+            throw new IOException("Downloaded file size does not match the listed size");
         }
         StringBuilder hex = new StringBuilder(64);
         for (byte b : actual) {
@@ -72,7 +74,7 @@ final class DownloadIntegrity {
             hex.append(Character.forDigit(b & 15, 16));
         }
         if (!hex.toString().equalsIgnoreCase(expected)) {
-            throw new IOException("Downloaded APK SHA-256 does not match GitHub asset");
+            throw new IOException("Downloaded file SHA-256 does not match the listed digest");
         }
     }
 }

@@ -1540,4 +1540,36 @@
         <item quantity="other">This one uses %1$d places. Add them under Places first</item>
     </plurals>
     <string name="auto_import_pick">Choose a place</string>
+    <!-- Speed limits (developer options, development stage, owner 2026-11-28). Approved by the owner 2026-11-28 -->
+    <string name="dev_group_speed_limit">Speed limits</string>
+    <string name="dev_speed_limit_button_title">Show speed limit on floating button</string>
+    <string name="dev_speed_limit_button_summary">Shows the limit of the road you are on in the middle of the floating button, from downloaded speed limit data</string>
+    <string name="dev_speed_limit_data_title">Speed limit data</string>
+    <string name="dev_speed_limit_data_none">Not downloaded</string>
+    <string name="dev_speed_limit_data_some">Downloaded: %1$s</string>
+    <string name="sl_network_title">Network</string>
+    <string name="sl_network_checking">Checking…</string>
+    <string name="sl_network_wifi">Wi-Fi</string>
+    <string name="sl_network_mobile">Mobile data, no downloads</string>
+    <string name="sl_network_unknown">Can\'t tell, no downloads</string>
+    <string name="sl_network_unconfirmed">Not confirmed as Wi-Fi yet</string>
+    <string name="sl_network_teach_wifi">This network counts as Wi-Fi. If it is the car\'s mobile data, choose Not Wi-Fi and nothing will download on it.</string>
+    <string name="sl_network_teach_mobile">This network counts as mobile data. If you are on Wi-Fi, choose Wi-Fi.</string>
+    <string name="sl_network_confirm">Is this network Wi-Fi? You only need to answer once for each network.</string>
+    <string name="sl_network_is_wifi">Wi-Fi</string>
+    <string name="sl_network_not_wifi">Not Wi-Fi</string>
+    <string name="sl_group_countries">Countries and regions</string>
+    <string name="sl_catalog_loading">Getting the list…</string>
+    <string name="sl_catalog_failed">Can\'t get the list. Try again</string>
+    <string name="sl_catalog_offline">Connect to Wi-Fi to get the list</string>
+    <string name="sl_catalog_unconfirmed">Confirm the network to get the list</string>
+    <string name="sl_installed">Downloaded · %1$s</string>
+    <string name="sl_update">Update available · %1$s · %2$s</string>
+    <string name="sl_downloading">Downloading %1$d%%</string>
+    <string name="sl_verifying">Verifying…</string>
+    <string name="sl_failed_download">Can\'t download. Try again</string>
+    <string name="sl_failed_verify">Verification failed. Not in use</string>
+    <string name="sl_failed_not_wifi">Not on Wi-Fi. Nothing downloaded</string>
+    <string name="sl_action_update">Update</string>
+    <string name="sl_note">Speed limit data comes from OpenStreetMap (© OpenStreetMap contributors) under the ODbL. It downloads only when you tap, only on Wi-Fi, and is used only after it passes verification.</string>
 </resources>
