@@ -1548,7 +1548,7 @@
         <item quantity="other">这一条用到 %1$d 个地点，先在下面的「地点」里添加</item>
     </plurals>
     <string name="auto_import_pick">选择地点</string>
-    <!-- 限速（开发者选项，项目所有者 2026-11-28 开发阶段）。草稿，待项目所有者批（项目本地文档 speed-limits/spec.md） -->
+    <!-- 限速（开发者选项，项目所有者 2026-11-28 开发阶段）。项目所有者 2026-11-28 批（项目本地文档 speed-limits/spec.md） -->
     <string name="dev_group_speed_limit">限速</string>
     <string name="dev_speed_limit_button_title">悬浮按钮显示限速</string>
     <string name="dev_speed_limit_button_summary">按已下载的限速数据，在悬浮按钮中间显示所在道路的限速</string>

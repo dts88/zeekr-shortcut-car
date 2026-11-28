@@ -1514,7 +1514,7 @@
         <item quantity="other">Yang ini menggunakan %1$d tempat. Tambahnya di bawah Tempat dahulu</item>
     </plurals>
     <string name="auto_import_pick">Pilih tempat</string>
-    <!-- Had laju (pilihan pembangun, peringkat pembangunan, pemilik 2026-11-28). Draf, menunggu kelulusan pemilik -->
+    <!-- Had laju (pilihan pembangun, peringkat pembangunan, pemilik 2026-11-28). Diluluskan oleh pemilik 2026-11-28 -->
     <string name="dev_group_speed_limit">Had laju</string>
     <string name="dev_speed_limit_button_title">Tunjukkan had laju pada butang terapung</string>
     <string name="dev_speed_limit_button_summary">Menunjukkan had laju jalan semasa di tengah butang terapung, daripada data had laju yang dimuat turun</string>
