@@ -11,6 +11,10 @@ commit message, not here.
 
 Nothing yet.
 
+## [4.19.0-alpha] - 2026-11-28
+
+- Developer options: Speed limits (development stage). Speed limit data lists per-country packages from zeekr.autos (OpenStreetMap data, ODbL). A package downloads only when you tap it and only on Wi-Fi, and is used only after it passes verification. Show speed limit on floating button writes the limit of the current road in the middle of the floating button.
+
 ## [4.18.0-alpha] - 2026-11-27
 
 - Places and automation: share codes. An expanded rule ends with its share code; tap it for a QR code that opens the rule on zeekr.autos. Add automation → Enter share code adds a rule from a code, with your own places. Codes carry no names, coordinates or radii.
