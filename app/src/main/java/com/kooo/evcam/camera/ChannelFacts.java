@@ -268,11 +268,14 @@ public final class ChannelFacts implements ChannelScheduler.Facts {
 
     // ---- 车
 
-    /** 哨兵模式（车辆信号核心那一份，熄屏判断登记的、一直在读）；车辆接口没连着算读不到。 */
+    /**
+     * 哨兵模式（车辆信号核心那一份，熄屏判断登记的、一直在读）；车辆接口没连着算读不到。警戒、报警先照旧算读不到
+     * （{@code telemetry.Sentry#forDecisions}，项目所有者 2026-11-28：确认了读数再动相机管家）。
+     */
     @Override
     public Integer sentry() {
         com.kooo.evcam.telemetry.Telemetry t = com.kooo.evcam.telemetry.Telemetry.get();
-        return t.carLinkConnected() ? t.latest().sentry : null;
+        return t.carLinkConnected() ? com.kooo.evcam.telemetry.Sentry.forDecisions(t.latest().sentry) : null;
     }
 
     /** 「熄屏持续录制」（开发者「熄屏录制（阻止休眠）」不算，lifecycle-spec §3.3）。每一轮现读：黑着时没人改得了它。 */
@@ -306,7 +309,8 @@ public final class ChannelFacts implements ChannelScheduler.Facts {
         try {
             com.kooo.evcam.telemetry.Readings r = com.kooo.evcam.telemetry.Telemetry.get().readings();
             long now = SystemClock.elapsedRealtime();
-            return new ChannelScheduler.Vehicle(r.code(com.kooo.evcam.telemetry.Signal.SENTRY_MODE),
+            return new ChannelScheduler.Vehicle(com.kooo.evcam.telemetry.Sentry.forDecisions(
+                    r.code(com.kooo.evcam.telemetry.Signal.SENTRY_MODE)),
                     r.code(com.kooo.evcam.telemetry.Signal.IGNITION),
                     com.kooo.evcam.telemetry.SignalAges.ageMs(com.kooo.evcam.telemetry.Signal.IGNITION, now),
                     com.kooo.evcam.telemetry.SignalAges.ageMs(com.kooo.evcam.telemetry.Signal.DOOR_DRIVER, now),

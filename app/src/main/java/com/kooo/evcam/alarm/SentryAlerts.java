@@ -169,7 +169,9 @@ public final class SentryAlerts implements Telemetry.Listener {
         }
         long now = SystemClock.elapsedRealtime();
         Integer before = watch.reading();
-        SentryWatch.Trigger trigger = watch.update(readings.code(Signal.SENTRY_MODE));
+        // 第一步（项目所有者 2026-11-28：先读取、记录）：警戒、报警照旧算读不到，提醒不会因它们发；车上核对过读数再放开
+        SentryWatch.Trigger trigger = watch.update(
+                com.kooo.evcam.telemetry.Sentry.forDecisions(readings.code(Signal.SENTRY_MODE)));
         Integer after = watch.reading();
         if (after != null && !after.equals(before)) {
             // 每一次变化都记：警戒、报警还没在车上见过，上车核对靠这几行

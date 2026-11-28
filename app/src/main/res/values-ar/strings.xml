@@ -333,6 +333,8 @@
     <string name="opt_screen_off_fps_follow">حسب جودة التسجيل</string>
     <string name="sentry_status_on">وضع الحراسة: تشغيل</string>
     <string name="sentry_status_armed">وضع الحراسة: متأهب</string>
+    <string name="sentry_status_alert">وضع الحراسة: تنبيه</string>
+    <string name="sentry_status_alarm">وضع الحراسة: إنذار</string>
     <string name="sentry_status_off">وضع الحراسة: إيقاف</string>
     <string name="sentry_status_reading">وضع الحراسة: جارٍ القراءة…</string>
     <string name="sentry_status_unknown">وضع الحراسة: تعذّرت القراءة</string>
@@ -496,6 +498,8 @@
     <string name="vi_v_day">نهار</string>
     <string name="vi_v_night">ليل</string>
     <string name="vi_v_armed">متأهب</string>
+    <string name="vi_v_alert">تنبيه</string>
+    <string name="vi_v_alarm">إنذار</string>
     <string name="vi_v_ign_acc">ACC</string>
     <string name="vi_v_ign_on">ON</string>
     <string name="vi_v_ign_driving">القيادة</string>

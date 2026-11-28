@@ -50,6 +50,34 @@ public class InfoBarShotsTest {
         shoot(Shots.DAY_EN, "info-bar-en");
     }
 
+    /**
+     * 哨兵那一格的六种样子，从上到下：读不到、关、开、已布防、警戒（黄底感叹号）、报警（红底感叹号）。
+     * 警戒、报警 2026-11-28 起读得出来（telemetry.Sentry）。
+     */
+    @Test
+    public void sentryStates() {
+        RuntimeEnvironment.setQualifiers(Shots.DAY);
+        Context context = RuntimeEnvironment.getApplication();
+        InfoBar.setSelected(context, Signal.SENTRY_MODE.name(), true);
+        Integer[] states = {null, 0, 1, 2, 3, 4};
+        android.graphics.Bitmap sheet = null;
+        android.graphics.Canvas canvas = null;
+        for (int i = 0; i < states.length; i++) {
+            InfoBarRenderer renderer = new InfoBarRenderer(context, WIDTH);
+            assertTrue(renderer.renderIfDue(sample().edit().sentry(states[i]).build()));
+            android.graphics.Bitmap bar = renderer.bitmap();
+            if (sheet == null) {
+                sheet = android.graphics.Bitmap.createBitmap(bar.getWidth(), bar.getHeight() * states.length,
+                        android.graphics.Bitmap.Config.ARGB_8888);
+                canvas = new android.graphics.Canvas(sheet);
+            }
+            canvas.drawBitmap(bar, 0, bar.getHeight() * i, null);
+            renderer.recycle();
+        }
+        File file = Shots.save(sheet, "info-bar-sentry");
+        assertTrue(file + " 是空的", file.length() > 5_000);
+    }
+
     /** 开着车、往左打灯：舒适模式 D 挡，62 km/h，油门 35%，日行灯和近光开着。 */
     static VehicleState sample() {
         return VehicleState.empty().edit()

@@ -165,7 +165,10 @@ public class SignalDecodeTest {
         assertEquals(100f, (Float) Signal.BRAKE_DEPTH.decode(44f), 0.01f);
         assertEquals(50f, (Float) Signal.BRAKE_DEPTH.decode(22f), 0.01f);
         assertEquals(Integer.valueOf(2), Signal.SENTRY_MODE.decode(2));
-        assertNull(Signal.SENTRY_MODE.decode(3));
+        // 3 警戒、4 报警 2026-11-28 起读得出来（Sentry）；做判断的地方照旧看不到（Sentry.forDecisions）
+        assertEquals(Integer.valueOf(3), Signal.SENTRY_MODE.decode(3));
+        assertEquals(Integer.valueOf(4), Signal.SENTRY_MODE.decode(4));
+        assertNull(Signal.SENTRY_MODE.decode(5));
     }
 
     /** 车速传感器给的是 m/s（Lab 0.10.0：15.833 = 57 km/h），表里直接换成 km/h。 */

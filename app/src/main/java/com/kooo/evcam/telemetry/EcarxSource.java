@@ -1313,8 +1313,34 @@ final class EcarxSource {
             if (DarkScreenProbes.watches(s)) {
                 probeChanged(DarkScreenProbes.key(s), DarkScreenProbes.text(s, decoded));
             }
+            if (s == Signal.SENTRY_MODE) {
+                noteSentryTrigger(decoded instanceof Integer ? (Integer) decoded : null);
+            }
         } catch (RuntimeException e) {
             probeFailed("signal", e);
+        }
+    }
+
+    /** 上一次记的哨兵读数（{@link #noteSentryTrigger}）；读不到的不算。 */
+    private Integer sentryNoted;
+
+    /**
+     * 哨兵的警戒、报警（项目所有者 2026-11-28：先读取、记录，{@link Sentry}）：进去、出来各记一行中文，黑匣子里一眼找得到；
+     * 「车辆信号：sentry_mode armed → alert」那一行照旧另有。读不到的不算变化。
+     */
+    private void noteSentryTrigger(Integer reading) {
+        if (reading == null || reading.equals(sentryNoted)) {
+            return;
+        }
+        Integer before = sentryNoted;
+        sentryNoted = reading;
+        if (reading == Sentry.ALERT) {
+            BlackBox.noteImportant("哨兵模式：警戒（读数 3）");
+        } else if (reading == Sentry.ALARM) {
+            BlackBox.noteImportant("哨兵模式：报警（读数 4）");
+        } else if (Sentry.triggered(before)) {
+            BlackBox.noteImportant("哨兵模式：" + (before == Sentry.ALARM ? "报警" : "警戒") + "结束，现在 "
+                    + Sentry.token(reading));
         }
     }
 

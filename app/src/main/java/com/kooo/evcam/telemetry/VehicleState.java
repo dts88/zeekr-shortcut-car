@@ -92,6 +92,7 @@ public final class VehicleState {
     /** 正在按喇叭（Lab 还没找到读数，现在总是 null）。 */
     public final Boolean horn;
     /** 哨兵模式：0 关、1 开、2 布防（锁车后）。熄屏后环视录到什么时候（车机要不要睡），看的就是它（规格 §3.3）。 */
+    /** 哨兵模式：0 关、1 开、2 布防、3 警戒、4 报警（{@link Sentry}）；读不到 null。做判断的地方经 {@link Sentry#forDecisions}。 */
     public final Integer sentry;
     /**
      * 后视镜上的灯（盲区指示灯、开门预警，左右各一）：另一个来源的（{@link Telemetry#lamps}），信息条上是转向灯箭头的边框。

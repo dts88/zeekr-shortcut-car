@@ -835,6 +835,17 @@ public final class InfoBarRenderer {
             canvas.drawPath(path, stroke);
             return;
         }
+        if (Sentry.triggered(code)) {
+            // 警戒（黄）、报警（红）：盾牌换色，中间一个感叹号 —— 形状和「布防」的眼睛不同，压缩以后也分得开（2026-11-28）
+            boolean alarm = code == Sentry.ALARM;
+            fill.setColor(alarm ? WARN : LEFT_YELLOW);
+            canvas.drawPath(path, fill);
+            fill.setColor(alarm ? TEXT : BG);
+            rect.set(cx - 4.5f, cy - 19, cx + 4.5f, cy + 5);
+            canvas.drawRoundRect(rect, 4.5f, 4.5f, fill);
+            canvas.drawCircle(cx, cy + 14, 5, fill);
+            return;
+        }
         fill.setColor(ON);
         canvas.drawPath(path, fill);
         if (code == 2) {

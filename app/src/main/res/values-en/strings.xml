@@ -332,6 +332,8 @@
     <string name="opt_screen_off_fps_follow">Follow recording quality</string>
     <string name="sentry_status_on">Sentry Mode: on</string>
     <string name="sentry_status_armed">Sentry Mode: armed</string>
+    <string name="sentry_status_alert">Sentry Mode: alert</string>
+    <string name="sentry_status_alarm">Sentry Mode: alarm</string>
     <string name="sentry_status_off">Sentry Mode: off</string>
     <string name="sentry_status_reading">Sentry Mode: reading…</string>
     <string name="sentry_status_unknown">Sentry Mode: unavailable</string>
@@ -498,6 +500,8 @@
     <string name="vi_v_day">Day</string>
     <string name="vi_v_night">Night</string>
     <string name="vi_v_armed">Armed</string>
+    <string name="vi_v_alert">Alert</string>
+    <string name="vi_v_alarm">Alarm</string>
     <string name="vi_v_ign_acc">ACC</string>
     <string name="vi_v_ign_on">ON</string>
     <string name="vi_v_ign_driving">Driving</string>

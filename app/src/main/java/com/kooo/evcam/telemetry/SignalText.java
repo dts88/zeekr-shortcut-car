@@ -51,7 +51,8 @@ public final class SignalText {
             }
             case SENTRY: {
                 int code = v instanceof Integer ? (Integer) v : -1;
-                return ctx.getString(code == 2 ? R.string.vi_v_armed : code == 1 ? R.string.vi_v_on : R.string.vi_v_off);
+                return ctx.getString(code == Sentry.ALARM ? R.string.vi_v_alarm : code == Sentry.ALERT ? R.string.vi_v_alert
+                        : code == 2 ? R.string.vi_v_armed : code == 1 ? R.string.vi_v_on : R.string.vi_v_off);
             }
             case DAY_NIGHT:
                 return ctx.getString(Integer.valueOf(Signal.NIGHT).equals(v) ? R.string.vi_v_night : R.string.vi_v_day);
