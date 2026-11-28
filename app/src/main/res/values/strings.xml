@@ -1548,4 +1548,36 @@
         <item quantity="other">这一条用到 %1$d 个地点，先在下面的「地点」里添加</item>
     </plurals>
     <string name="auto_import_pick">选择地点</string>
+    <!-- 限速（开发者选项，项目所有者 2026-11-28 开发阶段）。草稿，待项目所有者批（项目本地文档 speed-limits/spec.md） -->
+    <string name="dev_group_speed_limit">限速</string>
+    <string name="dev_speed_limit_button_title">悬浮按钮显示限速</string>
+    <string name="dev_speed_limit_button_summary">按已下载的限速数据，在悬浮按钮中间显示所在道路的限速</string>
+    <string name="dev_speed_limit_data_title">限速数据</string>
+    <string name="dev_speed_limit_data_none">未下载</string>
+    <string name="dev_speed_limit_data_some">已下载：%1$s</string>
+    <string name="sl_network_title">网络</string>
+    <string name="sl_network_checking">正在检查…</string>
+    <string name="sl_network_wifi">Wi-Fi</string>
+    <string name="sl_network_mobile">移动网络，不下载</string>
+    <string name="sl_network_unknown">无法判断，不下载</string>
+    <string name="sl_network_unconfirmed">未确认是不是 Wi-Fi</string>
+    <string name="sl_network_teach_wifi">当前网络算作 Wi-Fi。如果连接的是车辆的移动网络，请选「不是 Wi-Fi」，此后在这个网络下不下载。</string>
+    <string name="sl_network_teach_mobile">当前网络算作移动网络。如果已连接 Wi-Fi，请选「是 Wi-Fi」。</string>
+    <string name="sl_network_confirm">当前网络是 Wi-Fi 吗？每个网络只需确认一次，以后连接这个网络时不再询问。</string>
+    <string name="sl_network_is_wifi">是 Wi-Fi</string>
+    <string name="sl_network_not_wifi">不是 Wi-Fi</string>
+    <string name="sl_group_countries">国家和地区</string>
+    <string name="sl_catalog_loading">正在获取列表…</string>
+    <string name="sl_catalog_failed">无法获取列表，请重试</string>
+    <string name="sl_catalog_offline">连接 Wi-Fi 后才能获取列表</string>
+    <string name="sl_catalog_unconfirmed">确认网络后才能获取列表</string>
+    <string name="sl_installed">已下载 · %1$s</string>
+    <string name="sl_update">有更新 · %1$s · %2$s</string>
+    <string name="sl_downloading">正在下载 %1$d%%</string>
+    <string name="sl_verifying">正在校验…</string>
+    <string name="sl_failed_download">无法下载，请重试</string>
+    <string name="sl_failed_verify">校验未通过，未启用</string>
+    <string name="sl_failed_not_wifi">未连接 Wi-Fi，未下载</string>
+    <string name="sl_action_update">更新</string>
+    <string name="sl_note">限速数据来自 OpenStreetMap（© OpenStreetMap 贡献者），按 ODbL 授权提供。点按后才下载，仅在 Wi-Fi 下下载，校验通过后启用。</string>
 </resources>

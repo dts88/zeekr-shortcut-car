@@ -123,6 +123,8 @@ final class LocationSource implements LocationListener {
         final double lat = location.getLatitude();
         final double lon = location.getLongitude();
         final Float accuracy = location.hasAccuracy() ? location.getAccuracy() : null;
+        // 行进方向：限速数据分顺逆用（speed-limits/spec.md §五），定位没给就是 null
+        final Float bearing = location.hasBearing() ? location.getBearing() : null;
         // 定位的时刻换到 elapsedRealtime 那个钟上（getLastKnownLocation 交来的可能是很久以前的）
         final long at = location.getElapsedRealtimeNanos() > 0L
                 ? location.getElapsedRealtimeNanos() / 1_000_000L : android.os.SystemClock.elapsedRealtime();
@@ -130,7 +132,7 @@ final class LocationSource implements LocationListener {
         final float kmh = location.getSpeed() * 3.6f;
         // 停了之后定位线程上还排着的那一次也会到这里：Telemetry 只收当前来源的写入，它被丢掉，清掉的位置不会被写回来
         telemetry.edit(this, b -> {
-            b.position(lat, lon, accuracy, at);
+            b.position(lat, lon, accuracy, at, bearing);
             if (hasSpeed) {
                 b.speedKmh(kmh);
             }

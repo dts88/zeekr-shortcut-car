@@ -119,6 +119,8 @@ public class RecordingFloatingService extends Service {
     private FrameLayout floatingContainer;
     private RecordingButtonView recordingButton;
     private TextView timeTextView;
+    /** 开发者选项「悬浮按钮显示限速」开着、按钮在时才有（{@link #syncSpeedLimit}）。 */
+    private com.kooo.evcam.speedlimit.LimitDisplay speedLimits;
 
     // 布局参数
     private WindowManager.LayoutParams layoutParams;
@@ -234,6 +236,7 @@ public class RecordingFloatingService extends Service {
         floatingContainer.setAlpha(appConfig.getFloatingWindowAlpha() / 100f);
         timeTextView.setVisibility(isRecording && !waitingForCameras && appConfig.isFloatingDurationVisible()
                 ? View.VISIBLE : View.GONE);
+        syncSpeedLimit();
         AppLog.d(TAG, "悬浮按钮外观已更新: 大小 "
                 + appConfig.getRecordingFloatingButtonSizeDp() + "dp, 透明度 "
                 + appConfig.getFloatingWindowAlpha() + "%, 时长 "
@@ -353,6 +356,7 @@ public class RecordingFloatingService extends Service {
     }
 
     private void hideFloatingWindow() {
+        stopSpeedLimit();
         if (floatingContainer != null && windowManager != null) {
             windowManager.removeView(floatingContainer);
             floatingContainer = null;
@@ -547,6 +551,36 @@ public class RecordingFloatingService extends Service {
         }
     }
 
+    // ========== 限速（开发者选项，speed-limits/spec.md）==========
+
+    /**
+     * 「悬浮按钮显示限速」开着、按钮在：按下载的限速数据在按钮中间写所在道路的限速；关了、按钮收起：停掉（不再要定位）。
+     * 开关一改设置那边发 {@link #ACTION_UPDATE_STYLE}，走到这里。
+     */
+    private void syncSpeedLimit() {
+        boolean on = floatingContainer != null && appConfig.isSpeedLimitOnButton();
+        if (on && speedLimits == null) {
+            speedLimits = new com.kooo.evcam.speedlimit.LimitDisplay(this, match -> {
+                if (recordingButton != null) {
+                    recordingButton.setLimit(match != null && match.shown() ? String.valueOf(match.limit) : null);
+                }
+            });
+            speedLimits.start();
+        } else if (!on) {
+            stopSpeedLimit();
+        }
+    }
+
+    private void stopSpeedLimit() {
+        if (speedLimits != null) {
+            speedLimits.stop();
+            speedLimits = null;
+        }
+        if (recordingButton != null) {
+            recordingButton.setLimit(null);
+        }
+    }
+
     // ========== 按钮动作 ==========
 
     /**
@@ -666,7 +700,7 @@ public class RecordingFloatingService extends Service {
 
     // ========== 自定义录制按钮视图（iOS 扁平化风格）==========
 
-    private static class RecordingButtonView extends View {
+    static class RecordingButtonView extends View {
         private Paint backgroundPaint;
         private Paint iconPaint;
         private Paint shadowPaint;
@@ -680,12 +714,16 @@ public class RecordingFloatingService extends Service {
         private boolean waiting = false;
         /** 本段录到哪儿了，0–1。 */
         private float progress = 0f;
+        /** 限速（开发者选项）：有的时候中间写这个数，代替中间的点 / 方块；外圈照旧说录没录。 */
+        private String limitText;
+        private Paint limitPaint;
+        private final android.graphics.Rect limitBounds = new android.graphics.Rect();
         private float centerX, centerY;
         private float radius;
         private int buttonSize;
         private float cornerRadius;
 
-        public RecordingButtonView(Context context, int buttonSize) {
+        RecordingButtonView(Context context, int buttonSize) {
             super(context);
             this.buttonSize = buttonSize;
             init();
@@ -714,6 +752,20 @@ public class RecordingFloatingService extends Service {
             progressPaint.setStyle(Paint.Style.STROKE);
             progressPaint.setStrokeCap(Paint.Cap.ROUND);
             progressPaint.setColor(ContextCompat.getColor(getContext(), R.color.recording));
+
+            // 限速的数：正文色、粗体，不用红（红色只标「正在录」，ui-spec §二）
+            limitPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            limitPaint.setColor(ContextCompat.getColor(getContext(), R.color.text_primary));
+            limitPaint.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+            limitPaint.setTextAlign(Paint.Align.CENTER);
+        }
+
+        /** 中间写的限速；null = 照旧画点 / 方块。 */
+        public void setLimit(String text) {
+            if (!java.util.Objects.equals(text, limitText)) {
+                limitText = text;
+                invalidate();
+            }
         }
 
         /** 本段录到哪儿了，0–1。只在录制中画。 */
@@ -800,6 +852,10 @@ public class RecordingFloatingService extends Service {
                     canvas.drawArc(ringRect, -90f, 360f * progress, false, progressPaint);
                 }
 
+                if (limitText != null) {
+                    drawLimit(canvas, ringRadius - stroke / 2f);
+                    return;
+                }
                 // 停止方块：在录是红的；等摄像头时是灰的 —— 还是方块，按一下照样是停
                 iconPaint.setColor(ContextCompat.getColor(getContext(),
                         live ? R.color.recording : R.color.text_tertiary));
@@ -819,10 +875,31 @@ public class RecordingFloatingService extends Service {
                 //
                 // 试过中间不画东西，只剩一个空圈 —— 太素，一眼认不出这是个按钮。
                 // 红色仍然只在录制时出现：说明「正在录」的是颜色，不是有没有点。
+                if (limitText != null) {
+                    drawLimit(canvas, ringRadius - stroke / 2f);
+                    return;
+                }
                 iconPaint.setColor(ContextCompat.getColor(getContext(), R.color.text_tertiary));
                 canvas.drawCircle(centerX, centerY, radius * 0.32f, iconPaint);
                 iconPaint.setColor(ContextCompat.getColor(getContext(), R.color.recording));
             }
+        }
+
+        /**
+         * 在外圈里面写限速：字号取内径的 0.6 倍，放不下（三位数）再缩到刚好放下；竖着按字的实际高度居中。
+         *
+         * @param inner 外圈的内半径
+         */
+        private void drawLimit(Canvas canvas, float inner) {
+            float size = inner * 1.2f;
+            limitPaint.setTextSize(size);
+            float width = limitPaint.measureText(limitText);
+            float room = inner * 1.6f;
+            if (width > room) {
+                limitPaint.setTextSize(size * room / width);
+            }
+            limitPaint.getTextBounds(limitText, 0, limitText.length(), limitBounds);
+            canvas.drawText(limitText, centerX, centerY - limitBounds.exactCenterY(), limitPaint);
         }
     }
 }

@@ -72,6 +72,9 @@ public class DeveloperSettingsTest {
         ROWS.put("pref_side_view_calibration", Arrays.asList("side_view_back", "side_view_up", "side_view_fov"));
         // 录像回放分条的后备做法（项目所有者 2026-11-14）：默认照文件名和文件时间，开着时逐个打开读时长
         ROWS.put("pref_playback_read_durations", Arrays.asList("playback_read_durations"));
+        // 限速（项目所有者 2026-11-28，开发阶段）：开关存一个键；「限速数据」是另一页，装了哪些包看文件不看设置
+        ROWS.put("pref_speed_limit_on_button", Arrays.asList("speed_limit_on_button"));
+        ROWS.put("pref_speed_limit_data", NONE);
         ROWS.put("pref_repair_mp4", NONE);
         ROWS.put("pref_archive", NONE);
         ROWS.put("pref_developer_note", NONE);

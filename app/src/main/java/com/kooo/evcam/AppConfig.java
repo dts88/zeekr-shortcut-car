@@ -81,6 +81,7 @@ public class AppConfig {
     private static final String KEY_GPU_FISHEYE_PREVIEW = "gpu_fisheye_preview";  // 预览鱼眼校正走 GPU 逐像素（开发者选项）
     private static final String KEY_GPU_FISHEYE_VIDEO = "gpu_fisheye_video";      // 视频回看鱼眼校正走 GPU 逐像素（开发者选项）
     private static final String KEY_PLAYBACK_READ_DURATIONS = "playback_read_durations";  // 录像回放逐个读取片段时长（开发者选项）
+    private static final String KEY_SPEED_LIMIT_ON_BUTTON = "speed_limit_on_button";  // 悬浮按钮显示限速（开发者选项，开发阶段）
     private static final String KEY_CAMERA_HOLDER_SUSPECTS = "camera_holder_suspects";  // 记录可能占用摄像头的应用（开发者选项）
     private static final String KEY_PHOTO_FISHEYE_FOV = "photo_fisheye_fov";      // 图片回看的校正视野
     private static final String KEY_REARVIEW_FOV = "rearview_fov";                // 目标视野（度）
@@ -722,6 +723,7 @@ public class AppConfig {
                 KEY_GPU_FISHEYE_PREVIEW,              // 预览鱼眼校正走 GPU → 关
                 KEY_GPU_FISHEYE_VIDEO,                // 视频回看鱼眼校正走 GPU → 关
                 KEY_PLAYBACK_READ_DURATIONS,          // 录像回放逐个读取片段时长 → 关（照文件名和文件时间算）
+                KEY_SPEED_LIMIT_ON_BUTTON,            // 悬浮按钮显示限速 → 关（开发阶段，项目所有者 2026-11-28）
                 KEY_CAMERA_HOLDER_SUSPECTS,           // 记录可能占用摄像头的应用 → 关
                 KEY_PHOTO_VIA_JPEG,                   // 拍照使用 JPEG 输出 → 开（关着时主界面在后台拍不到画面）
                 KEY_STORAGE_LOCATION,                 // 存储位置 → U 盘（内置存储只有开发者选得了）
@@ -1324,6 +1326,18 @@ public class AppConfig {
 
     public void setPlaybackReadDurations(boolean on) {
         prefs.edit().putBoolean(KEY_PLAYBACK_READ_DURATIONS, on).apply();
+    }
+
+    /**
+     * 悬浮按钮显示限速（项目所有者 2026-11-28，开发阶段）：按「限速数据」里下载、校验过的包，在悬浮按钮中间写所在道路的限速
+     * （{@code speedlimit.LimitDisplay}）。默认关；归开发者选项管，关着开发者选项时按关算。
+     */
+    public boolean isSpeedLimitOnButton() {
+        return readBoolean(KEY_SPEED_LIMIT_ON_BUTTON, false);
+    }
+
+    public void setSpeedLimitOnButton(boolean on) {
+        prefs.edit().putBoolean(KEY_SPEED_LIMIT_ON_BUTTON, on).apply();
     }
 
     /**

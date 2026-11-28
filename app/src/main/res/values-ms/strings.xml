@@ -1514,4 +1514,36 @@
         <item quantity="other">Yang ini menggunakan %1$d tempat. Tambahnya di bawah Tempat dahulu</item>
     </plurals>
     <string name="auto_import_pick">Pilih tempat</string>
+    <!-- Had laju (pilihan pembangun, peringkat pembangunan, pemilik 2026-11-28). Draf, menunggu kelulusan pemilik -->
+    <string name="dev_group_speed_limit">Had laju</string>
+    <string name="dev_speed_limit_button_title">Tunjukkan had laju pada butang terapung</string>
+    <string name="dev_speed_limit_button_summary">Menunjukkan had laju jalan semasa di tengah butang terapung, daripada data had laju yang dimuat turun</string>
+    <string name="dev_speed_limit_data_title">Data had laju</string>
+    <string name="dev_speed_limit_data_none">Belum dimuat turun</string>
+    <string name="dev_speed_limit_data_some">Dimuat turun: %1$s</string>
+    <string name="sl_network_title">Rangkaian</string>
+    <string name="sl_network_checking">Menyemak…</string>
+    <string name="sl_network_wifi">Wi-Fi</string>
+    <string name="sl_network_mobile">Data mudah alih, tiada muat turun</string>
+    <string name="sl_network_unknown">Tidak dapat ditentukan, tiada muat turun</string>
+    <string name="sl_network_unconfirmed">Belum disahkan sebagai Wi-Fi</string>
+    <string name="sl_network_teach_wifi">Rangkaian ini dikira sebagai Wi-Fi. Jika ini data mudah alih kereta, pilih Bukan Wi-Fi dan tiada apa-apa akan dimuat turun pada rangkaian ini.</string>
+    <string name="sl_network_teach_mobile">Rangkaian ini dikira sebagai data mudah alih. Jika anda disambungkan ke Wi-Fi, pilih Wi-Fi.</string>
+    <string name="sl_network_confirm">Adakah rangkaian ini Wi-Fi? Anda hanya perlu menjawab sekali bagi setiap rangkaian.</string>
+    <string name="sl_network_is_wifi">Wi-Fi</string>
+    <string name="sl_network_not_wifi">Bukan Wi-Fi</string>
+    <string name="sl_group_countries">Negara dan wilayah</string>
+    <string name="sl_catalog_loading">Mendapatkan senarai…</string>
+    <string name="sl_catalog_failed">Tidak dapat mendapatkan senarai. Cuba lagi</string>
+    <string name="sl_catalog_offline">Sambung ke Wi-Fi untuk mendapatkan senarai</string>
+    <string name="sl_catalog_unconfirmed">Sahkan rangkaian untuk mendapatkan senarai</string>
+    <string name="sl_installed">Dimuat turun · %1$s</string>
+    <string name="sl_update">Kemas kini tersedia · %1$s · %2$s</string>
+    <string name="sl_downloading">Memuat turun %1$d%%</string>
+    <string name="sl_verifying">Mengesahkan…</string>
+    <string name="sl_failed_download">Tidak dapat memuat turun. Cuba lagi</string>
+    <string name="sl_failed_verify">Pengesahan gagal. Tidak digunakan</string>
+    <string name="sl_failed_not_wifi">Tiada Wi-Fi. Tiada apa-apa dimuat turun</string>
+    <string name="sl_action_update">Kemas kini</string>
+    <string name="sl_note">Data had laju daripada OpenStreetMap (© penyumbang OpenStreetMap) di bawah ODbL. Muat turun bermula hanya apabila anda mengetik, hanya melalui Wi-Fi, dan data digunakan hanya selepas lulus pengesahan.</string>
 </resources>
