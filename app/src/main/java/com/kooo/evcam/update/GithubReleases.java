@@ -45,9 +45,10 @@ import java.util.List;
  * 设置里关掉「接收 Beta 版」时只推正式版（{@link VersionName#isRelease}）；打开「接收 Alpha 版」
  * （项目所有者 2026-10-23，默认关，只在 Beta 也开着时算数）时连 alpha 一起推（{@link VersionName#isAlphaBetaOrRelease}）。</p>
  *
- * <h3>这是本应用唯一一次主动出网</h3>
+ * <h3>只在用户点了才出网</h3>
  *
- * <p>只在用户点「检查更新」时发生，去的是 {@code api.github.com} 和
+ * <p>应用自己从不主动出网：这里只在用户点「检查更新」时发生（另外两处也是用户点了才发：分享码的「分享到 zeekr.autos」、
+ * 开发者选项的「限速数据」），去的是 {@code api.github.com} 和
  * GitHub 的下载域名，不带任何设备信息，也不上传任何东西。
  * 只走 https；下载回来的 APK 要和 GitHub 给的 sha256、大小对上才算数（{@link DownloadIntegrity}）。</p>
  */
