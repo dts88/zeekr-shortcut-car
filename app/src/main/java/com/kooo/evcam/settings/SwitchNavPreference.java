@@ -48,6 +48,11 @@ public class SwitchNavPreference extends SwitchPreferenceCompat implements Prefe
         setLayoutResource(R.layout.pref_row_switch_nav_sentry);
     }
 
+    /** 行尾的当前值；没有是 null。 */
+    public CharSequence getValue() {
+        return value;
+    }
+
     /** 行尾的当前值（车牌号、选了几项）；空就只有 ›。 */
     public void setValue(CharSequence value) {
         if (!TextUtils.equals(this.value, value)) {

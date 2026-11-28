@@ -559,6 +559,7 @@
     <!-- 确定键用自己的字，不用系统的 android.R.string.ok：那一份由车机系统提供，英文版的 OK 在按钮里偏右，自己的「取消」一直是正的 -->
     <string name="action_ok">确定</string>
     <string name="action_got_it">知道了</string>
+    <string name="action_open_settings">打开设置</string>
     <string name="info_checking_storage">正在检测存储…</string>
     <string name="opt_internal_storage">内置存储</string>
     <string name="opt_internal_storage_locked">内置存储（需开启开发者选项）</string>
@@ -1561,13 +1562,14 @@
         <item quantity="other">这一条用到 %1$d 个地点，先在下面的「地点」里添加</item>
     </plurals>
     <string name="auto_import_pick">选择地点</string>
-    <!-- 限速（开发者选项，项目所有者 2026-11-28 开发阶段）。项目所有者 2026-11-28 批（项目本地文档 speed-limits/spec.md） -->
-    <string name="dev_group_speed_limit">限速</string>
-    <string name="dev_speed_limit_button_title">悬浮按钮显示限速</string>
-    <string name="dev_speed_limit_button_summary">按已下载的限速数据，在悬浮按钮中间显示所在道路的限速</string>
-    <string name="dev_speed_limit_data_title">限速数据</string>
-    <string name="dev_speed_limit_data_none">未下载</string>
-    <string name="dev_speed_limit_data_some">已下载：%1$s</string>
+    <!-- 限速（项目所有者 2026-11-28 加在开发者选项，同日实测后移到「设置 → 按键」）。项目所有者 2026-11-28 批（项目本地文档 speed-limits/spec.md） -->
+    <string name="set_speed_limit_title">悬浮按钮显示限速</string>
+    <string name="set_speed_limit_summary">按已下载的限速数据，在悬浮按钮中间显示所在道路的限速</string>
+    <string name="set_speed_limit_data_title">限速数据</string>
+    <string name="set_speed_limit_data_none">未下载</string>
+    <string name="set_speed_limit_data_some">已下载：%1$s</string>
+    <!-- 限速的提示：装上这个版本后第一次在主界面时弹一次（ui-spec §十五，项目所有者 2026-11-28）。草稿，待项目所有者批 -->
+    <string name="notice_speed_limit_msg">新加坡、马来西亚、香港的用户可以下载限速数据，在悬浮按钮中间显示所在道路的限速。在「设置 → 按键 → 悬浮按钮显示限速」中下载数据并开启。其他国家和地区的用户如需限速数据，请到 GitHub 的 Issues 页面提交需求。\n\ngithub.com/dts88/zeekr-shortcut-car/issues</string>
     <string name="sl_network_title">网络</string>
     <string name="sl_network_checking">正在检查…</string>
     <string name="sl_network_wifi">Wi-Fi</string>

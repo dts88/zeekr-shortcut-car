@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * 悬浮按钮中间的限速（开发者选项「悬浮按钮显示限速」，项目本地文档 speed-limits/spec.md §二）：
+ * 悬浮按钮中间的限速（「设置 → 按键 → 悬浮按钮显示限速」，项目本地文档 speed-limits/spec.md §二）：
  * 有人显示（{@link #start}）时登记成车辆信号的完整用户（要定位），每来一次新的定位，在自己的线程上匹配一次（{@link LimitMatcher}），
  * 连着两次一样才换数字（{@link LimitMatcher.Tracker}），在主线程上交给 {@link Sink}。
  *

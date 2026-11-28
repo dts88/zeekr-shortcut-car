@@ -72,9 +72,6 @@ public class DeveloperSettingsTest {
         ROWS.put("pref_side_view_calibration", Arrays.asList("side_view_back", "side_view_up", "side_view_fov"));
         // 录像回放分条的后备做法（项目所有者 2026-11-14）：默认照文件名和文件时间，开着时逐个打开读时长
         ROWS.put("pref_playback_read_durations", Arrays.asList("playback_read_durations"));
-        // 限速（项目所有者 2026-11-28，开发阶段）：开关存一个键；「限速数据」是另一页，装了哪些包看文件不看设置
-        ROWS.put("pref_speed_limit_on_button", Arrays.asList("speed_limit_on_button"));
-        ROWS.put("pref_speed_limit_data", NONE);
         ROWS.put("pref_repair_mp4", NONE);
         ROWS.put("pref_archive", NONE);
         ROWS.put("pref_developer_note", NONE);
@@ -100,7 +97,9 @@ public class DeveloperSettingsTest {
             "video_storage_limit_gb", "photo_storage_limit_gb", "custom_sd_card_path",
             "exposure_compensation", "awb_mode", "car_model", "side_view_enabled", "side_view_min_speed",
             "side_view_mode", "side_view_place_height", "side_view_place_edge",
-            "side_view_place_top");
+            "side_view_place_top",
+            // 悬浮按钮显示限速：2026-11-28 加在开发者选项，同日移到「按键」
+            "speed_limit_on_button");
 
     private static final Pattern KEY = Pattern.compile("android:key=\"([^\"]+)\"");
 

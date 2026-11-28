@@ -40,7 +40,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * 开发者选项 → 限速数据（项目所有者 2026-11-28，开发阶段；项目本地文档 speed-limits/spec.md）。
+ * 设置 → 按键 → 悬浮按钮显示限速 → 限速数据（项目所有者 2026-11-28 加在开发者选项，同日实测后移到「按键」；
+ * 项目本地文档 speed-limits/spec.md）。
  *
  * <p>打开这一页先看网络（{@link WifiGate}）：是 Wi-Fi 才去 zeekr.autos 取清单；国家的包只在点那一行时下，
  * 下之前再看一次网络。下好、大小和 sha256 对上清单、整个包解一遍都过了才换上（校验通过才启用），
@@ -97,17 +98,17 @@ public class SpeedLimitDataFragment extends PreferenceFragmentCompat {
     /** 没见过的网络这一页已经自己问过一次了（不追着问）。 */
     private boolean askedThisTime;
 
-    /** 开发者选项里「限速数据」那一行写什么：装了哪几个，没有就「未下载」。 */
+    /** 「悬浮按钮显示限速」那一行的行尾写什么：装了哪几个，没有就「未下载」。 */
     public static String summary(Context context) {
         List<LimitStore.Installed> installed = new LimitStore(context).installed();
         if (installed.isEmpty()) {
-            return context.getString(R.string.dev_speed_limit_data_none);
+            return context.getString(R.string.set_speed_limit_data_none);
         }
         List<String> names = new ArrayList<>();
         for (LimitStore.Installed i : installed) {
             names.add(countryName(context, i.country));
         }
-        return context.getString(R.string.dev_speed_limit_data_some,
+        return context.getString(R.string.set_speed_limit_data_some,
                 android.text.TextUtils.join(context.getString(R.string.auto_list_sep), names));
     }
 

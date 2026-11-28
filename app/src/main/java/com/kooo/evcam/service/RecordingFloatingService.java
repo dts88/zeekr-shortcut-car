@@ -119,7 +119,7 @@ public class RecordingFloatingService extends Service {
     private FrameLayout floatingContainer;
     private RecordingButtonView recordingButton;
     private TextView timeTextView;
-    /** 开发者选项「悬浮按钮显示限速」开着、按钮在时才有（{@link #syncSpeedLimit}）。 */
+    /** 「悬浮按钮显示限速」开着、按钮在时才有（{@link #syncSpeedLimit}）。 */
     private com.kooo.evcam.speedlimit.LimitDisplay speedLimits;
 
     // 布局参数
@@ -551,7 +551,7 @@ public class RecordingFloatingService extends Service {
         }
     }
 
-    // ========== 限速（开发者选项，speed-limits/spec.md）==========
+    // ========== 限速（设置 → 按键 → 悬浮按钮显示限速，speed-limits/spec.md）==========
 
     /**
      * 「悬浮按钮显示限速」开着、按钮在：按下载的限速数据在按钮中间写所在道路的限速；关了、按钮收起：停掉（不再要定位）。
@@ -714,7 +714,7 @@ public class RecordingFloatingService extends Service {
         private boolean waiting = false;
         /** 本段录到哪儿了，0–1。 */
         private float progress = 0f;
-        /** 限速（开发者选项）：有的时候中间写这个数，代替中间的点 / 方块；外圈照旧说录没录。 */
+        /** 限速：有的时候中间写这个数，代替中间的点 / 方块；外圈照旧说录没录。 */
         private String limitText;
         private Paint limitPaint;
         private final android.graphics.Rect limitBounds = new android.graphics.Rect();

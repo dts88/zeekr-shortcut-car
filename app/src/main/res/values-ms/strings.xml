@@ -535,6 +535,7 @@
     <string name="action_cancel">Batal</string>
     <string name="action_ok">OK</string>
     <string name="action_got_it">Faham</string>
+    <string name="action_open_settings">Buka tetapan</string>
     <string name="info_checking_storage">Menyemak storan…</string>
     <string name="opt_internal_storage">Storan dalaman</string>
     <string name="opt_internal_storage_locked">Storan dalaman (memerlukan pilihan pembangun)</string>
@@ -1527,13 +1528,14 @@
         <item quantity="other">Yang ini menggunakan %1$d tempat. Tambahnya di bawah Tempat dahulu</item>
     </plurals>
     <string name="auto_import_pick">Pilih tempat</string>
-    <!-- Had laju (pilihan pembangun, peringkat pembangunan, pemilik 2026-11-28). Diluluskan oleh pemilik 2026-11-28 -->
-    <string name="dev_group_speed_limit">Had laju</string>
-    <string name="dev_speed_limit_button_title">Tunjukkan had laju pada butang terapung</string>
-    <string name="dev_speed_limit_button_summary">Menunjukkan had laju jalan semasa di tengah butang terapung, daripada data had laju yang dimuat turun</string>
-    <string name="dev_speed_limit_data_title">Data had laju</string>
-    <string name="dev_speed_limit_data_none">Belum dimuat turun</string>
-    <string name="dev_speed_limit_data_some">Dimuat turun: %1$s</string>
+    <!-- Had laju (ditambah pada pilihan pembangun oleh pemilik 2026-11-28, dipindahkan ke Tetapan → Butang pada hari yang sama selepas diuji dalam kereta). Diluluskan oleh pemilik 2026-11-28 -->
+    <string name="set_speed_limit_title">Tunjukkan had laju pada butang terapung</string>
+    <string name="set_speed_limit_summary">Menunjukkan had laju jalan semasa di tengah butang terapung, daripada data had laju yang dimuat turun</string>
+    <string name="set_speed_limit_data_title">Data had laju</string>
+    <string name="set_speed_limit_data_none">Belum dimuat turun</string>
+    <string name="set_speed_limit_data_some">Dimuat turun: %1$s</string>
+    <!-- Notis had laju: ditunjukkan sekali pada skrin utama selepas versi ini dipasang (ui-spec §15, pemilik 2026-11-28). Draf, menunggu kelulusan pemilik -->
+    <string name="notice_speed_limit_msg">Pengguna di Singapura, Malaysia dan Hong Kong boleh memuat turun data had laju untuk menunjukkan had laju jalan semasa di tengah butang terapung. Muat turun data dan hidupkannya dalam Tetapan → Butang → Tunjukkan had laju pada butang terapung. Pengguna di negara dan wilayah lain yang memerlukan data had laju boleh menghantar permintaan di halaman Issues GitHub.\n\ngithub.com/dts88/zeekr-shortcut-car/issues</string>
     <string name="sl_network_title">Rangkaian</string>
     <string name="sl_network_checking">Menyemak…</string>
     <string name="sl_network_wifi">Wi-Fi</string>

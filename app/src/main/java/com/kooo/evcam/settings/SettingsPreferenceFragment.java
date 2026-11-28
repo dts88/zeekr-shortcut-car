@@ -266,9 +266,9 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             placeRows.resume();
         }
         // 「限速数据」那一页里可能下载、删除过
-        Preference speedLimitData = findPreference("pref_speed_limit_data");
-        if (speedLimitData != null && getContext() != null) {
-            speedLimitData.setSummary(SpeedLimitDataFragment.summary(getContext()));
+        SwitchNavPreference speedLimit = findPreference("pref_speed_limit_on_button");
+        if (speedLimit != null && getContext() != null) {
+            speedLimit.setValue(SpeedLimitDataFragment.summary(getContext()));
         }
     }
 
@@ -1503,6 +1503,19 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
             });
             appearance.setAction(getString(R.string.action_reset), () -> confirmFloatingReset(appearance));
         }
+
+        // 悬浮按钮显示限速（开关加下一层，项目所有者 2026-11-28 从开发者选项移过来）：开关一改，按钮就地重读
+        // （开着就开始按限速数据匹配，关了就停、不再要定位）；点这一行进「限速数据」，行尾写装了哪几个
+        bindSwitch("pref_speed_limit_on_button", appConfig.isSpeedLimitOnButton(), on -> {
+            appConfig.setSpeedLimitOnButton(on);
+            pushFloatingStyle();
+        });
+        onClick("pref_speed_limit_on_button",
+                pref -> openFragment(new SpeedLimitDataFragment(), R.string.set_speed_limit_data_title));
+        SwitchNavPreference speedLimit = findPreference("pref_speed_limit_on_button");
+        if (speedLimit != null) {
+            speedLimit.setValue(SpeedLimitDataFragment.summary(requireContext()));
+        }
         bindAccessories();
     }
 
@@ -2030,18 +2043,6 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         bindSwitch("pref_playback_read_durations", appConfig.isPlaybackReadDurations(),
                 appConfig::setPlaybackReadDurations);
 
-        // 限速（开发阶段）：开关一改，按钮就地重读（开着就开始按限速数据匹配，关了就停、不再要定位）
-        bindSwitch("pref_speed_limit_on_button", appConfig.isSpeedLimitOnButton(), on -> {
-            appConfig.setSpeedLimitOnButton(on);
-            pushFloatingStyle();
-        });
-        Preference speedLimitData = findPreference("pref_speed_limit_data");
-        if (speedLimitData != null) {
-            speedLimitData.setSummary(SpeedLimitDataFragment.summary(requireContext()));
-        }
-        onClick("pref_speed_limit_data",
-                pref -> openFragment(new SpeedLimitDataFragment(), R.string.dev_speed_limit_data_title));
-
         onClick("pref_repair_mp4", pref -> {
             if (getActivity() == null) {
                 return;
@@ -2300,6 +2301,7 @@ public class SettingsPreferenceFragment extends PreferenceFragmentCompat {
         show("pref_floating_tap", floating);
         show("pref_floating_long_press", floating);
         show("pref_floating_appearance", floating);
+        show("pref_speed_limit_on_button", floating);
 
         // 总开关下面的都跟着它（绑定的每一台是代码里加的行，AccessoryRows）
         androidx.preference.PreferenceCategory accessories = findPreference(AccessoryRows.CATEGORY_KEY);
