@@ -106,6 +106,20 @@ public class AutomationShareShotsTest {
         shoot(Shots.DAY_AR, "day-ar", false);
     }
 
+    /** 「分享到 zeekr.autos」换成假的、当场跑（不真发）；测完放回去。 */
+    @org.junit.Before
+    public void fakeTheSite() {
+        AutomationShare.background = Runnable::run;
+        AutomationShare.poster = code -> new com.kooo.evcam.share.SiteShare.Result(
+                com.kooo.evcam.share.SiteShare.Outcome.SHARED, 3);
+    }
+
+    @org.junit.After
+    public void restoreTheSite() {
+        AutomationShare.background = r -> new Thread(r, "SiteShare").start();
+        AutomationShare.poster = com.kooo.evcam.share.SiteShare::post;
+    }
+
     private void shoot(String qualifiers, String tag, boolean all) throws Exception {
         AppConfig config = new AppConfig(RuntimeEnvironment.getApplication());
         config.setAutomationPlacesAndRules(PlaceStore.format(Arrays.asList(HOME, WORK)), RuleStore.format(rules()));
@@ -141,8 +155,42 @@ public class AutomationShareShotsTest {
         assertNotNull("二维码", qr);
         assertEquals(AutomationShare.LINK + TAILGATE, scan(qr));
         assertTrue(texts(dialog.getWindow().getDecorView()).contains(ShareCode.display(TAILGATE)));
+        // 「分享到 zeekr.autos」：按之前先说清发什么、多少流量（项目所有者 2026-11-28）
+        assertTrue(texts(dialog.getWindow().getDecorView()).contains(
+                activity.getString(R.string.auto_share_site_note, TAILGATE.length())));
+        android.widget.Button send = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
+        assertEquals(activity.getString(R.string.auto_share_site), send.getText().toString());
+        assertTrue(send.isEnabled());
+        assertEquals(activity.getString(R.string.action_close),
+                dialog.getButton(AlertDialog.BUTTON_NEGATIVE).getText().toString());
         save(dialog, "settings-share-" + tag + "-dialog");
+
+        // 按下去：只发这串码；成了写热度、按钮变「已分享」点不动，框不关
+        String[] sent = new String[1];
+        AutomationShare.poster = code -> {
+            sent[0] = code;
+            return new com.kooo.evcam.share.SiteShare.Result(com.kooo.evcam.share.SiteShare.Outcome.SHARED, 3);
+        };
+        send.performClick();
+        Shots.settle();
+        assertEquals(TAILGATE, sent[0]);
+        assertTrue(dialog.isShowing());
+        assertEquals(activity.getString(R.string.auto_share_site_done), send.getText().toString());
+        assertFalse(send.isEnabled());
+        assertTrue(texts(dialog.getWindow().getDecorView()).contains(
+                activity.getString(R.string.auto_share_site_count, 3)));
+        if (all) {
+            save(dialog, "settings-share-" + tag + "-shared");
+        }
         dialog.dismiss();
+
+        // 再打开：这台车分享过，按钮一开始就是「已分享」、点不动
+        click(share);
+        AlertDialog again = (AlertDialog) ShadowDialog.getLatestDialog();
+        assertEquals(activity.getString(R.string.auto_share_site_done),
+                again.getButton(AlertDialog.BUTTON_POSITIVE).getText().toString());
+        assertFalse(again.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled());
+        again.dismiss();
 
         // 两个「在…」的那条：写为什么、灰着
         click(section.findPreference("automation_rule_s2"));

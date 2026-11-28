@@ -1509,6 +1509,15 @@
     <string name="auto_share_too_many_places">Tidak boleh dikongsi: menggunakan lebih daripada %1$d tempat</string>
     <string name="auto_share_place_conditions">Tidak boleh dikongsi: paling banyak satu syarat di tempat dan satu syarat bukan di tempat</string>
     <string name="auto_share_unsupported">Tidak boleh dikongsi</string>
+    <!-- Kongsi ke zeekr.autos (pemilik 2026-11-28). Draf, menunggu kelulusan pemilik -->
+    <string name="auto_share_site">Kongsi ke zeekr.autos</string>
+    <string name="auto_share_site_note">Kongsi ke zeekr.autos hanya menghantar kod kongsi ini (%1$d aksara), kira-kira 6 KB data termasuk sambungan selamat. Tiada nama, tempat, maklumat kereta atau maklumat peribadi dihantar; zeekr.autos hanya menyimpan kod kongsi dan bilangan kali setiap kod dikongsi.</string>
+    <string name="auto_share_site_sending">Berkongsi…</string>
+    <string name="auto_share_site_done">Dikongsi ke zeekr.autos</string>
+    <string name="auto_share_site_count">Dikongsi. Populariti: %1$d</string>
+    <string name="auto_share_site_failed">Tidak dapat menghubungi zeekr.autos. Cuba lagi</string>
+    <string name="auto_share_site_too_often">Terlalu kerap berkongsi. Cuba lagi kemudian</string>
+    <string name="auto_share_site_refused">zeekr.autos tidak menerima kod kongsi ini</string>
     <string name="auto_import">Masukkan kod kongsi</string>
     <string name="auto_import_desc">Tambah automasi yang dikongsi orang lain, dengan tempat anda sendiri</string>
     <string name="auto_import_hint">Contoh: 1EC1 2567</string>

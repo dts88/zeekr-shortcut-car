@@ -11,6 +11,8 @@ import android.content.Context;
 import android.content.res.ColorStateList;
 import android.graphics.Bitmap;
 import android.graphics.Typeface;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.Editable;
 import android.text.InputFilter;
 import android.text.InputType;
@@ -24,6 +26,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.inputmethod.BaseInputConnection;
 import android.view.inputmethod.EditorInfo;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -40,6 +43,7 @@ import com.kooo.evcam.automation.PlaceStore;
 import com.kooo.evcam.automation.Rule;
 import com.kooo.evcam.automation.ShareCode;
 import com.kooo.evcam.share.QrCode;
+import com.kooo.evcam.share.SiteShare;
 import com.kooo.evcam.ui.CamDialogs;
 
 import java.util.ArrayList;
@@ -50,8 +54,8 @@ import java.util.function.Supplier;
 
 /**
  * 分享码（ui-spec §十八「分享码」）：展开的一条最后一行「分享码」（{@link #rowText}），点了弹「分享这条自动化」框
- * （{@link #showShare}：二维码 + 码）；「添加自动化」里的「输入分享码」框（{@link #showImport}）。码的规格在
- * {@link ShareCode}。车上分享、导入都不联网。
+ * （{@link #showShare}：二维码 + 码 +「分享到 zeekr.autos」）；「添加自动化」里的「输入分享码」框（{@link #showImport}）。
+ * 码的规格在 {@link ShareCode}。联网的只有「分享到 zeekr.autos」那一下：用户点了才发，只发这串码（{@link SiteShare}）。
  */
 final class AutomationShare {
 
@@ -64,6 +68,11 @@ final class AutomationShare {
     private static final int QR_SIZE_PX = 420;
     /** 输入框最多收几个字符：最长的码 40 位上下，加上组间的空格。 */
     private static final int INPUT_MAX = 80;
+
+    /** 「分享到 zeekr.autos」那一下（测试换成假的，不真发）。 */
+    static Function<String, SiteShare.Result> poster = SiteShare::post;
+    /** 在哪个线程上发（测试换成当场跑的）。 */
+    static java.util.concurrent.Executor background = r -> new Thread(r, "SiteShare").start();
 
     private AutomationShare() {
     }
@@ -95,7 +104,11 @@ final class AutomationShare {
         }
     }
 
-    /** 「分享这条自动化」框：二维码（手机扫了在 zeekr.autos 打开这一条）、码（大字）、在别的车上怎么添加。按钮「关闭」。 */
+    /**
+     * 「分享这条自动化」框：二维码（手机扫了在 zeekr.autos 打开这一条）、码（大字）、在别的车上怎么添加；
+     * 「分享到 zeekr.autos」会发什么、多少流量（项目所有者 2026-11-28）。按钮「分享到 zeekr.autos」「关闭」；
+     * 这台车分享过这一条的，按钮写「已分享到 zeekr.autos」、点不动。
+     */
     static AlertDialog showShare(Context c, Rule r) {
         String code = code(r);
         if (code == null) {
@@ -125,12 +138,62 @@ final class AutomationShare {
         box.addView(centered(CamDialogs.note(c, c.getString(bitmap != null
                 ? R.string.auto_share_scan : R.string.sentry_alerts_qr_failed))), wide());
         TextView how = centered(CamDialogs.note(c, c.getString(R.string.auto_share_how)));
-        how.setPadding(0, Math.round(4 * density), 0, Math.round(8 * density));
+        how.setPadding(0, Math.round(4 * density), 0, Math.round(4 * density));
         box.addView(how, wide());
-        return CamDialogs.show(new MaterialAlertDialogBuilder(c, R.style.Theme_Cam_MaterialAlertDialog)
+        // 按下「分享到 zeekr.autos」之前先说清：发什么、多少流量、网站存什么（项目所有者 2026-11-28）
+        TextView site = centered(CamDialogs.note(c, c.getString(R.string.auto_share_site_note, code.length())));
+        site.setPadding(0, Math.round(4 * density), 0, Math.round(4 * density));
+        box.addView(site, wide());
+        TextView status = centered(CamDialogs.note(c, ""));
+        status.setTextColor(ContextCompat.getColor(c, R.color.text_primary));
+        status.setPadding(0, 0, 0, Math.round(8 * density));
+        status.setVisibility(View.GONE);
+        box.addView(status, wide());
+        boolean before = SiteShare.sharedBefore(c, code);
+        AlertDialog dialog = CamDialogs.show(new MaterialAlertDialogBuilder(c, R.style.Theme_Cam_MaterialAlertDialog)
                 .setTitle(R.string.auto_share_title)
                 .setView(scroll(c, box))
-                .setPositiveButton(R.string.action_close, null));
+                .setNegativeButton(R.string.action_close, null)
+                .setPositiveButton(before ? R.string.auto_share_site_done : R.string.auto_share_site, null));
+        if (before) {
+            CamDialogs.enable(dialog, AlertDialog.BUTTON_POSITIVE, false);
+        }
+        // 点了不关框：发完在下面写结果
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> sendToSite(c, dialog, code, status));
+        return dialog;
+    }
+
+    /**
+     * 发到 zeekr.autos：按钮先写「正在分享…」、点不动；成了写「已分享到 zeekr.autos」、下面写当前热度，记下这台车分享过；
+     * 没成下面写为什么，按钮恢复能点。黑匣子只记结果，不记码。
+     */
+    private static void sendToSite(Context c, AlertDialog dialog, String code, TextView status) {
+        Button send = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
+        send.setText(R.string.auto_share_site_sending);
+        CamDialogs.enable(dialog, AlertDialog.BUTTON_POSITIVE, false);
+        status.setVisibility(View.GONE);
+        Context app = c.getApplicationContext();
+        Handler main = new Handler(Looper.getMainLooper());
+        background.execute(() -> {
+            SiteShare.Result result = poster.apply(code);
+            if (result.outcome == SiteShare.Outcome.SHARED) {
+                SiteShare.remember(app, code);
+            }
+            com.kooo.evcam.blackbox.BlackBox.noteImportant("分享到 zeekr.autos：" + result.outcome);
+            main.post(() -> {
+                if (!dialog.isShowing()) {
+                    return;
+                }
+                boolean shared = result.outcome == SiteShare.Outcome.SHARED;
+                send.setText(shared ? R.string.auto_share_site_done : R.string.auto_share_site);
+                CamDialogs.enable(dialog, AlertDialog.BUTTON_POSITIVE, !shared);
+                status.setText(shared ? c.getString(R.string.auto_share_site_count, result.count)
+                        : c.getString(result.outcome == SiteShare.Outcome.TOO_OFTEN ? R.string.auto_share_site_too_often
+                        : result.outcome == SiteShare.Outcome.REFUSED ? R.string.auto_share_site_refused
+                        : R.string.auto_share_site_failed));
+                status.setVisibility(View.VISIBLE);
+            });
+        });
     }
 
     // ================================================================= 输入分享码
