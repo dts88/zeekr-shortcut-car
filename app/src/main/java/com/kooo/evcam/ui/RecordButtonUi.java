@@ -415,7 +415,9 @@ public final class RecordButtonUi {
         }
         boolean recording = state == State.RECORDING;
         Telemetry telemetry = Telemetry.get();
-        Integer reading = telemetry.carLinkConnected() ? telemetry.latest().sentry : null;
+        // 警戒、报警先照旧算读不到（Sentry#forDecisions，项目所有者 2026-11-28：确认了读数再改）
+        Integer reading = telemetry.carLinkConnected()
+                ? com.kooo.evcam.telemetry.Sentry.forDecisions(telemetry.latest().sentry) : null;
         setSentryKey(recording && CameraKeeper.get(context).onlySentryMissing(),
                 recording && reading != null && (reading == 1 || reading == 2));
     }

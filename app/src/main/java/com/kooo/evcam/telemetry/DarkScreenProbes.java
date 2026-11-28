@@ -192,10 +192,8 @@ final class DarkScreenProbes {
                 }
                 return raw(decoded);
             }
-            case SENTRY: {
-                int code = decoded instanceof Integer ? (Integer) decoded : -1;
-                return code == 0 ? "off" : code == 1 ? "on" : code == 2 ? "armed" : String.valueOf(decoded);
-            }
+            case SENTRY:
+                return decoded instanceof Integer ? Sentry.token((Integer) decoded) : String.valueOf(decoded);
             case DOOR:
                 return Boolean.TRUE.equals(decoded) ? "open" : "closed";
             case SEAT:

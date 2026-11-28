@@ -426,7 +426,8 @@ public enum Signal {
             case DAY_NIGHT:
                 return v == DAY || v == NIGHT ? v : null;
             case SENTRY:
-                return v >= 0 && v <= 2 ? v : null;
+                // 0 关、1 开启、2 已布防、3 警戒、4 报警（Sentry；警戒、报警 2026-11-28 起读出来，做判断的地方先照旧）
+                return v >= Sentry.OFF && v <= Sentry.ALARM ? v : null;
             case INDICATOR:
                 return v >= 0 && v <= 3 ? v : null;
             case LEVEL:

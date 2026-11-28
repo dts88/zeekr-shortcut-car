@@ -58,7 +58,7 @@ final class RemoteMove {
      * @param gear        挡位（P / R / N / D）；读不到是 null
      * @param seatTaken   主驾座椅读到有人；读不到是 null
      * @param ignitionLow 点火在 ACC 或更低；读不到是 null
-     * @param sentry      哨兵模式原值（0 关、1 开、2 布防）；读不到是 null
+     * @param sentry      哨兵模式原值（0 关、1 开、2 布防、3 警戒、4 报警；只记录）；读不到是 null
      */
     Change readings(boolean dark, boolean androidOff, String gear, Boolean seatTaken, Boolean ignitionLow,
                     Integer sentry, long now) {
@@ -168,19 +168,7 @@ final class RemoteMove {
     }
 
     static String sentryText(Integer code) {
-        if (code == null) {
-            return "?";
-        }
-        switch (code) {
-            case 0:
-                return "off";
-            case 1:
-                return "on";
-            case 2:
-                return "armed";
-            default:
-                return String.valueOf(code);
-        }
+        return com.kooo.evcam.telemetry.Sentry.token(code);
     }
 
     private void start(String gear, Boolean ignitionLow, Integer sentry, long now) {

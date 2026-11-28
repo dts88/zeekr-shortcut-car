@@ -332,6 +332,8 @@
     <string name="opt_screen_off_fps_follow">Ikut kualiti rakaman</string>
     <string name="sentry_status_on">Mod Sentry: hidup</string>
     <string name="sentry_status_armed">Mod Sentry: bersiaga</string>
+    <string name="sentry_status_alert">Mod Sentry: amaran</string>
+    <string name="sentry_status_alarm">Mod Sentry: penggera</string>
     <string name="sentry_status_off">Mod Sentry: mati</string>
     <string name="sentry_status_reading">Mod Sentry: membaca…</string>
     <string name="sentry_status_unknown">Mod Sentry: tidak tersedia</string>
@@ -498,6 +500,8 @@
     <string name="vi_v_day">Siang</string>
     <string name="vi_v_night">Malam</string>
     <string name="vi_v_armed">Bersiaga</string>
+    <string name="vi_v_alert">Amaran</string>
+    <string name="vi_v_alarm">Penggera</string>
     <string name="vi_v_ign_acc">ACC</string>
     <string name="vi_v_ign_on">ON</string>
     <string name="vi_v_ign_driving">Memandu</string>

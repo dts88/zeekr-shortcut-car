@@ -147,6 +147,8 @@ public class DarkScreenProbesTest {
         assertEquals("off", DarkScreenProbes.text(Signal.SENTRY_MODE, Signal.SENTRY_MODE.decode(0)));
         assertEquals("on", DarkScreenProbes.text(Signal.SENTRY_MODE, Signal.SENTRY_MODE.decode(1)));
         assertEquals("armed", DarkScreenProbes.text(Signal.SENTRY_MODE, Signal.SENTRY_MODE.decode(2)));
+        assertEquals("alert", DarkScreenProbes.text(Signal.SENTRY_MODE, Signal.SENTRY_MODE.decode(3)));
+        assertEquals("alarm", DarkScreenProbes.text(Signal.SENTRY_MODE, Signal.SENTRY_MODE.decode(4)));
         assertEquals("open", DarkScreenProbes.text(Signal.DOOR_DRIVER, Signal.DOOR_DRIVER.decode(1)));
         assertEquals("closed", DarkScreenProbes.text(Signal.DOOR_DRIVER, Signal.DOOR_DRIVER.decode(0)));
         assertEquals("occupied", DarkScreenProbes.text(Signal.SEAT_DRIVER, Signal.SEAT_DRIVER.decode(0x00203302)));

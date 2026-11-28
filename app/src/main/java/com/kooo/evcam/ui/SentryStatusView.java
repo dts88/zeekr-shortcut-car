@@ -20,7 +20,8 @@ import com.kooo.evcam.telemetry.Telemetry;
  *
  * <p>熄屏后环视能录多久看的就是哨兵模式：开着车机一直醒着、一直录；没开的话录到车机休眠（熄屏 v3，项目所有者 2026-10-12 D3）。
  * 所以凡是和熄屏录制有关的地方都可以放它 —— 现在在「设置 → 系统 → 熄屏持续录制」那一行的右边。读的是 {@link Telemetry#latest()} 里的
- * {@code sentry}（0 关、1 开、2 布防），和信息条、车辆状态面板、熄屏判断是同一份（录制键上的小字不看它）。</p>
+ * {@code sentry}（0 关、1 开、2 布防、3 警戒、4 报警），和信息条、车辆状态面板是同一份（录制键上的小字不看它）。
+ * 警戒、报警 2026-11-28 起照实写（{@code telemetry.Sentry}）。</p>
  */
 public class SentryStatusView extends TelemetryTextView {
 
@@ -41,6 +42,12 @@ public class SentryStatusView extends TelemetryTextView {
             // 还没读过一轮是「读取中」；读过了还没有就是这台车机读不到
             text = Telemetry.get().readings().version > 0
                     ? R.string.sentry_status_unknown : R.string.sentry_status_reading;
+        } else if (sentry == com.kooo.evcam.telemetry.Sentry.ALARM) {
+            text = R.string.sentry_status_alarm;
+            on = true;
+        } else if (sentry == com.kooo.evcam.telemetry.Sentry.ALERT) {
+            text = R.string.sentry_status_alert;
+            on = true;
         } else if (sentry == 2) {
             text = R.string.sentry_status_armed;
             on = true;

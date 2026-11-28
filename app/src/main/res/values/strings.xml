@@ -354,6 +354,8 @@
     <string name="opt_screen_off_fps_follow">跟随录制画质</string>
     <string name="sentry_status_on">哨兵模式：已开启</string>
     <string name="sentry_status_armed">哨兵模式：已布防</string>
+    <string name="sentry_status_alert">哨兵模式：警戒</string>
+    <string name="sentry_status_alarm">哨兵模式：报警</string>
     <string name="sentry_status_off">哨兵模式：未开启</string>
     <string name="sentry_status_reading">哨兵模式：读取中…</string>
     <string name="sentry_status_unknown">哨兵模式：无法读取</string>
@@ -521,6 +523,8 @@
     <string name="vi_v_day">白天</string>
     <string name="vi_v_night">夜晚</string>
     <string name="vi_v_armed">布防</string>
+    <string name="vi_v_alert">警戒</string>
+    <string name="vi_v_alarm">报警</string>
     <string name="vi_v_ign_acc">ACC</string>
     <string name="vi_v_ign_on">ON</string>
     <string name="vi_v_ign_driving">行驶</string>

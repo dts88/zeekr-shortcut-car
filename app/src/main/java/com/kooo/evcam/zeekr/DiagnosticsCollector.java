@@ -1131,12 +1131,13 @@ public final class DiagnosticsCollector {
         return name.equals(raw) || name.equals(String.valueOf(ignition)) ? name : name + "（" + raw + "）";
     }
 
-    /** 哨兵模式：0 关、1 开、2 布防（{@code Signal.Format.SENTRY}），带原值。 */
+    /** 哨兵模式：0 关、1 开、2 布防、3 警戒、4 报警（{@code telemetry.Sentry}），带原值。 */
     static String sentryText(Integer sentry) {
         if (sentry == null) {
             return "读不到";
         }
-        return (sentry == 0 ? "关" : sentry == 1 ? "开" : "布防") + "（" + sentry + "）";
+        return (sentry == 0 ? "关" : sentry == 1 ? "开" : sentry == 2 ? "布防" : sentry == 3 ? "警戒"
+                : sentry == 4 ? "报警" : "?") + "（" + sentry + "）";
     }
 
     /** 车辆接口此刻的结果。 */
