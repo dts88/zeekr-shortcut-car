@@ -1543,7 +1543,7 @@
     <string name="auto_share_too_many_places">不能分享：用到的地点超过 %1$d 个</string>
     <string name="auto_share_place_conditions">不能分享：在、不在某些地点的条件各最多一个</string>
     <string name="auto_share_unsupported">不能分享</string>
-    <!-- 分享到 zeekr.autos（项目所有者 2026-11-28）。草稿，待项目所有者批 -->
+    <!-- 分享到 zeekr.autos（项目所有者 2026-11-28）。项目所有者 2026-11-28 批 -->
     <string name="auto_share_site">分享到 zeekr.autos</string>
     <string name="auto_share_site_note">点「分享到 zeekr.autos」后，应用只发送这串分享码（%1$d 个字符），连同建立加密连接约 6 KB 流量。不发送名称、地点、车辆或你的任何信息；zeekr.autos 只保存分享码和被分享的次数。</string>
     <string name="auto_share_site_sending">正在分享…</string>

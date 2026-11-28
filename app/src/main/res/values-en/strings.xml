@@ -1534,7 +1534,7 @@
     <string name="auto_share_too_many_places">Can\'t be shared: uses more than %1$d places</string>
     <string name="auto_share_place_conditions">Can\'t be shared: at most one in-place and one not-in-place condition</string>
     <string name="auto_share_unsupported">Can\'t be shared</string>
-    <!-- Share to zeekr.autos (owner 2026-11-28). Draft, awaiting owner approval -->
+    <!-- Share to zeekr.autos (owner 2026-11-28). Approved by the owner 2026-11-28 -->
     <string name="auto_share_site">Share to zeekr.autos</string>
     <string name="auto_share_site_note">Share to zeekr.autos sends only this share code (%1$d characters), about 6 KB of data including the secure connection. No names, places, car or personal information is sent; zeekr.autos keeps only share codes and how many times each was shared.</string>
     <string name="auto_share_site_sending">Sharing…</string>

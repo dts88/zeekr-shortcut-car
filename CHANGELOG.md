@@ -11,6 +11,10 @@ commit message, not here.
 
 Nothing yet.
 
+## [4.21.0-alpha] - 2026-11-28
+
+- Automations: Share to zeekr.autos in the share dialog. It sends only the share code, about 6 KB including the secure connection; the site keeps only share codes and how many times each was shared. A code shared from this car shows as Shared.
+
 ## [4.20.0-alpha] - 2026-11-28
 
 - Sentry Mode: alert and alarm are read and shown in the info bar (a yellow or red shield with an exclamation mark), under Keep recording when the screen goes off, on the vehicle signals page, in the black box and in diagnostics. What the app does in Sentry Mode is unchanged for now.

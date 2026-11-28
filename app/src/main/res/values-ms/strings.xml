@@ -1509,7 +1509,7 @@
     <string name="auto_share_too_many_places">Tidak boleh dikongsi: menggunakan lebih daripada %1$d tempat</string>
     <string name="auto_share_place_conditions">Tidak boleh dikongsi: paling banyak satu syarat di tempat dan satu syarat bukan di tempat</string>
     <string name="auto_share_unsupported">Tidak boleh dikongsi</string>
-    <!-- Kongsi ke zeekr.autos (pemilik 2026-11-28). Draf, menunggu kelulusan pemilik -->
+    <!-- Kongsi ke zeekr.autos (pemilik 2026-11-28). Diluluskan oleh pemilik 2026-11-28 -->
     <string name="auto_share_site">Kongsi ke zeekr.autos</string>
     <string name="auto_share_site_note">Kongsi ke zeekr.autos hanya menghantar kod kongsi ini (%1$d aksara), kira-kira 6 KB data termasuk sambungan selamat. Tiada nama, tempat, maklumat kereta atau maklumat peribadi dihantar; zeekr.autos hanya menyimpan kod kongsi dan bilangan kali setiap kod dikongsi.</string>
     <string name="auto_share_site_sending">Berkongsi…</string>

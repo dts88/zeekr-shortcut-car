@@ -1568,7 +1568,7 @@
     <string name="auto_share_too_many_places">لا يمكن مشاركتها: تستخدم أكثر من %1$d أماكن</string>
     <string name="auto_share_place_conditions">لا يمكن مشاركتها: شرط واحد على الأكثر لكلٍّ من «في» و«ليس في» مكان</string>
     <string name="auto_share_unsupported">لا يمكن مشاركتها</string>
-    <!-- المشاركة على zeekr.autos (المالك 2026-11-28). مسودة بانتظار موافقة المالك -->
+    <!-- المشاركة على zeekr.autos (المالك 2026-11-28). مسودة بانتظار مراجعة متحدث أصلي -->
     <string name="auto_share_site">المشاركة على zeekr.autos</string>
     <string name="auto_share_site_note">عند الضغط على «المشاركة على zeekr.autos» يرسل التطبيق رمز المشاركة هذا فقط (%1$d حرفًا)، أي نحو 6 كيلوبايت من البيانات بما في ذلك إنشاء الاتصال الآمن. لا تُرسل أي أسماء أو أماكن أو معلومات عن السيارة أو معلومات شخصية، ويحتفظ zeekr.autos برموز المشاركة وعدد مرات مشاركتها فقط.</string>
     <string name="auto_share_site_sending">جارٍ المشاركة…</string>
