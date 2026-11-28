@@ -766,6 +766,8 @@
   auto_import_places_missing「这一条用到 %1$d 个地点，先在下面的「地点」里添加」；auto_import_pick「选择地点」。
 - 2026-11-28 批准（项目所有者：「批准，继续」；阿拉伯文照写，等审校）限速（开发者选项，开发阶段；ui-spec §八、§十六「开发者选项」）：
   dev_group_speed_limit「限速」；dev_speed_limit_button_title「悬浮按钮显示限速」；dev_speed_limit_button_summary「按已下载的限速数据，在悬浮按钮中间显示所在道路的限速」；dev_speed_limit_data_title「限速数据」；dev_speed_limit_data_none「未下载」；dev_speed_limit_data_some「已下载：%1$s」；sl_network_title「网络」；sl_network_checking「正在检查…」；sl_network_wifi「Wi-Fi」；sl_network_mobile「移动网络，不下载」；sl_network_unconfirmed「未确认是不是 Wi-Fi」；sl_network_unknown「无法判断，不下载」；sl_network_confirm「当前网络是 Wi-Fi 吗？每个网络只需确认一次，以后连接这个网络时不再询问。」；sl_network_teach_wifi「当前网络算作 Wi-Fi。如果连接的是车辆的移动网络，请选「不是 Wi-Fi」，此后在这个网络下不下载。」；sl_network_teach_mobile「当前网络算作移动网络。如果已连接 Wi-Fi，请选「是 Wi-Fi」。」；sl_network_is_wifi「是 Wi-Fi」；sl_network_not_wifi「不是 Wi-Fi」；sl_group_countries「国家和地区」；sl_catalog_loading「正在获取列表…」；sl_catalog_failed「无法获取列表，请重试」；sl_catalog_offline「连接 Wi-Fi 后才能获取列表」；sl_catalog_unconfirmed「确认网络后才能获取列表」；sl_installed「已下载 · %1$s」；sl_update「有更新 · %1$s · %2$s」；sl_downloading「正在下载 %1$d%%」；sl_verifying「正在校验…」；sl_failed_download「无法下载，请重试」；sl_failed_verify「校验未通过，未启用」；sl_failed_not_wifi「未连接 Wi-Fi，未下载」；sl_action_update「更新」；sl_note「限速数据来自 OpenStreetMap（© OpenStreetMap 贡献者），按 ODbL 授权提供。点按后才下载，仅在 Wi-Fi 下下载，校验通过后启用。」。
+- 2026-11-28 批准（项目所有者：「没问题，很好，出alpha版本」；阿拉伯文照写，等审校）哨兵模式的警戒、报警（PR 294，第一步只读取、记录）：
+  sentry_status_alert「哨兵模式：警戒」、sentry_status_alarm「哨兵模式：报警」；vi_v_alert「警戒」、vi_v_alarm「报警」。
 - vi_* 信号名来自实车实测的结论：措辞可以润色，含义必须一字不差。
 - 车主定过的文字即使与本规范有出入（如多句不以「。」结尾、个别口语），也不主动改。
 

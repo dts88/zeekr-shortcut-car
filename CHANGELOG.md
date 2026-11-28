@@ -11,6 +11,10 @@ commit message, not here.
 
 Nothing yet.
 
+## [4.20.0-alpha] - 2026-11-28
+
+- Sentry Mode: alert and alarm are read and shown in the info bar (a yellow or red shield with an exclamation mark), under Keep recording when the screen goes off, on the vehicle signals page, in the black box and in diagnostics. What the app does in Sentry Mode is unchanged for now.
+
 ## [4.19.0-alpha] - 2026-11-28
 
 - Developer options: Speed limits (development stage). Speed limit data lists per-country packages from zeekr.autos (OpenStreetMap data, ODbL). A package downloads only when you tap it and only on Wi-Fi, and is used only after it passes verification. Show speed limit on floating button writes the limit of the current road in the middle of the floating button.
